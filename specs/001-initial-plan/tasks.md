@@ -16,13 +16,9 @@
  - [X] T005 [P] Add CI workflow to run `cargo fmt`, `cargo clippy`, and `cargo test` in `/home/thawkins/Projects/gcodekit6/.github/workflows/ci.yml`
 
  ## Phase 2 — Foundational (blocking prerequisites)
-
- - [ ] T006 [P] Define `Device` and `Job` structs per `/home/thawkins/Projects/gcodekit6/specs/001-initial-plan/data-model.md` in `/home/thawkins/Projects/gcodekit6/crates/core/src/models.rs`
- - [ ] T007 Implement config and settings loader (serde + dirs-next) in `/home/thawkins/Projects/gcodekit6/crates/core/src/config.rs`
- - [ ] T008 [P] Implement basic error types using `thiserror` in `/home/thawkins/Projects/gcodekit6/crates/core/src/error.rs`
-- [X] T006 [P] Define `Device` and `Job` structs per `/home/thawkins/Projects/gcodekit6/specs/001-initial-plan/data-model.md` in `/home/thawkins/Projects/gcodekit6/crates/core/src/models.rs`
-- [X] T007 Implement config and settings loader (serde + dirs-next) in `/home/thawkins/Projects/gcodekit6/crates/core/src/config.rs`
-- [X] T008 [P] Implement basic error types using `thiserror` in `/home/thawkins/Projects/gcodekit6/crates/core/src/error.rs`
+ - [X] T006 [P] Define `Device` and `Job` structs per `/home/thawkins/Projects/gcodekit6/specs/001-initial-plan/data-model.md` in `/home/thawkins/Projects/gcodekit6/crates/core/src/models.rs`
+ - [X] T007 Implement config and settings loader (serde + dirs-next) in `/home/thawkins/Projects/gcodekit6/crates/core/src/config.rs`
+ - [X] T008 [P] Implement basic error types using `thiserror` in `/home/thawkins/Projects/gcodekit6/crates/core/src/error.rs`
  - [ ] T009 [P] Create a `device-adapters` module interface in `/home/thawkins/Projects/gcodekit6/crates/device-adapters/src/lib.rs` documenting required adapter functions (`connect`, `send_line`, `emergency_stop`)
  - [ ] T010 [P] Add unit-test scaffolding under `/home/thawkins/Projects/gcodekit6/tests/unit/` and contract tests under `/home/thawkins/Projects/gcodekit6/tests/contract/`
 
@@ -77,6 +73,8 @@
  - [X] T026 [P] Implement job history persistence in `/home/thawkins/Projects/gcodekit6/crates/core/src/persistence.rs`
  - [ ] T027 [P] Add UI tests / smoke checks in `/home/thawkins/Projects/gcodekit6/crates/ui/tests/` (if Slint enabled in CI)
  - [ ] T028 [P] Review and add more firmware-specific adapters (GRBL, Smoothieware, TinyG, G2core) under `/home/thawkins/Projects/gcodekit6/crates/device-adapters/src/` as separate modules
+ - [ ] T029 [P] Add performance harness for transport round-trip latency and throughput in `/home/thawkins/Projects/gcodekit6/tests/perf/transport_latency.rs` — measure p50/p95/p99 under simulated and local device conditions and record results in CI artifacts (maps to SC-001, SC-003)
+ - [ ] T030 [P] Add emergency-stop timing integration test in `/home/thawkins/Projects/gcodekit6/tests/integration/emergency_stop_timing.rs` — measure elapsed time from UI-trigger/API call to confirmed device stop under simulated device; target <200ms (maps to FR-004, SC-003)
 
  ## Dependencies (User story completion order)
 
