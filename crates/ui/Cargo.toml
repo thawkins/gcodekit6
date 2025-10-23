@@ -7,4 +7,5 @@ edition = "2021"
 slint = { version = "0.3", optional = true }
 
 [features]
-default = ["slint"]
+default = []
+with-slint = ["slint"]
