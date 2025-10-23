@@ -9,7 +9,7 @@ fn test_connect_timeout_unroutable() {
     let start = Instant::now();
     let res = NetworkConnection::connect_tcp(addr);
     let elapsed = start.elapsed();
-    // We expect an error; elapsed should be no greater than configured timeout + small margin
+    // We expect an error; elapsed should be approximately 30s (allow 5s margin)
     assert!(res.is_err(), "expected connect to fail or timeout");
-    assert!(elapsed.as_secs() <= 35, "connect took too long: {:?}", elapsed);
+    assert!(elapsed.as_secs() >= 25 && elapsed.as_secs() <= 35, "connect timeout not approx 30s: {:?}", elapsed);
 }

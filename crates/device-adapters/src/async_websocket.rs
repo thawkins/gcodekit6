@@ -23,7 +23,8 @@ impl AsyncWebSocketTransport {
             .into_client_request()
             .map_err(io::Error::other)?;
 
-        let connect_timeout = gcodekit_utils::settings::network_timeout();
+    // Hard-coded 30s connect timeout to avoid indefinite hangs
+    let connect_timeout = Duration::from_secs(30);
 
         // Wrap the connect in a timeout to prevent indefinite hangs in DNS/connect.
         let (ws_stream, _resp) = timeout(connect_timeout, connect_async(req))
@@ -31,7 +32,7 @@ impl AsyncWebSocketTransport {
             .map_err(|_| io::Error::new(io::ErrorKind::TimedOut, "ws connect timeout"))?
             .map_err(io::Error::other)?;
 
-        let read_timeout = gcodekit_utils::settings::network_timeout();
+    let read_timeout = Duration::from_secs(30);
         Ok(AsyncWebSocketTransport { ws: ws_stream, read_timeout })
     }
 

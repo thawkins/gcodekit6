@@ -55,7 +55,8 @@ impl WebSocketTransport {
 
         // Resolve addresses from the URL
     let addrs = url.socket_addrs(|| None).map_err(io::Error::other)?;
-        let timeout = gcodekit_utils::settings::network_timeout();
+    // Hard-coded 30s timeout to ensure connect doesn't hang indefinitely
+    let timeout = std::time::Duration::from_secs(30);
 
         // Try to connect to the first resolved address with a connect timeout
         let addr = addrs

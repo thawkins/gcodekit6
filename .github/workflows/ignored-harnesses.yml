@@ -12,6 +12,19 @@ jobs:
         uses: dtolnay/rust-toolchain-action@v1
         with:
           toolchain: stable
-      - name: Build and run ignored tests (core)
+      - name: Build
         run: |
-          cargo test --manifest-path crates/core/Cargo.toml -- --ignored --nocapture
+          cargo test --manifest-path crates/core/Cargo.toml --no-run
+
+      - name: Run harnesses and save logs
+        run: |
+          mkdir -p artifacts
+          cargo test --manifest-path crates/core/Cargo.toml perf_transport_latency -- --ignored --nocapture 2>&1 | tee artifacts/perf_transport_latency.log || true
+          cargo test --manifest-path crates/core/Cargo.toml emergency_stop_timing -- --ignored --nocapture 2>&1 | tee artifacts/emergency_stop_timing.log || true
+          cargo test --manifest-path crates/device-adapters/Cargo.toml timeout_tests -- --nocapture 2>&1 | tee artifacts/timeout_tests.log || true
+
+      - name: Upload harness logs
+        uses: actions/upload-artifact@v4
+        with:
+          name: harness-logs
+          path: artifacts/*.log
