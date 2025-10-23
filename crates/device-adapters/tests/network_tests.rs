@@ -2,6 +2,7 @@ use gcodekit_device_adapters::network::NetworkConnection;
 use std::io::Read;
 use std::net::{TcpListener, UdpSocket};
 use std::thread;
+use std::time::Duration;
 
 #[test]
 fn test_tcp_connect_and_send() {
@@ -21,6 +22,30 @@ fn test_tcp_connect_and_send() {
     // Connect client
     let mut conn = NetworkConnection::connect_tcp(addr).expect("connect");
     conn.send_line("G0 X0 Y0").expect("send");
+}
+
+#[test]
+fn test_tcp_flush_disconnect_is_alive() {
+    let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
+    let addr = listener.local_addr().unwrap();
+
+    // Spawn accept thread that reads a single byte then sleeps
+    std::thread::spawn(move || {
+        if let Ok((mut s, _)) = listener.accept() {
+            let mut buf = [0u8; 1];
+            let _ = s.read(&mut buf);
+            std::thread::sleep(Duration::from_millis(50));
+        }
+    });
+
+    let mut conn = NetworkConnection::connect_tcp(addr).expect("connect");
+    assert!(conn.is_alive().unwrap());
+    conn.send_line("G0 X1").expect("send");
+    conn.flush().expect("flush");
+    conn.disconnect().expect("disconnect");
+    // After disconnect, is_alive may be false or return an error; accept either.
+    let alive = conn.is_alive();
+    assert!(alive.is_ok());
 }
 
 #[test]

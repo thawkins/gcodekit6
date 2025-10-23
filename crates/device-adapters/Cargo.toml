@@ -5,5 +5,9 @@ edition = "2021"
 
 [dependencies]
 serialport = "4.0"
-tokio = { version = "1", features = ["rt-multi-thread", "macros"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "io-util", "time"] }
+async-trait = "0.1"
 gcodekit_utils = { path = "../utils" }
+
+[features]
+async = []

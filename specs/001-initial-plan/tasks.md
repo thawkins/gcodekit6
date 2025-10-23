@@ -9,17 +9,22 @@
 
  ## Phase 1 — Setup
 
- - [ ] T001 Create workspace resolver entry in `/home/thawkins/Projects/gcodekit6/Cargo.toml` (setup)
+ - [X] T001 Create workspace resolver entry in `/home/thawkins/Projects/gcodekit6/Cargo.toml` (setup)
  - [ ] T002 [P] Create `.gitignore` entries for `/home/thawkins/Projects/gcodekit6/target/` and `/home/thawkins/Projects/gcodekit6/target/temp/` in `/home/thawkins/Projects/gcodekit6/.gitignore`
- - [ ] T003 Initialize persistent data directory helpers in `/home/thawkins/Projects/gcodekit6/crates/utils/src/storage.rs`
+- [X] T003 Initialize persistent data directory helpers in `/home/thawkins/Projects/gcodekit6/crates/utils/src/storage.rs`
  - [ ] T004 Add basic logging initialization using `tracing` in `/home/thawkins/Projects/gcodekit6/crates/utils/src/logging.rs`
+ - [X] T004 Add basic logging initialization using `tracing` in `/home/thawkins/Projects/gcodekit6/crates/utils/src/logging.rs`
  - [ ] T005 [P] Add CI workflow to run `cargo fmt`, `cargo clippy`, and `cargo test` in `/home/thawkins/Projects/gcodekit6/.github/workflows/ci.yml`
+ - [X] T005 [P] Add CI workflow to run `cargo fmt`, `cargo clippy`, and `cargo test` in `/home/thawkins/Projects/gcodekit6/.github/workflows/ci.yml`
 
  ## Phase 2 — Foundational (blocking prerequisites)
 
  - [ ] T006 [P] Define `Device` and `Job` structs per `/home/thawkins/Projects/gcodekit6/specs/001-initial-plan/data-model.md` in `/home/thawkins/Projects/gcodekit6/crates/core/src/models.rs`
  - [ ] T007 Implement config and settings loader (serde + dirs-next) in `/home/thawkins/Projects/gcodekit6/crates/core/src/config.rs`
  - [ ] T008 [P] Implement basic error types using `thiserror` in `/home/thawkins/Projects/gcodekit6/crates/core/src/error.rs`
+- [X] T006 [P] Define `Device` and `Job` structs per `/home/thawkins/Projects/gcodekit6/specs/001-initial-plan/data-model.md` in `/home/thawkins/Projects/gcodekit6/crates/core/src/models.rs`
+- [X] T007 Implement config and settings loader (serde + dirs-next) in `/home/thawkins/Projects/gcodekit6/crates/core/src/config.rs`
+- [X] T008 [P] Implement basic error types using `thiserror` in `/home/thawkins/Projects/gcodekit6/crates/core/src/error.rs`
  - [ ] T009 [P] Create a `device-adapters` module interface in `/home/thawkins/Projects/gcodekit6/crates/device-adapters/src/lib.rs` documenting required adapter functions (`connect`, `send_line`, `emergency_stop`)
  - [ ] T010 [P] Add unit-test scaffolding under `/home/thawkins/Projects/gcodekit6/tests/unit/` and contract tests under `/home/thawkins/Projects/gcodekit6/tests/contract/`
 
@@ -34,6 +39,9 @@
  - [ ] T011 [US1] Implement serial discovery function in `/home/thawkins/Projects/gcodekit6/crates/device-adapters/src/serial.rs`
  - [ ] T012 [US1] Implement network discovery/connect in `/home/thawkins/Projects/gcodekit6/crates/device-adapters/src/network.rs`
  - [ ] T013 [US1] Implement `connect` API in `/home/thawkins/Projects/gcodekit6/crates/core/src/device_manager.rs` that uses adapters
+ - [X] T011 [US1] Implement serial discovery function in `/home/thawkins/Projects/gcodekit6/crates/device-adapters/src/serial.rs`
+ - [X] T012 [US1] Implement network discovery/connect in `/home/thawkins/Projects/gcodekit6/crates/device-adapters/src/network.rs`
+ - [X] T013 [US1] Implement `connect` API in `/home/thawkins/Projects/gcodekit6/crates/core/src/device_manager.rs` that uses adapters
  - [ ] T014 [US1] Add simulated device test server in `/home/thawkins/Projects/gcodekit6/tests/integration/simulated_serial.rs`
  - [ ] T015 [US1] Add automated test: connect to simulated device and assert status `connected` in `/home/thawkins/Projects/gcodekit6/tests/integration/connect_device.rs`
 

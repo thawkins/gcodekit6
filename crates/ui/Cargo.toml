@@ -4,8 +4,14 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-slint = { version = "0.3", optional = true }
+slint = { version = "1.14.0", optional = true }
 
 [features]
 default = []
 with-slint = ["slint"]
+
+# Feature that indicates the slint generated code is available. This is
+# intentionally NOT enabled by default so `--all-features` won't fail when
+# the generated code or compile-time env var is not present.
+slint_generated = []
+

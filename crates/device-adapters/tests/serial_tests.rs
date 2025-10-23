@@ -6,6 +6,5 @@ fn test_list_serial_ports_runs() {
     let res = list_serial_ports();
     assert!(res.is_ok());
     // We can't assert presence of ports in CI; just ensure it's a Vec.
-    let ports = res.unwrap();
-    assert!(ports.len() >= 0);
+    let _ports = res.unwrap();
 }

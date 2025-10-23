@@ -1,4 +1,4 @@
-use gcodekit_device_adapters::{network::NetworkConnection, Transport};
+use gcodekit_device_adapters::network::NetworkConnection;
 use std::net::TcpListener;
 
 #[test]

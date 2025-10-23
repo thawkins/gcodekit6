@@ -1,5 +1,7 @@
 use std::io::{self, Write};
 use std::net::{TcpStream, ToSocketAddrs, UdpSocket};
+use std::io::BufRead;
+use std::io::BufReader;
 use std::time::Duration;
 use gcodekit_utils::settings::network_timeout;
 
@@ -73,6 +75,43 @@ impl NetworkConnection {
         }
     }
 
+    /// Flush any buffered output. For TCP this forwards to the underlying
+    /// stream's flush implementation. For UDP this is a no-op.
+    pub fn flush(&mut self) -> io::Result<()> {
+        use std::io::Write;
+        match self {
+            NetworkConnection::Tcp(s) => s.flush(),
+            NetworkConnection::Udp(_, _) => Ok(()),
+        }
+    }
+
+    /// Attempt to gracefully disconnect the transport. For TCP we shutdown the
+    /// socket; for UDP this is a no-op (socket will be closed when dropped).
+    pub fn disconnect(&mut self) -> io::Result<()> {
+        use std::net::Shutdown;
+        match self {
+            NetworkConnection::Tcp(s) => s.shutdown(Shutdown::Both),
+            NetworkConnection::Udp(_, _) => Ok(()),
+        }
+    }
+
+    /// Lightweight liveness check. For TCP this inspects any pending socket
+    /// error; for UDP we assume the socket is alive if it exists.
+    pub fn is_alive(&self) -> io::Result<bool> {
+        match self {
+            NetworkConnection::Tcp(s) => {
+                // take_error returns any pending socket error; None means no
+                // error observed.
+                match s.take_error() {
+                    Ok(None) => Ok(true),
+                    Ok(Some(_)) => Ok(false),
+                    Err(e) => Err(e),
+                }
+            }
+            NetworkConnection::Udp(_, _) => Ok(true),
+        }
+    }
+
     /// Attempt to connect to a TCP peer at `addr` with a short timeout to
     /// determine reachability. Returns the peer string on success.
     pub fn discover_tcp_peer(addr: &str, timeout: Duration) -> io::Result<String> {
@@ -85,6 +124,33 @@ impl NetworkConnection {
             }
         } else {
             Err(io::Error::new(io::ErrorKind::InvalidInput, "no addrs"))
+        }
+    }
+
+    /// Read a line (up to and including a newline) from the transport and
+    /// return it without the trailing newline.
+    pub fn read_line(&mut self) -> io::Result<String> {
+        match self {
+            NetworkConnection::Tcp(s) => {
+                // Create a temporary BufReader borrowing the stream. To avoid
+                // taking ownership we duplicate the stream handle using try_clone.
+                let mut reader = BufReader::new(s.try_clone()?);
+                let mut line = String::new();
+                reader.read_line(&mut line)?;
+                if line.ends_with('\n') {
+                    line.truncate(line.len() - 1);
+                }
+                Ok(line)
+            }
+            NetworkConnection::Udp(s, _) => {
+                let mut buf = [0u8; 1500];
+                let n = s.recv(&mut buf)?;
+                let mut s = String::from_utf8_lossy(&buf[..n]).to_string();
+                if s.ends_with('\n') {
+                    s.truncate(s.len() - 1);
+                }
+                Ok(s)
+            }
         }
     }
 }
