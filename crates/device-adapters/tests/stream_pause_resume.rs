@@ -1,7 +1,10 @@
 use gcodekit_device_adapters::network::NetworkConnection;
 use std::net::UdpSocket;
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc,
+};
 use std::thread;
-use std::sync::{Arc, atomic::{AtomicBool, Ordering}};
 
 #[test]
 fn integration_stream_pause_resume_udp() {
@@ -15,7 +18,9 @@ fn integration_stream_pause_resume_udp() {
         let mut buf = [0u8; 512];
         while r.load(Ordering::SeqCst) {
             if let Ok((n, _)) = server.recv_from(&mut buf) {
-                if n == 0 { break; }
+                if n == 0 {
+                    break;
+                }
             }
         }
     });

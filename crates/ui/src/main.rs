@@ -1,13 +1,11 @@
-#[cfg(feature = "with-slint")]
-fn main() {
-    // Slint UI entrypoint
-    slint::include_modules!();
-    let ui = ui::MainWindow::new();
-    ui.run();
-}
+// Prefer the real Slint-generated UI when both features are enabled. Otherwise
+// fall back to a minimal generated shim that allows the crate to compile and
+// run under CI `--all-features` builds.
+// Include the build-time generated file which either includes real Slint
+// modules or re-exports the local generated stub.
+include!("ui_impl.rs");
 
-#[cfg(not(feature = "with-slint"))]
 fn main() {
-    // Fallback placeholder when Slint feature is not enabled
-    println!("gcodekit-ui: placeholder (run with feature 'with-slint' to enable Slint UI)");
+    let ui = MainWindow::new();
+    ui.run();
 }

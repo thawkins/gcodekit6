@@ -14,7 +14,9 @@ pub fn network_timeout() -> Duration {
     // 1. env var
     if let Ok(s) = std::env::var("GCK_NETWORK_TIMEOUT_SECS") {
         if let Ok(v) = s.parse::<u64>() {
-            if v > 0 { return Duration::from_secs(v); }
+            if v > 0 {
+                return Duration::from_secs(v);
+            }
         }
     }
 
@@ -25,7 +27,9 @@ pub fn network_timeout() -> Duration {
             if let Ok(contents) = std::fs::read_to_string(&cfg_path) {
                 if let Ok(cf) = serde_json::from_str::<ConfigFile>(&contents) {
                     if let Some(secs) = cf.network_timeout_secs {
-                        if secs > 0 { return Duration::from_secs(secs); }
+                        if secs > 0 {
+                            return Duration::from_secs(secs);
+                        }
                     }
                 }
             }

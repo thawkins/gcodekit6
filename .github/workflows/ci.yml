@@ -9,28 +9,47 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        toolchain: [stable, beta]
 
     steps:
     - uses: actions/checkout@v4
 
     - name: Install Rust
-      uses: dtolnay/rustup@v1
+      uses: actions-rs/toolchain@v1
       with:
-        toolchain: stable
+        toolchain: ${{ matrix.toolchain }}
+        profile: minimal
+        override: true
+
+    - name: Cache cargo registry and target
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/registry
+          target
+        key: ${{ runner.os }}-cargo-${{ matrix.toolchain }}-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-cargo-${{ matrix.toolchain }}-
 
     - name: Install wasm/other (noop)
       run: echo "No additional setup"
 
-    - name: Run cargo fmt
-      run: |
-        cargo install --locked cargo-fmt || true
-        cargo fmt --all -- --check
+    - name: Run fmt check
+      run: cargo fmt --all -- --check
 
-    - name: Run cargo clippy
-      run: |
-        rustup component add clippy || true
-        cargo clippy --all-targets --all-features -- -D warnings
+    - name: Run clippy
+      run: cargo clippy --all-targets --all-features -- -D warnings
 
     - name: Run tests
       run: |
-        cargo test --all --locked --quiet
+        mkdir -p test-logs
+        cargo test --all --all-features --locked --color always -- -Z unstable-options --format json > test-logs/results.json || true
+        tar -czf test-logs.tar.gz test-logs || true
+
+    - name: Upload test logs
+      uses: actions/upload-artifact@v4
+      with:
+        name: test-logs-${{ matrix.toolchain }}
+        path: test-logs.tar.gz

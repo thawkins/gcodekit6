@@ -15,7 +15,8 @@ fn test_config_file_overrides_default() {
 
     // Write config with network_timeout_secs = 7
     let mut f = fs::File::create(&cfg_path).expect("create cfg");
-    f.write_all(b"{ \"network_timeout_secs\": 7 }").expect("write");
+    f.write_all(b"{ \"network_timeout_secs\": 7 }")
+        .expect("write");
     drop(f);
 
     // Ensure env var is not set
@@ -36,6 +37,7 @@ fn test_device_manager_returns_transport() {
         }
     });
 
-    let mut transport = gcodekit_core::device_manager::DeviceManager::connect_network(addr).expect("connect");
+    let mut transport =
+        gcodekit_core::device_manager::DeviceManager::connect_network(addr).expect("connect");
     let _ = transport.send_line("M115");
 }
