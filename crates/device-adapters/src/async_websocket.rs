@@ -26,7 +26,10 @@ impl AsyncWebSocketTransport {
     // Hard-coded 30s connect timeout to avoid indefinite hangs
     let connect_timeout = Duration::from_secs(30);
 
-        // Wrap the connect in a timeout to prevent indefinite hangs in DNS/connect.
+    // Wrap the connect in a timeout to prevent indefinite hangs in DNS/connect.
+    // Note: async connect uses tokio::time::timeout which yields a
+    // `Elapsed` error if the connect doesn't complete within the specified
+    // duration. We use a 30s default here to match the synchronous adapter.
         let (ws_stream, _resp) = timeout(connect_timeout, connect_async(req))
             .await
             .map_err(|_| io::Error::new(io::ErrorKind::TimedOut, "ws connect timeout"))?
@@ -39,7 +42,7 @@ impl AsyncWebSocketTransport {
     pub async fn send_line(&mut self, line: &str) -> io::Result<()> {
     let text = line.trim_end_matches(&['\n', '\r'][..]).to_string();
         // Keep semantics consistent: send as a text frame without trailing newline
-        timeout(self.read_timeout, self.ws.send(Message::Text(text)))
+        timeout(self.read_timeout, self.ws.send(Message::Text(text.into())))
             .await
             .map_err(|_| io::Error::new(io::ErrorKind::TimedOut, "ws send timeout"))?
             .map_err(io::Error::other)?;
@@ -79,7 +82,7 @@ impl AsyncWebSocketTransport {
             .ok_or_else(|| io::Error::new(io::ErrorKind::UnexpectedEof, "ws closed"))?;
 
         match msg {
-            Ok(Message::Text(t)) => Ok(t),
+            Ok(Message::Text(t)) => Ok(t.to_string()),
             Ok(Message::Binary(b)) => Ok(String::from_utf8_lossy(&b).into_owned()),
             Ok(_) => Err(io::Error::other("unsupported ws frame")),
             Err(e) => Err(io::Error::other(e)),

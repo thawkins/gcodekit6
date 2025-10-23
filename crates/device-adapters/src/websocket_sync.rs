@@ -69,19 +69,37 @@ impl WebSocketTransport {
         stream.set_read_timeout(Some(timeout)).ok();
         stream.set_write_timeout(Some(timeout)).ok();
 
-    let (ws, _resp) = client(url, stream).map_err(io::Error::other)?;
-        Ok(WebSocketTransport { ws, timeout })
+    // Perform the tungstenite client handshake in a separate thread and enforce
+    // an overall timeout so this function cannot block indefinitely. The
+    // underlying TcpStream has read/write timeouts set, but some platforms
+    // or handshake scenarios can still block at the tungstenite handshake
+    // call (e.g., DNS, TLS handshake stalls). Running handshake in a thread
+    // and using `recv_timeout` provides a reliable wall-clock guard.
+    let (tx, rx) = std::sync::mpsc::channel();
+    let url_string = url.to_string();
+    std::thread::spawn(move || {
+        let res = client(url_string.as_str(), stream);
+        // Ignore send errors (receiver may have timed out)
+        let _ = tx.send(res);
+    });
+
+    let (ws, _resp) = rx
+        .recv_timeout(timeout)
+        .map_err(|_| io::Error::new(io::ErrorKind::TimedOut, "ws handshake timeout"))?
+        .map_err(io::Error::other)?;
+
+    Ok(WebSocketTransport { ws, timeout })
     }
 
     pub fn send_line(&mut self, line: &str) -> io::Result<()> {
         self.ws
-            .send(Message::Text(line.trim_end_matches(&['\n', '\r'][..]).to_string()))
+            .send(Message::Text(line.trim_end_matches(&['\n', '\r'][..]).to_string().into()))
             .map_err(io::Error::other)
     }
 
     pub fn emergency_stop(&mut self) -> io::Result<()> {
         self.ws
-            .send(Message::Text("!".to_string()))
+            .send(Message::Text("!".to_string().into()))
             .map_err(io::Error::other)
     }
 
@@ -103,7 +121,7 @@ impl WebSocketTransport {
     pub fn read_line(&mut self) -> io::Result<String> {
     let msg = self.ws.read().map_err(io::Error::other)?;
         match msg {
-            Message::Text(t) => Ok(t),
+            Message::Text(t) => Ok(t.to_string()),
             Message::Binary(b) => Ok(String::from_utf8_lossy(&b).into_owned()),
             _ => Err(io::Error::other("unsupported ws frame")),
         }
