@@ -31,7 +31,6 @@ fn start_echo_server(addr: &str) -> thread::JoinHandle<()> {
 }
 
 #[test]
-#[ignore]
 fn perf_transport_latency() {
     // This test is a manual performance harness. It is ignored by default.
     let addr = "127.0.0.1:40023";

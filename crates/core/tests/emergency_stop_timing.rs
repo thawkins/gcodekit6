@@ -40,7 +40,6 @@ fn start_simulated_device(addr: &str, stop_flag: Arc<AtomicBool>) -> thread::Joi
 }
 
 #[test]
-#[ignore]
 fn emergency_stop_timing() {
     // Manual test: measures time from issuing emergency stop to device cease.
     let addr = "127.0.0.1:40024";
