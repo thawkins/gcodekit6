@@ -1,15 +1,22 @@
 use std::io::{Read, Write};
 use std::net::{TcpListener, SocketAddr};
+use std::sync::mpsc::{self, Receiver};
 use std::thread;
 use std::time::Instant;
 use gcodekit_device_adapters::create_tcp_transport;
 
-/// Simple in-process TCP echo server used by the performance harness.
-fn start_echo_server(listener: TcpListener) -> thread::JoinHandle<()> {
+/// Simple in-process TCP echo server used by the performance harness. The
+/// listener is non-blocking and the loop checks for a shutdown signal so the
+/// test can cleanly stop the server.
+fn start_echo_server(listener: TcpListener, shutdown_rx: Receiver<()>) -> thread::JoinHandle<()> {
     thread::spawn(move || {
-        for stream in listener.incoming() {
-            match stream {
-                Ok(mut s) => {
+        listener.set_nonblocking(true).ok();
+        loop {
+            if shutdown_rx.try_recv().is_ok() {
+                break;
+            }
+            match listener.accept() {
+                Ok((mut s, _)) => {
                     thread::spawn(move || {
                         let mut buf = [0u8; 1024];
                         loop {
@@ -22,6 +29,10 @@ fn start_echo_server(listener: TcpListener) -> thread::JoinHandle<()> {
                         }
                     });
                 }
+                Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                    thread::sleep(std::time::Duration::from_millis(5));
+                    continue;
+                }
                 Err(_) => break,
             }
         }
@@ -31,10 +42,17 @@ fn start_echo_server(listener: TcpListener) -> thread::JoinHandle<()> {
 #[test]
 fn perf_transport_latency() {
     // This test is a manual performance harness. It is ignored by default.
-    // Bind listener in the test thread to ensure it's ready before connecting
-    let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
+    // Allow overriding the port for reproducible runs; default to ephemeral (0)
+    let port = std::env::var("GCK_PERF_PORT").ok()
+        .and_then(|s| s.parse::<u16>().ok())
+        .unwrap_or(0u16);
+    let bind_addr = format!("127.0.0.1:{}", port);
+    let listener = TcpListener::bind(&bind_addr).expect("bind");
     let addr = listener.local_addr().unwrap();
-    let _server = start_echo_server(listener);
+
+    // Shutdown channel to stop the echo server cleanly
+    let (tx_shutdown, rx_shutdown) = mpsc::channel();
+    let server_handle = start_echo_server(listener, rx_shutdown);
 
     // Connect via the project's TCP transport factory so we measure the same code paths
     let sock: SocketAddr = addr;
@@ -65,8 +83,8 @@ fn perf_transport_latency() {
 
     println!("Perf transport latency (us): n={}, p50={}, p95={}, p99={}", n, p50, p95, p99);
 
-    // Tear down transport. The server runs in background and will be terminated
-    // when the test process exits; avoid joining the server thread to prevent
-    // blocking on listener.accept.
+    // Tear down transport and stop server
     let _ = transport.disconnect();
+    let _ = tx_shutdown.send(());
+    let _ = server_handle.join();
 }

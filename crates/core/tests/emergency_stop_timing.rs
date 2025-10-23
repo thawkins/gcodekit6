@@ -1,17 +1,24 @@
 use std::net::TcpListener;
 use std::io::{Read, Write};
 use std::sync::{Arc, Mutex, atomic::{AtomicBool, Ordering}};
+use std::sync::mpsc::{self, Receiver};
 use std::thread;
 use std::time::{Duration, Instant};
 
-/// Simulated streaming device: accepts connections and echoes lines until stopped.
-fn start_simulated_device(addr: &str, stop_flag: Arc<AtomicBool>) -> thread::JoinHandle<()> {
-    let addr = addr.to_string();
+/// Simulated streaming device: accepts connections on an already-bound listener
+/// and echoes lines until stopped. The listener is non-blocking and the loop
+/// checks the provided stop flag and a shutdown receiver for graceful exit.
+fn start_simulated_device(listener: TcpListener, stop_flag: Arc<AtomicBool>, shutdown_rx: Receiver<()>) -> thread::JoinHandle<()> {
     thread::spawn(move || {
-        let listener = TcpListener::bind(&addr).expect("bind");
-        for stream in listener.incoming() {
-            match stream {
-                Ok(mut s) => {
+        listener.set_nonblocking(true).ok();
+        loop {
+            // Check for external shutdown
+            if shutdown_rx.try_recv().is_ok() {
+                break;
+            }
+
+            match listener.accept() {
+                Ok((mut s, _peer)) => {
                     let stop = stop_flag.clone();
                     thread::spawn(move || {
                         let mut buf = [0u8; 1024];
@@ -33,6 +40,10 @@ fn start_simulated_device(addr: &str, stop_flag: Arc<AtomicBool>) -> thread::Joi
                         }
                     });
                 }
+                Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                    thread::sleep(Duration::from_millis(10));
+                    continue;
+                }
                 Err(_) => break,
             }
         }
@@ -42,11 +53,19 @@ fn start_simulated_device(addr: &str, stop_flag: Arc<AtomicBool>) -> thread::Joi
 #[test]
 fn emergency_stop_timing() {
     // Manual test: measures time from issuing emergency stop to device cease.
-    // Bind listener in the test thread so it's ready before client connects
-    let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
+    // Bind listener in the test thread so it's ready before client connects.
+    let port = std::env::var("GCK_EMERGENCY_PORT").ok()
+        .and_then(|s| s.parse::<u16>().ok())
+        .unwrap_or(0u16);
+    let bind_addr = format!("127.0.0.1:{}", port);
+    let listener = TcpListener::bind(&bind_addr).expect("bind");
     let addr = listener.local_addr().unwrap();
+
     let stop_flag = Arc::new(AtomicBool::new(false));
-    let _server = start_simulated_device(&addr.to_string(), stop_flag.clone());
+
+    // Shutdown channel to stop the server background thread gracefully
+    let (tx_shutdown, rx_shutdown) = mpsc::channel();
+    let server_handle = start_simulated_device(listener, stop_flag.clone(), rx_shutdown);
 
     let sock: std::net::SocketAddr = addr;
     let transport = gcodekit_device_adapters::create_tcp_transport(sock).expect("create_tcp_transport");
@@ -70,14 +89,12 @@ fn emergency_stop_timing() {
     // Let the stream warm up
     thread::sleep(Duration::from_millis(200));
 
-    // Issue emergency stop: set stop flag and record time
+    // Issue emergency stop: send EMERGENCY_STOP via transport so device can detect it
     let start = Instant::now();
-    // Send an EMERGENCY_STOP command via the transport so the simulated device can detect it
     if let Ok(mut guard) = transport.lock() {
         let _ = guard.send_line("EMERGENCY_STOP");
     }
 
-    // Wait for server-side to stop responding (read returns error or 0)
     // Poll transport->is_alive to detect when the device stops
     let mut elapsed = None;
     for _ in 0..200 {
@@ -95,8 +112,9 @@ fn emergency_stop_timing() {
     running.store(false, Ordering::SeqCst);
     let _ = streamer.join();
 
-    // Do not block waiting for the server thread; it will exit when the process ends
-    // or when the stop flag is observed by the server loop.
+    // Signal server to shutdown and join
+    let _ = tx_shutdown.send(());
+    let _ = server_handle.join();
 
     match elapsed {
         Some(d) => println!("emergency-stop latency: {:?}", d),
