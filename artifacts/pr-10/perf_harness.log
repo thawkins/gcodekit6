@@ -1,0 +1,64 @@
+   Compiling gcodekit_core v0.1.0 (/home/thawkins/Projects/gcodekit6/crates/core)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.72s
+     Running unittests src/lib.rs (target/debug/deps/gcodekit_core-247fdab6cc4c4b6a)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.00s
+
+     Running tests/async_streamer_tests.rs (target/debug/deps/async_streamer_tests-ce684063e1595d10)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.00s
+
+     Running tests/config_tests.rs (target/debug/deps/config_tests-d98c7f7ad6998e78)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.00s
+
+     Running tests/emergency_stop_timing.rs (target/debug/deps/emergency_stop_timing-e9f0aa250af464df)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.00s
+
+     Running tests/perf_transport_latency.rs (target/debug/deps/perf_transport_latency-8c3fe3fe2ef0414c)
+
+running 1 test
+Perf transport latency (us): n=1000, p50=21, p95=46, p99=76
+test perf_transport_latency ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.04s
+
+     Running tests/persistence_tests.rs (target/debug/deps/persistence_tests-94f24c10aa6cdef3)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.00s
+
+     Running tests/streamer_ack_error_tests.rs (target/debug/deps/streamer_ack_error_tests-27b30ad46dfe3b52)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.00s
+
+     Running tests/streamer_tests.rs (target/debug/deps/streamer_tests-e3d73765fa12e530)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.00s
+
+     Running tests/streamer_worker_tests.rs (target/debug/deps/streamer_worker_tests-7a5fcb14376c87bb)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.00s
+
+     Running tests/websocket_integration.rs (target/debug/deps/websocket_integration-37e0da428dc516d7)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
