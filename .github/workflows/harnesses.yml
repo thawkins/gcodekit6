@@ -1,0 +1,71 @@
+name: Run harnesses
+
+on:
+  workflow_dispatch:
+    inputs:
+      perf_port:
+        description: 'Optional port for perf harness (u16). Leave empty to use ephemeral.'
+        required: false
+      emergency_port:
+        description: 'Optional port for emergency-stop harness (u16). Leave empty to use ephemeral.'
+        required: false
+
+jobs:
+  harnesses:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain-action@stable
+
+      - name: Build workspace
+        run: cargo build --workspace
+
+      - name: Run perf harness
+        run: |
+          set -euo pipefail
+          # Ensure artifact log directory exists and set logging environment
+          mkdir -p artifacts/logs
+          export RUST_LOG=${{ env.RUST_LOG || 'info' }}
+          export GCK_LOG_FILE=artifacts/logs
+          export GCK_LOG_JSON=1
+          if [ -n "${{ github.event.inputs.perf_port }}" ]; then
+            export GCK_PERF_PORT=${{ github.event.inputs.perf_port }}
+          fi
+          cargo test --manifest-path crates/core/Cargo.toml perf_transport_latency -- --nocapture 2>&1 | tee perf_harness.log
+        shell: bash
+
+      - name: Upload perf harness log
+        uses: actions/upload-artifact@v4
+        with:
+          name: perf_harness_log
+          path: perf_harness.log
+
+      - name: Upload harness logs directory
+        uses: actions/upload-artifact@v4
+        with:
+          name: harness_logs
+          path: artifacts/logs
+
+      - name: Run emergency-stop harness
+        run: |
+          set -euo pipefail
+          if [ -n "${{ github.event.inputs.emergency_port }}" ]; then
+            export GCK_EMERGENCY_PORT=${{ github.event.inputs.emergency_port }}
+          fi
+          cargo test --manifest-path crates/core/Cargo.toml emergency_stop_timing -- --nocapture 2>&1 | tee emergency_harness.log
+        shell: bash
+
+      - name: Upload emergency harness log
+        uses: actions/upload-artifact@v4
+        with:
+          name: emergency_harness_log
+          path: emergency_harness.log
+
+      - name: Upload harness logs directory (after emergency)
+        uses: actions/upload-artifact@v4
+        with:
+          name: harness_logs_after_emergency
+          path: artifacts/logs

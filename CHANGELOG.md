@@ -17,4 +17,10 @@ All notable changes to this project will be documented in this file.
 - Add device-adapters timeout unit test to assert connect-timeout behavior
 - Add manual GitHub Actions workflow `ignored-harnesses.yml` which runs the harnesses on demand and uploads logs
 
+- UI: Make Slint integration the default for the UI crate and add build-script
+	support to run Slint code generation when `SLINT_INCLUDE_GENERATED=1` is set.
+	The build script concatenates generated .rs files into `generated_ui.rs` and
+	falls back to a committed `src/ui_generated.rs` stub when generation is not
+	available. Added CI job to validate both fallback and generation builds.
+
 

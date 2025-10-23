@@ -42,6 +42,8 @@ fn start_echo_server(listener: TcpListener, shutdown_rx: Receiver<()>) -> thread
 #[test]
 fn perf_transport_latency() {
     // This test is a manual performance harness. It is ignored by default.
+    // Initialize tracing for harness runs so logs include timestamps/levels
+    let _ = gcodekit_utils::logging::init_logging();
     // Allow overriding the port for reproducible runs; default to ephemeral (0)
     let port = std::env::var("GCK_PERF_PORT").ok()
         .and_then(|s| s.parse::<u16>().ok())
@@ -81,7 +83,7 @@ fn perf_transport_latency() {
     let p95 = latencies[latencies.len() * 95 / 100];
     let p99 = latencies[latencies.len() * 99 / 100];
 
-    println!("Perf transport latency (us): n={}, p50={}, p95={}, p99={}", n, p50, p95, p99);
+    tracing::info!(n = n, p50 = p50, p95 = p95, p99 = p99, "Perf transport latency (us)");
 
     // Tear down transport and stop server
     let _ = transport.disconnect();

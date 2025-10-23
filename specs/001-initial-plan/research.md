@@ -1,3 +1,27 @@
+# Research: Initial decisions and clarifications
+
+Decision: Language and toolchain
+- Chosen: Rust (edition 2021, recommend 1.70+)
+- Rationale: Safety, performance, and Rust ecosystem for systems programming are essential for reliable fabrication control.
+- Alternatives considered: C++ (existing Candle app) — rejected due to memory-safety risk and higher maintenance burden.
+
+Decision: UI framework
+- Chosen: Slint
+- Rationale: Project previously adopted Slint; provides native desktop look and matches AGENTS.md guidelines.
+
+Decision: Async runtime and transports
+- Chosen: tokio for async runtime; feature-gated tokio-tungstenite for websocket support; synchronous tungstenite for blocking transports where needed.
+- Rationale: tokio is the de-facto async runtime in Rust; feature-gating optional transports reduces dependency footprint for minimal builds.
+
+Decision: Timeouts
+- Chosen: Hard-wire 30s connect/read timeouts for network transports; tests and code must enforce these to avoid hangs.
+
+Decision: Testing & harnesses
+- Chosen: crate-local integration tests allowed (per constitution amendment). Include harnesses for emergency-stop and perf; allow ports to be configured via env vars; provide a GitHub Actions workflow to run harnesses and upload logs.
+
+Open items (now resolved):
+- Test isolation: use `XDG_DATA_HOME` override in CI (confirmed).  
+- Emergency Stop measurement semantics: measure from API invocation to device ack; collect p50/p95/p99 and document environment.
 # research.md
 
 Feature: GCodeKit6 - Initial MVP

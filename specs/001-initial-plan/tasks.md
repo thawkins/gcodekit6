@@ -9,10 +9,10 @@ Phase 1: Setup (project initialization)
 
 Phase 2: Foundational (blocking prerequisites)
 
-- [ ] T005 Implement atomic storage helpers with directory creation and safe rename semantics (file: crates/core/src/persistence.rs)
-- [ ] T006 [P] Implement transport timeout defaults (30s) for network connect/read paths (files: crates/device-adapters/src/async_network.rs, crates/device-adapters/src/network.rs)
-- [ ] T007 [P] Feature-gate optional websocket transports and ensure default build does not include them (files: crates/device-adapters/Cargo.toml, src/async_websocket.rs, src/websocket_sync.rs)
-- [ ] T008 [P] Add tracing-based logging in core paths and replace `println!` in production code (files: crates/core/src/*.rs, crates/device-adapters/src/*.rs)
+- [X] T005 Implement atomic storage helpers with directory creation and safe rename semantics (file: crates/core/src/persistence.rs)
+- [X] T006 [P] Implement transport timeout defaults (30s) for network connect/read paths (files: crates/device-adapters/src/async_network.rs, crates/device-adapters/src/network.rs)
+- [X] T007 [P] Feature-gate optional websocket transports and ensure default build does not include them (files: crates/device-adapters/Cargo.toml, src/async_websocket.rs, src/websocket_sync.rs)
+- [X] T008 [P] Add tracing-based logging in core paths and replace `println!` in production code (files: crates/core/src/*.rs, crates/device-adapters/src/*.rs)
 
 Phase 3: User Story 1 - Connect to a Device (US1) (Priority: P1)
 

@@ -53,6 +53,8 @@ fn start_simulated_device(listener: TcpListener, stop_flag: Arc<AtomicBool>, shu
 #[test]
 fn emergency_stop_timing() {
     // Manual test: measures time from issuing emergency stop to device cease.
+    // Initialize tracing for harness runs so logs include timestamps/levels
+    let _ = gcodekit_utils::logging::init_logging();
     // Bind listener in the test thread so it's ready before client connects.
     let port = std::env::var("GCK_EMERGENCY_PORT").ok()
         .and_then(|s| s.parse::<u16>().ok())
@@ -117,7 +119,7 @@ fn emergency_stop_timing() {
     let _ = server_handle.join();
 
     match elapsed {
-        Some(d) => println!("emergency-stop latency: {:?}", d),
-        None => println!("emergency-stop latency: not observed within timeout"),
+        Some(d) => tracing::info!(latency = ?d, "emergency-stop latency"),
+        None => tracing::info!("emergency-stop latency: not observed within timeout"),
     }
 }
