@@ -20,7 +20,14 @@ All code MUST be written in Rust edition 2021 or greater with safety as the prim
 **Rationale**: Fabrication machine control demands absolute reliability - a software crash can damage expensive equipment or cause safety hazards.
 
 ### II. Test-Driven Development (NON-NEGOTIABLE)
-ALL tests MUST be located in the `tests/` folder organized by module hierarchy - NO inline tests in source files. Tests MUST be written FIRST, verified to FAIL, then implementation follows. Use `#[test]` for sync and `#[tokio::test]` for async tests. All test runs have a 10-minute timeout to prevent hanging. Import from public crate only (e.g., `use gcodekit6::`).
+ALL tests MUST be organized under a `tests/` directory and must import from the public crate (e.g., `use gcodekit6::`). Historically this required a single top-level `tests/` folder at the repository root; however, to better support idiomatic Rust workspace layouts and crate-level isolation, crate-local integration tests located in `crates/*/tests/` are ALSO permitted.
+
+Constraints when using crate-local `crates/*/tests/`:
+- Tests MUST still be public-integration style (use the public crate surface) and not be inline unit tests inside implementation files.
+- CI must run all integration tests across the workspace (top-level and crate-local). Test discovery rules and CI configuration MUST be documented in the repository CI configuration.
+- The project remains governed by the rule that tests are written before implementation (TDD): write tests first, verify they fail, then implement behavior.
+
+Use `#[test]` for sync and `#[tokio::test]` for async tests. All test runs have a 10-minute timeout to prevent hanging.
 
 **Rationale**: Machine control software requires extensive testing - untested code controlling physical devices poses safety and financial risks.
 
@@ -100,4 +107,16 @@ Constitution amendments require:
 ### Priority & Task Management
 When asked "what's next", present top 9 unimplemented tasks by task number, accept selection, and execute. Focus on implementation over feature suggestions unless explicitly requested.
 
-**Version**: 1.0.0-alpha | **Ratified**: 2025-10-23 | **Last Amended**: 2025-10-23
+---
+### Amendment: 2025-10-23 — Allow crate-local integration tests
+
+Summary: To reconcile constitution requirements with idiomatic Rust workspace layouts and to reduce heavy refactoring of existing test suites, the Governance Council ratified an amendment on 2025-10-23 to permit crate-local integration tests under `crates/*/tests/` in addition to a repository-level `tests/` directory. This preserves the testing principles (tests import from public crates and remain integration-style) while enabling modular development and faster iteration.
+
+Rationale: Rust workspaces commonly place integration tests inside crate-level `tests/` directories. Enforcing a single top-level `tests/` causes significant refactor overhead and harms developer ergonomics.
+
+Migration plan:
+- CI: Ensure the project's CI is configured to run all integration tests across crates and the root `tests/` folder.
+- Tests: Existing crate-local tests are acceptable; maintainers should ensure tests only use public APIs.
+- Documentation: Update CONTRIBUTING.md and the project README to explain test layout and how to run tests locally.
+
+**Version**: 1.1.0-alpha | **Ratified**: 2025-10-23 | **Last Amended**: 2025-10-23
