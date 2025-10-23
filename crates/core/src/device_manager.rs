@@ -1,19 +1,16 @@
 use anyhow::Result;
-use gcodekit_device_adapters::network::NetworkConnection;
+use gcodekit_device_adapters::Transport;
 use std::net::SocketAddr;
 
 /// High-level device manager that orchestrates adapter connections.
 pub struct DeviceManager {}
 
 impl DeviceManager {
-    /// Connect to a network device by socket address.
-    /// Returns an opaque connection handle (NetworkConnection) on success.
-    pub fn connect_network(addr: SocketAddr) -> Result<NetworkConnection> {
-        let timeout = crate::config::network_timeout();
-        // let the adapter manage timeouts; DeviceManager simply passes through
-        // for now, attempt connect via the adapter which uses the configured timeout
-        let conn = NetworkConnection::connect_tcp(addr)?;
-        Ok(conn)
+    /// Connect to a network device by socket address and return a boxed `Transport`.
+    pub fn connect_network(addr: SocketAddr) -> Result<Box<dyn Transport>> {
+        // Use the adapter factory to create a transport instance (TCP for now)
+        let transport = gcodekit_device_adapters::create_tcp_transport(addr)?;
+        Ok(transport)
     }
 }
 

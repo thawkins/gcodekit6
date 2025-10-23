@@ -17,6 +17,12 @@ impl Transport for network::NetworkConnection {
     }
 }
 
+/// Create a TCP transport boxed as a `Transport` trait object.
+pub fn create_tcp_transport(addr: std::net::SocketAddr) -> std::io::Result<Box<dyn Transport>> {
+    let conn = network::NetworkConnection::connect_tcp(addr)?;
+    Ok(Box::new(conn))
+}
+
 pub fn hello_adapters() -> &'static str {
     "gcodekit-device-adapters: ready"
 }

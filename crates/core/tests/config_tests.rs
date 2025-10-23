@@ -24,3 +24,18 @@ fn test_config_file_overrides_default() {
     let d = gcodekit_core::config::network_timeout();
     assert_eq!(d, Duration::from_secs(7));
 }
+
+#[test]
+fn test_device_manager_returns_transport() {
+    // Start a listener and use DeviceManager to obtain a transport
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").expect("bind");
+    let addr = listener.local_addr().unwrap();
+    std::thread::spawn(move || {
+        if let Ok((_s, _p)) = listener.accept() {
+            std::thread::sleep(std::time::Duration::from_millis(50));
+        }
+    });
+
+    let mut transport = gcodekit_core::device_manager::DeviceManager::connect_network(addr).expect("connect");
+    let _ = transport.send_line("M115");
+}
