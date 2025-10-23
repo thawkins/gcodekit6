@@ -1,8 +1,7 @@
 use gcodekit_device_adapters::network::NetworkConnection;
-use std::thread;
-use std::net::{TcpListener, UdpSocket};
-use std::time::Duration;
 use std::io::Read;
+use std::net::{TcpListener, UdpSocket};
+use std::thread;
 
 #[test]
 fn test_tcp_connect_and_send() {

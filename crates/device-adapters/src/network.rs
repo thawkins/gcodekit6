@@ -1,5 +1,5 @@
 use std::io::{self, Write};
-use std::net::{TcpStream, UdpSocket, ToSocketAddrs};
+use std::net::{TcpStream, ToSocketAddrs, UdpSocket};
 
 /// Simple network transport connection enum for tests and stubbing
 pub enum NetworkConnection {
