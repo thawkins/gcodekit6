@@ -131,9 +131,13 @@ Tasks summary
  - Can stream lines to a simulated device with pause/resume and report progress
 
  - [ ] T016 [US2] Implement G-code file loader/parser in `/home/thawkins/Projects/gcodekit6/crates/core/src/gcode/parser.rs`
+ - [X] T016 [US2] Implement G-code file loader/parser in `/home/thawkins/Projects/gcodekit6/crates/core/src/gcode/parser.rs`
  - [ ] T017 [US2] Implement job queueing and progress tracking in `/home/thawkins/Projects/gcodekit6/crates/core/src/job.rs`
  - [ ] T018 [US2] Implement streaming worker that sends lines via adapter `send_line` in `/home/thawkins/Projects/gcodekit6/crates/core/src/streamer.rs`
+ - [X] T017 [US2] Implement job queueing and progress tracking in `/home/thawkins/Projects/gcodekit6/crates/core/src/job.rs`
+ - [X] T018 [US2] Implement streaming worker that sends lines via adapter `send_line` in `/home/thawkins/Projects/gcodekit6/crates/core/src/streamer.rs`
  - [ ] T019 [US2] Add pause/resume control and tests in `/home/thawkins/Projects/gcodekit6/tests/integration/stream_pause_resume.rs`
+ - [X] T019 [US2] Add pause/resume control and tests in `/home/thawkins/Projects/gcodekit6/tests/integration/stream_pause_resume.rs`
  - [ ] T020 [US2] Add `.gcode` preview minimal UI hook in `/home/thawkins/Projects/gcodekit6/crates/ui/src/ui.slint` (placeholder)
 
  ## Phase 5 — [US3] Emergency Stop & Safety (Priority: P1)

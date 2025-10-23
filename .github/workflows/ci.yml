@@ -75,3 +75,44 @@ jobs:
         # Ensure system deps are present on Ubuntu runners for slint backends
         sudo apt-get update && sudo apt-get install -y libxcb-xinerama0 libxkbcommon-dev || true
         cargo build -p gcodekit_ui --verbose
+
+  device-adapters-websocket:
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Install Rust (stable)
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        profile: minimal
+        override: true
+
+    - name: Run device-adapters tests with websocket feature
+      run: |
+        # Ensure system deps for websocket backends if needed (best-effort)
+        sudo apt-get update && sudo apt-get install -y libssl-dev || true
+        cargo test -p gcodekit_device_adapters --features websocket -- --nocapture
+
+  test-websocket-adapters:
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Install Rust
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        profile: minimal
+        override: true
+
+    - name: Run device-adapters tests with websocket feature
+      run: |
+        # Run tests for the device-adapters crate with websocket features to
+        # validate the tungstenite/tokio-tungstenite integration on CI.
+        cargo test -p gcodekit_device_adapters --features websocket -- --nocapture
+

@@ -26,7 +26,7 @@ GCK_EMERGENCY_PORT=40200 cargo test --manifest-path crates/core/Cargo.toml emerg
 ```
 
 You can also trigger the harnesses via the GitHub Actions workflow `Run harnesses` (workflow_dispatch) which will run both harnesses and upload logs as artifacts; see `.github/workflows/harnesses.yml`.
- 
+
 Logging / Tracing
 -----------------
 
@@ -62,10 +62,29 @@ Key pointers:
 - Agent & runtime guidance: `AGENTS.md`
 - Issue templates: `.github/ISSUE_TEMPLATE/`
 
+Testing layout note
+-------------------
+
+Per the project constitution (see `.specify/memory/constitution.md`), integration tests may live either at the repository root `tests/` directory or inside crate-local `crates/*/tests/` directories. CI is expected to run both locations.
+
+Examples — run all workspace tests (recommended):
+
+```bash
+# Run the entire workspace test suite (root + crate-local integration tests)
+cargo test --all --all-features
+```
+
+Examples — run crate-local integration tests only:
+
+```bash
+# Run only the core crate integration tests
+cargo test --manifest-path crates/core/Cargo.toml --all-features -- --nocapture
+```
+
 Getting started:
 1. Install Rust and cargo (https://rustup.rs/)
 2. Install Slint (https://slint-ui.com/)
 3. Build: `cargo build`
-4. Run tests: `cargo test` (tests are located in the `tests/` directory)
+4. Run tests: `cargo test` (tests may live at the repo root `tests/` or under `crates/*/tests/`)
 
 License: TBD
