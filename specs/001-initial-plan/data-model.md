@@ -10,6 +10,10 @@
 - firmware: string
 - capabilities: list of strings
 - status: enum (disconnected, connected, error)
+ - transport: enum (serial, tcp, udp)
+ - host: string (for network transports; hostname or IP)
+ - port_number: integer (for network transports)
+ - udp_options: object (for UDP-specific behavior, e.g., retries, sequence numbers)
 
 ### Job
 - id: string (UUID)

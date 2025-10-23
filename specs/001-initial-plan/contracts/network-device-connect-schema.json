@@ -1,0 +1,19 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "NetworkDeviceConnect",
+  "type": "object",
+  "properties": {
+    "host": { "type": "string", "description": "Hostname or IP address" },
+    "port": { "type": "integer", "minimum": 1, "maximum": 65535 },
+    "protocol": { "type": "string", "enum": ["tcp", "udp"], "description": "Transport protocol" },
+    "timeout_ms": { "type": "integer", "minimum": 0 },
+    "udp_options": {
+      "type": "object",
+      "properties": {
+        "sequence_numbers": { "type": "boolean", "description": "If true, include application-level sequence numbers to detect reordering" },
+        "retries": { "type": "integer", "minimum": 0, "description": "Number of retries for UDP packets" }
+      }
+    }
+  },
+  "required": ["host", "port", "protocol"]
+}
