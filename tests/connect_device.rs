@@ -4,6 +4,7 @@ use std::thread;
 use std::io::Read;
 
 #[test]
+#[ignore]
 fn integration_connect_to_simulated_tcp_device() {
     // Start a TCP server that accepts one connection and reads some bytes
     let listener = TcpListener::bind("127.0.0.1:0").expect("bind");

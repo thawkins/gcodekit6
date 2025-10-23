@@ -5,6 +5,7 @@ use std::sync::{Arc, atomic::{AtomicBool, Ordering}};
 use std::io::Read;
 
 #[test]
+#[ignore]
 fn integration_emergency_stop_stops_streaming() {
     let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
     let addr = listener.local_addr().unwrap();

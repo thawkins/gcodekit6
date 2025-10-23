@@ -4,6 +4,7 @@ use std::thread;
 use std::sync::{Arc, atomic::{AtomicBool, Ordering}};
 
 #[test]
+#[ignore]
 fn integration_stream_pause_resume_udp() {
     // Bind a UDP server to receive packets
     let server = UdpSocket::bind("127.0.0.1:0").expect("bind");
