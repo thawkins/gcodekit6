@@ -11,3 +11,5 @@ gcodekit_device_adapters = { path = "../device-adapters" }
 gcodekit_utils = { path = "../utils" }
 dirs-next = "2"
 serde_json = "1.0"
+[dev-dependencies]
+tempfile = "3"
