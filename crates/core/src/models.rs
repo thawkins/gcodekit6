@@ -1,7 +1,7 @@
 //! Core data models: Device and Job
 
 use serde::{Deserialize, Serialize};
-use std::time::SystemTime;
+use chrono::{DateTime, Utc};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum DeviceStatus {
@@ -46,5 +46,5 @@ pub struct Job {
     pub lines_sent: usize,
     pub progress: f32,
     pub status: JobStatus,
-    pub created_at: SystemTime,
+    pub created_at: DateTime<Utc>,
 }

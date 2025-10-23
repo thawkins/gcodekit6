@@ -13,6 +13,7 @@ dirs-next = "2"
 serde_json = "1.0"
 url = "2"
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync"] }
+chrono = { version = "0.4", features = ["serde"] }
 [features]
 async = ["gcodekit_device_adapters/async"]
 [dev-dependencies]

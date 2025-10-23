@@ -1,6 +1,6 @@
 use gcodekit_core::persistence::{save_job_history, load_job_history};
 use gcodekit_core::models::Job;
-use std::time::SystemTime;
+use chrono::Utc;
 
 #[test]
 fn test_save_and_load_job_history() {
@@ -12,7 +12,7 @@ fn test_save_and_load_job_history() {
         lines_sent: 10,
         progress: 1.0,
         status: gcodekit_core::models::JobStatus::Completed,
-        created_at: SystemTime::now(),
+        created_at: Utc::now(),
     };
     let j2 = Job {
         id: "j2".into(),
@@ -21,12 +21,22 @@ fn test_save_and_load_job_history() {
         lines_sent: 5,
         progress: 0.25,
         status: gcodekit_core::models::JobStatus::Running,
-        created_at: SystemTime::now(),
+        created_at: Utc::now(),
     };
 
     let jobs = vec![j1.clone(), j2.clone()];
     save_job_history(jobs).expect("save failed");
 
+    if let Some(p) = gcodekit_utils::storage::file_path("jobs.json") {
+        eprintln!("storage file: {} exists={}", p.display(), p.exists());
+        if p.exists() {
+            eprintln!("raw contents:\n{}", std::fs::read_to_string(&p).unwrap_or_default());
+        }
+    }
+
+    // Directly use utils storage read_json to see what is deserialized in test runtime
+    let direct: Result<Vec<Job>, _> = gcodekit_utils::storage::read_json("jobs.json");
+    eprintln!("direct read result: {:?}", direct.as_ref().map(|v| v.len()));
     let loaded = load_job_history().expect("load failed");
     // Debug output
     eprintln!("Loaded {} jobs", loaded.len());
