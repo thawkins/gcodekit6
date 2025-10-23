@@ -2,7 +2,7 @@
 
 Phase 1: Setup (project initialization)
 
-- [ ] T001 Initialize workspace CI to run crate-local tests and enforce clippy/formatting in CI (files: .github/workflows/*)
+- [X] T001 Initialize workspace CI to run crate-local tests and enforce clippy/formatting in CI (files: .github/workflows/*)
 - [ ] T002 [P] Add documentation entry for running harnesses and env vars (file: README.md)
 - [ ] T003 [P] Add GitHub Actions workflow to run harnesses and upload logs (file: .github/workflows/harnesses.yml)
 - [ ] T004 Ensure `XDG_DATA_HOME` override is documented and used in tests (file: crates/utils/src/settings.rs)
