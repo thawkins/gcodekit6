@@ -1,0 +1,8 @@
+[workspace]
+resolver = "2"
+members = [
+  "crates/core",
+  "crates/ui",
+  "crates/device-adapters",
+  "crates/utils"
+]

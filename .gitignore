@@ -1,0 +1,15 @@
+# Rust/Cargo
+/target/
+# Temporary files used by agents per AGENTS.md
+/target/temp/
+
+# Rustfmt and editor files
+/**/*.rs.bk
+/.idea/
+.vscode/
+
+# OS
+.DS_Store
+
+# Logs
+*.log

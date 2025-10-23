@@ -1,0 +1,11 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "DeviceConnect",
+  "type": "object",
+  "properties": {
+    "port": { "type": "string" },
+    "baud": { "type": "integer" },
+    "timeout_ms": { "type": "integer" }
+  },
+  "required": ["port", "baud"]
+}

@@ -1,0 +1,15 @@
+[package]
+name = "gcodekit_core"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1.0"
+thiserror = "1.0"
+serde = { version = "1.0", features = ["derive"] }
+gcodekit_device_adapters = { path = "../device-adapters" }
+gcodekit_utils = { path = "../utils" }
+dirs-next = "2"
+serde_json = "1.0"
+[dev-dependencies]
+tempfile = "3"
