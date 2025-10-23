@@ -9,6 +9,9 @@ impl DeviceManager {
     /// Connect to a network device by socket address.
     /// Returns an opaque connection handle (NetworkConnection) on success.
     pub fn connect_network(addr: SocketAddr) -> Result<NetworkConnection> {
+        let timeout = crate::config::network_timeout();
+        // let the adapter manage timeouts; DeviceManager simply passes through
+        // for now, attempt connect via the adapter which uses the configured timeout
         let conn = NetworkConnection::connect_tcp(addr)?;
         Ok(conn)
     }
