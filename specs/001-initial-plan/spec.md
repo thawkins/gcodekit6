@@ -9,7 +9,8 @@
 
 ### Session 2025-10-23
 - Q: Target firmware support → A: GRBL + Smoothieware + TinyG + G2core
- - Q: Emergency Stop semantics → A: Software stop by default; optional hardware E-stop integration
+- Q: Emergency Stop semantics → A: Software stop by default; optional hardware E-stop integration
+- Q: Communication modes → A: Serial + TCP/UDP (both supported)
 
 ## User Scenarios & Testing (mandatory)
 
@@ -42,6 +43,8 @@ Acceptance Scenarios:
 - High-feedrate commands causing buffer overruns
 - Emergency Stop triggered during streaming (software stop)
 - Hardware E-stop input failure or stuck state (must be detected and reported)
+ - Network disconnects or packet loss for TCP/UDP transports
+ - Partial command delivery or reordering over UDP (must be detected and mitigated)
 
 ## Requirements (mandatory)
 
@@ -58,8 +61,11 @@ Acceptance Scenarios:
 - FR-006: System SHOULD support plugins for device-specific features (P3)
 - FR-007: System MUST support at minimum the following firmwares: GRBL, Smoothieware, TinyG, and G2core (P1)
 
+- FR-008: System MUST support the following communication transports: serial (USB/tty) and network (TCP/UDP) for devices and simulators. Discovery, connection, and streaming semantics for each transport MUST be defined in device adapter documentation (P1)
+
 ### Key Entities
 - Device: serial port, firmware, capabilities
+- transport: enum (serial, tcp, udp)
 - Job: G-code file, progress, history
 - Settings: port configs, feed/speed defaults
 
