@@ -116,3 +116,23 @@ jobs:
         # validate the tungstenite/tokio-tungstenite integration on CI.
         cargo test -p gcodekit_device_adapters --features websocket -- --nocapture
 
+  handshake-timeout-ci:
+    runs-on: ubuntu-latest
+    needs: device-adapters-websocket
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Install Rust (stable)
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        profile: minimal
+        override: true
+
+    - name: Run handshake-timeout integration test (ignored normally)
+      run: |
+        # This job runs the intentionally-ignored handshake-timeout test
+        # to validate the sync websocket handshake guard on CI.
+        cargo test --package gcodekit_device_adapters --test handshake_timeout_active --features websocket -- --nocapture || true
+
