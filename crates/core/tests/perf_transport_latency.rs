@@ -5,10 +5,8 @@ use std::time::Instant;
 use gcodekit_device_adapters::create_tcp_transport;
 
 /// Simple in-process TCP echo server used by the performance harness.
-fn start_echo_server(addr: &str) -> thread::JoinHandle<()> {
-    let addr = addr.to_string();
+fn start_echo_server(listener: TcpListener) -> thread::JoinHandle<()> {
     thread::spawn(move || {
-        let listener = TcpListener::bind(&addr).expect("bind");
         for stream in listener.incoming() {
             match stream {
                 Ok(mut s) => {
@@ -33,11 +31,13 @@ fn start_echo_server(addr: &str) -> thread::JoinHandle<()> {
 #[test]
 fn perf_transport_latency() {
     // This test is a manual performance harness. It is ignored by default.
-    let addr = "127.0.0.1:40023";
-    let _server = start_echo_server(addr);
+    // Bind listener in the test thread to ensure it's ready before connecting
+    let listener = TcpListener::bind("127.0.0.1:0").expect("bind");
+    let addr = listener.local_addr().unwrap();
+    let _server = start_echo_server(listener);
 
     // Connect via the project's TCP transport factory so we measure the same code paths
-    let sock: SocketAddr = addr.parse().expect("parse addr");
+    let sock: SocketAddr = addr;
     let mut transport = create_tcp_transport(sock).expect("create_tcp_transport");
 
     // Warmup
