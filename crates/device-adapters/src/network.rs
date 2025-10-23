@@ -1,6 +1,7 @@
 use std::io::{self, Write};
 use std::net::{TcpStream, ToSocketAddrs, UdpSocket};
 use std::time::Duration;
+use gcodekit_utils::settings::network_timeout;
 
 /// Simple network transport connection enum for tests and stubbing
 pub enum NetworkConnection {
@@ -10,8 +11,8 @@ pub enum NetworkConnection {
 
 impl NetworkConnection {
     pub fn connect_tcp<A: ToSocketAddrs>(addr: A) -> io::Result<Self> {
-        // Use a connect timeout to avoid hanging indefinitely.
-        let timeout = Duration::from_secs(30);
+    // Use the configured network timeout (defaults to 30s)
+    let timeout = network_timeout();
         let mut last_err = None;
         for sock in addr.to_socket_addrs()? {
             match TcpStream::connect_timeout(&sock, timeout) {
@@ -30,11 +31,11 @@ impl NetworkConnection {
     }
 
     pub fn connect_udp<A: ToSocketAddrs>(bind_addr: A, peer: &str) -> io::Result<Self> {
-        let socket = UdpSocket::bind(bind_addr)?;
+    let socket = UdpSocket::bind(bind_addr)?;
         socket.connect(peer)?;
         // Set blocking mode and timeouts so send/recv honor configured durations.
         socket.set_nonblocking(false)?;
-        let timeout = Duration::from_secs(30);
+    let timeout = network_timeout();
         socket.set_read_timeout(Some(timeout))?;
         socket.set_write_timeout(Some(timeout))?;
         Ok(NetworkConnection::Udp(socket, peer.to_string()))
