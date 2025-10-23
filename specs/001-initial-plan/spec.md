@@ -5,6 +5,11 @@
 **Status**: Draft
 **Input**: User description: "Create a desktop application that controls fabrication machines like CNC machines, laser engravers/cutters and 3D Printers. Use the contents of AGENTs.md to provide governance rules. Base the requirements on the specification of \"Universal Gcode Sender\""
 
+## Clarifications
+
+### Session 2025-10-23
+- Q: Target firmware support → A: GRBL + Smoothieware + TinyG + G2core
+
 ## User Scenarios & Testing (mandatory)
 
 ### User Story 1 - Connect to a Device (Priority: P1)
@@ -44,6 +49,7 @@ Acceptance Scenarios:
 - FR-004: System MUST present Emergency Stop (P1)
 - FR-005: System MUST log all communication with timestamped entries (P2)
 - FR-006: System SHOULD support plugins for device-specific features (P3)
+ - FR-007: System MUST support at minimum the following firmwares: GRBL, Smoothieware, TinyG, and G2core (P1)
 
 ### Key Entities
 - Device: serial port, firmware, capabilities
