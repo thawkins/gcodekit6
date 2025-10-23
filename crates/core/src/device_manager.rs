@@ -1,15 +1,126 @@
 use anyhow::Result;
 use gcodekit_device_adapters::Transport;
 use std::net::SocketAddr;
+use tracing::{debug, info};
 
 /// High-level device manager that orchestrates adapter connections.
 pub struct DeviceManager {}
 
+/// Rich device information returned to UIs and callers that need metadata.
+#[derive(Debug, Clone)]
+pub struct DiscoveredDevice {
+    pub id: String,
+    pub display: String,
+    pub transport: String,
+    pub product: Option<String>,
+    pub manufacturer: Option<String>,
+    pub vid: Option<u16>,
+    pub pid: Option<u16>,
+}
+
 impl DeviceManager {
+    /// Discover available devices on the system. Returns tuples of (id, display_name, transport_hint)
+    /// For now this includes serial ports and a placeholder for network discovery.
+    pub fn discover_devices() -> Result<Vec<(String, String, String)>> {
+        let mut devices = Vec::new();
+        // Pre-load any persisted devices so discovery can include known devices
+        if let Ok(persisted) = crate::device::load_devices() {
+            for d in persisted.iter() {
+                devices.push((d.id.clone(), d.name.clone(), format!("{:?}", d.transport)));
+            }
+        }
+        // Serial ports (structured info)
+        if let Ok(ports) = gcodekit_device_adapters::serial::list_serial_ports() {
+            for p in ports {
+                let display = if let Some(prod) = &p.product {
+                    format!("{} ({})", p.path, prod)
+                } else if let Some(mfr) = &p.manufacturer {
+                    format!("{} ({})", p.path, mfr)
+                } else if let (Some(vid), Some(pid)) = (p.vid, p.pid) {
+                    format!("{} ({:04x}:{:04x})", p.path, vid, pid)
+                } else {
+                    p.path.clone()
+                };
+                let id = format!("serial:{}", p.path);
+                devices.push((id.clone(), display, "serial".to_string()));
+            }
+        }
+
+        // Network discovery placeholder: return empty for now
+        Ok(devices)
+    }
+
+    /// Discover devices and return rich metadata where available.
+    pub fn discover_devices_detailed() -> Result<Vec<DiscoveredDevice>> {
+        let mut out = Vec::new();
+        // Load persisted devices first
+        if let Ok(persisted) = crate::device::load_devices() {
+            for d in persisted.into_iter() {
+                out.push(DiscoveredDevice {
+                    id: d.id.clone(),
+                    display: d.name.clone(),
+                    transport: format!("{:?}", d.transport),
+                    product: None,
+                    manufacturer: None,
+                    vid: None,
+                    pid: None,
+                });
+            }
+        }
+
+        // Structured serial ports
+        if let Ok(ports) = gcodekit_device_adapters::serial::list_serial_ports() {
+            for p in ports {
+                let display = if let Some(prod) = &p.product {
+                    format!("{} ({})", p.path, prod)
+                } else if let Some(mfr) = &p.manufacturer {
+                    format!("{} ({})", p.path, mfr)
+                } else if let (Some(vid), Some(pid)) = (p.vid, p.pid) {
+                    format!("{} ({:04x}:{:04x})", p.path, vid, pid)
+                } else {
+                    p.path.clone()
+                };
+                out.push(DiscoveredDevice {
+                    id: format!("serial:{}", p.path),
+                    display,
+                    transport: "serial".to_string(),
+                    product: p.product.clone(),
+                    manufacturer: p.manufacturer.clone(),
+                    vid: p.vid,
+                    pid: p.pid,
+                });
+            }
+        }
+
+        Ok(out)
+    }
+
+    /// Attempt to discover a TCP peer at the provided address string using a short timeout.
+    /// Returns the peer string on success.
+    pub fn discover_tcp_peer(addr: &str, timeout: std::time::Duration) -> Result<String> {
+        let res = gcodekit_device_adapters::network::discover_tcp_peer(addr, timeout)?;
+        Ok(res)
+    }
+
     /// Connect to a network device by socket address and return a boxed `Transport`.
     pub fn connect_network(addr: SocketAddr) -> Result<Box<dyn Transport>> {
         // Use the adapter factory to create a transport instance (TCP for now)
+        info!(addr = %addr, "device_manager::connect_network: attempting");
         let transport = gcodekit_device_adapters::create_tcp_transport(addr)?;
+        debug!(addr = %addr, "device_manager::connect_network: transport created");
+        // Persist a simple Device record for this network connection
+        let dev = crate::models::Device {
+            id: format!("tcp:{}", addr),
+            name: format!("TCP Device {}", addr),
+            port: addr.to_string(),
+            baud: None,
+            firmware: None,
+            capabilities: vec![],
+            status: crate::models::DeviceStatus::Connected,
+            transport: crate::models::Transport::Tcp,
+        };
+        // Save best-effort; ignore errors so connect still returns success
+        let _ = crate::device::save_devices(vec![dev]);
         Ok(transport)
     }
 
@@ -25,7 +136,9 @@ impl DeviceManager {
             // return an error with a suggestion.
             #[cfg(feature = "websocket")]
             {
+                info!(endpoint = %endpoint, "device_manager::connect_endpoint: websocket requested");
                 let transport = gcodekit_device_adapters::create_websocket_transport(endpoint)?;
+                debug!(endpoint = %endpoint, "device_manager::connect_endpoint: websocket transport created");
                 return Ok(transport);
             }
 
@@ -40,7 +153,9 @@ impl DeviceManager {
             // Strip optional tcp://
             let ep = endpoint.trim_start_matches("tcp://");
             let sock: std::net::SocketAddr = ep.parse()?;
+            info!(endpoint = %ep, sock = %sock, "device_manager::connect_endpoint: tcp requested");
             let transport = gcodekit_device_adapters::create_tcp_transport(sock)?;
+            debug!(endpoint = %ep, sock = %sock, "device_manager::connect_endpoint: tcp transport created");
             Ok(transport)
         } else {
             // Assume a serial device path. Support optional serial:// prefix and
@@ -87,8 +202,9 @@ impl DeviceManager {
                 parity: None,
                 flow_control: None,
             };
-            let transport =
-                gcodekit_device_adapters::create_serial_transport_with_options(path_str, opts)?;
+            debug!(path = %path_str, baud = %opts.baud, "device_manager::connect_endpoint: serial requested");
+            let transport = gcodekit_device_adapters::create_serial_transport_with_options(path_str, opts)?;
+            debug!(path = %path_str, "device_manager::connect_endpoint: serial transport created");
             Ok(transport)
         }
     }

@@ -5,6 +5,16 @@ use std::io::{BufRead, Write};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
+/// Structured serial port metadata returned by `list_serial_ports`.
+#[derive(Debug, Clone)]
+pub struct SerialPortInfo {
+    pub path: String,
+    pub product: Option<String>,
+    pub manufacturer: Option<String>,
+    pub vid: Option<u16>,
+    pub pid: Option<u16>,
+}
+
 /// A thin wrapper around a boxed `SerialPort` to provide higher-level
 /// operations used by the Transport trait. The inner port is wrapped in an
 /// Arc<Mutex<...>> so the connection can be shared across threads and still
@@ -108,10 +118,33 @@ impl SerialConnection {
 }
 
 /// List available serial ports on the host.
-/// Returns a vector of system path strings (e.g., /dev/ttyUSB0 or COM3).
-pub fn list_serial_ports() -> io::Result<Vec<String>> {
+/// Returns a vector of `SerialPortInfo` structs with path and optional metadata.
+pub fn list_serial_ports() -> io::Result<Vec<SerialPortInfo>> {
     match available_ports() {
-        Ok(ports) => Ok(ports.into_iter().map(|p| p.port_name).collect()),
+        Ok(ports) => {
+            let mut out = Vec::new();
+            for p in ports.into_iter() {
+                let mut info = SerialPortInfo {
+                    path: p.port_name.clone(),
+                    product: None,
+                    manufacturer: None,
+                    vid: None,
+                    pid: None,
+                };
+                match p.port_type {
+                    serialport::SerialPortType::UsbPort(ref usb) => {
+                        info.product = usb.product.clone();
+                        info.manufacturer = usb.manufacturer.clone();
+                        // usb.vid and usb.pid are u16
+                        info.vid = Some(usb.vid);
+                        info.pid = Some(usb.pid);
+                    }
+                    _ => {}
+                }
+                out.push(info);
+            }
+            Ok(out)
+        }
         Err(e) => Err(io::Error::other(format!("serialport error: {}", e))),
     }
 }

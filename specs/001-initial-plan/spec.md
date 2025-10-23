@@ -57,6 +57,14 @@ Acceptance Scenarios:
 	places the device in a safe state (response target: <200ms). The system MUST also
 	support optional hardware E-stop integration (input relay) where available; hardware
 	E-stop semantics and wiring MUST be documented in quickstart and device adapter docs.
+    
+	Note (measurement semantics): The Emergency Stop response-time requirement is
+	measured from the moment the Emergency Stop API is invoked (or the UI button is
+	pressed) to when the device reports a confirmed stop state (or a simulated device
+	acknowledges the stop). Tests should record p50/p95/p99 latencies and clearly
+	document the test harness conditions (CPU/OS, transport type, simulated vs
+	hardware-in-the-loop). Use an instrumented simulated device for CI tests where
+	hardware is not available.
 - FR-005: System MUST log all communication with timestamped entries (P2)
 - FR-006: System SHOULD support plugins for device-specific features (P3)
 - FR-007: System MUST support at minimum the following firmwares: GRBL, Smoothieware, TinyG, and G2core (P1)
@@ -68,6 +76,14 @@ Acceptance Scenarios:
 - transport: enum (serial, tcp, udp)
 - Job: G-code file, progress, history
 - Settings: port configs, feed/speed defaults
+
+## Storage & Test Isolation (clarification)
+
+- Storage: Local file storage is used for project files, job history, and settings.
+	During development, temporary files may be placed under project-local `target/tmp/`.
+	For persistent user data, use platform-appropriate locations (Linux: `~/.local/share/gcodekit6/`, macOS: `~/Library/Application Support/gcodekit6/`, Windows: `%APPDATA%\gcodekit6`).
+
+- Test isolation: Test runs MUST support overriding the platform data directory via the `XDG_DATA_HOME` environment variable (or platform equivalent) so tests can use an isolated temporary directory. CI jobs MUST set `XDG_DATA_HOME` to a temporary path and ensure cleanup of artifacts after runs.
 
 ## Success Criteria (mandatory)
 

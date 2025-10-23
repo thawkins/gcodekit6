@@ -1,4 +1,5 @@
 use gcodekit_utils::settings::network_timeout;
+use tracing::{debug, info};
 use std::io::BufRead;
 use std::io::BufReader;
 use std::io::{self, Write};
@@ -15,6 +16,7 @@ impl NetworkConnection {
     pub fn connect_tcp<A: ToSocketAddrs>(addr: A) -> io::Result<Self> {
         // Use the configured network timeout (defaults to 30s)
         let timeout = network_timeout();
+        info!(timeout = ?timeout, "network::connect_tcp: attempting to connect to addr");
         let mut last_err = None;
         for sock in addr.to_socket_addrs()? {
             match TcpStream::connect_timeout(&sock, timeout) {
@@ -23,6 +25,7 @@ impl NetworkConnection {
                     stream.set_nonblocking(false)?;
                     stream.set_read_timeout(Some(timeout))?;
                     stream.set_write_timeout(Some(timeout))?;
+                    debug!(peer = ?sock, "network::connect_tcp: connected");
                     return Ok(NetworkConnection::Tcp(stream));
                 }
                 Err(e) => last_err = Some(e),
@@ -47,13 +50,17 @@ impl NetworkConnection {
         match self {
             NetworkConnection::Tcp(s) => {
                 // write_all will block but respect the socket write timeout set at connect time
+                debug!(len = line.len(), "network::send_line: tcp sending bytes");
                 s.write_all(line.as_bytes())?;
                 s.write_all(b"\n")?;
+                debug!(len = line.len(), "network::send_line: tcp sent bytes");
                 Ok(())
             }
             NetworkConnection::Udp(s, _) => {
                 // send will respect the socket write timeout (where supported)
+                debug!(len = line.len(), "network::send_line: udp sending bytes");
                 s.send(line.as_bytes())?;
+                debug!(len = line.len(), "network::send_line: udp sent bytes");
                 Ok(())
             }
         }
@@ -65,11 +72,15 @@ impl NetworkConnection {
         match self {
             NetworkConnection::Tcp(s) => {
                 // Respect write timeout
+                debug!("network::emergency_stop: tcp sending stop");
                 s.write_all(stop)?;
+                debug!("network::emergency_stop: tcp sent stop");
                 Ok(())
             }
             NetworkConnection::Udp(s, _) => {
+                debug!("network::emergency_stop: udp sending stop");
                 s.send(stop)?;
+                debug!("network::emergency_stop: udp sent stop");
                 Ok(())
             }
         }
@@ -136,10 +147,12 @@ impl NetworkConnection {
                 // taking ownership we duplicate the stream handle using try_clone.
                 let mut reader = BufReader::new(s.try_clone()?);
                 let mut line = String::new();
+                debug!("network::read_line: tcp waiting for line");
                 reader.read_line(&mut line)?;
                 if line.ends_with('\n') {
                     line.truncate(line.len() - 1);
                 }
+                debug!(len = line.len(), "network::read_line: tcp read line bytes");
                 Ok(line)
             }
             NetworkConnection::Udp(s, _) => {
@@ -149,6 +162,7 @@ impl NetworkConnection {
                 if s.ends_with('\n') {
                     s.truncate(s.len() - 1);
                 }
+                debug!(len = n, "network::read_line: udp read bytes");
                 Ok(s)
             }
         }

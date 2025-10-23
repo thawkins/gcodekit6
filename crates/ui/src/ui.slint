@@ -1,9 +1,25 @@
-export component MainWindow inherits Window {
+Bexport component MainWindow inherits Window {
     width: 400px;
     height: 240px;
-    Text {
-        text: "GCodeKit6 — Slint demo";
-        horizontal-alignment: center;
-        vertical-alignment: center;
+    // Device record used by the list model
+    export struct Device {
+        id: string;
+        display: string;
+        transport: string;
+        product: string;
+        manufacturer: string;
+        vid: string;
+        pid: string;
+    }
+
+    // Model property populated from Rust
+    in property <Device> deviceModel[0];
+    callback connectRequested(string id);
+
+    Column {
+        spacing: 8px;
+        Text { text: "GCodeKit6 — Slint demo"; horizontal-alignment: center; }
+        ListView { id: devlist; model: deviceModel; delegate: Rectangle { height: 28px; Text { text: display } } }
+        Row { spacing: 8px; Button { text: "Connect"; clicked => { var sel = devlist.current_index(); if sel >= 0 { connectRequested(deviceModel[sel].id); } } } }
     }
 }

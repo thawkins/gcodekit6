@@ -8,6 +8,7 @@ use serde::Serialize;
 use std::fs;
 use std::io;
 use std::path::PathBuf;
+use tracing::debug;
 
 /// Return the platform-appropriate persistent data directory for gcodekit6.
 ///
@@ -37,17 +38,17 @@ pub fn write_json<T: Serialize>(name: &str, value: &T) -> io::Result<()> {
     let dir = ensure_data_dir()?;
     // Defensive: ensure the directory exists (tests may set XDG_DATA_HOME to a temp dir)
     if !dir.exists() {
-        eprintln!("[storage::write_json] data dir missing, creating: {}", dir.display());
+        debug!(dir = %dir.display(), "storage::write_json: data dir missing, creating");
         std::fs::create_dir_all(&dir)?;
     }
-    eprintln!("[storage::write_json] data dir: {} exists={}", dir.display(), dir.exists());
+    debug!(dir = %dir.display(), exists = dir.exists(), "storage::write_json: data dir status");
     let path = dir.join(name);
     let tmp = path.with_extension("tmp");
     let s = serde_json::to_vec_pretty(value).map_err(io::Error::other)?;
-    // Debug: print the paths involved so tests can diagnose failures
-    eprintln!("[storage::write_json] writing tmp file: {}", tmp.display());
+    // Log the paths involved so tests and CI can diagnose failures
+    debug!(tmp = %tmp.display(), final = %path.display(), "storage::write_json: writing and renaming");
     fs::write(&tmp, &s)?;
-    eprintln!("[storage::write_json] renaming tmp -> final: {} -> {}", tmp.display(), path.display());
+    debug!(tmp = %tmp.display(), final = %path.display(), "storage::write_json: renaming tmp -> final");
     fs::rename(tmp, path)?;
     Ok(())
 }

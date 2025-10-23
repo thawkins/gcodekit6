@@ -2,6 +2,7 @@
 pub mod async_streamer;
 pub mod config;
 pub mod device_manager;
+pub mod device;
 pub mod error;
 pub mod gcode;
 pub mod job;
