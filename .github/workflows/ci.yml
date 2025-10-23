@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, master, '001-initial-plan' ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install Rust
+      uses: dtolnay/rustup@v1
+      with:
+        toolchain: stable
+
+    - name: Install wasm/other (noop)
+      run: echo "No additional setup"
+
+    - name: Run cargo fmt
+      run: |
+        cargo install --locked cargo-fmt || true
+        cargo fmt --all -- --check
+
+    - name: Run cargo clippy
+      run: |
+        rustup component add clippy || true
+        cargo clippy --all-targets --all-features -- -D warnings
+
+    - name: Run tests
+      run: |
+        cargo test --all --locked --quiet
