@@ -24,12 +24,14 @@ impl Streamer {
 
     /// Stream lines from an iterator. This will block until the iterator is
     /// exhausted, pause is invoked, or emergency_stop is called.
+    #[allow(clippy::while_immutable_condition)]
     pub fn stream<I>(&self, lines: I) -> Result<()>
     where
         I: IntoIterator,
         I::Item: AsRef<str>,
     {
-        let mut in_flight = 0usize;
+    #[allow(clippy::while_immutable_condition)]
+    let mut in_flight = 0usize;
         for line in lines {
             // Check stop signal
             if *self.stop_signal.lock().unwrap() {

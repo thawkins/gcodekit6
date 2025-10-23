@@ -35,10 +35,19 @@ pub fn ensure_data_dir() -> io::Result<PathBuf> {
 /// Write a serializable object as JSON to a named file in the data dir.
 pub fn write_json<T: Serialize>(name: &str, value: &T) -> io::Result<()> {
     let dir = ensure_data_dir()?;
+    // Defensive: ensure the directory exists (tests may set XDG_DATA_HOME to a temp dir)
+    if !dir.exists() {
+        eprintln!("[storage::write_json] data dir missing, creating: {}", dir.display());
+        std::fs::create_dir_all(&dir)?;
+    }
+    eprintln!("[storage::write_json] data dir: {} exists={}", dir.display(), dir.exists());
     let path = dir.join(name);
     let tmp = path.with_extension("tmp");
-    let s = serde_json::to_vec_pretty(value).map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+    let s = serde_json::to_vec_pretty(value).map_err(io::Error::other)?;
+    // Debug: print the paths involved so tests can diagnose failures
+    eprintln!("[storage::write_json] writing tmp file: {}", tmp.display());
     fs::write(&tmp, &s)?;
+    eprintln!("[storage::write_json] renaming tmp -> final: {} -> {}", tmp.display(), path.display());
     fs::rename(tmp, path)?;
     Ok(())
 }
@@ -48,7 +57,7 @@ pub fn read_json<T: DeserializeOwned>(name: &str) -> io::Result<T> {
     let dir = ensure_data_dir()?;
     let path = dir.join(name);
     let data = fs::read(&path)?;
-    let v = serde_json::from_slice(&data).map_err(|e| io::Error::new(io::ErrorKind::Other, e))?;
+    let v = serde_json::from_slice(&data).map_err(io::Error::other)?;
     Ok(v)
 }
 

@@ -30,7 +30,9 @@ async fn test_async_streamer_basic() {
         // Use the async factory if compiled with device-adapters async feature
         let addr = endpoint.parse().unwrap();
         // create async transport via device-adapters (await directly in the tokio test)
-        gcodekit_device_adapters::async_network::AsyncTcpTransport::connect(addr).await.expect("connect")
+        gcodekit_device_adapters::async_network::AsyncTcpTransport::connect(addr)
+            .await
+            .expect("connect")
     };
 
     #[cfg(not(feature = "async"))]

@@ -1,11 +1,11 @@
 use anyhow::Result;
-use std::sync::Arc;
-use tokio::sync::Notify;
-#[cfg(feature = "async")]
-use tokio::sync::Mutex as AsyncMutex;
-use std::sync::Mutex as StdMutex;
 #[cfg(feature = "async")]
 use gcodekit_device_adapters::AsyncTransport;
+use std::sync::Arc;
+use std::sync::Mutex as StdMutex;
+#[cfg(feature = "async")]
+use tokio::sync::Mutex as AsyncMutex;
+use tokio::sync::Notify;
 
 /// AsyncStreamer wraps a blocking Transport object and performs sends/reads in
 /// spawn_blocking so it can be used from async contexts. It supports pause,
@@ -46,12 +46,14 @@ impl AsyncStreamer {
         }
     }
 
+    #[allow(clippy::while_immutable_condition)]
     pub async fn stream<I>(&self, lines: I) -> Result<()>
     where
         I: IntoIterator,
         I::Item: AsRef<str> + Send + 'static,
     {
-        let mut in_flight = 0usize;
+    #[allow(clippy::while_immutable_condition)]
+    let mut in_flight = 0usize;
         for line in lines {
             // Check stop
             if *self.stop_flag.lock().unwrap() {

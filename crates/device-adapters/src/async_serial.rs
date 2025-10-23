@@ -12,7 +12,9 @@ pub struct AsyncSerialTransport {
 
 impl AsyncSerialTransport {
     pub fn wrap(conn: serial::SerialConnection) -> Self {
-        AsyncSerialTransport { inner: std::sync::Arc::new(std::sync::Mutex::new(conn)) }
+        AsyncSerialTransport {
+            inner: std::sync::Arc::new(std::sync::Mutex::new(conn)),
+        }
     }
 
     pub async fn send_line(&self, line: &str) -> io::Result<()> {
@@ -22,8 +24,8 @@ impl AsyncSerialTransport {
             let mut g = inner.lock().unwrap();
             g.send_line(&s)
         })
-        .await
-        .map_err(|e| io::Error::new(io::ErrorKind::Other, format!("join error: {}", e)))??;
+    .await
+    .map_err(|e| io::Error::other(format!("join error: {}", e)))??;
         Ok(())
     }
 
@@ -33,8 +35,8 @@ impl AsyncSerialTransport {
             let mut g = inner.lock().unwrap();
             g.emergency_stop()
         })
-        .await
-        .map_err(|e| io::Error::new(io::ErrorKind::Other, format!("join error: {}", e)))??;
+    .await
+    .map_err(|e| io::Error::other(format!("join error: {}", e)))??;
         Ok(())
     }
 
@@ -44,8 +46,8 @@ impl AsyncSerialTransport {
             let mut g = inner.lock().unwrap();
             g.flush()
         })
-        .await
-        .map_err(|e| io::Error::new(io::ErrorKind::Other, format!("join error: {}", e)))??;
+    .await
+    .map_err(|e| io::Error::other(format!("join error: {}", e)))??;
         Ok(())
     }
 
@@ -55,8 +57,8 @@ impl AsyncSerialTransport {
             let mut g = inner.lock().unwrap();
             g.disconnect()
         })
-        .await
-        .map_err(|e| io::Error::new(io::ErrorKind::Other, format!("join error: {}", e)))??;
+    .await
+    .map_err(|e| io::Error::other(format!("join error: {}", e)))??;
         Ok(())
     }
 
@@ -66,8 +68,8 @@ impl AsyncSerialTransport {
             let g = inner.lock().unwrap();
             g.is_alive()
         })
-        .await
-        .map_err(|e| io::Error::new(io::ErrorKind::Other, format!("join error: {}", e)))?;
+    .await
+    .map_err(|e| io::Error::other(format!("join error: {}", e)))?;
         res
     }
 
@@ -77,9 +79,8 @@ impl AsyncSerialTransport {
             let mut g = inner.lock().unwrap();
             g.read_line()
         })
-        .await
-        .map_err(|e| io::Error::new(io::ErrorKind::Other, format!("join error: {}", e)))?;
+    .await
+    .map_err(|e| io::Error::other(format!("join error: {}", e)))?;
         res
     }
-
 }

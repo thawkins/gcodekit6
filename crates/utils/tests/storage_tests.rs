@@ -12,7 +12,11 @@ struct TestData {
 fn test_write_and_read_json() {
     // Use a unique filename to avoid collisions in CI
     let now = chrono::Utc::now();
-    let fname = format!("test-storage-{}{:09}.json", now.timestamp(), now.timestamp_subsec_nanos());
+    let fname = format!(
+        "test-storage-{}{:09}.json",
+        now.timestamp(),
+        now.timestamp_subsec_nanos()
+    );
 
     let data = TestData {
         name: "hello".into(),

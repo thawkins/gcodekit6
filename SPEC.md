@@ -26,14 +26,14 @@ Primary (implemented) requirements
 - Persistent job history (saved to platform data dir via `utils::storage`)
 
 Gaps & missing features (summary from `target/tmp/SPEC.md`)
-1. Connectivity: WebSocket transport and full WebSocket API surface are not yet implemented in `device-adapters`. Implement reconnection/backoff and message queuing.
-2. Communication: GRBL character-counted streaming (precise credit accounting) and a buffered communicator are partially implemented; extend tests and edge-case handling.
-3. G-Code processing: Advanced preprocessors (arc expansion, mesh leveling, coordinate transforms, line splitting) are minimal or missing in the `gcode` module.
+1. Connectivity: WebSocket transport and full WebSocket API surface are not yet implemented in `device-adapters`. Implement reconnection/backoff and message queuing. See issue #3 for the WebSocket transport plan.
+2. Communication: GRBL character-counted streaming (precise credit accounting) and a buffered communicator are partially implemented; extend tests and edge-case handling. See issue #4 for the GRBL character-counted streaming work.
+3. G-Code processing: Advanced preprocessors (arc expansion, mesh leveling, coordinate transforms, line splitting) are minimal or missing in the `gcode` module. See issue #5 for the arc expander preprocessor.
 4. Firmware support: Per-firmware settings managers and protocol adapters (GRBL settings parsing, TinyG/g2core JSON protocols) need completion and conformance tests.
-5. Visualizer: 3D toolpath visualization (wgpu-based renderer) is specified but not present in the codebase.
-6. UI wiring: Slint UI exists as scaffolding; full integration of panels (Visualizer, DRO, Overrides, Macro editor) and their event bindings are pending.
+5. Visualizer: 3D toolpath visualization (wgpu-based renderer) is specified but not present in the codebase. See issue #6 for the Visualizer MVP.
+6. UI wiring: Slint UI exists as scaffolding; full integration of panels (Visualizer, DRO, Overrides, Macro editor) and their event bindings are pending. See issue #7 for UI wiring to streamer & device manager.
 7. Remote APIs: REST/WebSocket APIs for remote control and streaming are planned but not implemented.
-8. Macros & scripting: Macro storage, variable substitution, and execution engine are not implemented.
+8. Macros & scripting: Macro storage, variable substitution, and execution engine are not implemented. See issue #8 for macro & script storage and execution.
 9. Performance: Non-functional targets (parse/stream throughput, memory budgets) require benchmarks and CI gates.
 10. Security & packaging: TLS for network transports, settings file permissions, and packaging/release workflows require work.
 
@@ -66,7 +66,7 @@ Deliverables and acceptance criteria
 
 Immediate next actions (this week)
 1. Commit this updated `SPEC.md`.
-2. Create issues for the top gaps: WebSocket transport, GRBL char-counting, arc expander, visualizer MVP, UI wiring for connection/DRO/console, macro storage.
+2. Create issues for the top gaps: WebSocket transport (#3), GRBL char-counting (#4), arc expander (#5), visualizer MVP (#6), UI wiring for connection/DRO/console (#7), macro storage (#8).
 3. Add a minimal integration test that exercises GRBL streaming flow using a mocked Transport implementation.
 
 Where to find detailed specs

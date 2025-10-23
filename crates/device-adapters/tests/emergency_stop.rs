@@ -1,8 +1,11 @@
 use gcodekit_device_adapters::network::NetworkConnection;
-use std::net::TcpListener;
-use std::thread;
-use std::sync::{Arc, atomic::{AtomicBool, Ordering}};
 use std::io::Read;
+use std::net::TcpListener;
+use std::sync::{
+    atomic::{AtomicBool, Ordering},
+    Arc,
+};
+use std::thread;
 
 #[test]
 #[ignore]

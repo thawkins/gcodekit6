@@ -10,11 +10,9 @@
  ## Phase 1 — Setup
 
  - [X] T001 Create workspace resolver entry in `/home/thawkins/Projects/gcodekit6/Cargo.toml` (setup)
- - [ ] T002 [P] Create `.gitignore` entries for `/home/thawkins/Projects/gcodekit6/target/` and `/home/thawkins/Projects/gcodekit6/target/temp/` in `/home/thawkins/Projects/gcodekit6/.gitignore`
-- [X] T003 Initialize persistent data directory helpers in `/home/thawkins/Projects/gcodekit6/crates/utils/src/storage.rs`
- - [ ] T004 Add basic logging initialization using `tracing` in `/home/thawkins/Projects/gcodekit6/crates/utils/src/logging.rs`
+ - [ ] T002 [P] Create `.gitignore` entries for `/home/thawkins/Projects/gcodekit6/target/` and `/home/thawkins/Projects/gcodekit6/target/tmp/` in `/home/thawkins/Projects/gcodekit6/.gitignore`
+ - [X] T003 Initialize persistent data directory helpers in `/home/thawkins/Projects/gcodekit6/crates/utils/src/storage.rs`
  - [X] T004 Add basic logging initialization using `tracing` in `/home/thawkins/Projects/gcodekit6/crates/utils/src/logging.rs`
- - [ ] T005 [P] Add CI workflow to run `cargo fmt`, `cargo clippy`, and `cargo test` in `/home/thawkins/Projects/gcodekit6/.github/workflows/ci.yml`
  - [X] T005 [P] Add CI workflow to run `cargo fmt`, `cargo clippy`, and `cargo test` in `/home/thawkins/Projects/gcodekit6/.github/workflows/ci.yml`
 
  ## Phase 2 — Foundational (blocking prerequisites)
@@ -76,6 +74,7 @@
 
  - [ ] T025 [P] Add structured logging to all transport send/receive points in `/home/thawkins/Projects/gcodekit6/crates/device-adapters/src/` and `/home/thawkins/Projects/gcodekit6/crates/core/src/`
  - [ ] T026 [P] Implement job history persistence in `/home/thawkins/Projects/gcodekit6/crates/core/src/persistence.rs`
+ - [X] T026 [P] Implement job history persistence in `/home/thawkins/Projects/gcodekit6/crates/core/src/persistence.rs`
  - [ ] T027 [P] Add UI tests / smoke checks in `/home/thawkins/Projects/gcodekit6/crates/ui/tests/` (if Slint enabled in CI)
  - [ ] T028 [P] Review and add more firmware-specific adapters (GRBL, Smoothieware, TinyG, G2core) under `/home/thawkins/Projects/gcodekit6/crates/device-adapters/src/` as separate modules
 

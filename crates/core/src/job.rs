@@ -8,8 +8,14 @@ pub struct JobQueue {
 }
 
 impl JobQueue {
+    // Provide Default for ergonomic construction in tests and APIs
     pub fn new() -> Self {
         JobQueue { inner: Arc::new(Mutex::new(VecDeque::new())) }
+    }
+
+    /// Returns true if the queue is empty.
+    pub fn is_empty(&self) -> bool {
+        self.inner.lock().unwrap().is_empty()
     }
 
     pub fn enqueue(&self, job: Job) {
@@ -27,3 +33,10 @@ impl JobQueue {
         q.len()
     }
 }
+
+impl Default for JobQueue {
+    fn default() -> Self {
+        JobQueue::new()
+    }
+}
+

@@ -1,8 +1,12 @@
 //! Device adapters for GCodeKit6 (GRBL, TinyG, Smoothieware)
-pub mod network;
-pub mod serial;
 pub mod async_network;
 pub mod async_serial;
+pub mod network;
+pub mod serial;
+#[cfg(all(feature = "async", feature = "websocket"))]
+pub mod async_websocket;
+#[cfg(feature = "websocket")]
+pub mod websocket_sync;
 
 /// Transport trait that adapters should implement; simplified for initial plumbing.
 pub trait Transport: Send + Sync {
@@ -101,7 +105,10 @@ impl AsyncTransport for async_serial::AsyncSerialTransport {
 
 /// Factory to create an async serial transport from path and options. This wraps the blocking serial port.
 #[cfg(feature = "async")]
-pub fn create_serial_async_transport_with_options(path: &str, opts: SerialOptions) -> std::io::Result<Box<dyn AsyncTransport>> {
+pub fn create_serial_async_transport_with_options(
+    path: &str,
+    opts: SerialOptions,
+) -> std::io::Result<Box<dyn AsyncTransport>> {
     let conn = serial::SerialConnection::open_with_options(path, opts)?;
     let wrapper = async_serial::AsyncSerialTransport::wrap(conn);
     Ok(Box::new(wrapper))
@@ -139,8 +146,20 @@ pub fn create_tcp_transport(addr: std::net::SocketAddr) -> std::io::Result<Box<d
     Ok(Box::new(conn))
 }
 
+/// Create an async websocket transport (boxed dyn AsyncTransport) when feature is enabled.
+#[cfg(all(feature = "async", feature = "websocket"))]
+pub async fn create_async_websocket_transport(url: &str) -> std::io::Result<Box<dyn AsyncTransport>> {
+    let conn = async_websocket::AsyncWebSocketTransport::connect(url).await?;
+    // Box the transport directly; it implements AsyncTransport via an impl in the module.
+    Ok(Box::new(conn))
+}
+
 /// Create a serial transport from a device path and baud rate.
-pub fn create_serial_transport(path: &str, baud: u32, timeout: std::time::Duration) -> std::io::Result<Box<dyn Transport>> {
+pub fn create_serial_transport(
+    path: &str,
+    baud: u32,
+    timeout: std::time::Duration,
+) -> std::io::Result<Box<dyn Transport>> {
     let conn = serial::SerialConnection::open(path, baud, timeout)?;
     Ok(Box::new(conn))
 }
@@ -154,9 +173,31 @@ pub struct SerialOptions {
 }
 
 /// Create a serial transport with extra options.
-pub fn create_serial_transport_with_options(path: &str, opts: SerialOptions) -> std::io::Result<Box<dyn Transport>> {
+pub fn create_serial_transport_with_options(
+    path: &str,
+    opts: SerialOptions,
+) -> std::io::Result<Box<dyn Transport>> {
     let conn = serial::SerialConnection::open_with_options(path, opts)?;
     Ok(Box::new(conn))
+}
+
+/// Create a synchronous websocket transport boxed as a `Transport` trait object.
+/// If the crate was built without the `websocket` feature this returns an error
+/// explaining the missing feature.
+pub fn create_websocket_transport(url: &str) -> std::io::Result<Box<dyn Transport>> {
+        #[cfg(feature = "websocket")]
+    {
+        let conn = websocket_sync::WebSocketTransport::connect(url)?;
+        Ok(Box::new(conn))
+    }
+
+    #[cfg(not(feature = "websocket"))]
+    {
+        let _ = url; // silence unused variable when websocket not enabled
+        Err(std::io::Error::other(
+            "device-adapters crate built without 'websocket' feature",
+        ))
+    }
 }
 
 impl Transport for serial::SerialConnection {

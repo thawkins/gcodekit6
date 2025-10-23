@@ -1,12 +1,12 @@
+use crate::models::Job;
 use std::io::Write;
 use std::path::PathBuf;
-use crate::models::Job;
 
 /// Save job history to the platform data directory as `jobs.json`.
 pub fn save_job_history(jobs: Vec<Job>) -> std::io::Result<()> {
     let fname = "jobs.json";
     // Re-use utils storage helper which performs atomic write
-    gcodekit_utils::storage::write_json(fname, &jobs).map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))
+    gcodekit_utils::storage::write_json(fname, &jobs).map_err(std::io::Error::other)
 }
 
 /// Load job history from platform data directory. Returns empty Vec if not found.

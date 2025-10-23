@@ -13,3 +13,9 @@ impl MainWindow {
         println!("gcodekit-ui: fake MainWindow running (generated stub)");
     }
 }
+
+impl Default for MainWindow {
+    fn default() -> Self {
+        Self::new()
+    }
+}

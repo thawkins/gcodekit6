@@ -18,6 +18,9 @@ fn integration_network_discovery_detects_local_listener() {
 
     let target = format!("127.0.0.1:{}", addr.port());
     let res = discover_tcp_peer(&target, Duration::from_millis(200));
-    assert!(res.is_ok(), "discover_tcp_peer should find the local listener");
+    assert!(
+        res.is_ok(),
+        "discover_tcp_peer should find the local listener"
+    );
     assert_eq!(res.unwrap(), target);
 }

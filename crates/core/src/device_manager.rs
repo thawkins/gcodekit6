@@ -16,10 +16,27 @@ impl DeviceManager {
     /// Connect to a device by endpoint string. Supports:
     /// - tcp://host:port or host:port -> TCP
     /// - serial:///dev/ttyXXX or a path starting with '/' -> serial device
-    /// Returns a boxed `Transport` for the selected adapter.
+    ///   Returns a boxed `Transport` for the selected adapter.
     pub fn connect_endpoint(endpoint: &str) -> Result<Box<dyn Transport>> {
-        // Quick heuristic: tcp:// or presence of ':' after a hostname indicates TCP
-        if endpoint.starts_with("tcp://") || (endpoint.contains(":") && !endpoint.starts_with('/')) {
+        // Quick heuristic: ws:// or wss:// indicates websocket, tcp:// or presence of ':' after a hostname indicates TCP
+        if endpoint.starts_with("ws://") || endpoint.starts_with("wss://") {
+            // The websocket transport factory is only available when the device-adapters
+            // crate is compiled with the `websocket` feature. If it's not enabled,
+            // return an error with a suggestion.
+            #[cfg(feature = "websocket")]
+            {
+                let transport = gcodekit_device_adapters::create_websocket_transport(endpoint)?;
+                return Ok(transport);
+            }
+
+            #[cfg(not(feature = "websocket"))]
+            {
+                return Err(anyhow::anyhow!("websocket transport requested but device-adapters not built with 'websocket' feature"));
+            }
+        }
+
+        if endpoint.starts_with("tcp://") || (endpoint.contains(":") && !endpoint.starts_with('/'))
+        {
             // Strip optional tcp://
             let ep = endpoint.trim_start_matches("tcp://");
             let sock: std::net::SocketAddr = ep.parse()?;
@@ -35,14 +52,26 @@ impl DeviceManager {
             let mut owned_path: Option<String> = None;
             if endpoint.starts_with("serial://") || endpoint.contains('?') {
                 // Use the url crate to parse query params safely.
-                let url = url::Url::parse(endpoint).or_else(|_| url::Url::parse(&format!("serial://{}", endpoint)))?;
+                let url = url::Url::parse(endpoint)
+                    .or_else(|_| url::Url::parse(&format!("serial://{}", endpoint)))?;
                 let path_owned = url.path().to_string();
-                let p = path_owned.strip_prefix('/').unwrap_or(&path_owned).to_string();
+                let p = path_owned
+                    .strip_prefix('/')
+                    .unwrap_or(&path_owned)
+                    .to_string();
                 owned_path = Some(p);
                 for (k, v) in url.query_pairs() {
                     match k.as_ref() {
-                        "baud" => if let Ok(b) = v.parse::<u32>() { baud = b },
-                        "timeout_ms" => if let Ok(ms) = v.parse::<u64>() { timeout = std::time::Duration::from_millis(ms) },
+                        "baud" => {
+                            if let Ok(b) = v.parse::<u32>() {
+                                baud = b
+                            }
+                        }
+                        "timeout_ms" => {
+                            if let Ok(ms) = v.parse::<u64>() {
+                                timeout = std::time::Duration::from_millis(ms)
+                            }
+                        }
                         _ => {}
                     }
                 }
@@ -52,8 +81,14 @@ impl DeviceManager {
 
             let path_str = owned_path.as_deref().unwrap_or(endpoint);
 
-            let opts = gcodekit_device_adapters::SerialOptions { baud, timeout, parity: None, flow_control: None };
-            let transport = gcodekit_device_adapters::create_serial_transport_with_options(path_str, opts)?;
+            let opts = gcodekit_device_adapters::SerialOptions {
+                baud,
+                timeout,
+                parity: None,
+                flow_control: None,
+            };
+            let transport =
+                gcodekit_device_adapters::create_serial_transport_with_options(path_str, opts)?;
             Ok(transport)
         }
     }
@@ -76,10 +111,10 @@ mod tests {
             }
         });
 
-    let endpoint = format!("127.0.0.1:{}", addr.port());
-    let mut conn = DeviceManager::connect_endpoint(&endpoint).expect("connect network");
-    // Basic smoke: send a line
-    let _ = conn.send_line("M115");
+        let endpoint = format!("127.0.0.1:{}", addr.port());
+        let mut conn = DeviceManager::connect_endpoint(&endpoint).expect("connect network");
+        // Basic smoke: send a line
+        let _ = conn.send_line("M115");
     }
 
     #[test]

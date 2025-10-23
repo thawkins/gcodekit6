@@ -16,5 +16,7 @@ tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync"] }
 chrono = { version = "0.4", features = ["serde"] }
 [features]
 async = ["gcodekit_device_adapters/async"]
+websocket = ["gcodekit_device_adapters/websocket"]
 [dev-dependencies]
 tempfile = "3"
+tungstenite = { version = "0.20", optional = false }

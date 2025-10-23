@@ -11,7 +11,9 @@ fn integration_serial_transport_basic() {
     let timeout = Duration::from_millis(200);
 
     if std::path::Path::new(device).exists() {
-        let mut conn = gcodekit_device_adapters::serial::SerialConnection::open(device, baud, timeout).expect("open serial");
+        let mut conn =
+            gcodekit_device_adapters::serial::SerialConnection::open(device, baud, timeout)
+                .expect("open serial");
         conn.send_line("M115").expect("send");
         conn.flush().expect("flush");
         assert!(conn.is_alive().unwrap());

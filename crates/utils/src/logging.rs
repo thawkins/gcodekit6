@@ -1,7 +1,7 @@
 //! Basic tracing initialization helpers for gcodekit6
 
-use tracing_subscriber::{fmt, layer::SubscriberExt, EnvFilter};
 use tracing_subscriber::util::SubscriberInitExt;
+use tracing_subscriber::{fmt, layer::SubscriberExt, EnvFilter};
 
 /// Initialize structured logging for the application.
 ///

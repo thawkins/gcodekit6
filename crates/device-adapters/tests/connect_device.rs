@@ -1,7 +1,7 @@
 use gcodekit_device_adapters::network::NetworkConnection;
+use std::io::Read;
 use std::net::TcpListener;
 use std::thread;
-use std::io::Read;
 
 #[test]
 fn integration_connect_to_simulated_tcp_device() {

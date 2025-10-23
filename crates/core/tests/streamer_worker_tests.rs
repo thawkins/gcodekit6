@@ -9,7 +9,10 @@ struct MockTransport {
 
 impl MockTransport {
     fn new(will_ack: bool) -> Self {
-        MockTransport { written: Arc::new(Mutex::new(Vec::new())), will_ack }
+        MockTransport {
+            written: Arc::new(Mutex::new(Vec::new())),
+            will_ack,
+        }
     }
 }
 
@@ -24,11 +27,21 @@ impl Transport for MockTransport {
         Ok(())
     }
 
-    fn flush(&mut self) -> std::io::Result<()> { Ok(()) }
-    fn disconnect(&mut self) -> std::io::Result<()> { Ok(()) }
-    fn is_alive(&self) -> std::io::Result<bool> { Ok(true) }
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+    fn disconnect(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+    fn is_alive(&self) -> std::io::Result<bool> {
+        Ok(true)
+    }
     fn read_line(&mut self) -> std::io::Result<String> {
-        if self.will_ack { Ok("ok".to_string()) } else { Err(std::io::Error::new(std::io::ErrorKind::Other, "no ack")) }
+        if self.will_ack {
+            Ok("ok".to_string())
+        } else {
+                Err(std::io::Error::other("no ack"))
+        }
     }
 }
 

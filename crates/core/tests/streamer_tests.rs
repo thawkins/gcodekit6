@@ -1,9 +1,9 @@
-use gcodekit_core::streamer::Streamer;
 use gcodekit_core::device_manager::DeviceManager;
+use gcodekit_core::streamer::Streamer;
 use std::io::{Read, Write};
 use std::net::TcpListener;
-use std::time::Duration;
 use std::sync::Arc;
+use std::time::Duration;
 
 #[test]
 fn test_streamer_sends_lines_to_tcp() {

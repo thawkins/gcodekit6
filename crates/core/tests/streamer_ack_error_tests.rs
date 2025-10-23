@@ -1,5 +1,5 @@
-use gcodekit_core::streamer::Streamer;
 use gcodekit_core::device_manager::DeviceManager;
+use gcodekit_core::streamer::Streamer;
 use std::io::{Read, Write};
 use std::net::TcpListener;
 
@@ -28,5 +28,8 @@ fn test_streamer_error_ack_stops_streaming() {
 
     let lines = vec!["G0 X0", "G0 X1"];
     let res = streamer.stream(lines);
-    assert!(res.is_err(), "expected stream to error on device ACK 'error'");
+    assert!(
+        res.is_err(),
+        "expected stream to error on device ACK 'error'"
+    );
 }

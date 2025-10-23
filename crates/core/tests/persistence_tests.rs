@@ -1,9 +1,13 @@
-use gcodekit_core::persistence::{save_job_history, load_job_history};
-use gcodekit_core::models::Job;
 use chrono::Utc;
+use gcodekit_core::models::Job;
+use gcodekit_core::persistence::{load_job_history, save_job_history};
 
 #[test]
 fn test_save_and_load_job_history() {
+    // Use a temporary XDG data home to isolate storage between tests
+    let td = tempfile::tempdir().expect("tempdir");
+    std::env::set_var("XDG_DATA_HOME", td.path());
+
     // Prepare two jobs
     let j1 = Job {
         id: "j1".into(),
@@ -30,7 +34,10 @@ fn test_save_and_load_job_history() {
     if let Some(p) = gcodekit_utils::storage::file_path("jobs.json") {
         eprintln!("storage file: {} exists={}", p.display(), p.exists());
         if p.exists() {
-            eprintln!("raw contents:\n{}", std::fs::read_to_string(&p).unwrap_or_default());
+            eprintln!(
+                "raw contents:\n{}",
+                std::fs::read_to_string(&p).unwrap_or_default()
+            );
         }
     }
 

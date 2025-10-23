@@ -6,7 +6,7 @@ pub fn parse_lines(input: &str) -> Vec<String> {
         .lines()
         .map(|l| {
             // Strip comments after ';' or '('
-            let mut s = l.splitn(2, ';').next().unwrap_or("").to_string();
+            let mut s = l.split(';').next().unwrap_or("").to_string();
             if let Some(idx) = s.find('(') {
                 s.truncate(idx);
             }
