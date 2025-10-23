@@ -34,7 +34,7 @@ fn start_echo_server(addr: &str) -> thread::JoinHandle<()> {
 fn perf_transport_latency() {
     // This test is a manual performance harness. It is ignored by default.
     let addr = "127.0.0.1:40023";
-    let server = start_echo_server(addr);
+    let _server = start_echo_server(addr);
 
     // Connect via the project's TCP transport factory so we measure the same code paths
     let sock: SocketAddr = addr.parse().expect("parse addr");
@@ -65,8 +65,8 @@ fn perf_transport_latency() {
 
     println!("Perf transport latency (us): n={}, p50={}, p95={}, p99={}", n, p50, p95, p99);
 
-    // Tear down server by dropping listener (server thread will exit when accept fails)
+    // Tear down transport. The server runs in background and will be terminated
+    // when the test process exits; avoid joining the server thread to prevent
+    // blocking on listener.accept.
     let _ = transport.disconnect();
-    // best effort join (server will run until process exit otherwise)
-    let _ = server.join();
 }

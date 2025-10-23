@@ -44,7 +44,7 @@ fn emergency_stop_timing() {
     // Manual test: measures time from issuing emergency stop to device cease.
     let addr = "127.0.0.1:40024";
     let stop_flag = Arc::new(AtomicBool::new(false));
-    let server = start_simulated_device(addr, stop_flag.clone());
+    let _server = start_simulated_device(addr, stop_flag.clone());
 
     let sock: std::net::SocketAddr = addr.parse().expect("parse addr");
     let transport = gcodekit_device_adapters::create_tcp_transport(sock).expect("create_tcp_transport");
@@ -93,8 +93,8 @@ fn emergency_stop_timing() {
     running.store(false, Ordering::SeqCst);
     let _ = streamer.join();
 
-    // best-effort join server
-    let _ = server.join();
+    // Do not block waiting for the server thread; it will exit when the process ends
+    // or when the stop flag is observed by the server loop.
 
     match elapsed {
         Some(d) => println!("emergency-stop latency: {:?}", d),
