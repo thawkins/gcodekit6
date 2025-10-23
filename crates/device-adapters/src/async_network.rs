@@ -14,8 +14,14 @@ pub struct AsyncTcpTransport {
 
 impl AsyncTcpTransport {
     pub async fn connect(addr: SocketAddr) -> io::Result<Self> {
-        let stream = TcpStream::connect(addr).await?;
-        // Use utility default timeout from gcodekit_utils if available
+        // Use the configured network timeout as a connect/read timeout (defaults to 30s)
+        let connect_timeout = gcodekit_utils::settings::network_timeout();
+        // Wrap the connect in a timeout to avoid indefinite hangs during DNS/handshake
+        let stream = tokio::time::timeout(connect_timeout, TcpStream::connect(addr))
+            .await
+            .map_err(|_| io::Error::new(io::ErrorKind::TimedOut, "connect timeout"))??;
+
+        // Use utility default timeout for subsequent read/write operations
         let read_timeout = gcodekit_utils::settings::network_timeout();
         Ok(AsyncTcpTransport {
             stream,
