@@ -9,6 +9,7 @@
 
 ### Session 2025-10-23
 - Q: Target firmware support → A: GRBL + Smoothieware + TinyG + G2core
+ - Q: Emergency Stop semantics → A: Software stop by default; optional hardware E-stop integration
 
 ## User Scenarios & Testing (mandatory)
 
@@ -39,6 +40,8 @@ Acceptance Scenarios:
 - Device disconnects during streaming
 - Corrupt G-code lines
 - High-feedrate commands causing buffer overruns
+- Emergency Stop triggered during streaming (software stop)
+- Hardware E-stop input failure or stuck state (must be detected and reported)
 
 ## Requirements (mandatory)
 
@@ -46,10 +49,14 @@ Acceptance Scenarios:
 - FR-001: System MUST allow users to discover and connect to serial/USB ports (P1)
 - FR-002: System MUST allow loading and parsing of `.gcode` files (P1)
 - FR-003: System MUST stream G-code reliably with pause/resume and progress (P1)
-- FR-004: System MUST present Emergency Stop (P1)
+- FR-004: System MUST present Emergency Stop (P1). Emergency Stop behavior: implement
+	a software stop (feedhold/kill) by default that immediately halts streaming and
+	places the device in a safe state (response target: <200ms). The system MUST also
+	support optional hardware E-stop integration (input relay) where available; hardware
+	E-stop semantics and wiring MUST be documented in quickstart and device adapter docs.
 - FR-005: System MUST log all communication with timestamped entries (P2)
 - FR-006: System SHOULD support plugins for device-specific features (P3)
- - FR-007: System MUST support at minimum the following firmwares: GRBL, Smoothieware, TinyG, and G2core (P1)
+- FR-007: System MUST support at minimum the following firmwares: GRBL, Smoothieware, TinyG, and G2core (P1)
 
 ### Key Entities
 - Device: serial port, firmware, capabilities
