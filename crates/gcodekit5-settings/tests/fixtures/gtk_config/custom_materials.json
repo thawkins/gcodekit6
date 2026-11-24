@@ -1,0 +1,30 @@
+[
+  {
+    "id": "fixture_birch_ply",
+    "name": "Birch Plywood 12mm",
+    "category": "Wood",
+    "subcategory": "Plywood",
+    "description": "",
+    "density": 750.0,
+    "machinability_rating": 7,
+    "tensile_strength": null,
+    "melting_point": null,
+    "brinell_hardness": null,
+    "rockwell_hardness": null,
+    "thermal_conductivity": null,
+    "specific_cutting_force": null,
+    "chip_type": "Continuous",
+    "heat_sensitivity": "Low",
+    "abrasiveness": "Low",
+    "surface_finish": "Good",
+    "dust_hazard": "Minimal",
+    "fume_hazard": "None",
+    "required_ppe": [
+      "EyeProtection"
+    ],
+    "coolant_required": false,
+    "cutting_params": {},
+    "custom": true,
+    "notes": ""
+  }
+]

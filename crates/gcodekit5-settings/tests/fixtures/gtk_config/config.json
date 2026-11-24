@@ -1,0 +1,118 @@
+{
+  "connection": {
+    "connection_type": "serial",
+    "port": "/dev/ttyUSB0",
+    "baud_rate": 115200,
+    "tcp_port": 8888,
+    "timeout_ms": 5000,
+    "auto_reconnect": true
+  },
+  "ui": {
+    "window_width": 1400,
+    "window_height": 900,
+    "panel_visibility": {
+      "dro": true,
+      "console": true,
+      "toolbar": true,
+      "jog": true,
+      "status_bar": true,
+      "visualizer_sidebar": true,
+      "connection": true,
+      "device_config_sidebar": true
+    },
+    "theme": "system",
+    "font_size": 12,
+    "language": "fr",
+    "measurement_system": "metric",
+    "feed_rate_units": "mm_per_min",
+    "startup_tab": "machine",
+    "show_about_on_startup": false,
+    "enable_stl_import": false,
+    "visualizer_sidebar_position": 480,
+    "device_config_sidebar_position": null,
+    "tools_sidebar_position": 505,
+    "tools_manager_search": "",
+    "tools_manager_type_filter": "all",
+    "tools_manager_material_filter": "all",
+    "tools_manager_dia_min": null,
+    "tools_manager_dia_max": null,
+    "tools_manager_selected_tool": "tool_vbit_90",
+    "grid_major_line_width": 2.0,
+    "grid_minor_line_width": 1.0
+  },
+  "file_processing": {
+    "enabled_preprocessors": [
+      "comment_remover",
+      "whitespace_cleaner"
+    ],
+    "arc_segment_length": 0.5,
+    "max_line_length": 256,
+    "preserve_comments": false,
+    "output_directory": "/home/user/gcode",
+    "recent_files_count": 10,
+    "line_numbers_enabled": false
+  },
+  "machine": {
+    "jog_increment": 1.0,
+    "jog_increment_rotary": 1.0,
+    "jog_feed_rate": 1000.0,
+    "x_limit": 420.0,
+    "y_limit": 200.0,
+    "z_limit": 100.0,
+    "a_limit": 360.0,
+    "b_limit": 360.0,
+    "c_limit": 360.0,
+    "default_unit": "mm",
+    "homing_direction": {
+      "Z": true,
+      "Y": true,
+      "B": true,
+      "A": true,
+      "X": true,
+      "C": true
+    },
+    "axis_direction_invert": {
+      "X": false,
+      "C": false,
+      "Z": false,
+      "A": false,
+      "Y": false,
+      "B": false
+    },
+    "steps_per_degree": {
+      "A": 80.0,
+      "C": 80.0,
+      "B": 80.0
+    },
+    "rotary_calibration": {
+      "C": 0.0,
+      "B": 0.0,
+      "A": 0.0
+    },
+    "rotary_backlash": {
+      "B": 0.0,
+      "A": 0.0,
+      "C": 0.0
+    }
+  },
+  "probe": {
+    "default_safe_height": 10.0,
+    "default_fast_feed": 100.0,
+    "default_slow_feed": 20.0,
+    "default_backoff": 2.0,
+    "default_max_depth": -10.0,
+    "auto_update_wcs": true,
+    "target_wcs": 54,
+    "use_temporary_offset": false,
+    "apply_tool_length": false,
+    "preview_before_apply": true,
+    "setter_plate_x": 0.0,
+    "setter_plate_y": 0.0,
+    "setter_plate_z": 0.0
+  },
+  "recent_files": [
+    "/home/user/gcode/tabbedbox.gcode",
+    "/home/user/gcode/spoilboard.nc"
+  ],
+  "last_opened_path": "/home/user/gcode"
+}

@@ -19,3 +19,5 @@ pub fn global_env_lock() -> std::sync::MutexGuard<'static, ()> {
 
 #[path = "config_regression_tests.rs"]
 mod config_regression_tests;
+#[path = "test_settings_migrate.rs"]
+mod test_settings_migrate;

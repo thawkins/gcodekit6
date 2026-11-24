@@ -1,0 +1,68 @@
+{
+  "active_id": "00000000-0000-4000-8000-000000000001",
+  "profiles": [
+    {
+      "a_axis": {
+        "enabled": false,
+        "max": 360.0,
+        "min": 0.0
+      },
+      "auto_reconnect": false,
+      "b_axis": {
+        "enabled": false,
+        "max": 360.0,
+        "min": 0.0
+      },
+      "baud_rate": 115200,
+      "c_axis": {
+        "enabled": false,
+        "max": 360.0,
+        "min": 0.0
+      },
+      "cnc_spindle_watts": 500.0,
+      "connection_type": "Serial",
+      "controller_type": "Grbl",
+      "description": "",
+      "device_type": "CncMill",
+      "grbl_settings": {
+        "0": "10",
+        "1": "25",
+        "100": "250.000",
+        "101": "250.000",
+        "102": "250.000",
+        "110": "500.000",
+        "130": "200.000"
+      },
+      "has_coolant": false,
+      "has_laser": false,
+      "has_spindle": true,
+      "id": "00000000-0000-4000-8000-000000000001",
+      "laser_watts": 5.0,
+      "max_feed_rate": 1000.0,
+      "max_s_value": 1000.0,
+      "max_spindle_speed_rpm": 12000,
+      "name": "Fixture Router",
+      "num_axes": 3,
+      "pen_mode": false,
+      "port": "/dev/ttyUSB0",
+      "tcp_host": "192.168.1.100",
+      "tcp_port": 23,
+      "timeout_ms": 5000,
+      "x_axis": {
+        "enabled": true,
+        "max": 200.0,
+        "min": 0.0
+      },
+      "y_axis": {
+        "enabled": true,
+        "max": 200.0,
+        "min": 0.0
+      },
+      "z_axis": {
+        "enabled": true,
+        "max": 100.0,
+        "min": 0.0
+      }
+    }
+  ]
+}
