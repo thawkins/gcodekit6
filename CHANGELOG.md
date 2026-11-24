@@ -1,3 +1,16 @@
+## [Unreleased] - 2026-11-25 (egui + craft-libs migration, milestone M0)
+
+### Added
+- **Migration plan**: `docs/superpowers/plans/2026-11-25-gtk4-to-egui-craft-libs-migration.md` plans the move from GTK4 to egui + storytold/craft-libs in 20 tasks, including every GitHub Actions workflow, Flatpak, WiX and helper script
+- **`gcodekit5-ui-egui`**: new, still empty egui front-end crate on egui 0.37 (storytold fork) and craft-libs rev `d15bf1f`, pinned in ADR-011; `deny.toml` allows the craft-libs, egui and winit git sources
+- **`gcodekit5-app`**: new crate for toolkit-free application state (device status, console, command history, tool/material backends, GRBL stream helpers) shared by both front ends
+- **`MachineController`**: non-blocking machine controller with one worker thread; real-time commands bypass the line queue, and disconnect never blocks the UI
+- **Translations without gettext**: `po/*.po` is parsed at build time into an embedded table (`tr!`/`trn!`); no `msgfmt` needed for the new code
+
+### Changed
+- **Settings storage**: settings are now saved to `config.toml` through craft-settings (atomic save, backup). On first start the existing `config.json`, devices, tools, materials and recent files are imported once; `config.json` is left untouched and no longer written
+- **CI**: Linux jobs also install the egui/wgpu packages and lavapipe so egui UI tests run headless; `msrv.yml` runs tests with nextest; every crate inherits the workspace lints
+
 ## [Unreleased] - 2026-11-18 (glam update)
 
 ### Changed
