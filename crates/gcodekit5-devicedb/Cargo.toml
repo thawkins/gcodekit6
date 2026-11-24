@@ -29,3 +29,6 @@ path = "src/lib.rs"
 [[test]]
 name = "all"
 path = "tests/all.rs"
+
+[lints]
+workspace = true
