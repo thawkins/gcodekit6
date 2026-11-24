@@ -24,7 +24,7 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgtk-4-dev libadwaita-1-dev libgtksourceview-5-dev libudev-dev
+          sudo apt-get install -y libgtk-4-dev libadwaita-1-dev libgtksourceview-5-dev libudev-dev libxkbcommon-dev libwayland-dev libx11-dev libxcursor-dev libxrandr-dev libxi-dev libvulkan1 mesa-vulkan-drivers
 
       - name: Cache cargo registry
         uses: actions/cache@v6
@@ -73,7 +73,7 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgtk-4-dev libadwaita-1-dev libgtksourceview-5-dev libudev-dev
+          sudo apt-get install -y libgtk-4-dev libadwaita-1-dev libgtksourceview-5-dev libudev-dev libxkbcommon-dev libwayland-dev libx11-dev libxcursor-dev libxrandr-dev libxi-dev libvulkan1 mesa-vulkan-drivers
 
       - name: Cache cargo registry
         uses: actions/cache@v6
@@ -99,7 +99,7 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgtk-4-dev libadwaita-1-dev libgtksourceview-5-dev libudev-dev gettext
+          sudo apt-get install -y libgtk-4-dev libadwaita-1-dev libgtksourceview-5-dev libudev-dev gettext libxkbcommon-dev libwayland-dev libx11-dev libxcursor-dev libxrandr-dev libxi-dev libvulkan1 mesa-vulkan-drivers
 
       - name: Install cargo-nextest
         uses: taiki-e/install-action@nextest
@@ -115,6 +115,18 @@ jobs:
 
       - name: Run tests
         run: cargo nextest run --workspace --profile ci
+        env:
+          WGPU_BACKEND: vulkan
+
+      - name: Upload kittest snapshot diffs
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: kittest-snapshot-diffs
+          path: |
+            crates/gcodekit5-ui-egui/tests/snapshots/**/*.diff.png
+            crates/gcodekit5-ui-egui/tests/snapshots/**/*.new.png
+          if-no-files-found: ignore
 
       - name: Run doc tests
         run: cargo test --workspace --doc
