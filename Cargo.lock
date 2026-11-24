@@ -2049,11 +2049,13 @@ dependencies = [
  "dirs",
  "gcodekit5-communication",
  "gcodekit5-core",
+ "gcodekit5-settings",
  "gettext-rs",
  "once_cell",
  "serde",
  "serde_json",
  "tempfile",
+ "thiserror 2.0.21",
  "tracing",
 ]
 

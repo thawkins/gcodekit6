@@ -18,6 +18,7 @@ pub mod command_history;
 pub mod console;
 pub mod device_console_manager;
 pub mod device_status;
+pub mod machine;
 pub mod materials_manager_backend;
 pub mod tools_manager_backend;
 pub mod types;

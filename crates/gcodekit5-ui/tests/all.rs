@@ -64,8 +64,6 @@ mod test_glib_log_filter;
 mod test_i18n_language_restart;
 #[path = "test_i18n_locale_env.rs"]
 mod test_i18n_locale_env;
-#[path = "test_job_preferences.rs"]
-mod test_job_preferences;
 #[path = "test_translation_catalogs.rs"]
 mod test_translation_catalogs;
 #[path = "test_ui_leaks.rs"]

@@ -21,8 +21,12 @@ pub fn global_env_lock() -> std::sync::MutexGuard<'static, ()> {
 mod test_command_history;
 #[path = "test_device_console_manager.rs"]
 mod test_device_console_manager;
+#[path = "test_job_preferences.rs"]
+mod test_job_preferences;
 #[path = "test_machine_busy_guard.rs"]
 mod test_machine_busy_guard;
+#[path = "test_machine_controller.rs"]
+mod test_machine_controller;
 #[path = "test_materials_manager_backend.rs"]
 mod test_materials_manager_backend;
 #[path = "test_report_units.rs"]

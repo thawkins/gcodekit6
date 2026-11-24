@@ -48,7 +48,7 @@ use std::rc::Rc;
 mod connection;
 mod continuous_jog;
 mod direct_sender;
-pub mod grbl_stream;
+pub use gcodekit5_app::machine::grbl_stream;
 mod state;
 mod status_report;
 mod ui_builders;
