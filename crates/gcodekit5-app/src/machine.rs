@@ -33,7 +33,9 @@ use gcodekit5_communication::firmware::grbl::{FEED_OVERRIDE_CODES, SPINDLE_OVERR
 use gcodekit5_communication::{Communicator, ConnectionParams, SerialCommunicator};
 use gcodekit5_settings::{ConnectionSettings, ConnectionType};
 
-use grbl_stream::{CharCountWindow, GrblResponseLine, ResponseLineSplitter, classify_response};
+use grbl_stream::{
+    CharCountWindow, GrblResponseLine, ResponseLineSplitter, classify_response, linear_jog_command,
+};
 
 /// How often the worker asks the controller for a status report (`?`).
 const STATUS_INTERVAL: Duration = Duration::from_millis(200);
@@ -224,18 +226,24 @@ struct Worker {
     commands: Sender<Command>,
     events: Receiver<MachineEvent>,
     handle: JoinHandle<()>,
+    /// Set by the worker once the transport is open (just before `Connected`).
+    ready: Arc<AtomicBool>,
 }
 
 /// Non-blocking front-end handle to a machine connection.
 ///
 /// Every method returns without waiting for I/O. Call [`poll`](Self::poll) regularly
 /// (every frame) to collect [`MachineEvent`]s. Dropping the controller disconnects and
-/// joins the worker thread.
+/// joins the worker thread, except while a connect is still in progress: that worker is
+/// told to shut down and left to finish on its own, so the caller never waits for a
+/// connect timeout.
 pub struct MachineController {
     factory: TransportFactory,
     repaint: SharedHook,
     streaming: Arc<AtomicBool>,
     worker: Option<Worker>,
+    /// Workers told to shut down while still connecting; reaped once finished.
+    closing: Vec<JoinHandle<()>>,
     pending: Vec<MachineEvent>,
 }
 
@@ -273,6 +281,7 @@ impl MachineController {
             repaint: Arc::new(Mutex::new(None)),
             streaming: Arc::new(AtomicBool::new(false)),
             worker: None,
+            closing: Vec::new(),
             pending: Vec::new(),
         }
     }
@@ -285,13 +294,21 @@ impl MachineController {
     ///
     /// # Errors
     /// [`MachineError::AlreadyConnected`] if a connection is open, or
-    /// [`MachineError::InvalidSettings`] if `cfg` cannot describe a connection, or
+    /// [`MachineError::InvalidSettings`] if `cfg` cannot describe a connection (including
+    /// an empty or unresolved `"Auto"` port), or
     /// [`MachineError::WorkerStart`] if the worker thread cannot be spawned.
     pub fn connect(&mut self, cfg: &ConnectionSettings) -> Result<(), MachineError> {
         if self.is_worker_running() {
             return Err(MachineError::AlreadyConnected);
         }
         self.reap_worker();
+        self.reap_closing();
+        let port = cfg.port.trim();
+        if port.is_empty() || port.eq_ignore_ascii_case("auto") {
+            return Err(MachineError::InvalidSettings(format!(
+                "port '{port}' must name a device or host"
+            )));
+        }
         let params = connection_params(cfg);
         params
             .validate()
@@ -299,6 +316,7 @@ impl MachineController {
 
         let (cmd_tx, cmd_rx) = mpsc::channel();
         let (ev_tx, ev_rx) = mpsc::channel();
+        let ready = Arc::new(AtomicBool::new(false));
         let state = WorkerState::new(
             (self.factory)(),
             cmd_rx,
@@ -307,6 +325,7 @@ impl MachineController {
                 repaint: self.repaint.clone(),
             },
             self.streaming.clone(),
+            ready.clone(),
         );
         self.streaming.store(false, Ordering::SeqCst);
         let handle = std::thread::Builder::new()
@@ -317,23 +336,41 @@ impl MachineController {
             commands: cmd_tx,
             events: ev_rx,
             handle,
+            ready,
         });
         Ok(())
     }
 
-    /// Closes the connection and joins the worker thread.
+    /// Closes the connection without waiting on I/O.
     ///
-    /// Events the worker emitted on the way out (including
-    /// [`MachineEvent::Disconnected`]) stay available to [`poll`](Self::poll).
+    /// A connected worker is joined (it exits within one loop iteration), and the
+    /// events it emitted on the way out (including [`MachineEvent::Disconnected`]) stay
+    /// available to [`poll`](Self::poll). A worker still inside the transport's
+    /// `connect` is told to shut down and detached: [`MachineEvent::Disconnected`] is
+    /// reported at once, its later events are discarded, and [`poll`](Self::poll) or the
+    /// next [`connect`](Self::connect) joins it once it has finished.
     pub fn disconnect(&mut self) {
-        if let Some(worker) = self.worker.as_ref() {
-            // A send error means the worker already exited; joining is still right.
-            let _ = worker.commands.send(Command::Shutdown);
+        let Some(worker) = self.worker.as_ref() else {
+            return;
+        };
+        // A send error means the worker already exited; joining is still right.
+        let _ = worker.commands.send(Command::Shutdown);
+        if worker.ready.load(Ordering::SeqCst) || worker.handle.is_finished() {
+            self.reap_worker();
+            return;
         }
-        self.reap_worker();
+        if let Some(worker) = self.worker.take() {
+            // Dropping the channels makes the worker exit as soon as connect returns.
+            self.closing.push(worker.handle);
+            self.pending.push(MachineEvent::Disconnected);
+            self.streaming.store(false, Ordering::SeqCst);
+        }
     }
 
     /// Queues `program` for streaming and returns immediately.
+    ///
+    /// Lines are sent as given (trimmed), so the program must already be prepared
+    /// with [`grbl_stream::prepare_program`] (comments removed, length checked).
     ///
     /// # Errors
     /// [`MachineError::NotConnected`] without a connection, or
@@ -384,12 +421,7 @@ impl MachineController {
             ));
             return;
         }
-        let line = format!(
-            "$J=G91 G21 {}{:.2} F{}",
-            axis.letter(),
-            distance_mm,
-            feed_mm_min
-        );
+        let line = linear_jog_command(axis.letter(), distance_mm, feed_mm_min);
         self.send_or_report(Command::Line(line));
     }
 
@@ -400,6 +432,7 @@ impl MachineController {
 
     /// Returns every event since the last call, oldest first. Never blocks.
     pub fn poll(&mut self) -> Vec<MachineEvent> {
+        self.reap_closing();
         let mut events = std::mem::take(&mut self.pending);
         if let Some(worker) = self.worker.as_ref() {
             events.extend(worker.events.try_iter());
@@ -448,6 +481,21 @@ impl MachineController {
             self.pending.push(MachineEvent::Disconnected);
         }
         self.streaming.store(false, Ordering::SeqCst);
+    }
+}
+
+impl MachineController {
+    /// Joins the detached workers that have finished; leaves the others running.
+    fn reap_closing(&mut self) {
+        let (done, running): (Vec<_>, Vec<_>) = std::mem::take(&mut self.closing)
+            .into_iter()
+            .partition(JoinHandle::is_finished);
+        self.closing = running;
+        for handle in done {
+            if handle.join().is_err() {
+                tracing::warn!("detached machine worker thread panicked");
+            }
+        }
     }
 }
 
@@ -503,6 +551,7 @@ struct WorkerState {
     commands: Receiver<Command>,
     sink: EventSink,
     streaming: Arc<AtomicBool>,
+    ready: Arc<AtomicBool>,
     window: CharCountWindow,
     /// One entry per line in `window`: true for a program line, false for a manual one.
     in_flight_is_program: VecDeque<bool>,
@@ -524,12 +573,14 @@ impl WorkerState {
         commands: Receiver<Command>,
         sink: EventSink,
         streaming: Arc<AtomicBool>,
+        ready: Arc<AtomicBool>,
     ) -> Self {
         Self {
             comm,
             commands,
             sink,
             streaming,
+            ready,
             window: CharCountWindow::default(),
             in_flight_is_program: VecDeque::new(),
             splitter: ResponseLineSplitter::new(),
@@ -545,9 +596,12 @@ impl WorkerState {
         if let Err(e) = self.comm.connect(params) {
             self.sink
                 .emit(MachineEvent::Error(format!("connect failed: {e}")));
+            // A stream queued while connecting never started.
+            self.streaming.store(false, Ordering::SeqCst);
             self.sink.emit(MachineEvent::Disconnected);
             return;
         }
+        self.ready.store(true, Ordering::SeqCst);
         self.sink.emit(MachineEvent::Connected);
 
         let exit = self.io_loop();
@@ -556,7 +610,7 @@ impl WorkerState {
         }
         self.end_stream(false);
         if let Err(e) = self.comm.disconnect() {
-            tracing::debug!("machine transport disconnect failed: {e}");
+            tracing::warn!("machine transport disconnect failed: {e}");
         }
         self.sink.emit(MachineEvent::Disconnected);
     }

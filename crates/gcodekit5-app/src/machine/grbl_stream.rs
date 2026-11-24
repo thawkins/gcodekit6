@@ -475,6 +475,13 @@ pub fn rotary_jog_command(axis: char, delta: f32, feed_mm_per_min: f32) -> Strin
     format!("$J=G21 G91 {axis}{delta} F{feed_mm_per_min}\n")
 }
 
+/// The `$J=` jog for a linear axis: `distance_mm` (relative, 2 decimal places) at
+/// `feed_mm_min`, without a trailing newline, e.g. `$J=G91 G21 X1.00 F1000`.
+/// `G21` is stated so a program left in `G20` cannot turn it into inches.
+pub fn linear_jog_command(axis: char, distance_mm: f32, feed_mm_min: f32) -> String {
+    format!("$J=G91 G21 {axis}{distance_mm:.2} F{feed_mm_min}")
+}
+
 /// The steps-per-degree value to send for Preferences text `value`, or
 /// `None` when it is not a finite number. Values below 1 become 1, as saving
 /// Preferences stores them, so the controller and the config agree.

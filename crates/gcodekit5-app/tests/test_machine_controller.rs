@@ -34,11 +34,26 @@ struct LoopbackShared {
     /// While set, no `ok` is released (the controller is "holding").
     hold_acks: AtomicBool,
     connected: AtomicBool,
+    /// How long `connect` takes (a slow TCP connect).
+    connect_delay: Duration,
+    /// When set, `connect` fails after `connect_delay`.
+    fail_connect: bool,
+    /// Response bytes handed out by `receive` before any `ok`.
+    inject: Mutex<VecDeque<Vec<u8>>>,
+    /// Lines written but not yet answered with `ok`.
+    outstanding: std::sync::atomic::AtomicUsize,
 }
 
 impl LoopbackShared {
     fn log(&self) -> Vec<Wrote> {
         self.log.lock().unwrap().clone()
+    }
+
+    fn inject(&self, response: &str) {
+        self.inject
+            .lock()
+            .unwrap()
+            .push_back(response.as_bytes().to_vec());
     }
 
     fn lines_written(&self) -> usize {
@@ -78,6 +93,10 @@ fn is_realtime_byte(b: u8) -> bool {
 
 impl Communicator for Loopback {
     fn connect(&mut self, params: &ConnectionParams) -> gcodekit5_core::Result<()> {
+        std::thread::sleep(self.shared.connect_delay);
+        if self.shared.fail_connect {
+            return Err(gcodekit5_core::Error::other("loopback refused"));
+        }
         self.params = Some(params.clone());
         self.shared.connected.store(true, Ordering::SeqCst);
         Ok(())
@@ -109,6 +128,7 @@ impl Communicator for Loopback {
                 let due = self.last_due.max(Instant::now()) + self.ok_delay;
                 self.last_due = due;
                 self.pending_acks.push_back(due);
+                self.shared.outstanding.fetch_add(1, Ordering::SeqCst);
             } else {
                 self.carry.push(b);
             }
@@ -117,11 +137,15 @@ impl Communicator for Loopback {
     }
 
     fn receive(&mut self) -> gcodekit5_core::Result<Vec<u8>> {
+        if let Some(data) = self.shared.inject.lock().unwrap().pop_front() {
+            return Ok(data);
+        }
         if !self.shared.hold_acks.load(Ordering::SeqCst)
             && let Some(&due) = self.pending_acks.front()
             && due <= Instant::now()
         {
             self.pending_acks.pop_front();
+            self.shared.outstanding.fetch_sub(1, Ordering::SeqCst);
             return Ok(b"ok\n".to_vec());
         }
         // Behave like a serial read with a short timeout.
@@ -339,4 +363,281 @@ fn test_repaint_hook_called_on_event() {
     }));
     connect(&mut controller);
     assert!(calls.load(Ordering::SeqCst) > 0);
+}
+
+/// Starts a 100-line stream with acks held and waits until the window is in use.
+fn held_stream(lines: usize) -> (Arc<LoopbackShared>, MachineController) {
+    let shared = Arc::new(LoopbackShared::default());
+    shared.hold_acks.store(true, Ordering::SeqCst);
+    let mut controller = loopback_controller(&shared, Duration::from_millis(1));
+    connect(&mut controller);
+    controller
+        .start_stream(program(lines))
+        .expect("start_stream");
+    assert!(wait_until(|| shared.lines_written() > 0), "no line sent");
+    (shared, controller)
+}
+
+/// Collects events until `pred` matches, returning all of them.
+fn events_until(
+    controller: &mut MachineController,
+    pred: impl Fn(&MachineEvent) -> bool,
+) -> Vec<MachineEvent> {
+    let deadline = Instant::now() + EVENTUALLY;
+    let mut seen = Vec::new();
+    while Instant::now() < deadline {
+        let batch = controller.poll();
+        let done = batch.iter().any(&pred);
+        seen.extend(batch);
+        if done {
+            return seen;
+        }
+        std::thread::sleep(Duration::from_millis(2));
+    }
+    panic!("event never arrived; saw {seen:?}");
+}
+
+/// The jog line [`MachineController::jog`] writes for X +1 mm at 1000 mm/min.
+fn jog_line() -> Wrote {
+    Wrote::Line("$J=G91 G21 X1.00 F1000".to_string())
+}
+
+#[test]
+fn test_disconnect_during_slow_connect_returns_quickly() {
+    let shared = Arc::new(LoopbackShared {
+        connect_delay: Duration::from_secs(2),
+        ..LoopbackShared::default()
+    });
+    let mut controller = loopback_controller(&shared, Duration::from_millis(1));
+    controller.connect(&tcp_settings()).expect("connect");
+
+    let started = Instant::now();
+    controller.disconnect();
+    let elapsed = started.elapsed();
+    assert!(
+        elapsed < Duration::from_millis(500),
+        "disconnect blocked {elapsed:?}"
+    );
+    assert!(controller.poll().contains(&MachineEvent::Disconnected));
+    // The detached worker never reports Connected to this controller.
+    let deadline = Instant::now() + Duration::from_millis(2500);
+    while Instant::now() < deadline {
+        assert!(!controller.poll().contains(&MachineEvent::Connected));
+        std::thread::sleep(Duration::from_millis(20));
+    }
+    // And it shut its transport once connect returned.
+    assert!(wait_until(|| !shared.connected.load(Ordering::SeqCst)));
+}
+
+#[test]
+fn test_drop_during_slow_connect_returns_quickly() {
+    let shared = Arc::new(LoopbackShared {
+        connect_delay: Duration::from_secs(2),
+        ..LoopbackShared::default()
+    });
+    let mut controller = loopback_controller(&shared, Duration::from_millis(1));
+    controller.connect(&tcp_settings()).expect("connect");
+
+    let started = Instant::now();
+    drop(controller);
+    let elapsed = started.elapsed();
+    assert!(
+        elapsed < Duration::from_millis(500),
+        "drop blocked {elapsed:?}"
+    );
+}
+
+#[test]
+fn test_stop_soft_resets_and_clears_buffers() {
+    let (shared, mut controller) = held_stream(100);
+    controller.stop();
+    let events = events_until(&mut controller, |e| {
+        matches!(e, MachineEvent::StreamStopped { .. })
+    });
+    assert!(events.contains(&MachineEvent::StreamStopped {
+        acked: 0,
+        total: 100
+    }));
+    let log = shared.log();
+    let reset_at = log
+        .iter()
+        .position(|w| *w == Wrote::Realtime(0x18))
+        .expect("soft reset written");
+
+    // The window was cleared: a jog goes out although no line was ever acked.
+    controller.jog(gcodekit5_app::machine::Axis::X, 1.0, 1000.0);
+    assert!(wait_until(|| shared.log().contains(&jog_line())));
+    let log = shared.log();
+    let program_lines_after_reset = log[reset_at..]
+        .iter()
+        .filter(|w| matches!(w, Wrote::Line(_)) && **w != jog_line())
+        .count();
+    assert_eq!(program_lines_after_reset, 0, "program continued after stop");
+}
+
+#[test]
+fn test_pause_stops_feeding_and_resume_restarts() {
+    let shared = Arc::new(LoopbackShared::default());
+    let mut controller = loopback_controller(&shared, Duration::from_millis(10));
+    connect(&mut controller);
+    controller.start_stream(program(100)).expect("start_stream");
+    assert!(wait_until(|| shared.lines_written() > 0), "no line sent");
+
+    controller.pause();
+    // Every in-flight line is acked and the feed hold went out.
+    assert!(wait_until(|| {
+        shared.log().contains(&Wrote::Realtime(b'!'))
+            && shared.outstanding.load(Ordering::SeqCst) == 0
+    }));
+    // Several status-report cycles later, still nothing new.
+    let paused_lines = shared.lines_written();
+    let settle = Instant::now() + Duration::from_millis(300);
+    while Instant::now() < settle {
+        controller.poll();
+        std::thread::sleep(Duration::from_millis(10));
+    }
+    assert_eq!(shared.lines_written(), paused_lines, "fed while paused");
+    assert!(paused_lines < 100);
+    let log = shared.log();
+    let hold_at = log
+        .iter()
+        .position(|w| *w == Wrote::Realtime(b'!'))
+        .expect("feed hold logged");
+    assert!(
+        !log[hold_at..].iter().any(|w| matches!(w, Wrote::Line(_))),
+        "line written after feed hold"
+    );
+
+    controller.resume();
+    assert_eq!(
+        wait_for(&mut controller, |e| {
+            matches!(e, MachineEvent::StreamFinished { .. })
+        }),
+        Some(MachineEvent::StreamFinished { lines: 100 })
+    );
+    let log = shared.log();
+    let resume_at = log
+        .iter()
+        .position(|w| *w == Wrote::Realtime(b'~'))
+        .expect("cycle start logged");
+    assert!(resume_at > hold_at);
+    assert_eq!(shared.lines_written(), 100);
+}
+
+#[test]
+fn test_error_reply_counts_as_ack() {
+    let (shared, mut controller) = held_stream(3);
+    assert!(wait_until(|| shared.lines_written() == 3));
+    shared.inject("error:20\n");
+    let events = events_until(&mut controller, |e| {
+        matches!(e, MachineEvent::StreamProgress { acked: 1, .. })
+    });
+    assert!(
+        events
+            .iter()
+            .any(|e| matches!(e, MachineEvent::Error(m) if m.contains("error:20"))),
+        "{events:?}"
+    );
+    // Two more oks finish the 3-line program; the third queued ok is surplus.
+    shared.hold_acks.store(false, Ordering::SeqCst);
+    assert_eq!(
+        wait_for(&mut controller, |e| {
+            matches!(e, MachineEvent::StreamFinished { .. })
+        }),
+        Some(MachineEvent::StreamFinished { lines: 3 })
+    );
+}
+
+#[test]
+fn test_alarm_ends_stream() {
+    let (shared, mut controller) = held_stream(10);
+    shared.inject("ALARM:1\n");
+    let events = events_until(&mut controller, |e| {
+        matches!(e, MachineEvent::StreamStopped { .. })
+    });
+    assert!(events.contains(&MachineEvent::Error("ALARM:1".to_string())));
+    assert!(events.contains(&MachineEvent::StreamStopped {
+        acked: 0,
+        total: 10
+    }));
+}
+
+#[test]
+fn test_reset_banner_clears_window() {
+    let (shared, mut controller) = held_stream(100);
+    let banner = "Grbl 1.1h ['$' for help]";
+    shared.inject(&format!("{banner}\n"));
+    let events = events_until(&mut controller, |e| {
+        matches!(e, MachineEvent::StreamStopped { .. })
+    });
+    assert!(events.contains(&MachineEvent::Received(banner.to_string())));
+    // With acks still held, only an emptied window lets the jog out.
+    controller.jog(gcodekit5_app::machine::Axis::X, 1.0, 1000.0);
+    assert!(
+        wait_until(|| shared.log().contains(&jog_line())),
+        "jog blocked by a stale window"
+    );
+}
+
+#[test]
+fn test_failed_connect_emits_error_then_disconnected() {
+    let shared = Arc::new(LoopbackShared {
+        fail_connect: true,
+        ..LoopbackShared::default()
+    });
+    let mut controller = loopback_controller(&shared, Duration::from_millis(1));
+    controller.connect(&tcp_settings()).expect("connect starts");
+    let events = events_until(&mut controller, |e| *e == MachineEvent::Disconnected);
+    let error_at = events
+        .iter()
+        .position(|e| matches!(e, MachineEvent::Error(m) if m.contains("connect failed")))
+        .expect("connect error reported");
+    let disconnected_at = events
+        .iter()
+        .position(|e| *e == MachineEvent::Disconnected)
+        .expect("disconnected reported");
+    assert!(error_at < disconnected_at, "{events:?}");
+    assert!(!events.contains(&MachineEvent::Connected));
+}
+
+#[test]
+fn test_failed_connect_clears_streaming() {
+    let shared = Arc::new(LoopbackShared {
+        connect_delay: Duration::from_millis(200),
+        fail_connect: true,
+        ..LoopbackShared::default()
+    });
+    let mut controller = loopback_controller(&shared, Duration::from_millis(1));
+    controller.connect(&tcp_settings()).expect("connect starts");
+    // Queued while the worker is still connecting.
+    controller.start_stream(program(5)).expect("queued");
+    events_until(&mut controller, |e| *e == MachineEvent::Disconnected);
+
+    controller.jog(gcodekit5_app::machine::Axis::X, 1.0, 1000.0);
+    let events = controller.poll();
+    assert!(
+        events.contains(&MachineEvent::Error(
+            gcodekit5_app::machine::MachineError::NotConnected.to_string()
+        )),
+        "{events:?}"
+    );
+}
+
+#[test]
+fn test_connect_rejects_auto_or_empty_port() {
+    let shared = Arc::new(LoopbackShared::default());
+    let mut controller = loopback_controller(&shared, Duration::from_millis(1));
+    for port in ["Auto", "auto", "", "  "] {
+        let cfg = ConnectionSettings {
+            port: port.to_string(),
+            ..tcp_settings()
+        };
+        assert!(
+            matches!(
+                controller.connect(&cfg),
+                Err(gcodekit5_app::machine::MachineError::InvalidSettings(_))
+            ),
+            "port {port:?} accepted"
+        );
+    }
 }
