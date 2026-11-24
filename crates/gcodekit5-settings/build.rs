@@ -2,21 +2,28 @@
 //!
 //! Each `po/<lang>.po` is parsed with `polib` (no `msgfmt`, no gettext) and
 //! written to `$OUT_DIR/catalogs.rs` as one sorted `(msgid, msgstr)` slice per
-//! language, which `src/i18n.rs` includes and binary-searches. Untranslated and
-//! fuzzy entries are left out, so lookups fall back to the msgid.
+//! language, which `src/i18n.rs` includes and binary-searches. Untranslated,
+//! fuzzy and msgctxt entries are left out, so lookups fall back to the msgid.
 
 use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 
-/// Maps a catalog's `Plural-Forms` expression to the `PluralRule` variant the
+/// Maps a catalog's `Plural-Forms` header to the `PluralRule` variant the
 /// runtime evaluates. Only the expressions the shipped catalogs use are known;
 /// a new one fails the build so it cannot be silently mistranslated.
-fn plural_rule(file: &Path, nplurals: usize, expr: &str) -> &'static str {
+///
+/// `header` is `None` when the file has no `Plural-Forms` line (polib then
+/// reports `nplurals=1; plural=0`, the same as a real one-form header);
+/// gettext uses the Germanic default `n != 1` for such a catalog. A real
+/// one-form header is a different rule and, like any other unknown one,
+/// fails the build until `PluralRule` supports it.
+fn plural_rule(file: &Path, header: Option<(usize, &str)>) -> &'static str {
+    let Some((nplurals, expr)) = header else {
+        return "PluralRule::NotOne";
+    };
     let expr: String = expr.chars().filter(|c| !c.is_whitespace()).collect();
     match (nplurals, expr.as_str()) {
-        // polib's value for a catalog without a Plural-Forms header; gettext
-        // then uses the Germanic default.
-        (1, "0") | (2, "(n!=1)") | (2, "n!=1") => "PluralRule::NotOne",
+        (2, "(n!=1)") | (2, "n!=1") => "PluralRule::NotOne",
         (2, "(n>1)") | (2, "n>1") => "PluralRule::GreaterThanOne",
         _ => panic!(
             "{}: unsupported Plural-Forms nplurals={nplurals}; plural={expr} \
@@ -34,8 +41,12 @@ fn main() {
     println!("cargo:rerun-if-changed={}", po_dir.display());
 
     let mut files: Vec<PathBuf> = std::fs::read_dir(&po_dir)
-        .expect("read the po/ directory")
-        .map(|entry| entry.expect("read a po/ directory entry").path())
+        .unwrap_or_else(|e| panic!("{}: cannot read: {e}", po_dir.display()))
+        .map(|entry| {
+            entry
+                .unwrap_or_else(|e| panic!("{}: cannot read an entry: {e}", po_dir.display()))
+                .path()
+        })
         .filter(|p| p.extension().is_some_and(|e| e == "po"))
         .collect();
     files.sort();
@@ -47,16 +58,33 @@ fn main() {
         let lang = file
             .file_stem()
             .and_then(|s| s.to_str())
-            .expect("po file name is UTF-8");
+            .unwrap_or_else(|| panic!("{}: file name is not UTF-8", file.display()));
+        let text = std::fs::read_to_string(file)
+            .unwrap_or_else(|e| panic!("{}: cannot read: {e}", file.display()));
         let catalog = polib::po_file::parse(file)
             .unwrap_or_else(|e| panic!("{}: cannot parse: {e}", file.display()));
         let rules = &catalog.metadata.plural_rules;
-        let rule = plural_rule(file, rules.nplurals, &rules.expr);
+        let has_header = text.contains("\"Plural-Forms:");
+        let rule = plural_rule(
+            file,
+            has_header.then_some((rules.nplurals, rules.expr.as_str())),
+        );
 
         let mut singular: Vec<(String, String)> = Vec::new();
         let mut plural: Vec<(String, Vec<String>)> = Vec::new();
         for message in catalog.messages() {
             if !message.is_translated() || message.is_fuzzy() {
+                continue;
+            }
+            // Lookups have no context yet: an entry with msgctxt would
+            // shadow (or be shadowed by) the context-free msgid.
+            if let Some(ctx) = message.msgctxt().filter(|c| !c.is_empty()) {
+                println!(
+                    "cargo:warning={}: skipped msgctxt {ctx:?} entry {:?} \
+                     (context lookups are not supported)",
+                    file.display(),
+                    message.msgid()
+                );
                 continue;
             }
             let id = message.msgid().to_string();
@@ -90,5 +118,5 @@ fn main() {
 
     let dest =
         PathBuf::from(std::env::var_os("OUT_DIR").expect("cargo sets OUT_DIR")).join("catalogs.rs");
-    std::fs::write(&dest, out).expect("write catalogs.rs");
+    std::fs::write(&dest, out).unwrap_or_else(|e| panic!("{}: cannot write: {e}", dest.display()));
 }

@@ -17,7 +17,7 @@
 use crate::config::Config;
 use crate::manager::SettingsManager;
 use craft_settings::paths::{self, Probe};
-use craft_settings::{LoadReport, Location, Portable, SettingsStore};
+use craft_settings::{LoadReport, Location, Portable, SettingsStore, Source};
 use std::path::{Path, PathBuf};
 
 /// Application id: the settings folder name and the `GCODEKIT5_CONFIG_DIR`
@@ -129,7 +129,8 @@ impl ConfigDirs {
 
 /// Imports the GTK build's settings and data files into `dirs.config`, once.
 ///
-/// `config.json` becomes `config.toml` unless one exists already; each data
+/// `config.json` becomes `config.toml` unless a valid one exists already
+/// (a damaged one is moved aside by craft-settings and replaced); each data
 /// file is copied unless the new folder already has it. Legacy files are left
 /// in place. A marker in `dirs.config` makes every later call return
 /// [`MigrationReport::AlreadyMigrated`]; it is not written when the legacy
@@ -199,20 +200,22 @@ pub fn open_store(
     (store, report, migration)
 }
 
-/// Writes `legacy` (`config.json`) to `config.toml` in `dir` when that does
-/// not exist yet. Returns whether it was imported.
+/// Writes `legacy` (`config.json`) to `config.toml` in `dir` when the store
+/// there starts from defaults (no `config.toml`, or a damaged one that
+/// craft-settings moved aside). A valid `config.toml` wins and `legacy` is not
+/// even parsed. Returns whether it was imported.
 fn import_config(legacy: &Path, dir: &Path) -> Result<bool, SettingsError> {
+    let (mut store, report) = SettingsStore::<Config>::open_at(dir);
+    if report.source != Source::Defaults {
+        return Ok(false);
+    }
+    if let Some(reason) = report.read_only {
+        return Err(SettingsError::ReadOnly(reason.to_string()));
+    }
     let config = Config::load_from_file(legacy).map_err(|e| SettingsError::Legacy {
         path: legacy.to_path_buf(),
         message: e.to_string(),
     })?;
-    if dir.join(craft_settings::store::CONFIG_FILE).exists() {
-        return Ok(false);
-    }
-    let (mut store, report) = SettingsStore::<Config>::open_at(dir);
-    if let Some(reason) = report.read_only {
-        return Err(SettingsError::ReadOnly(reason.to_string()));
-    }
     store.set(config);
     store.flush()?;
     Ok(true)
