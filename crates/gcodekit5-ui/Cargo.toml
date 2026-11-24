@@ -10,6 +10,7 @@ description = "Slint-based user interface for GCodeKit4"
 autotests = false
 
 [dependencies]
+gcodekit5-app = { path = "../gcodekit5-app" }
 gcodekit5-core = { path = "../gcodekit5-core" }
 gcodekit5-communication = { path = "../gcodekit5-communication" }
 gcodekit5-camtools = { path = "../gcodekit5-camtools" }

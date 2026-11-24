@@ -2043,6 +2043,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "gcodekit5-app"
+version = "1.2.0-beta.2"
+dependencies = [
+ "dirs",
+ "gcodekit5-communication",
+ "gcodekit5-core",
+ "gettext-rs",
+ "once_cell",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "tracing",
+]
+
+[[package]]
 name = "gcodekit5-camtools"
 version = "1.2.0-beta.2"
 dependencies = [
@@ -2167,6 +2182,7 @@ version = "1.2.0-beta.2"
 dependencies = [
  "anyhow",
  "dirs",
+ "gcodekit5-app",
  "gcodekit5-camtools",
  "gcodekit5-communication",
  "gcodekit5-core",

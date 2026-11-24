@@ -5,8 +5,8 @@
 //! and functional area of the application.
 
 pub mod cam_tools;
-pub mod command_history;
 pub mod common;
+pub use gcodekit5_app::command_history;
 pub mod designer;
 pub mod designer_canvas;
 pub mod designer_layers;

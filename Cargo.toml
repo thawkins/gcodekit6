@@ -7,6 +7,7 @@ members = [
     "crates/gcodekit5-visualizer",
     "crates/gcodekit5-settings",
     "crates/gcodekit5-devicedb",
+    "crates/gcodekit5-app",
     "crates/gcodekit5-ui",
     "crates/gcodekit5-ui-egui",
 ]

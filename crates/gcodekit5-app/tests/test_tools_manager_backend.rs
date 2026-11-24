@@ -1,7 +1,7 @@
-//! Tests for `gcodekit5_ui::ui::tools_manager_backend` (moved from the inline test module).
+//! Tests for `gcodekit5_app::tools_manager_backend` (moved from the inline test module).
 
+use gcodekit5_app::tools_manager_backend::*;
 use gcodekit5_core::data::tools::{Tool, ToolId, ToolType};
-use gcodekit5_ui::ui::tools_manager_backend::*;
 
 /// A storage file of this test's own under `target/temp`, so no test reads or
 /// overwrites the user's `custom_tools.json` (PR #99 review). Each test and process
