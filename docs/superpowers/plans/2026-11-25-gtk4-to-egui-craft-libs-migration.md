@@ -27,7 +27,7 @@
 
 ## Decisions to confirm before Task 1
 
-These are choices the plan makes by default. Change them here before execution starts; later tasks depend on them.
+All six defaults below were confirmed by the user on 2026-11-25.
 
 | # | Decision | Default in this plan | Alternative |
 |---|---|---|---|
