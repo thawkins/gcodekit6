@@ -641,3 +641,54 @@ fn test_connect_rejects_auto_or_empty_port() {
         );
     }
 }
+
+#[test]
+fn test_stale_worker_cannot_clear_new_session_streaming() {
+    // First transport: a slow connect that fails. Second: a working loopback.
+    let stale = Arc::new(LoopbackShared {
+        connect_delay: Duration::from_millis(300),
+        fail_connect: true,
+        ..LoopbackShared::default()
+    });
+    let live = Arc::new(LoopbackShared::default());
+    live.hold_acks.store(true, Ordering::SeqCst);
+    let calls = Arc::new(std::sync::atomic::AtomicUsize::new(0));
+    let (factory_stale, factory_live) = (stale.clone(), live.clone());
+    let mut controller = MachineController::with_transport(Box::new(move || {
+        let shared = if calls.fetch_add(1, Ordering::SeqCst) == 0 {
+            factory_stale.clone()
+        } else {
+            factory_live.clone()
+        };
+        Box::new(Loopback::new(shared, Duration::from_millis(1))) as Box<dyn Communicator>
+    }));
+
+    controller
+        .connect(&tcp_settings())
+        .expect("slow connect starts");
+    controller.disconnect();
+    connect(&mut controller);
+    controller.start_stream(program(100)).expect("start_stream");
+    assert!(wait_until(|| live.lines_written() > 0), "no line sent");
+
+    // Bounded wait until the stale worker has finished (its Arc clone is dropped:
+    // left are the test's handle and the factory closure's clone).
+    assert!(
+        wait_until(|| Arc::strong_count(&stale) == 2),
+        "stale worker never finished"
+    );
+    controller.poll();
+
+    assert_eq!(
+        controller.start_stream(program(1)),
+        Err(gcodekit5_app::machine::MachineError::StreamInProgress)
+    );
+    controller.jog(gcodekit5_app::machine::Axis::X, 1.0, 1000.0);
+    let events = controller.poll();
+    assert!(
+        events
+            .iter()
+            .any(|e| matches!(e, MachineEvent::Error(m) if m.contains("streaming"))),
+        "{events:?}"
+    );
+}

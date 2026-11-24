@@ -14,7 +14,7 @@
 //! with GRBL's character-counting protocol ([`grbl_stream::CharCountWindow`]).
 //!
 //! No lock is held across I/O: the transport is owned by the worker alone, and the
-//! only shared state is the repaint hook and an atomic "streaming" flag.
+//! only shared state is the repaint hook and a per-connection atomic "streaming" flag.
 //!
 //! Depends on `gcodekit5-communication` (transport, response parsing) and
 //! `gcodekit5-settings` ([`ConnectionSettings`]).
@@ -317,6 +317,9 @@ impl MachineController {
         let (cmd_tx, cmd_rx) = mpsc::channel();
         let (ev_tx, ev_rx) = mpsc::channel();
         let ready = Arc::new(AtomicBool::new(false));
+        // A fresh flag per connection: a detached worker from an earlier session keeps
+        // its own clone, so it can never clear this session's streaming state.
+        self.streaming = Arc::new(AtomicBool::new(false));
         let state = WorkerState::new(
             (self.factory)(),
             cmd_rx,
@@ -327,7 +330,6 @@ impl MachineController {
             self.streaming.clone(),
             ready.clone(),
         );
-        self.streaming.store(false, Ordering::SeqCst);
         let handle = std::thread::Builder::new()
             .name("machine-controller".to_string())
             .spawn(move || state.run(&params))
