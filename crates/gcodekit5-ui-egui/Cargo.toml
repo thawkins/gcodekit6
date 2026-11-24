@@ -13,6 +13,7 @@ autotests = false
 anyhow = { workspace = true }
 egui = { workspace = true }
 eframe = { workspace = true }
+craft-ui = { workspace = true }
 
 [dev-dependencies]
 egui_kittest = { workspace = true }

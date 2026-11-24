@@ -11,3 +11,13 @@ fn test_app_renders_empty_frame() {
     harness.run();
     let _ = harness.get_by_label("GCodeKit");
 }
+
+#[test]
+fn test_widget_palette_applied() {
+    let mut widgets = egui::Visuals::dark().widgets;
+    gcodekit5_ui_egui::app::apply_widget_palette(&mut widgets);
+    assert_eq!(
+        widgets.hovered.bg_fill,
+        gcodekit5_ui_egui::app::WIDGET_PALETTE.hovered
+    );
+}

@@ -30,7 +30,6 @@ uuid = { version = "1.6", features = ["v4", "serde"] }
 chrono = { version = "0.4", features = ["serde"] }
 tempfile = "3.8"
 
-
 # egui front end (ADR-011). egui family must match the craft-libs pin; the
 # [patch.crates-io] block below replicates craft-libs' egui/winit forks.
 egui = { version = "0.37", default-features = false }
@@ -62,6 +61,9 @@ authors.workspace = true
 repository.workspace = true
 readme = "README.md"
 
+[lints]
+workspace = true
+
 # The binary keeps the product name that the release workflow, the
 # Windows installer, the flatpak and the desktop file expect.
 [[bin]]
@@ -86,7 +88,6 @@ tracing-subscriber = { version = "0.3", features = [
     "json",
 ] }
 anyhow = "1.0"
-
 
 [package.metadata.deb]
 maintainer = "GCodeKit Contributors"
@@ -131,5 +132,6 @@ name = "all"
 path = "tests/all.rs"
 
 [workspace.lints.cargo]
-# craft-libs workspace deps are declared ahead of the crates that use them (ADR-011).
+# Workspace deps for craft-libs are declared ahead of the crates that use them (ADR-011).
+# The root package opts in via [lints] workspace = true so cargo stops warning about them.
 unused_workspace_dependencies = "allow"

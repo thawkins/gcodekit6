@@ -1,6 +1,6 @@
 //! egui + craft-libs front end for GCodeKit5.
 //!
-//! Dependencies: `egui` and `eframe` for the UI and native window.
+//! Dependencies: `egui` and `eframe` for the UI and native window, `craft-ui` for widgets.
 
 #![deny(unsafe_code)]
 
@@ -23,7 +23,8 @@ pub struct LaunchOptions {
 /// # Returns
 /// `Ok(())` on a clean exit, or an error if the native window cannot start.
 pub fn run(options: LaunchOptions) -> anyhow::Result<()> {
-    let _ = options.files;
+    // `options.files` is consumed once the app opens files (Tasks 4 and 9).
+    let LaunchOptions { files: _ } = options;
     eframe::run_native(
         "GCodeKit",
         eframe::NativeOptions::default(),
