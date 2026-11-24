@@ -16,6 +16,7 @@ This directory contains Architecture Decision Records (ADRs) for GCodeKit5. ADRs
 | [ADR-008](ADR-008-units-system.md) | Internal Units System | Accepted | 2026-02-18 |
 | [ADR-009](ADR-009-communication-protocol.md) | Communication Protocol Architecture | Accepted | 2026-02-18 |
 | [ADR-010](ADR-010-dependency-management.md) | Dependency Management Strategy | Accepted | 2026-02-18 |
+| [ADR-011](ADR-011-egui-craft-libs-pin.md) | egui and craft-libs Pin | Accepted | 2026-11-25 |
 
 ## ADR Template
 

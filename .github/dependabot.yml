@@ -24,7 +24,26 @@ updates:
       # updates (see #107). Remove this entry when it does.
       - dependency-name: "nalgebra"
         versions: [">=0.34"]
+      # Bump together with the craft-libs rev: egui 0.37 is what craft-libs
+      # pins at d15bf1f (ADR-011).
+      - dependency-name: "egui"
+        versions: [">=0.38"]
+      - dependency-name: "eframe"
+        versions: [">=0.38"]
+      - dependency-name: "egui_*"
+        versions: [">=0.38"]
+      - dependency-name: "egui-*"
+        versions: [">=0.38"]
+      - dependency-name: "epaint"
+        versions: [">=0.38"]
+      - dependency-name: "emath"
+        versions: [">=0.38"]
+      - dependency-name: "ecolor"
+        versions: [">=0.38"]
     groups:
+      # egui family bumps together (and with the craft-libs rev).
+      egui:
+        patterns: ["egui", "eframe", "egui_*", "egui-*", "epaint", "emath", "ecolor"]
       # Group minor and patch updates to reduce PR noise
       rust-minor-patch:
         patterns:

@@ -125,7 +125,7 @@ impl SettingsController {
                     SettingValue::Boolean(_) => Some(SettingValue::Boolean(value == "true")),
                     SettingValue::Path(_) => Some(SettingValue::Path(value.to_string())),
                     SettingValue::Enum(_, options) => {
-                        if options.contains(&value.to_string()) {
+                        if options.iter().any(|i: &String| i == value) {
                             Some(SettingValue::Enum(value.to_string(), options.clone()))
                         } else {
                             None

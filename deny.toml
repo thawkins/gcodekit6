@@ -55,7 +55,13 @@ skip-tree = []
 unknown-registry = "deny"
 unknown-git = "deny"
 allow-registry = ["https://github.com/rust-lang/crates.io-index"]
-allow-git = ["https://github.com/bbqsrc/core2"]
+allow-git = [
+    "https://github.com/bbqsrc/core2",
+    "https://github.com/storytold/craft-libs",
+    # egui and winit forks that craft-libs requires (ADR-011).
+    "https://github.com/storytold/egui.git",
+    "https://github.com/storytold/winit.git",
+]
 
 [sources.allow-org]
 github = []
