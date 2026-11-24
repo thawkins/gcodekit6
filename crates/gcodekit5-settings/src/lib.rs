@@ -5,6 +5,7 @@
 
 pub mod config;
 pub mod controller;
+pub mod i18n;
 pub mod manager;
 pub mod persistence;
 pub mod view_model;

@@ -325,9 +325,9 @@ pub fn stop_pending() -> bool {
 /// stop the job.
 pub fn manual_command_blocked() -> Option<String> {
     if stop_pending() {
-        return Some(t!("the machine is stopping"));
+        return Some(crate::tr!("the machine is stopping").into_owned());
     }
-    is_job_active().then(|| t!("a job is running"))
+    is_job_active().then(|| crate::tr!("a job is running").into_owned())
 }
 
 /// Why a `$` settings command (`$$`, `$n=v`) must not be sent now, or `None`.
@@ -343,7 +343,10 @@ pub fn settings_command_blocked() -> Option<String> {
     if low.is_empty() || low.starts_with("idle") || low.starts_with("alarm") {
         None
     } else {
-        Some(format!("{} ({state})", t!("the machine must be idle")))
+        Some(format!(
+            "{} ({state})",
+            crate::tr!("the machine must be idle")
+        ))
     }
 }
 

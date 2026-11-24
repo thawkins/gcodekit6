@@ -11,12 +11,10 @@ use crate::view_model::{
 use gcodekit5_core::Result;
 use std::path::Path;
 
+/// Translates a settings label into the current language.
 macro_rules! t {
     ($s:expr) => {
-        gettextrs::gettext($s)
-    };
-    ($s:expr, $($args:tt)*) => {
-        format!(gettext_rs::gettext($s), $($args)*)
+        $crate::tr!($s).into_owned()
     };
 }
 

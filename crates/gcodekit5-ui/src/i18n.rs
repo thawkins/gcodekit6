@@ -52,6 +52,11 @@ pub fn init(lang: Option<String>) {
             }
         }
 
+        // Strings translated outside this crate (settings labels, device
+        // status) use the po-based translator, which reads `LANGUAGE` for
+        // "system" just as gettext does.
+        gcodekit5_app::i18n::set_language(applied_language());
+
         // The C locale (`setlocale(LC_ALL, "")`) is set by GTK itself when the
         // application starts (`gtk_init`), before any widget is built and so
         // before the first string is translated. Setting it here as well would
