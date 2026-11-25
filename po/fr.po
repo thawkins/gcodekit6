@@ -3183,3 +3183,6 @@ msgstr "Jog refusé : la position de la machine est inconnue."
 
 msgid "Jog refused: no travel left in that direction."
 msgstr "Jog refusé : plus de course disponible dans cette direction."
+
+msgid "Jog refused: the machine is not idle."
+msgstr "Jog refusé : la machine n'est pas au repos."

@@ -17,7 +17,9 @@ use gcodekit5_ui_egui::commands::Command;
 use gcodekit5_ui_egui::workspace::PaneId;
 
 use crate::machine_support::{loopback_config, step_until, wait_until};
-use crate::test_machine_pane::{pane_app_with, pointer_button, wrote_realtime};
+use crate::test_machine_pane::{
+    pane_app_with, pointer_button, report_idle, report_state, wrote_realtime,
+};
 
 /// The `$J` lines written so far.
 fn jog_lines(shared: &LoopbackShared) -> Vec<String> {
@@ -47,18 +49,12 @@ fn hold_app(
     mpos: Option<[f32; 3]>,
 ) -> (Harness<'static, GcodeKitApp>, Arc<LoopbackShared>) {
     let (mut harness, shared) = pane_app_with(config, Duration::from_millis(1), true);
-    if let Some([x, y, z]) = mpos {
-        shared.inject(&format!("<Idle|MPos:{x:.3},{y:.3},{z:.3}|FS:0,0>\n"));
-        assert!(
-            step_until(&mut harness, |app| app
-                .state()
-                .machine
-                .status()
-                .machine_position()
-                .is_some()),
-            "no status report"
-        );
-    }
+    let report = match mpos {
+        Some([x, y, z]) => format!("<Idle|MPos:{x:.4},{y:.4},{z:.4}|FS:0,0>"),
+        // Idle, but only a work position and no offset: the machine position is unknown.
+        None => "<Idle|WPos:0.000,0.000,0.000|FS:0,0>".to_string(),
+    };
+    report_state(&mut harness, &shared, &report, "Idle");
     harness.get_by_label("Continuous").click();
     harness.step();
     (harness, shared)
@@ -287,13 +283,22 @@ fn test_hold_refused_without_position() {
 /// C2: Preferences > Machine > Invert reverses an axis for step and hold jogs alike.
 #[test]
 fn test_inverted_z_jogs_negative() {
-    let _guard = crate::global_env_lock();
+    /// Puts Z back to not inverted however the test ends, panics included.
+    struct RestoreZ;
+    impl Drop for RestoreZ {
+        fn drop(&mut self) {
+            gcodekit5_app::device_status::set_jog_inverted('Z', false);
+        }
+    }
+    let _lock = crate::global_env_lock();
+    let _restore = RestoreZ;
     let mut config = loopback_config();
     config
         .machine
         .axis_direction_invert
         .insert("Z".to_string(), true);
     let (mut harness, shared) = pane_app_with(config.clone(), Duration::from_millis(1), true);
+    report_idle(&mut harness, &shared);
     harness.get_by_label("Jog Z+").click();
     harness.step();
     assert_eq!(wait_jogs(&shared, 1), ["$J=G91 G21 Z-1.00 F1000"]);
@@ -306,7 +311,6 @@ fn test_inverted_z_jogs_negative() {
     let at = press(&mut harness, "Jog Z+");
     assert_eq!(wait_jogs(&shared, 1), ["$J=G91 G21 Z-60.00 F1000"]);
     release(&mut harness, at);
-    gcodekit5_app::device_status::set_jog_inverted('Z', false);
 }
 
 /// C1 (app): exiting during a hold writes jog cancel before the transport closes.
@@ -336,7 +340,7 @@ fn inch_config() -> Config {
     config
 }
 
-/// I6: in inch mode the DRO shows inches with two decimals.
+/// I6: in inch mode the DRO shows inches with three decimals.
 #[test]
 fn test_dro_in_inches() {
     let (mut harness, shared) = pane_app_with(inch_config(), Duration::from_millis(1), true);
@@ -353,23 +357,25 @@ fn test_dro_in_inches() {
     harness.step();
     assert!(
         !harness
-            .query_all_by_label("1.00")
+            .query_all_by_label("1.000")
             .collect::<Vec<_>>()
             .is_empty()
     );
     assert!(
         !harness
-            .query_all_by_label("-2.00")
+            .query_all_by_label("-2.000")
             .collect::<Vec<_>>()
             .is_empty()
     );
     assert!(harness.query_by_label("25.40").is_none());
+    assert!(harness.query_by_label("1.00").is_none());
 }
 
 /// I6: inch step presets jog the matching distance in mm (the `$J` line stays G21).
 #[test]
 fn test_jog_step_in_inches() {
     let (mut harness, shared) = pane_app_with(inch_config(), Duration::from_millis(1), true);
+    report_idle(&mut harness, &shared);
     harness.get_by_label("Step").click();
     // The popup's items appear in the accessibility tree a frame after it opens.
     harness.step();
@@ -396,4 +402,116 @@ fn test_job_running_right_after_start() {
         .expect("start");
     assert!(!state.machine.status().streaming, "no progress polled yet");
     assert!(state.job_running());
+}
+
+/// `$13=1`: reports in inches are converted to mm before the DRO and the hold clamp use
+/// them (X at -150 mm reports -5.9055 in).
+#[test]
+fn test_report_inches_converted_for_dro_and_clamp() {
+    let (mut harness, shared) = pane_app_with(loopback_config(), Duration::from_millis(1), true);
+    shared.inject("$13=1\n");
+    shared.inject("$130=300.000\n");
+    assert!(
+        step_until(&mut harness, |app| {
+            let status = app.state().machine.status();
+            status.report_inches && status.grbl_travel[0] == Some(300.0)
+        }),
+        "no $13 / $130"
+    );
+    report_state(
+        &mut harness,
+        &shared,
+        "<Idle|MPos:-5.9055,-3.9370,-1.9685|FS:0,0>",
+        "Idle",
+    );
+    assert!(
+        !harness
+            .query_all_by_label("-150.00")
+            .collect::<Vec<_>>()
+            .is_empty()
+    );
+    assert!(
+        !harness
+            .query_all_by_label("-100.00")
+            .collect::<Vec<_>>()
+            .is_empty()
+    );
+    assert!(harness.query_by_label("-5.91").is_none());
+    harness.get_by_label("Continuous").click();
+    harness.step();
+    let at = press(&mut harness, "Jog X-");
+    assert_eq!(wait_jogs(&shared, 1), ["$J=G91 G21 X-150.00 F1000"]);
+    release(&mut harness, at);
+}
+
+/// Jogging (step button, Jog command and hold) is refused while homing and in alarm.
+#[test]
+fn test_jog_refused_in_home_and_alarm() {
+    for state in ["Home", "Alarm"] {
+        let (mut harness, shared) =
+            pane_app_with(loopback_config(), Duration::from_millis(1), true);
+        let report = format!("<{state}|MPos:-100.000,-100.000,-50.000|FS:0,0>");
+        report_state(&mut harness, &shared, &report, state);
+        harness.get_by_label("Jog X+").click();
+        harness.step();
+        harness.state_mut().dispatch(Command::JogXPos);
+        harness.step();
+        let _ = harness.get_by_label("Jog refused: the machine is not idle.");
+        harness.get_by_label("Continuous").click();
+        harness.step();
+        let at = press(&mut harness, "Jog X+");
+        harness.step();
+        release(&mut harness, at);
+        std::thread::sleep(Duration::from_millis(30));
+        assert!(jog_lines(&shared).is_empty(), "{state}: {:?}", shared.log());
+    }
+}
+
+/// A hold ends with jog cancel as soon as a report leaves Idle/Jog (an alarm here).
+#[test]
+fn test_hold_ends_when_state_becomes_alarm() {
+    let (mut harness, shared) = hold_app(loopback_config(), Some([-100.0, -100.0, -50.0]));
+    let at = press(&mut harness, "Jog X+");
+    wait_jogs(&shared, 1);
+    report_state(
+        &mut harness,
+        &shared,
+        "<Jog|MPos:-90.000,-100.000,-50.000|FS:1000,0>",
+        "Jog",
+    );
+    assert_eq!(settled_cancels(&shared), 0, "Jog state ended the hold");
+    report_state(
+        &mut harness,
+        &shared,
+        "<Alarm|MPos:-80.000,-100.000,-50.000|FS:0,0>",
+        "Alarm",
+    );
+    assert!(wait_until(|| cancels(&shared) == 1), "{:?}", shared.log());
+    release(&mut harness, at);
+    assert_eq!(settled_cancels(&shared), 1);
+}
+
+/// A `$13` change drops the cached work offset (and report), which were in the old units;
+/// the next report is converted with the new setting.
+#[test]
+fn test_report_inches_change_drops_cached_offset() {
+    use gcodekit5_app::machine::MachineEvent;
+    use gcodekit5_communication::firmware::grbl::status_parser::StatusParser;
+    use gcodekit5_ui_egui::machine::MachineStatus;
+    let mut status = MachineStatus::default();
+    let report = |line: &str| MachineEvent::StatusReport(Box::new(StatusParser::parse_full(line)));
+    status.apply(&[report(
+        "<Idle|MPos:-10.000,0.000,0.000|WCO:-5.000,0.000,0.000|FS:0,0>",
+    )]);
+    assert!(status.wco.is_some());
+    status.apply(&[MachineEvent::Received("$13=1".to_string())]);
+    assert!(status.report_inches);
+    assert!(status.wco.is_none(), "offset in the old units kept");
+    assert!(status.report.is_none(), "report in the old units kept");
+    status.apply(&[report("<Idle|MPos:-1.0000,0.000,0.000|FS:0,0>")]);
+    let mpos = status.machine_position().expect("position");
+    assert!((mpos[0] + 25.4).abs() < 1e-3, "{mpos:?}");
+    // The same setting again changes nothing.
+    status.apply(&[MachineEvent::Received("$13=1".to_string())]);
+    assert!(status.report.is_some());
 }

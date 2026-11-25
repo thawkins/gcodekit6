@@ -3176,3 +3176,6 @@ msgstr "Tippen abgelehnt: Die Maschinenposition ist unbekannt."
 
 msgid "Jog refused: no travel left in that direction."
 msgstr "Tippen abgelehnt: In dieser Richtung ist kein Verfahrweg mehr frei."
+
+msgid "Jog refused: the machine is not idle."
+msgstr "Tippen abgelehnt: Die Maschine ist nicht im Leerlauf."

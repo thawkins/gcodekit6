@@ -3100,3 +3100,6 @@ msgstr ""
 
 msgid "Jog refused: no travel left in that direction."
 msgstr ""
+
+msgid "Jog refused: the machine is not idle."
+msgstr ""

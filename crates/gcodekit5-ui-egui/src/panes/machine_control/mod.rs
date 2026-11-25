@@ -216,8 +216,17 @@ impl MachineControlPane {
         }
     }
 
-    /// Jogs `axis` one step in the direction of `sign`.
-    fn jog_step(&mut self, axis: Axis, sign: f32) {
+    /// Jogs `axis` one step in the direction of `sign`, only while the machine is idle (or
+    /// jogging).
+    fn jog_step(&mut self, ctx: &PaneContext, axis: Axis, sign: f32) {
+        if !ctx.machine().is_some_and(|m| m.status().jog_allowed()) {
+            self.notice = Some(
+                ctx.tr
+                    .tr("Jog refused: the machine is not idle.")
+                    .into_owned(),
+            );
+            return;
+        }
         let (step, feed) = (self.jog.step_mm(), self.jog.feed_mm_min());
         let distance = jog::directed(axis, sign * step);
         self.with_controller(|c| c.jog(axis, distance, feed));
@@ -227,12 +236,12 @@ impl MachineControlPane {
     fn run(&mut self, command: Command, ctx: &PaneContext) -> bool {
         let tr = ctx.tr;
         match command {
-            Command::JogXPos => self.jog_step(Axis::X, 1.0),
-            Command::JogXNeg => self.jog_step(Axis::X, -1.0),
-            Command::JogYPos => self.jog_step(Axis::Y, 1.0),
-            Command::JogYNeg => self.jog_step(Axis::Y, -1.0),
-            Command::JogZPos => self.jog_step(Axis::Z, 1.0),
-            Command::JogZNeg => self.jog_step(Axis::Z, -1.0),
+            Command::JogXPos => self.jog_step(ctx, Axis::X, 1.0),
+            Command::JogXNeg => self.jog_step(ctx, Axis::X, -1.0),
+            Command::JogYPos => self.jog_step(ctx, Axis::Y, 1.0),
+            Command::JogYNeg => self.jog_step(ctx, Axis::Y, -1.0),
+            Command::JogZPos => self.jog_step(ctx, Axis::Z, 1.0),
+            Command::JogZNeg => self.jog_step(ctx, Axis::Z, -1.0),
             Command::Connect => self.connect(tr),
             Command::Disconnect => {
                 // Disconnect writes jog cancel itself when a jog is outstanding.

@@ -3171,3 +3171,6 @@ msgstr "Jog recusado: a posição da máquina é desconhecida."
 
 msgid "Jog refused: no travel left in that direction."
 msgstr "Jog recusado: não resta curso nessa direção."
+
+msgid "Jog refused: the machine is not idle."
+msgstr "Jog recusado: a máquina não está em repouso."

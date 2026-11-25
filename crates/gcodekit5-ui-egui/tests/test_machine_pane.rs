@@ -53,6 +53,39 @@ pub(crate) fn pane_app_with(
     (harness, shared)
 }
 
+/// Has the loopback send the status report `line` and steps until the app shows a report
+/// in `state`.
+pub(crate) fn report_state(
+    harness: &mut Harness<'_, GcodeKitApp>,
+    shared: &LoopbackShared,
+    line: &str,
+    state: &str,
+) {
+    shared.inject(&format!("{line}\n"));
+    assert!(
+        step_until(harness, |app| app
+            .state()
+            .machine
+            .status()
+            .report
+            .as_ref()
+            .and_then(|r| r.machine_state.as_deref())
+            == Some(state)),
+        "no {state} report"
+    );
+    harness.step();
+}
+
+/// Reports the machine idle at the machine origin.
+pub(crate) fn report_idle(harness: &mut Harness<'_, GcodeKitApp>, shared: &LoopbackShared) {
+    report_state(
+        harness,
+        shared,
+        "<Idle|MPos:0.000,0.000,0.000|FS:0,0>",
+        "Idle",
+    );
+}
+
 /// Whether the loopback saw the real-time byte of `command`.
 pub(crate) fn wrote_realtime(shared: &LoopbackShared, command: RealtimeCommand) -> bool {
     shared.log().contains(&Wrote::Realtime(command.byte()))
@@ -105,6 +138,7 @@ fn test_connect_button_connects() {
 #[test]
 fn test_jog_x_positive_sends_jog() {
     let (mut harness, shared) = pane_app(Duration::from_millis(1), true);
+    report_idle(&mut harness, &shared);
     harness.get_by_label("Jog X+").click();
     harness.step();
     assert!(
@@ -279,6 +313,7 @@ fn test_escape_is_unbound() {
 #[test]
 fn test_pane_keys_never_steal_from_focused_widget() {
     let (mut harness, shared) = pane_app(Duration::from_millis(1), true);
+    report_idle(&mut harness, &shared);
     let binding = Binding::parse("Alt+J").expect("binding");
     harness
         .state_mut()

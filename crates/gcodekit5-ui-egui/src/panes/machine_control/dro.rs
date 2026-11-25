@@ -1,8 +1,8 @@
 //! The digital readout (DRO): machine state, work and machine positions of X, Y and Z, and
 //! the current feed rate and spindle speed, from the latest status report.
 //!
-//! Positions are millimetres internally, shown in the user's measurement system with two
-//! decimals (ported from the GTK `osd_format::format_length_with_unit` and the GTK status
+//! Positions are millimetres internally, shown in the user's measurement system (two
+//! decimals for mm, three for inches) (ported from the GTK `osd_format::format_length_with_unit` and the GTK status
 //! report's DRO). A report carries either `MPos` or `WPos`; the
 //! other is derived with the last work coordinate offset (`WCO`) when one is known.
 //!
@@ -24,17 +24,21 @@ pub(super) const MSGIDS: &[&str] = &[
     n_!("Spindle:"),
 ];
 
-/// Formats a length held in millimetres in `units`, with two decimals, e.g. `1.23`.
+/// Formats a length held in millimetres in `units`: mm with two decimals (`1.23`), inches
+/// with three (`0.049`).
+///
+/// Three decimals for inches are a deliberate exception to the project's two-decimal rule,
+/// which is about mm values: 0.01 in is 0.254 mm, too coarse to see the 0.001 in jog steps,
+/// and the GTK front end showed inches with three decimals too.
 ///
 /// # Arguments
 /// * `value_mm` - Length in millimetres.
 /// * `units` - The measurement system to show.
 pub(super) fn format_length(value_mm: f32, units: MeasurementSystem) -> String {
-    let value = match units {
-        MeasurementSystem::Metric => value_mm,
-        MeasurementSystem::Imperial => value_mm / 25.4,
-    };
-    format!("{value:.2}")
+    match units {
+        MeasurementSystem::Metric => format!("{value_mm:.2}"),
+        MeasurementSystem::Imperial => format!("{:.3}", value_mm / 25.4),
+    }
 }
 
 /// Draws one position block.

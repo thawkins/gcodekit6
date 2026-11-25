@@ -3179,3 +3179,6 @@ msgstr "Jog rifiutato: la posizione della macchina è sconosciuta."
 
 msgid "Jog refused: no travel left in that direction."
 msgstr "Jog rifiutato: nessuna corsa residua in quella direzione."
+
+msgid "Jog refused: the machine is not idle."
+msgstr "Jog rifiutato: la macchina non è inattiva."

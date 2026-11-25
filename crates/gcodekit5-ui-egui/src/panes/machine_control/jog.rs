@@ -10,7 +10,8 @@
 //! continuous jog: one `$J` move toward the end of travel, cancelled with jog cancel (0x85).
 //! The move is clamped to the travel left in that direction (see [`remaining_travel`]); with
 //! no known machine position, or no travel left, nothing moves and the pane says why. The
-//! hold is tracked here rather than with egui's "pointer down on" flag, which this egui
+//! Jogging (step and hold) is enabled only while the last status report says `Idle` or
+//! `Jog`. The hold is tracked here rather than with egui's "pointer down on" flag, which this egui
 //! clears once a press can no longer be a click: it lasts while the primary button that
 //! was pressed on the button stays down, the pointer stays on the button and the button
 //! stays enabled. Anything else ends it with 0x85, and the pane and the app end it on
@@ -38,6 +39,7 @@ pub(super) const MSGIDS: &[&str] = &[
     n_!("Continuous"),
     n_!("Jog refused: the machine position is unknown."),
     n_!("Jog refused: no travel left in that direction."),
+    n_!("Jog refused: the machine is not idle."),
 ];
 
 /// Default step, feed and travel, as `MachineSettings` defaults them.
@@ -354,7 +356,8 @@ impl JogPanel {
         status: &MachineStatus,
     ) -> Vec<Action> {
         let mut actions = Vec::new();
-        let enabled = status.connected && !status.streaming;
+        // Disabled outside Idle and Jog; a hold in progress ends when its button disables.
+        let enabled = status.connected && !status.streaming && status.jog_allowed();
         ui.strong(tr.tr("Jog"));
         self.show_step(ui, tr);
         self.show_feed(ui, tr);

@@ -59,10 +59,21 @@ pub struct MachineStatus {
     pub last_error: Option<String>,
     /// X, Y and Z max travel in mm (`$130`-`$132`), once the controller reported them.
     pub grbl_travel: [Option<f32>; 3],
+    /// Whether the controller reports positions in inches (`$13=1`). Until a `$$` line says
+    /// so, reports are taken as mm, GRBL's default (as the GTK front end does).
+    pub report_inches: bool,
 }
 
 /// X, Y and Z in millimetres.
 pub type Xyz = [f32; 3];
+
+/// The `$13` report-inches setting a `$$` line reports.
+fn parse_report_inches(line: &str) -> Option<bool> {
+    let (key, value) = line.trim().split_once('=')?;
+    (key == "$13").then_some(())?;
+    let value: f32 = value.trim().parse().ok()?;
+    Some(value >= 1.0)
+}
 
 /// The `$130`-`$132` max-travel setting a `$$` line reports: axis index and value in mm.
 fn parse_travel(line: &str) -> Option<(usize, f32)> {
@@ -78,6 +89,16 @@ fn parse_travel(line: &str) -> Option<(usize, f32)> {
 }
 
 impl MachineStatus {
+    /// Whether the latest status report allows jogging: its state is `Idle` or `Jog`. Without
+    /// a report, or in any other state (Home, Alarm, Hold, Check, Run, Door, ...), a `$J`
+    /// would wait in the controller's buffer and run later from a stale position.
+    pub fn jog_allowed(&self) -> bool {
+        self.report
+            .as_ref()
+            .and_then(|r| r.machine_state.as_deref())
+            .is_some_and(|state| state.starts_with("Idle") || state.starts_with("Jog"))
+    }
+
     /// The machine position (`MPos`) of the latest report, or `WPos + WCO` when the report
     /// carries only the work position.
     pub fn machine_position(&self) -> Option<Xyz> {
@@ -120,16 +141,28 @@ impl MachineStatus {
                     self.report = None;
                     self.wco = None;
                     self.grbl_travel = [None; 3];
+                    self.report_inches = false;
                 }
                 MachineEvent::StatusReport(report) => {
+                    // Positions, offsets and feed are kept in mm whatever `$13` says.
+                    let report = (**report).clone().into_mm(self.report_inches);
                     if let Some(wco) = report.wco {
                         self.wco = Some(wco);
                     }
-                    self.report = Some((**report).clone());
+                    self.report = Some(report);
                 }
                 MachineEvent::Received(line) => {
                     if let Some((index, travel)) = parse_travel(line) {
                         self.grbl_travel[index] = Some(travel);
+                    }
+                    if let Some(inches) = parse_report_inches(line)
+                        && inches != self.report_inches
+                    {
+                        // A cached offset (and report) in the old units would be wrong:
+                        // drop them and wait for the controller's next report, as GTK does.
+                        self.report_inches = inches;
+                        self.wco = None;
+                        self.report = None;
                     }
                 }
                 MachineEvent::StreamProgress { sent, acked, total } => {
