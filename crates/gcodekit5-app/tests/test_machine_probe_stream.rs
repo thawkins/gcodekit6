@@ -427,3 +427,34 @@ fn test_probe_stream_halt_skips_every_report_owed_before_the_hold() {
     );
     check_halt(&shared);
 }
+
+#[test]
+fn test_probe_stream_halt_forgets_status_replies_that_never_came() {
+    // No report injected yet: every `?` written is lost (never answered).
+    let (shared, mut controller) = connected();
+    let mut events = Vec::new();
+    until(
+        &mut controller,
+        &mut events,
+        "25 lost status queries",
+        || shared.status_queries() >= 25,
+    );
+    error_mid_stream(&shared, &mut controller, &mut events);
+    // From now on every `?` is answered: the machine is still decelerating. Lost replies
+    // must not make the halt skip these fresh reports until its one-second timeout.
+    shared.inject("<Hold:1|MPos:0.000,0.000,0.000|FS:500,0>\n");
+    no_reset_for(
+        &shared,
+        &mut controller,
+        &mut events,
+        Duration::from_millis(1800),
+    );
+    shared.inject("<Hold:0|MPos:0.000,0.000,0.000|FS:0,0>\n");
+    let from = Instant::now();
+    let waited = until_reset(&shared, &mut controller, &mut events, from, EVENTUALLY);
+    assert!(
+        waited < Duration::from_millis(800),
+        "the reset did not follow Hold:0: {waited:?}"
+    );
+    check_halt(&shared);
+}

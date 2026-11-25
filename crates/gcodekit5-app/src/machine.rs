@@ -50,6 +50,11 @@ pub const HALT_MAX_WAIT: Duration = Duration::from_secs(10);
 const STATUS_INTERVAL: Duration = Duration::from_millis(200);
 /// The most status queries whose replies are tracked; see [`WorkerState::query_tags`].
 const MAX_QUERY_TAGS: usize = 3;
+/// How long a `?` may stay unanswered before the worker presumes its reply lost (a reply
+/// dropped by a reset or the transport); see [`WorkerState::unanswered_queries`].
+const QUERY_REPLY_TIMEOUT: Duration = Duration::from_secs(2);
+/// The most unanswered `?`s the worker remembers; see [`WorkerState::unanswered_queries`].
+const MAX_UNANSWERED_QUERIES: usize = 64;
 /// How long an idle worker waits for a command before reading the transport again.
 const IDLE_WAIT: Duration = Duration::from_millis(2);
 
@@ -747,9 +752,15 @@ struct WorkerState {
     /// Capped at [`MAX_QUERY_TAGS`]: on overflow the two oldest tags merge into the lower one,
     /// so a lagging queue only ever under-states freshness.
     query_tags: VecDeque<u64>,
-    /// `?`s written and not yet answered, uncapped (unlike [`Self::query_tags`]): how many
-    /// reports a halt must skip as possibly describing the machine before the hold.
-    queries_outstanding: usize,
+    /// When each `?` not yet answered was written, oldest first: how many reports a halt must
+    /// skip as possibly describing the machine before the hold. A status report pops the
+    /// oldest entry (nothing when none is left, so an unsolicited report cannot underflow
+    /// it). The count corrects itself and stays bounded: an entry older than
+    /// [`QUERY_REPLY_TIMEOUT`] is presumed lost and dropped, at most
+    /// [`MAX_UNANSWERED_QUERIES`] are kept (the oldest goes first), and a reset clears them.
+    /// An unsolicited report (auto-reporting firmware) can still answer for a `?` and make
+    /// the count low until that `?`'s own reply arrives; the next `?`s set it right again.
+    unanswered_queries: VecDeque<Instant>,
     /// A `$J` jog was queued and is not known to be over: set when it is queued and again when
     /// it is written, cleared by jog cancel (0x85, which also drops queued jogs), soft reset
     /// (0x18), or an `Idle` report after a `Jog` one received since it was written.
@@ -790,7 +801,7 @@ impl WorkerState {
             written_seq: 0,
             fresh,
             query_tags: VecDeque::new(),
-            queries_outstanding: 0,
+            unanswered_queries: VecDeque::new(),
             jog_outstanding: false,
             jog_seen: false,
             halt: None,
@@ -973,8 +984,25 @@ impl WorkerState {
             *next = (*next).min(oldest);
         }
         self.query_tags.push_back(self.written_seq);
-        self.queries_outstanding += 1;
+        self.forget_lost_queries();
+        if self.unanswered_queries.len() >= MAX_UNANSWERED_QUERIES {
+            self.unanswered_queries.pop_front();
+        }
+        self.unanswered_queries.push_back(Instant::now());
         Ok(())
+    }
+
+    /// Drops the unanswered `?`s older than [`QUERY_REPLY_TIMEOUT`]: their replies are
+    /// presumed lost.
+    fn forget_lost_queries(&mut self) {
+        let now = Instant::now();
+        while self
+            .unanswered_queries
+            .front()
+            .is_some_and(|at| now.duration_since(*at) >= QUERY_REPLY_TIMEOUT)
+        {
+            self.unanswered_queries.pop_front();
+        }
     }
 
     /// Queues a manual line (`seq` > 0 for a state line), or reports one too long for the
@@ -1078,7 +1106,7 @@ impl WorkerState {
             }
             GrblResponseLine::Status(report) => {
                 let status = StatusParser::parse_full(&report);
-                self.queries_outstanding = self.queries_outstanding.saturating_sub(1);
+                self.unanswered_queries.pop_front();
                 let state = status.machine_state.as_deref();
                 let held = state.is_some_and(|s| s.starts_with("Hold:0") || s.starts_with("Idle"));
                 let decelerating = state.is_some_and(|s| s.starts_with("Hold:1"));
@@ -1178,13 +1206,14 @@ impl WorkerState {
     /// Starts halting the stream: no line is fed from now on, and a feed hold is written.
     /// A failed write is retried by the reset ([`Self::drive_halt`]).
     fn begin_halt(&mut self, reason: String) {
+        self.forget_lost_queries();
         let now = Instant::now();
         self.halt = Some(Halt {
             reason,
             started: now,
             deadline: now + HALT_TIMEOUT,
             next_query: now,
-            stale_reports: self.queries_outstanding,
+            stale_reports: self.unanswered_queries.len(),
         });
         match self.write(&[RealtimeCommand::FeedHold.byte()]) {
             Ok(()) => self.echo_realtime(RealtimeCommand::FeedHold.byte()),
@@ -1260,7 +1289,7 @@ impl WorkerState {
     fn reset_buffers(&mut self) {
         self.jog_outstanding = false;
         self.query_tags.clear();
-        self.queries_outstanding = 0;
+        self.unanswered_queries.clear();
         self.window = CharCountWindow::default();
         self.in_flight_is_program.clear();
         // Dropped state lines never run: a report after the reset describes the machine.
