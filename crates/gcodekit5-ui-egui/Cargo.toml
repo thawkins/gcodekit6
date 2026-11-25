@@ -34,6 +34,7 @@ gcodekit5-designer = { path = "../gcodekit5-designer" }
 gcodekit5-devicedb = { path = "../gcodekit5-devicedb" }
 gcodekit5-settings = { path = "../gcodekit5-settings" }
 gcodekit5-visualizer = { path = "../gcodekit5-visualizer" }
+image = "0.25"
 serde = { workspace = true }
 serde_json = { workspace = true }
 tracing = { workspace = true }

@@ -33,6 +33,8 @@ pub enum CamAction {
     SendToDesigner,
     /// Choose the Gerber project folder (GTK's Browse).
     ChooseFolder,
+    /// Choose the image to engrave (the Laser Image Engraver's Browse).
+    ChooseImage,
 }
 
 /// Why a page produced no program.

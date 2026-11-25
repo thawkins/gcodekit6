@@ -2371,6 +2371,7 @@ dependencies = [
  "gcodekit5-ui-egui",
  "gcodekit5-visualizer",
  "glam 0.34.3",
+ "image",
  "lyon",
  "raw-window-handle",
  "rusttype",

@@ -3615,3 +3615,15 @@ msgstr "Trop de séparateurs : ils ne tiennent pas sur le côté"
 
 msgid "Must be at most 100"
 msgstr "Doit être au plus 100"
+
+msgid "Must be between 0 and 100"
+msgstr "Doit être compris entre 0 et 100"
+
+msgid "Must not be more than the maximum power"
+msgstr "Ne doit pas dépasser la puissance maximale"
+
+msgid "Must be between 0 and 255"
+msgstr "Doit être compris entre 0 et 255"
+
+msgid "The engraving is too large: at most 10000 pixels per line"
+msgstr "La gravure est trop grande : au plus 10000 pixels par ligne"

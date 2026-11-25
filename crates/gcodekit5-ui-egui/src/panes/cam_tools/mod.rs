@@ -17,6 +17,8 @@
 //! Dependencies: `egui`, `gcodekit5-camtools` (generators), `gcodekit5-app` (translations),
 //! `gcodekit5-settings` (units).
 
+pub mod bitmap_engraving;
+mod bitmap_pane;
 pub mod common;
 pub mod drill_press;
 pub mod gerber;
@@ -26,6 +28,7 @@ pub mod speeds_feeds;
 pub mod spoilboard_grid;
 pub mod spoilboard_surfacing;
 pub mod tabbed_box;
+pub mod tools;
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -35,6 +38,8 @@ use gcodekit5_app::i18n::Translator;
 use gcodekit5_core::units::MeasurementSystem;
 use gcodekit5_settings::config::Config;
 
+use bitmap_engraving::BitmapEngravingParams;
+use bitmap_pane::BitmapRun;
 pub use common::{CamAction, CamError, FieldError};
 use drill_press::DrillPressParams;
 use gcodekit5_core::data::materials::{Material, init_standard_library as material_library};
@@ -48,118 +53,9 @@ use speeds_feeds::SpeedsFeedsParams;
 use spoilboard_grid::SpoilboardGridParams;
 use spoilboard_surfacing::SpoilboardSurfacingParams;
 use tabbed_box::TabbedBoxParams;
+pub use tools::{CamTool, Category};
 
 use crate::workspace::{Pane, PaneContext, PaneId};
-
-/// One CAM tool of the picker.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum CamTool {
-    /// Jigsaw Puzzle Generator.
-    Jigsaw,
-    /// Tabbed Box Maker.
-    TabbedBox,
-    /// Speeds and Feeds Calculator.
-    SpeedsFeeds,
-    /// Gerber to G-Code.
-    Gerber,
-    /// Create Spoilboard Grid.
-    SpoilboardGrid,
-    /// Spoilboard Surfacing.
-    SpoilboardSurfacing,
-    /// Drill Press.
-    DrillPress,
-}
-
-impl CamTool {
-    /// Every tool, in GTK's list order.
-    pub const ALL: [CamTool; 7] = [
-        CamTool::Jigsaw,
-        CamTool::TabbedBox,
-        CamTool::SpeedsFeeds,
-        CamTool::SpoilboardSurfacing,
-        CamTool::SpoilboardGrid,
-        CamTool::Gerber,
-        CamTool::DrillPress,
-    ];
-
-    /// The msgid of the tool's title.
-    pub fn title_msgid(self) -> &'static str {
-        match self {
-            CamTool::Jigsaw => n_!("Jigsaw Puzzle Generator"),
-            CamTool::TabbedBox => n_!("Tabbed Box Maker"),
-            CamTool::SpeedsFeeds => n_!("Speeds and Feeds Calculator"),
-            CamTool::Gerber => n_!("Gerber to G-Code"),
-            CamTool::SpoilboardGrid => n_!("Create Spoilboard Grid"),
-            CamTool::SpoilboardSurfacing => n_!("Spoilboard Surfacing"),
-            CamTool::DrillPress => n_!("Drill Press"),
-        }
-    }
-
-    /// The msgid of the tool's description.
-    pub fn description_msgid(self) -> &'static str {
-        match self {
-            CamTool::Jigsaw => n_!("Create custom jigsaw puzzle patterns from images"),
-            CamTool::TabbedBox => n_!("Generate G-code for laser/CNC cut boxes with finger joints"),
-            CamTool::SpeedsFeeds => n_!("Calculate cutting speeds and feeds for your materials"),
-            CamTool::Gerber => n_!("Convert Gerber files to G-Code for PCB milling"),
-            CamTool::SpoilboardGrid => n_!("Generate grid patterns for spoilboard alignment"),
-            CamTool::SpoilboardSurfacing => {
-                n_!("Generate surfacing toolpaths to flatten your spoilboard")
-            }
-            CamTool::DrillPress => {
-                n_!("Emulate a drill press with peck drilling and helical cycles")
-            }
-        }
-    }
-
-    /// The picker category the tool is listed under.
-    pub fn category(self) -> Category {
-        match self {
-            CamTool::Jigsaw | CamTool::TabbedBox | CamTool::Gerber => Category::Generators,
-            CamTool::SpeedsFeeds => Category::Calculators,
-            CamTool::SpoilboardGrid => Category::Maintenance,
-            CamTool::SpoilboardSurfacing => Category::Maintenance,
-            CamTool::DrillPress => Category::Generators,
-        }
-    }
-}
-
-/// The picker's category filter (GTK's ids).
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum Category {
-    /// Every tool.
-    All,
-    /// Program generators.
-    Generators,
-    /// Engraving tools.
-    Engraving,
-    /// Calculators.
-    Calculators,
-    /// Machine maintenance.
-    Maintenance,
-}
-
-impl Category {
-    /// Every category, in menu order.
-    pub const ALL: [Category; 5] = [
-        Category::All,
-        Category::Generators,
-        Category::Engraving,
-        Category::Calculators,
-        Category::Maintenance,
-    ];
-
-    /// The msgid of the category's name.
-    pub fn msgid(self) -> &'static str {
-        match self {
-            Category::All => n_!("All"),
-            Category::Generators => n_!("Generators"),
-            Category::Engraving => n_!("Engraving"),
-            Category::Calculators => n_!("Calculators"),
-            Category::Maintenance => n_!("Maintenance"),
-        }
-    }
-}
 
 /// How a page's program reaches the editor.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -197,6 +93,7 @@ pub fn msgids() -> Vec<&'static str> {
     ids.extend(jigsaw::msgids());
     ids.extend(tabbed_box::msgids());
     ids.extend(gerber::msgids());
+    ids.extend(bitmap_engraving::msgids());
     ids
 }
 
@@ -242,6 +139,10 @@ pub struct CamToolsPane {
     tabbed_box: TabbedBoxParams,
     /// The Gerber to G-Code page.
     gerber: GerberParams,
+    /// The Laser Image Engraver page.
+    bitmap_engraving: BitmapEngravingParams,
+    /// The Laser Image Engraver's engraving and image preview, running off the UI thread.
+    bitmap_run: BitmapRun,
     /// Send to Editor / Preview, waiting for the app.
     editor_request: Option<CamDelivery>,
     /// The program the request hands to the editor.
@@ -291,6 +192,8 @@ impl CamToolsPane {
             jigsaw: JigsawParams::new(units),
             tabbed_box: TabbedBoxParams::new(units),
             gerber: GerberParams::new(units),
+            bitmap_engraving: BitmapEngravingParams::new(units),
+            bitmap_run: BitmapRun::default(),
             output: None,
             notice: None,
             designer_request: None,
@@ -379,6 +282,7 @@ impl CamToolsPane {
             CamTool::SpeedsFeeds | CamTool::Jigsaw => String::new(),
             CamTool::TabbedBox => format!("{:?}", self.tabbed_box),
             CamTool::Gerber => format!("{:?}", self.gerber),
+            CamTool::BitmapEngraving => format!("{:?}", self.bitmap_engraving),
             CamTool::SpoilboardSurfacing => format!("{:?}", self.spoilboard_surfacing),
             CamTool::SpoilboardGrid => format!("{:?}", self.spoilboard_grid),
             CamTool::DrillPress => format!("{:?}", self.drill_press),
@@ -421,6 +325,7 @@ impl CamToolsPane {
         self.jigsaw.set_units(units);
         self.tabbed_box.set_units(units);
         self.gerber.set_units(units);
+        self.bitmap_engraving.set_units(units);
     }
 
     /// The Drill Press page's input.
@@ -500,10 +405,19 @@ impl CamToolsPane {
                 self.folder_request = true;
                 return;
             }
+            CamAction::ChooseImage => {
+                self.bitmap_run.image_request = true;
+                return;
+            }
             CamAction::Generate => None,
             CamAction::SendToEditor => Some(CamDelivery::Editor),
             CamAction::Preview => Some(CamDelivery::Preview),
         };
+        if tool == CamTool::BitmapEngraving {
+            // The engraving runs on a worker thread; the pane polls it every frame.
+            self.start_bitmap_job(delivery, tr);
+            return;
+        }
         match self.generate(tool, tr) {
             Ok(gcode) => {
                 self.notice = None;
@@ -524,6 +438,8 @@ impl CamToolsPane {
         match tool {
             // The calculator makes numbers and the jigsaw shapes, not a program (see `act`).
             CamTool::SpeedsFeeds | CamTool::Jigsaw => Err(CamError::Invalid),
+            // Engraved on a worker thread (see `act`).
+            CamTool::BitmapEngraving => Err(CamError::Invalid),
             CamTool::SpoilboardGrid => self.spoilboard_grid.generate(),
             CamTool::SpoilboardSurfacing => self.spoilboard_surfacing.generate(),
             CamTool::TabbedBox => self.tabbed_box.generate(),
@@ -538,6 +454,11 @@ impl CamToolsPane {
             CamTool::Jigsaw => jigsaw::show(ui, &mut self.jigsaw, tr),
             CamTool::TabbedBox => tabbed_box::show(ui, &mut self.tabbed_box, tr),
             CamTool::Gerber => gerber::show(ui, &mut self.gerber, tr),
+            CamTool::BitmapEngraving => {
+                let preview = self.bitmap_run.preview_texture(ui.ctx());
+                let busy = self.bitmap_job_running();
+                bitmap_engraving::show(ui, &mut self.bitmap_engraving, preview.as_ref(), busy, tr)
+            }
             CamTool::SpeedsFeeds => speeds_feeds::show(ui, &mut self.speeds_feeds, tr),
             CamTool::SpoilboardGrid => spoilboard_grid::show(ui, &mut self.spoilboard_grid, tr),
             CamTool::SpoilboardSurfacing => {
@@ -555,6 +476,8 @@ impl CamToolsPane {
         self.spoilboard_surfacing.num_axes = axes;
         self.tabbed_box.num_axes = axes;
         self.gerber.num_axes = axes;
+        self.bitmap_engraving.num_axes = axes;
+        self.poll_bitmap(ui.ctx(), tr);
         self.drill_press.laser_mode = drill_press::device_in_laser_mode();
         if let Some(notice) = self.notice.clone() {
             ui.horizontal(|ui| {
@@ -584,6 +507,9 @@ impl CamToolsPane {
             .id_salt("cam-tool-page")
             .auto_shrink([false, false])
             .show(ui, |ui| {
+                if tool == CamTool::BitmapEngraving {
+                    self.show_bitmap_progress(ui, tr);
+                }
                 let action = self.show_page(ui, tool, tr);
                 self.act(tool, action, tr);
                 if let Some(gcode) = self.output() {

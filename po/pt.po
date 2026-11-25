@@ -3603,3 +3603,15 @@ msgstr "Divisórias demais: não cabem no lado"
 
 msgid "Must be at most 100"
 msgstr "Deve ser no máximo 100"
+
+msgid "Must be between 0 and 100"
+msgstr "Deve estar entre 0 e 100"
+
+msgid "Must not be more than the maximum power"
+msgstr "Não deve ser maior que a potência máxima"
+
+msgid "Must be between 0 and 255"
+msgstr "Deve estar entre 0 e 255"
+
+msgid "The engraving is too large: at most 10000 pixels per line"
+msgstr "A gravação é grande demais: no máximo 10000 pixels por linha"

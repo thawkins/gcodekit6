@@ -1,5 +1,5 @@
-//! The app's side of a CAM page's Load and Save, and of the Gerber page's Browse: the file or
-//! folder dialog the pane asks for, and its answer handed back to the pane
+//! The app's side of a CAM page's Load and Save, and of the Gerber and Laser Image Engraver
+//! pages' Browse: the file or folder dialog the pane asks for, and its answer handed back to the pane
 //! ([`crate::panes::cam_tools::CamToolsPane::load_preset`],
 //! [`crate::panes::cam_tools::CamToolsPane::save_preset`],
 //! [`crate::panes::cam_tools::CamToolsPane::choose_gerber_folder`]).
@@ -36,6 +36,16 @@ impl GcodeKitApp {
         }
     }
 
+    /// Shows the image dialog the Laser Image Engraver's Browse asked for.
+    pub(super) fn ask_cam_image(&mut self) {
+        if self.cam_tools.borrow_mut().take_image_request() {
+            self.dialogs.open_file(
+                FilePurpose::OpenEngravingImage,
+                &FilePurpose::OpenEngravingImage.filters(),
+            );
+        }
+    }
+
     /// Hands a CAM page's file or folder dialog answer to the CAM pane.
     ///
     /// # Returns
@@ -56,12 +66,16 @@ impl GcodeKitApp {
                 purpose: FilePurpose::OpenGerberFolder,
                 path,
             } => cam.choose_gerber_folder(path),
+            DialogAnswer::File {
+                purpose: FilePurpose::OpenEngravingImage,
+                path,
+            } => cam.choose_bitmap_image(path),
             DialogAnswer::Cancelled {
                 purpose: FilePurpose::LoadCamPreset | FilePurpose::SaveCamPreset,
             } => cam.cancel_preset(),
             // Nothing to forget: the page keeps its folder.
             DialogAnswer::Cancelled {
-                purpose: FilePurpose::OpenGerberFolder,
+                purpose: FilePurpose::OpenGerberFolder | FilePurpose::OpenEngravingImage,
             } => {}
             DialogAnswer::Unavailable {
                 asked: Asked::File(FilePurpose::LoadCamPreset | FilePurpose::SaveCamPreset),
@@ -74,6 +88,10 @@ impl GcodeKitApp {
                 asked: Asked::File(FilePurpose::OpenGerberFolder),
                 reason,
             } => tracing::warn!(%reason, "Gerber folder dialog unavailable"),
+            DialogAnswer::Unavailable {
+                asked: Asked::File(FilePurpose::OpenEngravingImage),
+                reason,
+            } => tracing::warn!(%reason, "engraving image dialog unavailable"),
             DialogAnswer::File { .. }
             | DialogAnswer::Cancelled { .. }
             | DialogAnswer::Unavailable { .. }

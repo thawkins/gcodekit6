@@ -48,6 +48,8 @@ pub enum FilePurpose {
     SaveCamPreset,
     /// Choose the Gerber page's project folder.
     OpenGerberFolder,
+    /// Choose the image the Laser Image Engraver engraves.
+    OpenEngravingImage,
 }
 
 impl FilePurpose {
@@ -65,6 +67,7 @@ impl FilePurpose {
             Self::LoadCamPreset => n_!("Load Parameters"),
             Self::SaveCamPreset => n_!("Save Parameters"),
             Self::OpenGerberFolder => n_!("Open Gerber Directory"),
+            Self::OpenEngravingImage => n_!("Select Image"),
         }
     }
 
@@ -95,6 +98,7 @@ impl FilePurpose {
             Self::LoadCamPreset | Self::SaveCamPreset => Vec::new(),
             // A folder has no file types.
             Self::OpenGerberFolder => Vec::new(),
+            Self::OpenEngravingImage => vec![FileFilter::ENGRAVING_IMAGE],
         }
     }
 }
@@ -139,6 +143,11 @@ impl FileFilter {
     pub const IMAGE: Self = Self {
         name_msgid: n_!("Image files"),
         extensions: &["png", "jpg", "jpeg", "bmp", "tif", "tiff", "webp"],
+    };
+    /// The images the Laser Image Engraver reads (GTK's PNG, JPEG, BMP, GIF and TIFF types).
+    pub const ENGRAVING_IMAGE: Self = Self {
+        name_msgid: n_!("Image files"),
+        extensions: &["png", "jpg", "jpeg", "bmp", "gif", "tif", "tiff"],
     };
     /// The G-code types the designer's export offers (GTK's).
     pub const GCODE_EXPORT: Self = Self {
@@ -532,6 +541,7 @@ pub fn msgids() -> Vec<&'static str> {
         FilePurpose::LoadCamPreset,
         FilePurpose::SaveCamPreset,
         FilePurpose::OpenGerberFolder,
+        FilePurpose::OpenEngravingImage,
     ]
     .map(FilePurpose::title_msgid);
     let filters = [

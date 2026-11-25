@@ -3532,3 +3532,15 @@ msgstr ""
 
 msgid "Must be at most 100"
 msgstr ""
+
+msgid "Must be between 0 and 100"
+msgstr ""
+
+msgid "Must not be more than the maximum power"
+msgstr ""
+
+msgid "Must be between 0 and 255"
+msgstr ""
+
+msgid "The engraving is too large: at most 10000 pixels per line"
+msgstr ""

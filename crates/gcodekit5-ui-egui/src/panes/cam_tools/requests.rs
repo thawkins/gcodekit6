@@ -84,9 +84,14 @@ impl CamToolsPane {
                 CamTool::Jigsaw => self.jigsaw.apply_preset(&json),
                 CamTool::TabbedBox => self.tabbed_box.apply_preset(&json),
                 CamTool::Gerber => self.gerber.apply_preset(&json),
+                CamTool::BitmapEngraving => self.bitmap_engraving.apply_preset(&json),
                 // The calculator has no presets (GTK's had none).
                 CamTool::SpeedsFeeds => Ok(()),
             });
+        if tool == CamTool::BitmapEngraving {
+            // A preset names its image; show it (GTK loaded its preview too).
+            self.refresh_bitmap_preview();
+        }
         match loaded {
             Ok(()) => self.notice = None,
             Err(e) => {
@@ -134,6 +139,9 @@ impl CamToolsPane {
             CamTool::Jigsaw => (self.jigsaw.preset_json(tr), "puzzle_params.json"),
             CamTool::TabbedBox => (self.tabbed_box.preset_json(tr), "box_params.json"),
             CamTool::Gerber => (self.gerber.preset_json(tr), "gerber_params.json"),
+            CamTool::BitmapEngraving => {
+                (self.bitmap_engraving.preset_json(tr), "bitmap_params.json")
+            }
             CamTool::SpeedsFeeds => return,
         };
         match saved {
@@ -176,6 +184,7 @@ impl CamToolsPane {
             | CamTool::SpoilboardSurfacing
             | CamTool::SpoilboardGrid
             | CamTool::Gerber
+            | CamTool::BitmapEngraving
             | CamTool::SpeedsFeeds => Err(CamError::Invalid),
         };
         match made {

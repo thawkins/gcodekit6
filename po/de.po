@@ -3608,3 +3608,15 @@ msgstr "Zu viele Trennwände: sie passen nicht auf die Seite"
 
 msgid "Must be at most 100"
 msgstr "Darf höchstens 100 sein"
+
+msgid "Must be between 0 and 100"
+msgstr "Muss zwischen 0 und 100 liegen"
+
+msgid "Must not be more than the maximum power"
+msgstr "Darf nicht größer als die maximale Leistung sein"
+
+msgid "Must be between 0 and 255"
+msgstr "Muss zwischen 0 und 255 liegen"
+
+msgid "The engraving is too large: at most 10000 pixels per line"
+msgstr "Die Gravur ist zu groß: höchstens 10000 Pixel pro Zeile"

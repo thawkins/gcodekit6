@@ -263,7 +263,8 @@ impl GcodeKitApp {
                     | FilePurpose::SaveGcode
                     | FilePurpose::LoadCamPreset
                     | FilePurpose::SaveCamPreset
-                    | FilePurpose::OpenGerberFolder => return false,
+                    | FilePurpose::OpenGerberFolder
+                    | FilePurpose::OpenEngravingImage => return false,
                 }
             }
             DialogAnswer::Cancelled {

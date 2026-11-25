@@ -3611,3 +3611,15 @@ msgstr "Troppi divisori: non entrano nel lato"
 
 msgid "Must be at most 100"
 msgstr "Deve essere al massimo 100"
+
+msgid "Must be between 0 and 100"
+msgstr "Deve essere tra 0 e 100"
+
+msgid "Must not be more than the maximum power"
+msgstr "Non deve superare la potenza massima"
+
+msgid "Must be between 0 and 255"
+msgstr "Deve essere tra 0 e 255"
+
+msgid "The engraving is too large: at most 10000 pixels per line"
+msgstr "L'incisione è troppo grande: al massimo 10000 pixel per riga"
