@@ -510,3 +510,72 @@ fn test_firmware_settings_disconnect_ends_a_retrieve_with_a_notice() {
     let notice = h.state().firmware_settings().notice().unwrap_or_default();
     assert_eq!(notice, "Not connected");
 }
+
+/// A GRBL write whose read-back holds another value (GRBL 1.1 stores `$3` in a byte, so
+/// `$3=257` becomes `$3=1`) is a mismatch naming the stored value, never accepted.
+#[test]
+fn test_firmware_settings_write_read_back_with_another_value_is_a_mismatch() {
+    use gcodekit5_app::i18n::Translator;
+    use gcodekit5_ui_egui::windows::setting_write::{PendingWrite, WriteOutcome};
+
+    let (mut state, _shared) = loopback_state(Duration::from_millis(1));
+    connect(&mut state);
+    let tr = Translator::new("en");
+    let mut write = PendingWrite::send(&state.machine, "$3=257", true, &tr).expect("send");
+    assert_eq!(
+        write.observe(&MachineEvent::Sent("$3=257".to_string())),
+        None
+    );
+    // Earlier settings of the dump say the write's `ok` came first, not what `$3` holds.
+    assert_eq!(
+        write.observe(&MachineEvent::Received("$0=10".to_string())),
+        None
+    );
+    assert_eq!(
+        write.observe(&MachineEvent::Received("$3=1".to_string())),
+        Some(WriteOutcome::Mismatch("$3=1".to_string()))
+    );
+
+    // The same value, printed with the controller's decimals, is accepted.
+    let mut write = PendingWrite::send(&state.machine, "$110=5000", true, &tr).expect("send");
+    write.observe(&MachineEvent::Sent("$110=5000".to_string()));
+    assert_eq!(
+        write.observe(&MachineEvent::Received("$110=5000.000".to_string())),
+        Some(WriteOutcome::Accepted)
+    );
+    // A float is compared to the precision the controller prints.
+    let mut write = PendingWrite::send(&state.machine, "$11=0.0104", true, &tr).expect("send");
+    write.observe(&MachineEvent::Sent("$11=0.0104".to_string()));
+    assert_eq!(
+        write.observe(&MachineEvent::Received("$11=0.010".to_string())),
+        Some(WriteOutcome::Accepted)
+    );
+    // An integer reported without decimals is compared exactly.
+    let mut write = PendingWrite::send(&state.machine, "$26=25.5", true, &tr).expect("send");
+    write.observe(&MachineEvent::Sent("$26=25.5".to_string()));
+    assert_eq!(
+        write.observe(&MachineEvent::Received("$26=25".to_string())),
+        Some(WriteOutcome::Mismatch("$26=25".to_string()))
+    );
+}
+
+/// The Firmware Settings window reports a stored value that differs from the written one
+/// as a failure naming both, never as "Setting written".
+#[test]
+fn test_firmware_settings_mismatched_read_back_is_reported() {
+    let (mut h, shared) = open_window(|_| {});
+    edit_110(&mut h, "5000");
+    h.get_by_label("Apply").click();
+    h.run_steps(2);
+    assert!(wait_until(|| wrote(&shared, "$$")));
+    shared.inject("$22=1\n$110=4000.000\n");
+    assert!(
+        step_until(&mut h, |app| app.firmware_settings().notice().is_some_and(
+            |n| n.contains("$110=5000") && n.contains("$110=4000.000")
+        )),
+        "notice: {:?}",
+        h.state().firmware_settings().notice()
+    );
+    let notice = h.state().firmware_settings().notice().unwrap_or_default();
+    assert!(!notice.contains("Setting written"), "{notice:?}");
+}

@@ -4574,3 +4574,12 @@ msgstr "El ID no debe contener espacios"
 
 msgid "Index"
 msgstr "Índice"
+
+msgid "the controller stored a different value:"
+msgstr "el controlador guardó un valor distinto:"
+
+msgid "written"
+msgstr "escrito"
+
+msgid "stored"
+msgstr "guardado"

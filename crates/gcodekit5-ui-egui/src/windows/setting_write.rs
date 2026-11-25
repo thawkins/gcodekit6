@@ -8,7 +8,9 @@
 //! reading the settings back: `$n=v` is followed by `$$`. The controller answers lines in
 //! order, and a write starts only once every earlier line is answered ([`blocked`]), so
 //! after `$n=v` is written the first reply seen is its own: an `error:N` refuses it, and
-//! the first `$n=` line of the `$$` dump means its `ok` came first.
+//! the first `$`-line of the `$$` dump means its `ok` came first. The write is accepted only
+//! once the dump's own `$n=` line holds the value written: GRBL 1.1 stores some settings in a
+//! byte (`$3=257` is kept as `1`), so a different read-back is a [`WriteOutcome::Mismatch`].
 //!
 //! Dependencies: `gcodekit5-app` (controller, settings guard, translations).
 
@@ -81,6 +83,9 @@ pub enum WriteOutcome {
     Rejected(String),
     /// No answer within [`WRITE_TIMEOUT`], or the connection closed.
     NoReply,
+    /// The controller took the line but its read-back holds another value (GRBL stores a
+    /// byte setting truncated); holds the read-back line (`$3=1`).
+    Mismatch(String),
 }
 
 /// A setting write waiting for the controller's answer.
@@ -89,6 +94,9 @@ pub struct PendingWrite {
     line: String,
     confirm: bool,
     written: bool,
+    /// The write's `ok` came (a `$`-line of the read-back arrived); errors after it are
+    /// not the write's.
+    acknowledged: bool,
     started: Instant,
 }
 
@@ -116,6 +124,7 @@ impl PendingWrite {
             line: line.to_string(),
             confirm,
             written: false,
+            acknowledged: false,
             started: Instant::now(),
         })
     }
@@ -139,11 +148,14 @@ impl PendingWrite {
             MachineEvent::Error(message) if !self.written && message.ends_with(&self.line) => {
                 Some(WriteOutcome::Rejected(message.clone()))
             }
-            MachineEvent::Error(message) if self.written && message.starts_with("error:") => {
+            MachineEvent::Error(message)
+                if self.written && !self.acknowledged && message.starts_with("error:") =>
+            {
                 Some(WriteOutcome::Rejected(message.clone()))
             }
             MachineEvent::Received(line) if self.written && line.trim_start().starts_with('$') => {
-                Some(WriteOutcome::Accepted)
+                self.acknowledged = true;
+                self.read_back(line.trim())
             }
             MachineEvent::Disconnected => Some(WriteOutcome::NoReply),
             MachineEvent::Connected
@@ -158,6 +170,24 @@ impl PendingWrite {
         }
     }
 
+    /// The answer a read-back `$n=v` line gives: none for another setting, else whether it
+    /// holds the value written.
+    fn read_back(&self, line: &str) -> Option<WriteOutcome> {
+        let Some((number, written)) = split_setting(&self.line) else {
+            // Not a `$n=v` write: its `ok` is all there is to learn.
+            return Some(WriteOutcome::Accepted);
+        };
+        let (reported, stored) = split_setting(line)?;
+        if reported != number {
+            return None;
+        }
+        Some(if same_value(written, stored) {
+            WriteOutcome::Accepted
+        } else {
+            WriteOutcome::Mismatch(format!("${number}={stored}"))
+        })
+    }
+
     /// Whether the answer is overdue.
     pub fn timed_out(&self) -> bool {
         self.started.elapsed() > WRITE_TIMEOUT
@@ -169,6 +199,51 @@ impl PendingWrite {
     }
 }
 
+/// Splits a `$n=v` line into the setting number and the value (up to the first space, so
+/// an old GRBL's `$3=1 (dir port invert mask)` gives `1`).
+fn split_setting(line: &str) -> Option<(&str, &str)> {
+    let (number, value) = line.strip_prefix('$')?.split_once('=')?;
+    if number.is_empty() || !number.bytes().all(|b| b.is_ascii_digit()) {
+        return None;
+    }
+    Some((number, value.split_whitespace().next().unwrap_or("")))
+}
+
+/// Whether a read-back `stored` value is the `written` one. Numbers are compared to the
+/// precision the controller prints: within half a unit of the last decimal it shows
+/// (`0.0104` is stored as `0.010`), and exactly when it shows no decimals (an integer
+/// setting dropped `25.5` to `25`). Anything else (a grblHAL host name) is compared as text.
+fn same_value(written: &str, stored: &str) -> bool {
+    match (written.parse::<f64>(), stored.parse::<f64>()) {
+        (Ok(w), Ok(s)) => {
+            let decimals = stored.split_once('.').map_or(0, |(_, f)| f.len());
+            let decimals = i32::try_from(decimals).unwrap_or(i32::MAX);
+            let tolerance = if decimals == 0 {
+                0.0
+            } else {
+                0.5 * 10f64.powi(-decimals)
+            };
+            (w - s).abs() <= tolerance + 1e-9
+        }
+        (Ok(_), Err(_)) | (Err(_), Ok(_)) | (Err(_), Err(_)) => written == stored,
+    }
+}
+
+/// The translated failure for a write whose read-back holds another value.
+///
+/// # Arguments
+/// * `written` - The line written, `$3=257`.
+/// * `stored` - The read-back line, `$3=1`.
+/// * `tr` - Translator for the current UI language.
+pub fn mismatch_text(written: &str, stored: &str, tr: &Translator) -> String {
+    format!(
+        "{} {} {written}, {} {stored}",
+        tr.tr(n_!("the controller stored a different value:")),
+        tr.tr(n_!("written")),
+        tr.tr(n_!("stored")),
+    )
+}
+
 /// The English msgids this module shows, for the translation test.
 pub fn msgids() -> Vec<&'static str> {
     vec![
@@ -176,5 +251,8 @@ pub fn msgids() -> Vec<&'static str> {
         n_!("a job is running"),
         n_!("waiting for the controller to answer earlier commands"),
         n_!("the machine must be idle"),
+        n_!("the controller stored a different value:"),
+        n_!("written"),
+        n_!("stored"),
     ]
 }

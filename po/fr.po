@@ -4578,3 +4578,12 @@ msgstr "L'identifiant ne doit pas contenir d'espaces"
 
 msgid "Index"
 msgstr "Index"
+
+msgid "the controller stored a different value:"
+msgstr "le contrôleur a enregistré une valeur différente :"
+
+msgid "written"
+msgstr "écrit"
+
+msgid "stored"
+msgstr "enregistré"

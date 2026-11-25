@@ -4571,3 +4571,12 @@ msgstr "ID darf keine Leerzeichen enthalten"
 
 msgid "Index"
 msgstr "Index"
+
+msgid "the controller stored a different value:"
+msgstr "die Steuerung hat einen anderen Wert gespeichert:"
+
+msgid "written"
+msgstr "geschrieben"
+
+msgid "stored"
+msgstr "gespeichert"

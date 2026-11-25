@@ -138,6 +138,9 @@ impl DeviceInfoWindow {
             }
             WriteOutcome::Rejected(reply) => worker_message(&reply, tr),
             WriteOutcome::NoReply => tr.tr(n_!("no reply from the controller")).into_owned(),
+            WriteOutcome::Mismatch(stored) => {
+                setting_write::mismatch_text(write.pending.line(), &stored, tr)
+            }
         };
         self.device_type = write.previous;
         self.refuse(&reason, tr);

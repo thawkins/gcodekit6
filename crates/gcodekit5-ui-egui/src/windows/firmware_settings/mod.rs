@@ -319,6 +319,7 @@ impl FirmwareSettingsWindow {
                 None => crate::machine::worker_message(&reply, tr),
             },
             WriteOutcome::NoReply => tr.tr(n_!("no reply from the controller")).into_owned(),
+            WriteOutcome::Mismatch(stored) => setting_write::mismatch_text(&line, &stored, tr),
         };
         self.refuse_write(&line, &failure, tr);
     }
