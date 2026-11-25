@@ -23,7 +23,7 @@ use gcodekit5_designer::DesignerState;
 use gcodekit5_designer::canvas::DrawingObject;
 use gcodekit5_designer::commands::{ChangeProperty, CompositeCommand, DesignerCommand};
 
-use super::builders::{Edit, Fields};
+use super::builders::{Check, Edit, Fields};
 use super::update::Summary;
 use crate::panes::designer::DesignerPane;
 
@@ -33,6 +33,8 @@ pub struct Ctx<'a> {
     pub designer: &'a mut DesignerPane,
     /// The fields being edited.
     pub edits: &'a mut Vec<Edit>,
+    /// The inline errors: field key and msgid.
+    pub errors: &'a [(&'static str, &'static str)],
     /// The selection as shown.
     pub summary: &'a Summary,
     /// The display units.
@@ -47,6 +49,8 @@ impl Ctx<'_> {
         Fields {
             edits: self.edits,
             selection: &self.summary.ids,
+            errors: self.errors,
+            tr: self.tr,
         }
     }
 
@@ -54,6 +58,36 @@ impl Ctx<'_> {
     pub fn state(&mut self) -> &mut DesignerState {
         self.designer.state_mut()
     }
+}
+
+/// A section's `apply`: `None` when the field is not the section's.
+type SectionApply = fn(&mut Ctx<'_>, &str, &str) -> Option<Check>;
+
+/// Applies the committed `text` of field `key` to the selected shapes, through the section
+/// the field belongs to.
+///
+/// # Arguments
+/// * `cx` - The frame's context; its selection is the shapes the edit belongs to.
+/// * `key` - The field.
+/// * `text` - The committed text.
+///
+/// # Errors
+/// The inline error's msgid when the text is invalid or out of range (nothing applied).
+pub fn apply(cx: &mut Ctx<'_>, key: &str, text: &str) -> Check {
+    let sections: [SectionApply; 8] = [
+        dimensions::apply,
+        geometry::apply,
+        text::apply,
+        gear_sprocket::apply,
+        effects::apply,
+        cam::apply,
+        image::apply,
+        laser_override::apply,
+    ];
+    sections
+        .iter()
+        .find_map(|apply| apply(cx, key, text))
+        .unwrap_or(Ok(()))
 }
 
 /// Applies `modify` to a copy of every selected shape and records the changed ones as one

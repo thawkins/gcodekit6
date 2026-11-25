@@ -3,8 +3,10 @@
 //!
 //! A field applies when the user commits it, as GTK's `connect_entry_commit`: Enter, or
 //! moving the focus away. Typing changes nothing in the design, so one edit is one undo
-//! step. A commit whose text is unchanged, or that comes after the selection changed while
-//! the field was being edited, applies nothing (GTK discards it too).
+//! step. The panel commits a finished [`Edit`] to the shapes that were selected when the
+//! editing began, even when the selection changed since (a click on the canvas both ends
+//! the edit and changes the selection). Text that does not parse, or a value out of range,
+//! applies nothing and shows an inline error under the field.
 //!
 //! Lengths are shown in the display units with 2 decimals (the toolbox's `to_display`
 //! conversion) and parsed with `gcodekit5_core::units::parse_length`, which also takes
@@ -20,14 +22,49 @@ use crate::panes::designer::toolbox::settings::{Kind, to_display};
 /// The text shown for a value the selected shapes do not share.
 pub const MIXED: &str = "---";
 
+/// Inline error: the text is not a number.
+pub const E_NUMBER: &str = n_!("Enter a number");
+/// Inline error: the value must be above 0.
+pub const E_POSITIVE: &str = n_!("Enter a value greater than 0");
+/// Inline error: the value must be 0 or more.
+pub const E_NON_NEGATIVE: &str = n_!("Enter a value of 0 or more");
+/// Inline error: an angle outside 0..=90 degrees.
+pub const E_ANGLE: &str = n_!("Enter an angle from 0 to 90");
+/// Inline error: a count below 1.
+pub const E_COUNT: &str = n_!("Enter a whole number of 1 or more");
+/// Inline error: any other value out of its range.
+pub const E_RANGE: &str = n_!("Value out of range");
+/// Inline error: blank text.
+pub const E_TEXT: &str = n_!("Text cannot be empty");
+
+/// The msgids of the inline errors.
+pub fn msgids() -> Vec<&'static str> {
+    vec![
+        E_NUMBER,
+        E_POSITIVE,
+        E_NON_NEGATIVE,
+        E_ANGLE,
+        E_COUNT,
+        E_RANGE,
+        E_TEXT,
+    ]
+}
+
+/// The result of applying a committed field: `Err` holds the inline error's msgid.
+pub type Check = Result<(), &'static str>;
+
 /// A field being edited: which one, what it showed when editing began, what is typed now,
-/// and the selection then.
+/// the shapes it edits (the selection when editing began), and its widget.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Edit {
     key: &'static str,
     baseline: String,
     text: String,
     selection: Vec<u64>,
+    widget: egui::Id,
+    /// Whether its field was drawn since the panel last looked (a field that is no longer
+    /// drawn, because the selection changed, cannot keep the keyboard).
+    seen: bool,
 }
 
 impl Edit {
@@ -35,20 +72,49 @@ impl Edit {
     pub fn key(&self) -> &'static str {
         self.key
     }
+
+    /// The text typed so far.
+    pub fn text(&self) -> &str {
+        &self.text
+    }
+
+    /// The shapes the edit applies to (the selection when editing began).
+    pub fn selection(&self) -> &[u64] {
+        &self.selection
+    }
+
+    /// The text field's widget id (the edit is finished when it loses the focus).
+    pub fn widget(&self) -> egui::Id {
+        self.widget
+    }
+
+    /// Whether the field was drawn since the panel last looked.
+    pub fn seen(&self) -> bool {
+        self.seen
+    }
+
+    /// Whether the field was drawn since the last call, which resets it.
+    pub fn take_seen(&mut self) -> bool {
+        std::mem::take(&mut self.seen)
+    }
+
+    /// Whether the text differs from what the field showed when editing began.
+    pub fn changed(&self) -> bool {
+        self.text != self.baseline
+    }
 }
 
 /// What happened to a field this frame.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum FieldEvent {
-    /// Nothing to apply.
+    /// Nothing new.
     None,
     /// The user typed; the text so far (for a live preview).
     Typed(String),
-    /// The user committed this changed text.
-    Committed(String),
 }
 
-/// The fields of one frame: the edits in progress and the selection now.
+/// The fields of one frame: the edits in progress, the selection now, and the inline
+/// errors.
 ///
 /// Moving the focus from one field to the next starts the new edit a frame before the old
 /// one commits, so two can be in progress at once.
@@ -57,6 +123,10 @@ pub struct Fields<'a> {
     pub edits: &'a mut Vec<Edit>,
     /// The selected shapes now.
     pub selection: &'a [u64],
+    /// The inline errors: field key and msgid.
+    pub errors: &'a [(&'static str, &'static str)],
+    /// Translator for the errors.
+    pub tr: &'a gcodekit5_app::i18n::Translator,
 }
 
 /// A section: a framed group with a bold title over a three-column grid (label, field,
@@ -86,7 +156,7 @@ pub fn section(
         .response
 }
 
-/// A labelled text field row that applies on commit.
+/// A labelled text field row that applies on commit, with its inline error below.
 ///
 /// # Arguments
 /// * `ui` - The section's grid.
@@ -110,10 +180,17 @@ pub fn entry(
     let event = text_field(ui, fields, key, shown, enabled, 110.0, label.id);
     ui.add_enabled(enabled, egui::Label::new(unit));
     ui.end_row();
+    if let Some((_, msgid)) = fields.errors.iter().find(|(k, _)| *k == key) {
+        let color = crate::theme::palette(ui.ctx().theme()).error;
+        ui.label("");
+        ui.colored_label(color, fields.tr.tr(msgid));
+        ui.end_row();
+    }
     event
 }
 
-/// A text field that applies on commit, named by the widget `label_id`.
+/// A text field that records an [`Edit`] while focused (the panel commits it), named by
+/// the widget `label_id`.
 ///
 /// # Arguments
 /// * `ui` - Where to show it.
@@ -150,27 +227,19 @@ pub fn text_field(
             baseline: shown.to_string(),
             text: buffer.clone(),
             selection: fields.selection.to_vec(),
+            widget: response.id,
+            seen: true,
         });
-    } else if !response.has_focus() && !response.lost_focus() && editing.is_some() {
-        // A stale edit (its field was hidden while focused): show the value again.
-        fields.edits.retain(|e| e.key != key);
+    }
+    if let Some(edit) = fields.edits.iter_mut().find(|e| e.key == key) {
+        edit.seen = true;
     }
     let mut event = FieldEvent::None;
     if response.changed()
         && let Some(edit) = fields.edits.iter_mut().find(|e| e.key == key)
     {
         edit.text.clone_from(&buffer);
-        event = FieldEvent::Typed(buffer.clone());
-    }
-    if response.lost_focus()
-        && let Some(i) = fields.edits.iter().position(|e| e.key == key)
-    {
-        let edit = fields.edits.remove(i);
-        if edit.selection != fields.selection {
-            tracing::debug!(key, "property edit discarded: the selection changed");
-        } else if buffer != edit.baseline {
-            event = FieldEvent::Committed(buffer);
-        }
+        event = FieldEvent::Typed(buffer);
     }
     event
 }
@@ -242,28 +311,60 @@ pub fn length_unit(system: MeasurementSystem) -> &'static str {
     units::get_unit_label(system)
 }
 
-/// The millimetres of a length typed in the display units; `None` for empty or invalid
-/// text.
+/// The millimetres of a length typed in the display units.
 ///
 /// # Arguments
-/// * `text` - The typed length.
+/// * `text` - The typed length (a comma is a decimal point; inch fractions allowed).
 /// * `system` - The display units.
-pub fn parse_length(text: &str, system: MeasurementSystem) -> Option<f64> {
+///
+/// # Errors
+/// [`E_NUMBER`] for empty or invalid text.
+pub fn length(text: &str, system: MeasurementSystem) -> Result<f64, &'static str> {
     let text = text.trim().replace(',', ".");
     if text.is_empty() {
-        return None;
+        return Err(E_NUMBER);
     }
     units::parse_length(&text, system)
         .ok()
         .map(f64::from)
         .filter(|v| v.is_finite())
+        .ok_or(E_NUMBER)
 }
 
-/// A typed number (a comma is a decimal point); `None` for invalid text.
-pub fn parse_number(text: &str) -> Option<f64> {
+/// A typed number (a comma is a decimal point).
+///
+/// # Errors
+/// [`E_NUMBER`] for invalid text.
+pub fn number(text: &str) -> Result<f64, &'static str> {
     text.trim()
         .replace(',', ".")
         .parse::<f64>()
         .ok()
         .filter(|v| v.is_finite())
+        .ok_or(E_NUMBER)
+}
+
+/// `v` when it is above 0.
+///
+/// # Errors
+/// [`E_POSITIVE`] otherwise.
+pub fn positive(v: f64) -> Result<f64, &'static str> {
+    if v > 0.0 { Ok(v) } else { Err(E_POSITIVE) }
+}
+
+/// `v` when it is 0 or more.
+///
+/// # Errors
+/// [`E_NON_NEGATIVE`] otherwise.
+pub fn non_negative(v: f64) -> Result<f64, &'static str> {
+    if v >= 0.0 { Ok(v) } else { Err(E_NON_NEGATIVE) }
+}
+
+/// A typed whole number of at least `min`.
+///
+/// # Errors
+/// [`E_NUMBER`] for text that is not a whole number, `below` when it is under `min`.
+pub fn whole(text: &str, min: usize, below: &'static str) -> Result<usize, &'static str> {
+    let n = text.trim().parse::<usize>().map_err(|_| E_NUMBER)?;
+    if n >= min { Ok(n) } else { Err(below) }
 }

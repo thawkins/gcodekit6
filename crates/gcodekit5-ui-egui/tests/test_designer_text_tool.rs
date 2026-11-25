@@ -177,3 +177,22 @@ fn test_text_is_painted_as_glyph_outlines_inside_its_bounds() {
     assert!(contours >= 3, "{contours} contours");
     assert!(text_path(&DesignText::new(" ".to_string(), 0.0, 0.0, 10.0)).is_none());
 }
+
+#[test]
+fn test_enter_in_the_size_field_adds_the_text() {
+    let mut h = harness(DesignerPane::new());
+    click_text_tool(&mut h, 50.0, 50.0);
+    type_in(&mut h, "Z");
+    let size_field = h
+        .get_by_role_and_label(egui::accesskit::Role::TextInput, "Size:")
+        .rect()
+        .center();
+    click(&mut h, size_field);
+    h.key_combination_modifiers(egui::Modifiers::COMMAND, &[egui::Key::A]);
+    type_in(&mut h, "30");
+    press(&mut h, egui::Key::Enter);
+    assert!(!h.state().text_dialog_open());
+    let placed = texts(h.state());
+    assert_eq!(placed.len(), 1);
+    assert!(close(placed[0].font_size, 30.0 * MM_PER_PT));
+}

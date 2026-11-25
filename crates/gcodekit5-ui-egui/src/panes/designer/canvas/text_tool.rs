@@ -1,6 +1,6 @@
 //! The Text tool's Add Text dialog, as GTK's `open_text_tool_dialog`: a click with the Text
 //! tool opens it for the snapped point; it asks for the text, the font family, the size in
-//! points and bold/italic. Add (or Enter in the text field) places a text shape centred on
+//! points and bold/italic. Add (or Enter in the text or size field) places a text shape centred on
 //! the point as one undo step and selects it; Cancel or Escape places nothing, and empty
 //! text places nothing. The font, size and style are remembered for the next text.
 //!
@@ -193,8 +193,12 @@ impl TextTool {
                         ui.end_row();
                         let size_label = ui.label(tr.tr("Size:"));
                         ui.horizontal(|ui| {
-                            ui.add(egui::TextEdit::singleline(&mut self.size).desired_width(60.0))
+                            let size = ui
+                                .add(egui::TextEdit::singleline(&mut self.size).desired_width(60.0))
                                 .labelled_by(size_label.id);
+                            // Enter in the size field adds too, like the text field.
+                            add |=
+                                size.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter));
                             ui.label("pt");
                         });
                         ui.end_row();

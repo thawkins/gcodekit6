@@ -7,7 +7,7 @@
 
 use gcodekit5_designer::model::{DesignText, Shape};
 
-use super::super::builders::{self, FieldEvent, entry, section};
+use super::super::builders::{self, Check, E_POSITIVE, E_TEXT, entry, section};
 use super::{Ctx, change_selected};
 use crate::panes::designer::canvas::text_tool::{font_combo, format_points, parse_points_mm};
 
@@ -34,6 +34,32 @@ where
     });
 }
 
+/// Applies the committed `text` of field `key`, if it is one of this section's: the
+/// content (not blank, as the Add Text dialog) or the size in points (above 0).
+///
+/// # Arguments
+/// * `cx` - The frame's context, for the shapes the edit belongs to.
+/// * `key` - The field.
+/// * `text` - The committed text.
+pub fn apply(cx: &mut Ctx<'_>, key: &str, text: &str) -> Option<Check> {
+    let result = match key {
+        "text_content" if text.trim().is_empty() => Err(E_TEXT),
+        "text_content" => {
+            change_text(cx, "Change Text", |s| {
+                super::set_value(&mut s.text, text.to_string())
+            });
+            Ok(())
+        }
+        "font_size" => parse_points_mm(text).ok_or(E_POSITIVE).map(|mm| {
+            change_text(cx, "Change Font Size", |s| {
+                super::set_f64(&mut s.font_size, mm)
+            });
+        }),
+        _ => return None,
+    };
+    Some(result)
+}
+
 /// The Text section.
 pub fn show(ui: &mut egui::Ui, cx: &mut Ctx<'_>) {
     let Some(Shape::Text(t)) = &cx.summary.single else {
@@ -42,7 +68,7 @@ pub fn show(ui: &mut egui::Ui, cx: &mut Ctx<'_>) {
     let t = t.clone();
     let tr = cx.tr;
     section(ui, &tr.tr("Text:"), |ui| {
-        if let FieldEvent::Committed(text) = entry(
+        entry(
             ui,
             &mut cx.fields(),
             "text_content",
@@ -50,11 +76,7 @@ pub fn show(ui: &mut egui::Ui, cx: &mut Ctx<'_>) {
             &t.text,
             "",
             true,
-        ) {
-            change_text(cx, "Change Text", |s| {
-                super::set_value(&mut s.text, text.clone())
-            });
-        }
+        );
         let font_label = ui.label(tr.tr("Font:"));
         let mut family = t.font_family.clone();
         let picked = font_combo(ui, "gcodekit5-properties-font", &mut family, font_label.id);
@@ -74,7 +96,7 @@ pub fn show(ui: &mut egui::Ui, cx: &mut Ctx<'_>) {
                 changed
             });
         }
-        if let FieldEvent::Committed(text) = entry(
+        entry(
             ui,
             &mut cx.fields(),
             "font_size",
@@ -82,11 +104,6 @@ pub fn show(ui: &mut egui::Ui, cx: &mut Ctx<'_>) {
             &format_points(t.font_size),
             "pt",
             true,
-        ) && let Some(mm) = parse_points_mm(&text)
-        {
-            change_text(cx, "Change Font Size", |s| {
-                super::set_f64(&mut s.font_size, mm)
-            });
-        }
+        );
     });
 }

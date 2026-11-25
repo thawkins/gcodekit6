@@ -11,7 +11,8 @@ use gcodekit5_designer::commands::{ChangeProperty, DesignerCommand};
 use gcodekit5_designer::model::Shape;
 
 use super::super::builders::{
-    self, FieldEvent, entry, length_text, length_unit, parse_number, section,
+    self, Check, E_RANGE, entry, length, length_text, length_unit, non_negative, number, section,
+    whole,
 };
 use super::super::update::shape_rotation;
 use super::{Ctx, change_selected};
@@ -39,6 +40,35 @@ pub fn msgids() -> Vec<&'static str> {
     ]
 }
 
+/// Applies the committed `text` of field `key`, if it is one of these sections'.
+///
+/// # Arguments
+/// * `cx` - The frame's context, for the shapes the edit belongs to.
+/// * `key` - The field.
+/// * `text` - The committed text.
+pub fn apply(cx: &mut Ctx<'_>, key: &str, text: &str) -> Option<Check> {
+    let units = cx.units;
+    let rotated = cx.summary.rotated();
+    let result = match key {
+        "rotation" => number(text).map(|d| cx.state().set_selected_rotation(d)),
+        "corner_radius" => length(text, units)
+            .and_then(non_negative)
+            .map(|v| cx.state().set_selected_corner_radius(v)),
+        "sides" if !rotated => whole(text, 3, E_RANGE).map(|n| {
+            let n = u32::try_from(n).unwrap_or(u32::MAX);
+            change_selected(cx.state(), "Change Polygon Sides", |obj| {
+                match &mut obj.shape {
+                    Shape::Polygon(polygon) => super::set_value(&mut polygon.sides, n),
+                    _ => false,
+                }
+            });
+        }),
+        "sides" => Ok(()),
+        _ => return None,
+    };
+    Some(result)
+}
+
 /// The Rotation section.
 pub fn rotation(ui: &mut egui::Ui, cx: &mut Ctx<'_>) {
     let s = cx.summary;
@@ -56,7 +86,7 @@ pub fn rotation(ui: &mut egui::Ui, cx: &mut Ctx<'_>) {
         ),
     };
     section(ui, &tr.tr("Rotation:"), |ui| {
-        let event = entry(
+        entry(
             ui,
             &mut cx.fields(),
             "rotation",
@@ -65,11 +95,6 @@ pub fn rotation(ui: &mut egui::Ui, cx: &mut Ctx<'_>) {
             "deg",
             true,
         );
-        if let FieldEvent::Committed(text) = event
-            && let Some(degrees) = parse_number(&text)
-        {
-            cx.state().set_selected_rotation(degrees);
-        }
     })
     .on_hover_text(tr.tr(tip));
 }
@@ -84,7 +109,7 @@ pub fn corner(ui: &mut egui::Ui, cx: &mut Ctx<'_>) {
     };
     let tr = cx.tr;
     section(ui, &tr.tr("Corner"), |ui| {
-        let event = entry(
+        entry(
             ui,
             &mut cx.fields(),
             "corner_radius",
@@ -93,11 +118,6 @@ pub fn corner(ui: &mut egui::Ui, cx: &mut Ctx<'_>) {
             length_unit(units),
             true,
         );
-        if let FieldEvent::Committed(text) = event
-            && let Some(v) = builders::parse_length(&text, units)
-        {
-            cx.state().set_selected_corner_radius(v);
-        }
         if let Some(on) = builders::check(ui, &tr.tr("Slot Mode:"), slot, is_rect) {
             cx.state().set_selected_is_slot(on);
         }
@@ -112,7 +132,7 @@ pub fn polygon(ui: &mut egui::Ui, cx: &mut Ctx<'_>) {
     let (sides, rotated) = (p.sides, cx.summary.rotated());
     let tr = cx.tr;
     section(ui, &tr.tr("Polygon"), |ui| {
-        let event = entry(
+        entry(
             ui,
             &mut cx.fields(),
             "sides",
@@ -121,17 +141,6 @@ pub fn polygon(ui: &mut egui::Ui, cx: &mut Ctx<'_>) {
             "",
             !rotated,
         );
-        if let FieldEvent::Committed(text) = event
-            && let Ok(n) = text.trim().parse::<u32>()
-            && n >= 3
-        {
-            change_selected(cx.state(), "Change Polygon Sides", |obj| {
-                match &mut obj.shape {
-                    Shape::Polygon(polygon) => super::set_value(&mut polygon.sides, n),
-                    _ => false,
-                }
-            });
-        }
     });
 }
 

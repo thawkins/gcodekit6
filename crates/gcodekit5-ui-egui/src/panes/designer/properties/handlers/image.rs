@@ -9,7 +9,7 @@
 
 use gcodekit5_designer::model::{RasterImage, Shape};
 
-use super::super::builders::{self, FieldEvent, entry, parse_number, section};
+use super::super::builders::{self, Check, E_RANGE, entry, number, section};
 use super::{Ctx, change_selected, set_f64, set_value};
 
 /// The scan directions: model value and label msgid.
@@ -65,13 +65,9 @@ struct Numeric {
     store: fn(&mut RasterImage, f64) -> bool,
 }
 
-/// The Laser Engraving section.
-pub fn show(ui: &mut egui::Ui, cx: &mut Ctx<'_>) {
-    let Some(Shape::RasterImage(r)) = &cx.summary.single else {
-        return;
-    };
-    let tr = cx.tr;
-    let numerics = [
+/// The numeric fields of image `r`.
+fn numerics(r: &RasterImage) -> [Numeric; 5] {
+    [
         Numeric {
             key: "image_feed",
             msgid: n_!("Feed Rate:"),
@@ -117,10 +113,47 @@ pub fn show(ui: &mut egui::Ui, cx: &mut Ctx<'_>) {
             clamp: |v| v.clamp(1.0, 1000.0),
             store: |img, v| set_f64(&mut img.ppi, v),
         },
-    ];
+    ]
+}
+
+/// Applies the committed `text` of field `key`, if it is one of this section's: a number,
+/// clamped to its field's range, or a halftone threshold of 0 to 255.
+///
+/// # Arguments
+/// * `cx` - The frame's context, for the shapes the edit belongs to.
+/// * `key` - The field.
+/// * `text` - The committed text.
+pub fn apply(cx: &mut Ctx<'_>, key: &str, text: &str) -> Option<Check> {
+    if key == "image_halftone" {
+        return Some(text.trim().parse::<u8>().map_err(|_| E_RANGE).map(|t| {
+            change_images(cx, "Change Halftone Threshold", |img| {
+                set_value(&mut img.halftone_threshold, t)
+            });
+        }));
+    }
+    if !key.starts_with("image_") {
+        return None;
+    }
+    let Some(Shape::RasterImage(r)) = &cx.summary.single else {
+        return Some(Ok(()));
+    };
+    let n = numerics(r).into_iter().find(|n| n.key == key)?;
+    Some(number(text).map(|v| {
+        let v = (n.clamp)(v);
+        change_images(cx, n.undo, |img| (n.store)(img, v));
+    }))
+}
+
+/// The Laser Engraving section.
+pub fn show(ui: &mut egui::Ui, cx: &mut Ctx<'_>) {
+    let Some(Shape::RasterImage(r)) = &cx.summary.single else {
+        return;
+    };
+    let tr = cx.tr;
+    let numerics = numerics(r);
     section(ui, &tr.tr("Laser Engraving"), |ui| {
         for n in numerics {
-            if let FieldEvent::Committed(text) = entry(
+            entry(
                 ui,
                 &mut cx.fields(),
                 n.key,
@@ -128,11 +161,7 @@ pub fn show(ui: &mut egui::Ui, cx: &mut Ctx<'_>) {
                 &n.value.to_string(),
                 n.unit,
                 true,
-            ) && let Some(v) = parse_number(&text)
-            {
-                let v = (n.clamp)(v);
-                change_images(cx, n.undo, |img| (n.store)(img, v));
-            }
+            );
         }
         let scans: Vec<String> = SCANS.iter().map(|(_, m)| tr.tr(m).into_owned()).collect();
         let scan = SCANS
@@ -164,7 +193,7 @@ pub fn show(ui: &mut egui::Ui, cx: &mut Ctx<'_>) {
                 set_value(&mut img.dithering, value.clone())
             });
         }
-        if let FieldEvent::Committed(text) = entry(
+        entry(
             ui,
             &mut cx.fields(),
             "image_halftone",
@@ -172,11 +201,6 @@ pub fn show(ui: &mut egui::Ui, cx: &mut Ctx<'_>) {
             &r.halftone_threshold.to_string(),
             "(0-255)",
             true,
-        ) && let Ok(t) = text.trim().parse::<u8>()
-        {
-            change_images(cx, "Change Halftone Threshold", |img| {
-                set_value(&mut img.halftone_threshold, t)
-            });
-        }
+        );
     });
 }

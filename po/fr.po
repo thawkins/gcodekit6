@@ -3294,3 +3294,27 @@ msgstr "Objet pivoté : dimensions verrouillées"
 
 msgid "0 = no raster, 100 = full length"
 msgstr "0 = pas de trame, 100 = longueur totale"
+
+msgid "Enter a number"
+msgstr "Saisissez un nombre"
+
+msgid "Enter a value greater than 0"
+msgstr "Saisissez une valeur supérieure à 0"
+
+msgid "Enter a value of 0 or more"
+msgstr "Saisissez une valeur de 0 ou plus"
+
+msgid "Enter an angle from 0 to 90"
+msgstr "Saisissez un angle de 0 à 90"
+
+msgid "Enter a whole number of 1 or more"
+msgstr "Saisissez un nombre entier de 1 ou plus"
+
+msgid "Value out of range"
+msgstr "Valeur hors limites"
+
+msgid "Text cannot be empty"
+msgstr "Le texte ne peut pas être vide"
+
+msgid "The edited shapes were deleted or locked; the change was not applied."
+msgstr "Les formes modifiées ont été supprimées ou verrouillées ; la modification n'a pas été appliquée."

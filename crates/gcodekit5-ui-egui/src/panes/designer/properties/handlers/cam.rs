@@ -13,7 +13,7 @@ use gcodekit5_designer::pocket_operations::PocketStrategy;
 use gcodekit5_designer::shapes::OperationType;
 
 use super::super::builders::{
-    self, FieldEvent, entry, length_text, length_unit, parse_length, parse_number, section,
+    self, Check, E_ANGLE, entry, length, length_text, length_unit, number, positive, section,
 };
 use super::Ctx;
 
@@ -61,6 +61,42 @@ fn strategy_at(i: usize) -> PocketStrategy {
     }
 }
 
+/// Applies the committed `text` of field `key`, if it is one of this section's. Step down
+/// and step in must be above 0 (the generator cuts a step of 0 or less as one full-depth
+/// pass); the ramp angle is 0 (no ramp, a plunge) to 90 degrees; the raster fill is
+/// clamped to 0..100 %.
+///
+/// # Arguments
+/// * `cx` - The frame's context, for the shapes the edit belongs to.
+/// * `key` - The field.
+/// * `text` - The committed text.
+pub fn apply(cx: &mut Ctx<'_>, key: &str, text: &str) -> Option<Check> {
+    let units = cx.units;
+    let state = cx.state();
+    let result = match key {
+        "step_down" => length(text, units)
+            .and_then(positive)
+            .map(|v| state.set_selected_step_down(v)),
+        "step_in" => length(text, units)
+            .and_then(positive)
+            .map(|v| state.set_selected_step_in(v)),
+        "ramp_angle" => number(text)
+            .and_then(|a| {
+                if (0.0..=90.0).contains(&a) {
+                    Ok(a)
+                } else {
+                    Err(E_ANGLE)
+                }
+            })
+            .map(|a| state.set_selected_ramp_angle(a)),
+        "raster_fill" => {
+            number(text).map(|v| state.set_selected_raster_fill_ratio(v.clamp(0.0, 100.0) / 100.0))
+        }
+        _ => return None,
+    };
+    Some(result)
+}
+
 /// The CAM Properties section.
 pub fn show(ui: &mut egui::Ui, cx: &mut Ctx<'_>) {
     let first = &cx.summary.first;
@@ -89,7 +125,7 @@ pub fn show(ui: &mut egui::Ui, cx: &mut Ctx<'_>) {
             cx.state().set_selected_pocket_properties(i == 1, depth);
         }
         let unit = length_unit(units);
-        if let FieldEvent::Committed(text) = entry(
+        entry(
             ui,
             &mut cx.fields(),
             "step_down",
@@ -97,11 +133,8 @@ pub fn show(ui: &mut egui::Ui, cx: &mut Ctx<'_>) {
             &length_text(step_down, units),
             unit,
             custom,
-        ) && let Some(v) = parse_length(&text, units)
-        {
-            cx.state().set_selected_step_down(v);
-        }
-        if let FieldEvent::Committed(text) = entry(
+        );
+        entry(
             ui,
             &mut cx.fields(),
             "step_in",
@@ -109,11 +142,8 @@ pub fn show(ui: &mut egui::Ui, cx: &mut Ctx<'_>) {
             &length_text(step_in, units),
             unit,
             custom && pocket,
-        ) && let Some(v) = parse_length(&text, units)
-        {
-            cx.state().set_selected_step_in(v);
-        }
-        if let FieldEvent::Committed(text) = entry(
+        );
+        entry(
             ui,
             &mut cx.fields(),
             "ramp_angle",
@@ -121,10 +151,7 @@ pub fn show(ui: &mut egui::Ui, cx: &mut Ctx<'_>) {
             &format!("{ramp:.1}"),
             "deg",
             custom,
-        ) && let Some(v) = parse_number(&text)
-        {
-            cx.state().set_selected_ramp_angle(v);
-        }
+        );
         let strategies = [
             tr.tr("Raster").into_owned(),
             tr.tr("Offset").into_owned(),
@@ -139,7 +166,7 @@ pub fn show(ui: &mut egui::Ui, cx: &mut Ctx<'_>) {
         ) {
             cx.state().set_selected_pocket_strategy(strategy_at(i));
         }
-        if let FieldEvent::Committed(text) = entry(
+        entry(
             ui,
             &mut cx.fields(),
             "raster_fill",
@@ -147,11 +174,7 @@ pub fn show(ui: &mut egui::Ui, cx: &mut Ctx<'_>) {
             &format!("{:.0}", fill * 100.0),
             "%",
             custom && pocket,
-        ) && let Some(v) = parse_number(&text)
-        {
-            cx.state()
-                .set_selected_raster_fill_ratio(v.clamp(0.0, 100.0) / 100.0);
-        }
+        );
         ui.add_enabled(
             custom && pocket,
             egui::Label::new(egui::RichText::new(tr.tr(RASTER_HINT)).weak()),

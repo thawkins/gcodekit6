@@ -3290,3 +3290,27 @@ msgstr "Objeto girado: dimensiones bloqueadas"
 
 msgid "0 = no raster, 100 = full length"
 msgstr "0 = sin raster, 100 = longitud completa"
+
+msgid "Enter a number"
+msgstr "Introduzca un número"
+
+msgid "Enter a value greater than 0"
+msgstr "Introduzca un valor mayor que 0"
+
+msgid "Enter a value of 0 or more"
+msgstr "Introduzca un valor de 0 o más"
+
+msgid "Enter an angle from 0 to 90"
+msgstr "Introduzca un ángulo de 0 a 90"
+
+msgid "Enter a whole number of 1 or more"
+msgstr "Introduzca un número entero de 1 o más"
+
+msgid "Value out of range"
+msgstr "Valor fuera de rango"
+
+msgid "Text cannot be empty"
+msgstr "El texto no puede estar vacío"
+
+msgid "The edited shapes were deleted or locked; the change was not applied."
+msgstr "Las formas editadas se eliminaron o bloquearon; el cambio no se aplicó."

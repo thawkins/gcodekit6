@@ -3211,3 +3211,27 @@ msgstr ""
 
 msgid "0 = no raster, 100 = full length"
 msgstr ""
+
+msgid "Enter a number"
+msgstr ""
+
+msgid "Enter a value greater than 0"
+msgstr ""
+
+msgid "Enter a value of 0 or more"
+msgstr ""
+
+msgid "Enter an angle from 0 to 90"
+msgstr ""
+
+msgid "Enter a whole number of 1 or more"
+msgstr ""
+
+msgid "Value out of range"
+msgstr ""
+
+msgid "Text cannot be empty"
+msgstr ""
+
+msgid "The edited shapes were deleted or locked; the change was not applied."
+msgstr ""

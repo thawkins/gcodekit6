@@ -34,6 +34,8 @@ mod test_designer_layers;
 mod test_designer_properties;
 #[path = "test_designer_properties_cam.rs"]
 mod test_designer_properties_cam;
+#[path = "test_designer_properties_commit.rs"]
+mod test_designer_properties_commit;
 #[path = "test_designer_properties_shapes.rs"]
 mod test_designer_properties_shapes;
 #[path = "test_designer_snapshots.rs"]

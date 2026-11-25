@@ -3287,3 +3287,27 @@ msgstr "Gedrehtes Objekt: Abmessungen gesperrt"
 
 msgid "0 = no raster, 100 = full length"
 msgstr "0 = kein Raster, 100 = volle Länge"
+
+msgid "Enter a number"
+msgstr "Geben Sie eine Zahl ein"
+
+msgid "Enter a value greater than 0"
+msgstr "Geben Sie einen Wert größer als 0 ein"
+
+msgid "Enter a value of 0 or more"
+msgstr "Geben Sie einen Wert von 0 oder mehr ein"
+
+msgid "Enter an angle from 0 to 90"
+msgstr "Geben Sie einen Winkel von 0 bis 90 ein"
+
+msgid "Enter a whole number of 1 or more"
+msgstr "Geben Sie eine ganze Zahl von 1 oder mehr ein"
+
+msgid "Value out of range"
+msgstr "Wert außerhalb des Bereichs"
+
+msgid "Text cannot be empty"
+msgstr "Der Text darf nicht leer sein"
+
+msgid "The edited shapes were deleted or locked; the change was not applied."
+msgstr "Die bearbeiteten Formen wurden gelöscht oder gesperrt; die Änderung wurde nicht übernommen."

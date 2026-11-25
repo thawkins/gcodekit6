@@ -371,39 +371,3 @@ fn test_delete_in_a_field_edits_text_not_the_design() {
     assert_eq!(ids(&h.state().designer.borrow()).len(), shapes_before);
     assert_eq!(selected(&h.state().designer.borrow()).len(), 1);
 }
-
-#[test]
-fn test_an_edit_is_dropped_when_the_selection_changes() {
-    let designer = two_rects();
-    let mut h = both(Rc::clone(&designer));
-    let before = undo_depth(&h);
-    type_text(&mut h, "Width:", "77");
-    // Select the other rectangle on the canvas: the field loses focus.
-    let other = h
-        .state()
-        .designer
-        .borrow()
-        .view()
-        .world_to_screen(glam::Vec2::new(60.0, 15.0));
-    click(&mut h, other);
-    assert_eq!(undo_depth(&h), before, "the pending edit is discarded");
-    let widths: Vec<f64> = {
-        let d = designer.borrow();
-        d.state()
-            .canvas
-            .shapes()
-            .map(|o| o.shape.bounds())
-            .map(|b| b.2 - b.0)
-            .collect()
-    };
-    assert!(widths.iter().all(|w| close(*w, 20.0)), "{widths:?}");
-}
-
-#[test]
-fn test_locked_shape_is_not_edited() {
-    let designer = two_rects();
-    let id = selected(&designer.borrow())[0];
-    designer.borrow_mut().set_locked(id, true);
-    let h = both(designer);
-    h.get_by_label("Select a shape to edit its properties");
-}

@@ -192,3 +192,47 @@ fn test_raster_image_engraving_settings() {
     assert_eq!(r.dithering, "floyd");
     assert_eq!(r.scan_direction, "vertical");
 }
+
+#[test]
+fn test_cam_rejects_unsafe_step_and_ramp_values() {
+    let mut h = both(two_rects());
+    if !objects(&h)[0].use_custom_values {
+        toggle(&mut h, "Use global values");
+    }
+    pick(&mut h, 0, "Pocket");
+    let before = (
+        objects(&h)[0].step_down,
+        objects(&h)[0].step_in,
+        objects(&h)[0].ramp_angle,
+    );
+    set_field(&mut h, "Step Down:", "0");
+    h.get_by_label("Enter a value greater than 0");
+    set_field(&mut h, "Step In:", "-1");
+    set_field(&mut h, "Ramp Angle:", "95");
+    h.get_by_label("Enter an angle from 0 to 90");
+    let o = &objects(&h)[0];
+    assert_eq!((o.step_down, o.step_in, o.ramp_angle), before);
+    set_field(&mut h, "Ramp Angle:", "90");
+    assert!(close(f64::from(objects(&h)[0].ramp_angle), 90.0));
+}
+
+#[test]
+fn test_laser_override_rejects_zero_feed_and_passes() {
+    let d = design(
+        vec![Shape::Rectangle(DesignRectangle::new(
+            10.0, 10.0, 20.0, 10.0,
+        ))],
+        1,
+    );
+    let mut h = both(d);
+    if laser(&first(&h)).use_global {
+        toggle(&mut h, "Use global values");
+    }
+    let before = laser(&first(&h));
+    set_field(&mut h, "Feed rate:", "0");
+    h.get_by_label("Enter a value greater than 0");
+    set_field(&mut h, "Passes:", "0");
+    h.get_by_label("Enter a whole number of 1 or more");
+    let p = laser(&first(&h));
+    assert!(close(p.feed_rate, before.feed_rate) && p.passes == before.passes);
+}

@@ -7,14 +7,18 @@
 //! images as one undo step, in both copies GTK keeps (the shape's own parameters, which the
 //! 2D toolpaths read, and the object's, which are saved).
 //!
-//! Change from GTK: committing one field of several shapes keeps each shape's other values;
-//! GTK read "---" as its defaults (1000 mm/min, 100 %, 1 pass) and wrote those to all.
+//! Changes from GTK: committing one field of several shapes keeps each shape's other values
+//! (GTK read "---" as its defaults, 1000 mm/min, 100 %, 1 pass, and wrote those to all); a
+//! feed rate of 0 or less and passes below 1 are rejected with an inline error (GTK turned
+//! them into defaults).
 //!
 //! Dependencies: `egui`, `gcodekit5-designer` (model).
 
 use gcodekit5_designer::model::{LaserParams, Shape};
 
-use super::super::builders::{self, FieldEvent, MIXED, entry, parse_number, section};
+use super::super::builders::{
+    self, Check, E_COUNT, MIXED, entry, number, positive, section, whole,
+};
 use super::super::update::{resolve_laser, shape_laser_params};
 use super::{Ctx, change_selected};
 
@@ -56,7 +60,7 @@ fn set_shape_params(shape: &mut Shape, params: LaserParams) {
 }
 
 /// Applies `change` to every selected shape that has laser parameters (one undo step).
-fn apply(cx: &mut Ctx<'_>, change: Change) {
+fn apply_change(cx: &mut Ctx<'_>, change: Change) {
     let state = cx.state();
     let global = state.tool_settings.clone();
     change_selected(state, "Change Laser Override", |obj| {
@@ -83,7 +87,7 @@ fn apply(cx: &mut Ctx<'_>, change: Change) {
             LaserParams {
                 feed_rate: change.feed.unwrap_or(feed),
                 power_percent: change.power.unwrap_or(power).clamp(0.0, 100.0),
-                passes: change.passes.unwrap_or(passes).max(1),
+                passes: change.passes.unwrap_or(passes),
                 use_global: false,
             }
         };
@@ -97,6 +101,31 @@ fn apply(cx: &mut Ctx<'_>, change: Change) {
         set_shape_params(&mut obj.shape, params);
         changed
     });
+}
+
+/// Applies the committed `text` of field `key`, if it is one of this section's: a feed rate
+/// above 0, a power (clamped to 0..100 %), or whole passes of 1 or more.
+///
+/// # Arguments
+/// * `cx` - The frame's context, for the shapes the edit belongs to.
+/// * `key` - The field.
+/// * `text` - The committed text.
+pub fn apply(cx: &mut Ctx<'_>, key: &str, text: &str) -> Option<Check> {
+    // GTK: a value edit takes the switch as shown (off whenever the fields are editable).
+    let mut change = Change {
+        use_global: Some(cx.summary.laser.is_some_and(|s| s.all_use_global)),
+        ..Change::default()
+    };
+    let parsed = match key {
+        "laser_feed" => number(text)
+            .and_then(positive)
+            .map(|v| change.feed = Some(v)),
+        "laser_power" => number(text).map(|v| change.power = Some(v)),
+        "laser_passes" => whole(text, 1, E_COUNT)
+            .map(|n| change.passes = Some(u32::try_from(n).unwrap_or(u32::MAX))),
+        _ => return None,
+    };
+    Some(parsed.map(|()| apply_change(cx, change)))
 }
 
 /// The Laser Config (Object) section.
@@ -118,7 +147,7 @@ pub fn show(ui: &mut egui::Ui, cx: &mut Ctx<'_>) {
         if let Some(global) =
             builders::check(ui, &tr.tr("Use global values"), sum.all_use_global, true)
         {
-            apply(
+            apply_change(
                 cx,
                 Change {
                     use_global: Some(global),
@@ -126,46 +155,20 @@ pub fn show(ui: &mut egui::Ui, cx: &mut Ctx<'_>) {
                 },
             );
         }
-        // GTK: a value edit takes the switch as shown (off whenever the fields are editable).
-        let mut change = Change {
-            use_global: Some(sum.all_use_global),
-            ..Change::default()
-        };
-        if let FieldEvent::Committed(t) = entry(
-            ui,
-            &mut cx.fields(),
-            "laser_feed",
-            &tr.tr("Feed rate:"),
-            &feed,
-            "",
-            editable,
-        ) {
-            change.feed = parse_number(&t);
-        }
-        if let FieldEvent::Committed(t) = entry(
-            ui,
-            &mut cx.fields(),
-            "laser_power",
-            &tr.tr("Power:"),
-            &power,
-            "",
-            editable,
-        ) {
-            change.power = parse_number(&t);
-        }
-        if let FieldEvent::Committed(t) = entry(
-            ui,
-            &mut cx.fields(),
-            "laser_passes",
-            &tr.tr("Passes:"),
-            &passes,
-            "",
-            editable,
-        ) {
-            change.passes = t.trim().parse::<u32>().ok();
-        }
-        if change.feed.is_some() || change.power.is_some() || change.passes.is_some() {
-            apply(cx, change);
+        for (key, msgid, shown) in [
+            ("laser_feed", n_!("Feed rate:"), &feed),
+            ("laser_power", n_!("Power:"), &power),
+            ("laser_passes", n_!("Passes:"), &passes),
+        ] {
+            entry(
+                ui,
+                &mut cx.fields(),
+                key,
+                &tr.tr(msgid),
+                shown,
+                "",
+                editable,
+            );
         }
     });
 }
