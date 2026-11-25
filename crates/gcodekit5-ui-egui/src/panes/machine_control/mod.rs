@@ -219,7 +219,7 @@ impl MachineControlPane {
     /// Jogs `axis` one step in the direction of `sign`, only while the machine is idle (or
     /// jogging).
     fn jog_step(&mut self, ctx: &PaneContext, axis: Axis, sign: f32) {
-        if !ctx.machine().is_some_and(|m| m.status().jog_allowed()) {
+        if !ctx.machine().is_some_and(|m| m.jog_allowed()) {
             self.notice = Some(
                 ctx.tr
                     .tr("Jog refused: the machine is not idle.")
@@ -404,7 +404,9 @@ impl Pane for MachineControlPane {
                     None => {}
                 }
                 ui.separator();
-                for action in self.jog.show(ui, tr, status) {
+                // Read now, after this frame's Home/Unlock buttons: a line they sent blocks it.
+                let jog_allowed = machine.is_some_and(|m| m.jog_allowed());
+                for action in self.jog.show(ui, tr, status, jog_allowed) {
                     let mut controller = lock(&controller);
                     if !matches!(action, jog::Action::Refused(_)) {
                         self.notice = None;

@@ -92,13 +92,13 @@ pub(crate) fn wrote_realtime(shared: &LoopbackShared, command: RealtimeCommand) 
 }
 
 /// The command entry.
-fn entry<'h>(harness: &'h Harness<'_, GcodeKitApp>) -> egui_kittest::Node<'h> {
+pub(crate) fn entry<'h>(harness: &'h Harness<'_, GcodeKitApp>) -> egui_kittest::Node<'h> {
     harness.get_by_role_and_label(Role::TextInput, "Enter G-code command...")
 }
 
 /// Scrolls the command entry into view, then hovers and clicks it (a TextEdit takes focus
 /// from a click only once the pointer has hovered it on an earlier frame).
-fn focus_entry(harness: &mut Harness<'_, GcodeKitApp>) {
+pub(crate) fn focus_entry(harness: &mut Harness<'_, GcodeKitApp>) {
     entry(harness).scroll_to_me();
     harness.step();
     harness.step();

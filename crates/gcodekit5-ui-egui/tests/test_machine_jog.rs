@@ -515,3 +515,88 @@ fn test_report_inches_change_drops_cached_offset() {
     status.apply(&[MachineEvent::Received("$13=1".to_string())]);
     assert!(status.report.is_some());
 }
+
+/// What sends a command line in [`test_jog_blocked_after_command_line_until_fresh_report`].
+#[derive(Clone, Copy, Debug)]
+enum LineSource {
+    HomeButton,
+    HomeCommand,
+    CommandEntry,
+}
+
+/// After `$H` (button or command) or an MDI line, the last Idle report may predate the line:
+/// no jog (step button, Jog command, hold) runs until a report read after the line.
+#[test]
+fn test_jog_blocked_after_command_line_until_fresh_report() {
+    let idle = "<Idle|MPos:-100.000,-100.000,-50.000|FS:0,0>";
+    for source in [
+        LineSource::HomeButton,
+        LineSource::HomeCommand,
+        LineSource::CommandEntry,
+    ] {
+        let (mut harness, shared) =
+            pane_app_with(loopback_config(), Duration::from_millis(1), true);
+        report_state(&mut harness, &shared, idle, "Idle");
+        let line = match source {
+            LineSource::HomeButton => {
+                harness.get_by_label("Home").click();
+                "$H"
+            }
+            LineSource::HomeCommand => {
+                harness.state_mut().dispatch(Command::Home);
+                "$H"
+            }
+            LineSource::CommandEntry => {
+                crate::test_machine_pane::focus_entry(&mut harness);
+                crate::test_machine_pane::entry(&harness).type_text("G0 X0");
+                harness.step();
+                harness.get_by_label("Send Command").click();
+                "G0 X0"
+            }
+        };
+        harness.step();
+        assert!(
+            wait_until(|| shared.log().contains(&Wrote::Line(line.to_string()))),
+            "{source:?}: line not written: {:?}",
+            shared.log()
+        );
+        for _ in 0..3 {
+            harness.step();
+        }
+        assert!(!harness.state().state().machine.jog_allowed(), "{source:?}");
+
+        // Step button, Jog command and hold, all refused.
+        harness.get_by_label("Jog X+").click();
+        harness.step();
+        harness.state_mut().dispatch(Command::JogXPos);
+        harness.step();
+        let _ = harness.get_by_label("Jog refused: the machine is not idle.");
+        harness.get_by_label("Continuous").click();
+        harness.step();
+        let at = press(&mut harness, "Jog X+");
+        release(&mut harness, at);
+        std::thread::sleep(Duration::from_millis(30));
+        assert!(
+            jog_lines(&shared).is_empty(),
+            "{source:?}: {:?}",
+            shared.log()
+        );
+
+        // A report read after the line: jogging works again.
+        shared.inject(&format!("{idle}\n"));
+        assert!(
+            step_until(&mut harness, |app| app.state().machine.jog_allowed()),
+            "{source:?}: no fresh report"
+        );
+        harness.step();
+        harness.state_mut().dispatch(Command::JogXPos);
+        assert_eq!(wait_jogs(&shared, 1).len(), 1, "{source:?}");
+        let at = press(&mut harness, "Jog X+");
+        assert_eq!(
+            wait_jogs(&shared, 2)[1],
+            "$J=G91 G21 X100.00 F1000",
+            "{source:?}"
+        );
+        release(&mut harness, at);
+    }
+}

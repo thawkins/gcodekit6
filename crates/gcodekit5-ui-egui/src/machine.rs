@@ -235,6 +235,8 @@ pub struct Machine {
     status: MachineStatus,
     events: Vec<MachineEvent>,
     program: Option<Arc<[String]>>,
+    /// Whether the controller's latest report was fresh when this frame polled it.
+    report_fresh: bool,
 }
 
 impl Machine {
@@ -248,6 +250,7 @@ impl Machine {
             status: MachineStatus::default(),
             events: Vec::new(),
             program: None,
+            report_fresh: true,
         }
     }
 
@@ -275,9 +278,25 @@ impl Machine {
     /// Takes the controller's events, replacing the previous frame's, and updates the status.
     /// Call once per frame. Never blocks on I/O.
     pub fn poll(&mut self) {
-        let events = lock(&self.controller).poll();
+        let (fresh, events) = {
+            let mut controller = lock(&self.controller);
+            // Freshness first: the worker marks a report fresh after sending it, so a fresh
+            // report is already among the events polled next.
+            (controller.report_fresh(), controller.poll())
+        };
+        self.report_fresh = fresh;
         self.events = coalesce_progress(events);
         self.status.apply(&self.events);
+    }
+
+    /// Whether jogging is allowed now: the last status report says Idle or Jog
+    /// ([`MachineStatus::jog_allowed`]) and was read after every command line sent so far
+    /// (`$H`, `$X`, an MDI line), both as of this frame's poll and right now, so a line sent
+    /// since the poll blocks jogging at once. Until a fresh report arrives the last one may
+    /// describe the machine before the line (Idle before homing), and a `$J` would wait in
+    /// the controller's buffer and run afterwards from a stale position.
+    pub fn jog_allowed(&self) -> bool {
+        self.status.jog_allowed() && self.report_fresh && lock(&self.controller).report_fresh()
     }
 
     /// Adds `events` taken from the controller outside [`Machine::poll`] to this frame's

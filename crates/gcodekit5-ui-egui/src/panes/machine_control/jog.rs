@@ -11,7 +11,7 @@
 //! The move is clamped to the travel left in that direction (see [`remaining_travel`]); with
 //! no known machine position, or no travel left, nothing moves and the pane says why. The
 //! Jogging (step and hold) is enabled only while the last status report says `Idle` or
-//! `Jog`. The hold is tracked here rather than with egui's "pointer down on" flag, which this egui
+//! `Jog` and was read after the last command line (`$H`, `$X`, MDI) was written. The hold is tracked here rather than with egui's "pointer down on" flag, which this egui
 //! clears once a press can no longer be a click: it lasts while the primary button that
 //! was pressed on the button stays down, the pointer stays on the button and the button
 //! stays enabled. Anything else ends it with 0x85, and the pane and the app end it on
@@ -354,10 +354,12 @@ impl JogPanel {
         ui: &mut egui::Ui,
         tr: &Translator,
         status: &MachineStatus,
+        allowed: bool,
     ) -> Vec<Action> {
         let mut actions = Vec::new();
-        // Disabled outside Idle and Jog; a hold in progress ends when its button disables.
-        let enabled = status.connected && !status.streaming && status.jog_allowed();
+        // Disabled outside Idle and Jog, and until a report read after the last command line
+        // (`allowed`, from `Machine::jog_allowed`); a hold ends when its button disables.
+        let enabled = status.connected && !status.streaming && allowed;
         ui.strong(tr.tr("Jog"));
         self.show_step(ui, tr);
         self.show_feed(ui, tr);
