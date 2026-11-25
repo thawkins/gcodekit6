@@ -265,6 +265,7 @@ impl ToolForm {
     /// # Arguments
     /// * `tool` - The tool to edit.
     pub fn from_tool(tool: &Tool) -> Self {
+        // Deliberate exception to the UI's 2 decimals: 1/8" = 3.175 mm must not round.
         let mm = |v: f32| format!("{v:.3}");
         let mut form = Self {
             id: tool.id.0.clone(),
@@ -525,6 +526,7 @@ pub fn tool_summary(tool: &Tool, type_name: &str, none: &str) -> String {
         .map(|c| c.to_string())
         .unwrap_or_else(|| none.to_string());
     let shaft = tool.shaft_diameter.unwrap_or(tool.diameter);
+    // Deliberate exception to the UI's 2 decimals: 1/8" = 3.175 mm must not round.
     format!(
         "{type_name} - id:{} - D{:.3}mm - shaft D{:.3}mm - {}F - FL{:.3}mm - {} / {coating}",
         tool.id.0, tool.diameter, shaft, tool.flutes, tool.flute_length, tool.material,
