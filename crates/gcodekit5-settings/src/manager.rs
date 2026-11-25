@@ -4,6 +4,10 @@
 //! through the craft-settings store (`config.toml`). The first load imports
 //! the GTK build's `config.json` and data files once
 //! ([`crate::migrate::import_legacy`]); `config.json` is never written again.
+//!
+//! A [`SettingsManager`] value holds the loaded settings and the folders they
+//! came from, for a front end that edits them and applies the result
+//! ([`SettingsManager::open`], [`SettingsManager::apply`]).
 
 use crate::config::Config;
 use crate::migrate::{self, ConfigDirs};
@@ -12,10 +16,74 @@ use craft_settings::store::CONFIG_FILE;
 use gcodekit5_core::{Error, Result};
 use std::path::PathBuf;
 
-/// Locations of the application's configuration files.
-pub struct SettingsManager;
+/// Locations of the application's configuration files, and (as a value) the
+/// loaded settings with the folders they are saved to.
+#[derive(Debug, Clone)]
+pub struct SettingsManager {
+    /// Where the settings are saved; `None` when there is no settings folder.
+    dirs: Option<ConfigDirs>,
+    /// The settings as last loaded or applied.
+    config: Config,
+}
 
 impl SettingsManager {
+    /// Loads the settings from `dirs` ([`SettingsManager::load`]) and keeps
+    /// the folders for [`SettingsManager::apply`].
+    ///
+    /// # Arguments
+    /// * `dirs` - the legacy and craft-settings folders
+    ///
+    /// # Returns
+    /// The manager, and a description of any problem to show the user.
+    pub fn open(dirs: ConfigDirs) -> (Self, Option<String>) {
+        let (config, problem) = Self::load(&dirs);
+        (
+            Self {
+                dirs: Some(dirs),
+                config,
+            },
+            problem,
+        )
+    }
+
+    /// A manager over `config` with no settings folder: applying fails, so
+    /// nothing is written (no platform folder, headless use).
+    ///
+    /// # Arguments
+    /// * `config` - the settings to hold
+    pub fn detached(config: Config) -> Self {
+        Self { dirs: None, config }
+    }
+
+    /// The settings as last loaded or applied.
+    pub fn config(&self) -> &Config {
+        &self.config
+    }
+
+    /// The folders the settings are saved to, if any.
+    pub fn dirs(&self) -> Option<&ConfigDirs> {
+        self.dirs.as_ref()
+    }
+
+    /// Saves `config` ([`SettingsManager::save`]) and, once it is written,
+    /// keeps it as the current settings.
+    ///
+    /// # Arguments
+    /// * `config` - the settings to save
+    ///
+    /// # Errors
+    /// Returns an error when there is no settings folder or the save fails;
+    /// the current settings are then unchanged.
+    pub fn apply(&mut self, config: Config) -> Result<()> {
+        let dirs = self
+            .dirs
+            .as_ref()
+            .ok_or_else(|| Error::other("No settings folder; settings are not saved"))?;
+        Self::save(dirs, &config)?;
+        self.config = config;
+        Ok(())
+    }
+
     /// The legacy (GTK build) config directory, which also holds the device,
     /// tool and material files.
     pub fn config_directory() -> Result<PathBuf> {

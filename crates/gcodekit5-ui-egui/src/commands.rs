@@ -331,12 +331,3 @@ pub fn keymap() -> Keymap {
     let catalog = Command::ALL.into_iter().map(Command::bindable).collect();
     Keymap::new(catalog, scopes, Platform::current())
 }
-
-/// A file dialog a command asked for, for the dialog layer (Task 6) to open.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum DialogRequest {
-    /// Choose a G-code file to open.
-    Open,
-    /// Choose where to save the current file.
-    SaveAs,
-}

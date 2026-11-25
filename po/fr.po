@@ -3105,3 +3105,60 @@ msgstr "Faire défiler le menu vers le haut"
 
 msgid "Scroll menu down"
 msgstr "Faire défiler le menu vers le bas"
+
+msgid "Apply"
+msgstr "Appliquer"
+
+msgid "Metric"
+msgstr "Métrique"
+
+msgid "Imperial"
+msgstr "Impérial"
+
+msgid "Jog Step Size (Linear)"
+msgstr "Pas de déplacement (linéaire)"
+
+msgid "Jog Feed Rate"
+msgstr "Vitesse de déplacement"
+
+msgid "X Axis Limit"
+msgstr "Limite de l'axe X"
+
+msgid "Y Axis Limit"
+msgstr "Limite de l'axe Y"
+
+msgid "Z Axis Limit"
+msgstr "Limite de l'axe Z"
+
+msgid "Light"
+msgstr "Clair"
+
+msgid "Dark"
+msgstr "Sombre"
+
+msgid "Use system title bar"
+msgstr "Utiliser la barre de titre du système"
+
+msgid "Arc Segment Length"
+msgstr "Longueur de segment d'arc"
+
+msgid "Max Line Length"
+msgstr "Longueur de ligne maximale"
+
+msgid "3D Stock Removal Visualization"
+msgstr "Visualisation 3D de l'enlèvement de matière"
+
+msgid "STL File Import"
+msgstr "Importation de fichiers STL"
+
+msgid "License:"
+msgstr "Licence :"
+
+msgid "G-Code Files"
+msgstr "Fichiers G-Code"
+
+msgid "Restart to apply settings?"
+msgstr "Redémarrer pour appliquer les paramètres ?"
+
+msgid "GCodeKit5 must restart to use the new settings. The machine connection will be closed. Restart now?"
+msgstr "GCodeKit5 doit redémarrer pour utiliser les nouveaux paramètres. La connexion à la machine sera fermée. Redémarrer maintenant ?"

@@ -9,6 +9,7 @@ use craft_window::policy::{
 use egui::accesskit::Role;
 use egui_kittest::Harness;
 use egui_kittest::kittest::Queryable;
+use gcodekit5_settings::SettingsManager;
 use gcodekit5_settings::config::{Config, UiSettings};
 use gcodekit5_ui_egui::frame::title_bar_pref;
 use gcodekit5_ui_egui::{AppState, GcodeKitApp};
@@ -26,7 +27,10 @@ fn desktop(kind: DesktopKind) -> Desktop {
 }
 
 fn app(decision: Decision) -> GcodeKitApp {
-    GcodeKitApp::from_state(AppState::new(Config::default(), decision))
+    GcodeKitApp::from_state(AppState::new(
+        SettingsManager::detached(Config::default()),
+        decision,
+    ))
 }
 
 /// A harness drawing `app` over the whole window with no margin, as eframe's root `Ui` is

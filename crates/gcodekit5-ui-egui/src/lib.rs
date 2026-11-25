@@ -18,9 +18,11 @@ macro_rules! n_ {
 
 pub mod app;
 pub mod commands;
+pub mod dialogs;
 pub mod frame;
 pub mod menu;
 pub mod theme;
+pub mod windows;
 pub mod workspace;
 
 pub use app::{AppState, GcodeKitApp};
@@ -42,14 +44,15 @@ pub struct LaunchOptions {
 pub fn run(options: LaunchOptions) -> anyhow::Result<()> {
     // `options.files` is consumed once the app opens files (Tasks 4 and 9).
     let LaunchOptions { files: _ } = options;
-    let config = AppState::load_config();
-    gcodekit5_app::i18n::set_language(&config.ui.language);
+    let settings = AppState::load_settings();
+    gcodekit5_app::i18n::set_language(&settings.config().ui.language);
     let decision = craft_window::policy::decide_for(
         craft_window::Prefix::new("GCODEKIT5"),
         craft_window::policy::Backend::from_env(),
-        frame::title_bar_pref(&config.ui),
+        frame::title_bar_pref(&settings.config().ui),
     );
-    let state = AppState::new(config, decision);
+    let state = AppState::new(settings, decision);
+    let restart = std::sync::Arc::clone(&state.restart);
     let viewport = egui::ViewportBuilder::default()
         .with_title("GCodeKit")
         .with_inner_size([1280.0, 800.0])
@@ -63,5 +66,20 @@ pub fn run(options: LaunchOptions) -> anyhow::Result<()> {
         native,
         Box::new(move |cc| Ok(Box::new(GcodeKitApp::new(cc, state)))),
     )
-    .map_err(|e| anyhow::anyhow!("eframe failed: {e}"))
+    .map_err(|e| anyhow::anyhow!("eframe failed: {e}"))?;
+    if restart.load(std::sync::atomic::Ordering::SeqCst) {
+        relaunch_command()?.spawn()?;
+    }
+    Ok(())
+}
+
+/// The command that starts this executable again with the same arguments, for a restart the
+/// user asked for after changing a setting that needs one.
+///
+/// # Errors
+/// Returns an error when the path of the running executable is unavailable.
+pub fn relaunch_command() -> std::io::Result<std::process::Command> {
+    let mut command = std::process::Command::new(std::env::current_exe()?);
+    command.args(std::env::args_os().skip(1));
+    Ok(command)
 }

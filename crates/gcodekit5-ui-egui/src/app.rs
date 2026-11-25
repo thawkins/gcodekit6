@@ -11,8 +11,16 @@
 //! native); and the panes ([`PaneContext::request`]). All of them end in
 //! [`GcodeKitApp::dispatch`].
 //!
+//! File dialogs and confirmations go through [`Dialogs`]: queued by a command, shown at the
+//! end of the frame and answered on a later one, so the event loop never blocks. The
+//! Preferences and About windows are drawn over the workspace while open.
+//!
 //! Dependencies: `egui`, `eframe`, `craft-window`, `craft-platform`, `craft-keymap`,
-//! `craft-menu`, `gcodekit5-app` (translations), `gcodekit5-settings` (configuration).
+//! `craft-menu`, `craft-dialogs`, `gcodekit5-app` (translations), `gcodekit5-settings`
+//! (configuration).
+
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, OnceLock};
 
 use craft_keymap::egui::Dispatcher;
 use craft_keymap::{Active, Keymap};
@@ -23,51 +31,64 @@ use gcodekit5_app::i18n::Translator;
 use gcodekit5_settings::SettingsManager;
 use gcodekit5_settings::config::Config;
 
-use crate::commands::{self, Command, DialogRequest};
+use crate::commands::{self, Command};
+use crate::dialogs::{
+    ConfirmChoice, ConfirmRequest, DialogAnswer, Dialogs, FileFilter, FilePurpose,
+};
 use crate::menu::Menus;
 use crate::theme;
+use crate::windows::{AboutWindow, SettingsOutcome, SettingsWindow};
 use crate::workspace::{PaneContext, Workspace};
 
 /// State held by the egui front end.
 #[derive(Debug)]
 pub struct AppState {
-    /// The loaded settings.
-    pub config: Config,
+    /// The loaded settings and where they are saved.
+    pub settings: SettingsManager,
     /// Translator for the configured UI language.
     pub translator: Translator,
     /// craft-window's frame decision: who draws the title bar, the caption buttons' layout
     /// and look, and the desktop it was made for (whether "Use system title bar" matters).
     pub decision: Decision,
+    /// Set when the user asked to restart; [`crate::run`] relaunches after the window closes.
+    pub restart: Arc<AtomicBool>,
 }
 
 impl AppState {
-    /// State over `config`, with its UI language, framed as `decision` says.
+    /// State over `settings`, with their UI language, framed as `decision` says.
     ///
     /// # Arguments
-    /// * `config` - The settings to use.
+    /// * `settings` - The settings to use and save to.
     /// * `decision` - craft-window's frame decision for the window.
-    pub fn new(config: Config, decision: Decision) -> Self {
-        let translator = Translator::new(&config.ui.language);
+    pub fn new(settings: SettingsManager, decision: Decision) -> Self {
+        let translator = Translator::new(&settings.config().ui.language);
         Self {
-            config,
+            settings,
             translator,
             decision,
+            restart: Arc::new(AtomicBool::new(false)),
         }
     }
 
-    /// The saved settings, or defaults when they cannot be read.
-    pub fn load_config() -> Config {
+    /// The current settings.
+    pub fn config(&self) -> &Config {
+        self.settings.config()
+    }
+
+    /// The saved settings, or defaults that are never saved when there is no settings
+    /// folder.
+    pub fn load_settings() -> SettingsManager {
         match SettingsManager::config_dirs() {
             Ok(dirs) => {
-                let (config, problem) = SettingsManager::load(&dirs);
+                let (settings, problem) = SettingsManager::open(dirs);
                 if let Some(problem) = problem {
                     tracing::warn!(%problem, "settings loaded with problems");
                 }
-                config
+                settings
             }
             Err(error) => {
                 tracing::warn!(%error, "no settings folder; using defaults");
-                Config::default()
+                SettingsManager::detached(Config::default())
             }
         }
     }
@@ -88,8 +109,16 @@ pub struct GcodeKitApp {
     queue: Vec<Command>,
     /// Window commands the dispatched commands asked for, sent at the end of the frame.
     viewport_commands: Vec<egui::ViewportCommand>,
-    /// A file dialog a command asked for; the dialog layer (Task 6) takes it.
-    pending_dialog: Option<DialogRequest>,
+    /// File dialogs and confirmations, answered on a later frame.
+    dialogs: Dialogs,
+    /// The context [`GcodeKitApp::dialogs`] wakes when an answer comes in, once known.
+    wake_ctx: Arc<OnceLock<egui::Context>>,
+    /// The last dialog answer no feature has taken yet (until the editor and designer can).
+    last_dialog_answer: Option<DialogAnswer>,
+    /// The Preferences window.
+    settings_window: SettingsWindow,
+    /// The About window.
+    about_window: AboutWindow,
     /// The last command dispatched.
     last_dispatched: Option<Command>,
     /// The `movable` flag last set on the macOS window (`title_bar::sync_movable`).
@@ -103,7 +132,10 @@ impl std::fmt::Debug for GcodeKitApp {
             .field("state", &self.state)
             .field("workspace", &self.workspace)
             .field("menus", &self.menus)
-            .field("pending_dialog", &self.pending_dialog)
+            .field("dialogs", &self.dialogs)
+            .field("last_dialog_answer", &self.last_dialog_answer)
+            .field("settings_window", &self.settings_window)
+            .field("about_window", &self.about_window)
             .field("last_dispatched", &self.last_dispatched)
             .finish_non_exhaustive()
     }
@@ -135,6 +167,24 @@ impl GcodeKitApp {
     pub fn from_state(state: AppState) -> Self {
         let keymap = commands::keymap();
         let menus = Menus::new(&state.translator, &keymap);
+        let wake_ctx: Arc<OnceLock<egui::Context>> = Arc::new(OnceLock::new());
+        let wake = {
+            let wake_ctx = Arc::clone(&wake_ctx);
+            Arc::new(move || {
+                if let Some(ctx) = wake_ctx.get() {
+                    ctx.request_repaint();
+                }
+            })
+        };
+        let dialogs = Dialogs::new(state.translator, wake);
+        let settings_window = SettingsWindow::new(
+            crate::frame::title_bar_setting_applies(&state.decision),
+            &state.config().ui,
+        );
+        let mut about_window = AboutWindow::default();
+        if state.config().ui.show_about_on_startup {
+            about_window.open();
+        }
         Self {
             state,
             workspace: Workspace::default_layout(),
@@ -144,7 +194,11 @@ impl GcodeKitApp {
             menus,
             queue: Vec::new(),
             viewport_commands: Vec::new(),
-            pending_dialog: None,
+            dialogs,
+            wake_ctx,
+            last_dialog_answer: None,
+            settings_window,
+            about_window,
             last_dispatched: None,
             #[cfg(target_os = "macos")]
             movable: None,
@@ -158,6 +212,10 @@ impl GcodeKitApp {
     pub fn ui(&mut self, ui: &mut egui::Ui) {
         self.sync_theme(ui.ctx());
         let ctx = ui.ctx().clone();
+        let _ = self.wake_ctx.set(ctx.clone());
+        while let Some(answer) = self.dialogs.poll() {
+            self.handle_answer(answer);
+        }
         self.dispatch_keys(&ctx);
         let gate = Gate {
             text_editing: ctx.text_edit_focused(),
@@ -172,6 +230,7 @@ impl GcodeKitApp {
             self.dispatch(command);
         }
         self.queue = queue;
+        self.show_windows(&ctx);
         for command in self.viewport_commands.drain(..) {
             ctx.send_viewport_cmd(command);
         }
@@ -233,11 +292,16 @@ impl GcodeKitApp {
     pub fn dispatch(&mut self, cmd: Command) {
         self.last_dispatched = Some(cmd);
         match cmd {
-            Command::FileOpen => self.pending_dialog = Some(DialogRequest::Open),
+            Command::FileOpen => self.dialogs.open_file(
+                FilePurpose::OpenGcode,
+                &[FileFilter::GCODE, FileFilter::ALL],
+            ),
             // No document has a path of its own yet, so Save asks where to save too.
-            Command::FileSave | Command::FileSaveAs => {
-                self.pending_dialog = Some(DialogRequest::SaveAs);
-            }
+            Command::FileSave | Command::FileSaveAs => self
+                .dialogs
+                .save_file(FilePurpose::SaveGcode, &[FileFilter::GCODE]),
+            Command::OpenSettings => self.settings_window.open(&self.state.settings),
+            Command::About => self.about_window.open(),
             Command::Quit => self.viewport_commands.push(egui::ViewportCommand::Close),
             Command::Cut => self
                 .viewport_commands
@@ -280,18 +344,70 @@ impl GcodeKitApp {
             | Command::ViewTop
             | Command::ViewFront
             | Command::ViewIso => tracing::debug!(?cmd, "view command not available yet"),
-            Command::OpenSettings
-            | Command::OpenDeviceManager
+            Command::OpenDeviceManager
             | Command::OpenToolsManager
             | Command::OpenMaterialsManager
-            | Command::OpenHelp
-            | Command::About => tracing::debug!(?cmd, "window command not available yet"),
+            | Command::OpenHelp => tracing::debug!(?cmd, "window command not available yet"),
         }
     }
 
-    /// The file dialog a command asked for and no dialog has taken yet.
-    pub fn pending_dialog(&self) -> Option<DialogRequest> {
-        self.pending_dialog
+    /// Draws the Preferences and About windows while they are open, and acts on what
+    /// Preferences decided.
+    fn show_windows(&mut self, ctx: &egui::Context) {
+        let outcome =
+            self.settings_window
+                .show(ctx, &mut self.state.settings, &self.state.translator);
+        match outcome {
+            SettingsOutcome::Applied { restart: true } => {
+                self.dialogs.confirm(ConfirmRequest::Restart);
+            }
+            SettingsOutcome::Closed
+            | SettingsOutcome::Open
+            | SettingsOutcome::Cancelled
+            | SettingsOutcome::Applied { restart: false }
+            | SettingsOutcome::Failed(_) => {}
+        }
+        self.about_window.show(ctx, &self.state.translator);
+    }
+
+    /// Acts on a dialog's answer. Answers for features that do not exist yet (opening and
+    /// saving files, Tasks 7 and 9) are kept in [`GcodeKitApp::last_dialog_answer`].
+    fn handle_answer(&mut self, answer: DialogAnswer) {
+        match &answer {
+            DialogAnswer::Confirm {
+                request: ConfirmRequest::Restart,
+                choice,
+            } => {
+                if *choice == ConfirmChoice::Yes {
+                    self.state.restart.store(true, Ordering::SeqCst);
+                    self.viewport_commands.push(egui::ViewportCommand::Close);
+                }
+            }
+            DialogAnswer::Unavailable { reason } => {
+                tracing::warn!(%reason, "dialog unavailable");
+            }
+            DialogAnswer::File { .. }
+            | DialogAnswer::Cancelled { .. }
+            | DialogAnswer::Confirm { .. } => {
+                tracing::debug!(?answer, "dialog answer not consumed yet");
+            }
+        }
+        self.last_dialog_answer = Some(answer);
+    }
+
+    /// The dialog queue.
+    pub fn dialogs(&self) -> &Dialogs {
+        &self.dialogs
+    }
+
+    /// The dialog queue, for showing its requests at the end of a frame and for tests.
+    pub fn dialogs_mut(&mut self) -> &mut Dialogs {
+        &mut self.dialogs
+    }
+
+    /// The last dialog answer [`GcodeKitApp::ui`] took.
+    pub fn last_dialog_answer(&self) -> Option<&DialogAnswer> {
+        self.last_dialog_answer.as_ref()
     }
 
     /// The last command [`GcodeKitApp::dispatch`] ran.
@@ -302,7 +418,10 @@ impl GcodeKitApp {
     /// Shows the light/dark mode the settings and the desktop ask for.
     fn sync_theme(&self, ctx: &egui::Context) {
         let observed = self.system_theme.as_ref().and_then(|watch| watch(ctx));
-        let mode = theme::resolve(self.state.config.ui.theme, observed.or(ctx.system_theme()));
+        let mode = theme::resolve(
+            self.state.config().ui.theme,
+            observed.or(ctx.system_theme()),
+        );
         if ctx.theme() != mode {
             theme::install(ctx);
             ctx.set_theme(mode);
@@ -312,8 +431,9 @@ impl GcodeKitApp {
 
 impl eframe::App for GcodeKitApp {
     /// Draws the whole window.
-    fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
+    fn ui(&mut self, ui: &mut egui::Ui, frame: &mut eframe::Frame) {
         self.ui(ui);
+        self.dialogs.end_frame(Some(&*frame));
     }
 
     /// Feeds the native menu's key equivalents to egui before it reads the input.

@@ -6,8 +6,10 @@ use craft_keymap::{Active, Chord, Lookup};
 use craft_menu::{LayoutOptions, Target};
 use egui_kittest::Harness;
 use gcodekit5_app::i18n::Translator;
+use gcodekit5_settings::SettingsManager;
 use gcodekit5_settings::config::Config;
-use gcodekit5_ui_egui::commands::{self, Command, DialogRequest};
+use gcodekit5_ui_egui::commands::{self, Command};
+use gcodekit5_ui_egui::dialogs::{DialogAnswer, FilePurpose};
 use gcodekit5_ui_egui::menu;
 use gcodekit5_ui_egui::workspace::PaneContext;
 use gcodekit5_ui_egui::{AppState, GcodeKitApp};
@@ -202,20 +204,20 @@ fn test_pane_request_queues_command() {
 #[test]
 fn test_deferred_commands_are_recorded() {
     let mut app = GcodeKitApp::from_state(AppState::new(
-        Config::default(),
+        SettingsManager::detached(Config::default()),
         crate::test_smoke::native_decision(),
     ));
     for command in [Command::Connect, Command::JogXPos, Command::ViewTop] {
         app.dispatch(command);
         assert_eq!(app.last_dispatched(), Some(command));
     }
-    assert_eq!(app.pending_dialog(), None);
+    assert_eq!(app.dialogs().waiting(), 0);
 }
 
 #[test]
 fn test_ctrl_o_dispatches_file_open() {
     let mut app = GcodeKitApp::from_state(AppState::new(
-        Config::default(),
+        SettingsManager::detached(Config::default()),
         crate::test_smoke::native_decision(),
     ));
     {
@@ -226,15 +228,55 @@ fn test_ctrl_o_dispatches_file_open() {
         harness.key_press_modifiers(egui::Modifiers::COMMAND, egui::Key::O);
         harness.run();
     }
-    assert_eq!(app.pending_dialog(), Some(DialogRequest::Open));
     assert_eq!(app.last_dispatched(), Some(Command::FileOpen));
+    assert_eq!(app.dialogs().waiting(), 1, "Open dialog queued");
+
+    // The queued request is shown at the end of a frame (craft-dialogs' override answers it
+    // here) and its answer is taken on the next frame.
+    let path = std::path::PathBuf::from("/work/part.nc");
+    let answer = path.clone();
+    app.dialogs_mut().set_override(Some(Box::new(move |_| {
+        craft_dialogs::Answer::Paths(vec![answer.clone()])
+    })));
+    app.dialogs_mut().end_frame(None::<&eframe::Frame>);
+    {
+        let mut harness = Harness::builder()
+            .with_size(egui::vec2(1280.0, 800.0))
+            .build_ui(|ui| app.ui(ui));
+        harness.run();
+    }
+    assert_eq!(
+        app.last_dialog_answer(),
+        Some(&DialogAnswer::File {
+            purpose: FilePurpose::OpenGcode,
+            path,
+        })
+    );
+}
+
+#[test]
+fn test_settings_and_about_open_windows() {
+    use egui_kittest::kittest::Queryable;
+    let mut app = GcodeKitApp::from_state(AppState::new(
+        SettingsManager::detached(Config::default()),
+        crate::test_smoke::native_decision(),
+    ));
+    app.dispatch(Command::OpenSettings);
+    app.dispatch(Command::About);
+    let mut harness = Harness::builder()
+        .with_size(egui::vec2(1280.0, 800.0))
+        .build_ui(|ui| app.ui(ui));
+    harness.run();
+    let _ = harness.get_by_label("Measurement System");
+    let version = format!("Version {}", env!("CARGO_PKG_VERSION"));
+    let _ = harness.get_by_label(&version);
 }
 
 #[test]
 fn test_menu_click_dispatches() {
     use egui_kittest::kittest::Queryable;
     let mut app = GcodeKitApp::from_state(AppState::new(
-        Config::default(),
+        SettingsManager::detached(Config::default()),
         crate::test_smoke::native_decision(),
     ));
     {
@@ -268,7 +310,10 @@ fn test_menu_in_title_strip_when_app_draws_frame() {
         None,
     );
     assert!(matches!(decision.frame, Frame::Integrated(_)));
-    let mut app = GcodeKitApp::from_state(AppState::new(Config::default(), decision));
+    let mut app = GcodeKitApp::from_state(AppState::new(
+        SettingsManager::detached(Config::default()),
+        decision,
+    ));
     let mut harness = Harness::builder()
         .with_size(egui::vec2(1280.0, 800.0))
         .build_ui(|ui| app.ui(ui));

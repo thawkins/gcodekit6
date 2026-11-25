@@ -34,6 +34,17 @@ pub fn title_bar_pref(ui: &UiSettings) -> TitleBarPref {
     }
 }
 
+/// Whether the "Use system title bar" setting changes anything under `decision`: not when
+/// `GCODEKIT5_TITLEBAR` (or `CRAFT_TITLEBAR`) forced the frame, nor on a tiling compositor,
+/// where the desktop draws (or omits) the frame either way.
+///
+/// # Arguments
+/// * `decision` - craft-window's frame decision for the window.
+pub fn title_bar_setting_applies(decision: &craft_window::policy::Decision) -> bool {
+    decision.overridden.is_none()
+        && decision.desktop.kind != craft_window::policy::DesktopKind::Tiling
+}
+
 /// The English msgid naming a caption button (its accessible label).
 ///
 /// # Arguments

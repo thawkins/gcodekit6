@@ -3022,3 +3022,60 @@ msgstr ""
 
 msgid "Scroll menu down"
 msgstr ""
+
+msgid "Apply"
+msgstr ""
+
+msgid "Metric"
+msgstr ""
+
+msgid "Imperial"
+msgstr ""
+
+msgid "Jog Step Size (Linear)"
+msgstr ""
+
+msgid "Jog Feed Rate"
+msgstr ""
+
+msgid "X Axis Limit"
+msgstr ""
+
+msgid "Y Axis Limit"
+msgstr ""
+
+msgid "Z Axis Limit"
+msgstr ""
+
+msgid "Light"
+msgstr ""
+
+msgid "Dark"
+msgstr ""
+
+msgid "Use system title bar"
+msgstr ""
+
+msgid "Arc Segment Length"
+msgstr ""
+
+msgid "Max Line Length"
+msgstr ""
+
+msgid "3D Stock Removal Visualization"
+msgstr ""
+
+msgid "STL File Import"
+msgstr ""
+
+msgid "License:"
+msgstr ""
+
+msgid "G-Code Files"
+msgstr ""
+
+msgid "Restart to apply settings?"
+msgstr ""
+
+msgid "GCodeKit5 must restart to use the new settings. The machine connection will be closed. Restart now?"
+msgstr ""

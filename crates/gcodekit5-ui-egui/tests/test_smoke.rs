@@ -4,6 +4,7 @@ use craft_window::policy::{Backend, Desktop, DesktopKind, Os, TitleBarPref, deci
 use egui::accesskit::Role;
 use egui_kittest::Harness;
 use egui_kittest::kittest::Queryable;
+use gcodekit5_settings::SettingsManager;
 use gcodekit5_settings::config::Config;
 use gcodekit5_ui_egui::{AppState, GcodeKitApp};
 
@@ -26,7 +27,10 @@ pub(crate) fn native_decision() -> craft_window::policy::Decision {
 
 #[test]
 fn test_app_renders_workspace() {
-    let mut app = GcodeKitApp::from_state(AppState::new(Config::default(), native_decision()));
+    let mut app = GcodeKitApp::from_state(AppState::new(
+        SettingsManager::detached(Config::default()),
+        native_decision(),
+    ));
     let mut harness = Harness::builder()
         .with_size(egui::vec2(1280.0, 800.0))
         .build_ui(|ui| app.ui(ui));

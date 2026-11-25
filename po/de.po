@@ -3098,3 +3098,60 @@ msgstr "Menü nach oben scrollen"
 
 msgid "Scroll menu down"
 msgstr "Menü nach unten scrollen"
+
+msgid "Apply"
+msgstr "Übernehmen"
+
+msgid "Metric"
+msgstr "Metrisch"
+
+msgid "Imperial"
+msgstr "Zöllig"
+
+msgid "Jog Step Size (Linear)"
+msgstr "Jog-Schrittweite (linear)"
+
+msgid "Jog Feed Rate"
+msgstr "Jog-Vorschub"
+
+msgid "X Axis Limit"
+msgstr "Grenze X-Achse"
+
+msgid "Y Axis Limit"
+msgstr "Grenze Y-Achse"
+
+msgid "Z Axis Limit"
+msgstr "Grenze Z-Achse"
+
+msgid "Light"
+msgstr "Hell"
+
+msgid "Dark"
+msgstr "Dunkel"
+
+msgid "Use system title bar"
+msgstr "Titelleiste des Systems verwenden"
+
+msgid "Arc Segment Length"
+msgstr "Bogensegmentlänge"
+
+msgid "Max Line Length"
+msgstr "Maximale Zeilenlänge"
+
+msgid "3D Stock Removal Visualization"
+msgstr "3D-Visualisierung des Materialabtrags"
+
+msgid "STL File Import"
+msgstr "STL-Dateiimport"
+
+msgid "License:"
+msgstr "Lizenz:"
+
+msgid "G-Code Files"
+msgstr "G-Code-Dateien"
+
+msgid "Restart to apply settings?"
+msgstr "Neu starten, um die Einstellungen zu übernehmen?"
+
+msgid "GCodeKit5 must restart to use the new settings. The machine connection will be closed. Restart now?"
+msgstr "GCodeKit5 muss neu starten, um die neuen Einstellungen zu verwenden. Die Maschinenverbindung wird getrennt. Jetzt neu starten?"
