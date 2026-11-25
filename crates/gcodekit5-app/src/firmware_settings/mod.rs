@@ -282,6 +282,74 @@ pub fn write_command(number: u16, eeprom_type: Option<u8>, value: &str) -> Optio
     }
 }
 
+/// Why a typed value is not written.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ValueError {
+    /// Nothing was typed.
+    Empty,
+    /// The setting takes a number and this is not one (`5,000`, `abc`).
+    NotANumber,
+    /// The Repetier position takes an integer.
+    NotAWholeNumber,
+    /// The integer does not fit the Repetier position's type.
+    OutOfRange,
+}
+
+impl ValueError {
+    /// The English msgid of the reason.
+    pub fn msgid(self) -> &'static str {
+        match self {
+            ValueError::Empty => n_!("Enter a value"),
+            ValueError::NotANumber => n_!("Enter a number"),
+            ValueError::NotAWholeNumber => n_!("Enter a whole number"),
+            ValueError::OutOfRange => n_!("The value is out of range"),
+        }
+    }
+}
+
+/// Checks a typed value before it is written, and trims it.
+///
+/// A Repetier position takes what its reported type holds (a byte, a 16- or 32-bit
+/// integer, or a float). A GRBL setting whose reported value is a number takes a number
+/// (with a decimal point, never a comma); one reported as text (a grblHAL host name) takes
+/// any text.
+///
+/// # Arguments
+/// * `setting` - The setting as the controller reported it.
+/// * `value` - The value as typed.
+///
+/// # Errors
+/// The [`ValueError`] saying why the value cannot be written.
+pub fn check_value(setting: &Setting, value: &str) -> Result<String, ValueError> {
+    let value = value.trim();
+    if value.is_empty() {
+        return Err(ValueError::Empty);
+    }
+    let number = || {
+        value
+            .parse::<f64>()
+            .ok()
+            .filter(|v| v.is_finite() && !value.contains(|c: char| c.is_alphabetic()))
+            .ok_or(ValueError::NotANumber)
+    };
+    let range = match setting.eeprom_type {
+        Some(0) => Some((0, i64::from(u8::MAX))),
+        Some(1) => Some((i64::from(i16::MIN), i64::from(i16::MAX))),
+        Some(2) => Some((i64::from(i32::MIN), i64::from(i32::MAX))),
+        Some(_) => None,
+        None if setting.numeric_value.is_none() => return Ok(value.to_string()),
+        None => None,
+    };
+    number()?;
+    if let Some((min, max)) = range {
+        let integer: i64 = value.parse().map_err(|_| ValueError::NotAWholeNumber)?;
+        if integer < min || integer > max {
+            return Err(ValueError::OutOfRange);
+        }
+    }
+    Ok(value.to_string())
+}
+
 /// Why a settings command (`$$`, `$I`, `$n=v`) must not be sent now.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SettingsBlocked {

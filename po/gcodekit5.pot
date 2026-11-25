@@ -3793,3 +3793,12 @@ msgstr ""
 
 msgid "unknown EEPROM value type"
 msgstr ""
+
+msgid "Enter a value"
+msgstr ""
+
+msgid "Enter a whole number"
+msgstr ""
+
+msgid "The value is out of range"
+msgstr ""

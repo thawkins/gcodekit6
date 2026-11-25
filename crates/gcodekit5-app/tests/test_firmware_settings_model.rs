@@ -72,3 +72,57 @@ fn test_firmware_settings_repetier_write_uses_the_reported_type() {
         Some("$110=5000")
     );
 }
+
+fn setting(
+    number: u16,
+    value: &str,
+    eeprom_type: Option<u8>,
+) -> gcodekit5_communication::firmware::grbl::settings::Setting {
+    gcodekit5_communication::firmware::grbl::settings::Setting {
+        number,
+        name: String::new(),
+        value: value.to_string(),
+        numeric_value: value.parse().ok(),
+        description: String::new(),
+        range: None,
+        read_only: false,
+        unit: None,
+        eeprom_type,
+    }
+}
+
+#[test]
+fn test_firmware_settings_typed_value_is_checked() {
+    use gcodekit5_app::firmware_settings::{ValueError, check_value};
+    let max_rate = setting(110, "500.000", None);
+    assert_eq!(check_value(&max_rate, " 5000 "), Ok("5000".to_string()));
+    assert_eq!(check_value(&max_rate, "-2.5"), Ok("-2.5".to_string()));
+    assert_eq!(check_value(&max_rate, ""), Err(ValueError::Empty));
+    assert_eq!(check_value(&max_rate, "   "), Err(ValueError::Empty));
+    for bad in ["5,000", "abc", "1e", "inf", "NaN", "5 000"] {
+        assert_eq!(
+            check_value(&max_rate, bad),
+            Err(ValueError::NotANumber),
+            "{bad}"
+        );
+    }
+    // A setting the controller reports as text (a grblHAL host name) takes text.
+    let host = setting(305, "my-cnc", None);
+    assert_eq!(check_value(&host, "shop-cnc"), Ok("shop-cnc".to_string()));
+    assert_eq!(check_value(&host, ""), Err(ValueError::Empty));
+
+    let float = setting(1011, "80.0000", Some(3));
+    assert_eq!(check_value(&float, "80"), Ok("80".to_string()));
+    assert_eq!(check_value(&float, "0,5"), Err(ValueError::NotANumber));
+    let long = setting(1075, "115200", Some(2));
+    assert_eq!(check_value(&long, "1.5"), Err(ValueError::NotAWholeNumber));
+    assert_eq!(
+        check_value(&long, "3000000000"),
+        Err(ValueError::OutOfRange)
+    );
+    let byte = setting(1028, "1", Some(0));
+    assert_eq!(check_value(&byte, "300"), Err(ValueError::OutOfRange));
+    assert_eq!(check_value(&byte, "255"), Ok("255".to_string()));
+    let short = setting(1030, "1", Some(1));
+    assert_eq!(check_value(&short, "40000"), Err(ValueError::OutOfRange));
+}

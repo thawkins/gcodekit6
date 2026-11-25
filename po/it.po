@@ -3872,3 +3872,12 @@ msgstr "in attesa che il controller risponda ai comandi precedenti"
 
 msgid "unknown EEPROM value type"
 msgstr "tipo di valore EEPROM sconosciuto"
+
+msgid "Enter a value"
+msgstr "Inserire un valore"
+
+msgid "Enter a whole number"
+msgstr "Inserire un numero intero"
+
+msgid "The value is out of range"
+msgstr "Il valore è fuori intervallo"

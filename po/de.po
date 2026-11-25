@@ -3869,3 +3869,12 @@ msgstr "warte auf die Antwort der Steuerung auf frühere Befehle"
 
 msgid "unknown EEPROM value type"
 msgstr "unbekannter EEPROM-Werttyp"
+
+msgid "Enter a value"
+msgstr "Geben Sie einen Wert ein"
+
+msgid "Enter a whole number"
+msgstr "Geben Sie eine ganze Zahl ein"
+
+msgid "The value is out of range"
+msgstr "Der Wert liegt außerhalb des Bereichs"

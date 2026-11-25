@@ -77,7 +77,11 @@ fn set_field(h: &mut Harness<'_, GcodeKitApp>, label: &str, text: &str) {
     h.get_by_role_and_label(Role::TextInput, label).focus();
     h.step();
     h.key_combination_modifiers(egui::Modifiers::COMMAND, &[egui::Key::A]);
-    h.event(egui::Event::Text(text.to_string()));
+    if text.is_empty() {
+        h.key_press(egui::Key::Backspace);
+    } else {
+        h.event(egui::Event::Text(text.to_string()));
+    }
     h.step();
 }
 
@@ -399,6 +403,32 @@ fn test_firmware_settings_repetier_float_slot_written_as_float() {
     assert!(
         wait_until(|| wrote(&shared, "M206 T3 P11 X80")),
         "written: {:?}",
+        shared.log()
+    );
+}
+
+#[test]
+fn test_firmware_settings_invalid_value_is_not_sent() {
+    let (mut h, shared) = open_window(|_| {});
+    for bad in ["5,000", "abc", ""] {
+        edit_110(&mut h, bad);
+        h.get_by_label("Apply").click();
+        h.run_steps(2);
+        let notice = h.state().firmware_settings().notice().unwrap_or_default();
+        assert!(
+            notice.contains("Setting not changed")
+                && (notice.contains("Enter a number") || notice.contains("Enter a value")),
+            "{bad:?}: {notice:?}"
+        );
+    }
+    std::thread::sleep(Duration::from_millis(30));
+    h.run_steps(2);
+    assert!(
+        !shared
+            .log()
+            .iter()
+            .any(|w| matches!(w, Wrote::Line(l) if l.starts_with("$110"))),
+        "{:?}",
         shared.log()
     );
 }

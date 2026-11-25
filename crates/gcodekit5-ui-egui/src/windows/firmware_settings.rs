@@ -25,9 +25,9 @@ use std::time::{Duration, Instant};
 
 use gcodekit5_app::device_identity::DeviceIdentity;
 use gcodekit5_app::firmware_settings::{
-    ConfigSettingRow, REPETIER_OFFSET, SETTING_CATEGORIES, SettingsBlocked, apply_value,
-    filtered_rows, grbl_definitions, load_definitions, parse_repetier_epr_line,
-    repetier_definitions, setting_id, write_command,
+    ConfigSettingRow, REPETIER_OFFSET, SETTING_CATEGORIES, SettingsBlocked, ValueError,
+    apply_value, check_value, filtered_rows, grbl_definitions, load_definitions,
+    parse_repetier_epr_line, repetier_definitions, setting_id, write_command,
 };
 use gcodekit5_app::i18n::Translator;
 use gcodekit5_app::machine::MachineEvent;
@@ -302,12 +302,19 @@ impl FirmwareSettingsWindow {
         let Some(edit) = self.edit.take() else {
             return;
         };
-        let value = edit.value.trim().to_string();
+        let Some(setting) = self.table.get_setting(edit.number) else {
+            return;
+        };
         // A Repetier position is written as the type the controller reported for it.
-        let eeprom_type = self
-            .table
-            .get_setting(edit.number)
-            .and_then(|s| s.eeprom_type);
+        let eeprom_type = setting.eeprom_type;
+        let value = match check_value(setting, &edit.value) {
+            Ok(value) => value,
+            Err(error) => {
+                let reason = tr.tr(error.msgid());
+                self.refuse_write(&setting_id(edit.number), &reason, tr);
+                return;
+            }
+        };
         let Some(line) = write_command(edit.number, eeprom_type, &value) else {
             let reason = tr.tr(n_!("unknown EEPROM value type"));
             self.refuse_write(&setting_id(edit.number), &reason, tr);
@@ -614,6 +621,15 @@ pub fn msgids() -> Vec<&'static str> {
         n_!("Apply"),
         n_!("unknown EEPROM value type"),
     ];
+    ids.extend(
+        [
+            ValueError::Empty,
+            ValueError::NotANumber,
+            ValueError::NotAWholeNumber,
+            ValueError::OutOfRange,
+        ]
+        .map(ValueError::msgid),
+    );
     ids.extend(SETTING_CATEGORIES);
     ids.extend(setting_write::msgids());
     ids
