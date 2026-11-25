@@ -3118,3 +3118,24 @@ msgstr ""
 
 msgid "Error"
 msgstr ""
+
+msgid "Matches:"
+msgstr ""
+
+msgid "Line:"
+msgstr ""
+
+msgid "Edit anyway"
+msgstr ""
+
+msgid "Large file: shown read-only to stay fast."
+msgstr ""
+
+msgid "Could not open file"
+msgstr ""
+
+msgid "Could not save file"
+msgstr ""
+
+msgid "Cannot stream this program"
+msgstr ""

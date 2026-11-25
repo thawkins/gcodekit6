@@ -3189,3 +3189,24 @@ msgstr "Dispositivo desconectado"
 
 msgid "Error"
 msgstr "Erro"
+
+msgid "Matches:"
+msgstr "Ocorrências:"
+
+msgid "Line:"
+msgstr "Linha:"
+
+msgid "Edit anyway"
+msgstr "Editar mesmo assim"
+
+msgid "Large file: shown read-only to stay fast."
+msgstr "Ficheiro grande: mostrado só de leitura para continuar rápido."
+
+msgid "Could not open file"
+msgstr "Não foi possível abrir o ficheiro"
+
+msgid "Could not save file"
+msgstr "Não foi possível guardar o ficheiro"
+
+msgid "Cannot stream this program"
+msgstr "Não é possível enviar este programa"

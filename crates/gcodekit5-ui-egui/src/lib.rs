@@ -33,7 +33,7 @@ pub use app::{AppState, DirtyState, GcodeKitApp, QuitSource};
 /// Options controlling how the front end starts.
 #[derive(Debug, Clone, Default)]
 pub struct LaunchOptions {
-    /// G-code files to open at startup.
+    /// G-code files to open at startup; the first is opened in the editor.
     pub files: Vec<std::path::PathBuf>,
 }
 
@@ -46,8 +46,7 @@ pub struct LaunchOptions {
 /// # Returns
 /// `Ok(())` on a clean exit, or an error if the native window cannot start.
 pub fn run(options: LaunchOptions) -> anyhow::Result<()> {
-    // `options.files` is consumed once the app opens files (Tasks 4 and 9).
-    let LaunchOptions { files: _ } = options;
+    let LaunchOptions { files } = options;
     let settings = AppState::load_settings();
     gcodekit5_app::i18n::set_language(&settings.config().ui.language);
     let decision = craft_window::policy::decide_for(
@@ -63,7 +62,11 @@ pub fn run(options: LaunchOptions) -> anyhow::Result<()> {
     eframe::run_native(
         "GCodeKit",
         native,
-        Box::new(move |cc| Ok(Box::new(GcodeKitApp::new(cc, state)))),
+        Box::new(move |cc| {
+            let mut app = GcodeKitApp::new(cc, state);
+            app.open_startup_files(&files);
+            Ok(Box::new(app))
+        }),
     )
     .map_err(|e| anyhow::anyhow!("eframe failed: {e}"))?;
     Ok(())

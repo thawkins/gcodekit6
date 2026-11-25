@@ -24,6 +24,8 @@ mod test_commands;
 mod test_console_pane;
 #[path = "test_dialogs.rs"]
 mod test_dialogs;
+#[path = "test_editor.rs"]
+mod test_editor;
 #[path = "test_frame.rs"]
 mod test_frame;
 #[path = "test_machine_jog.rs"]

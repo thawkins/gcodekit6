@@ -5,7 +5,7 @@ use gcodekit5_app::i18n::Translator;
 use gcodekit5_ui_egui::dialogs;
 use gcodekit5_ui_egui::frame::caption_msgid;
 use gcodekit5_ui_egui::menu;
-use gcodekit5_ui_egui::panes::{console, machine_control};
+use gcodekit5_ui_egui::panes::{console, editor, machine_control};
 use gcodekit5_ui_egui::status_bar;
 use gcodekit5_ui_egui::windows::{about, settings};
 use gcodekit5_ui_egui::workspace::PaneId;
@@ -90,6 +90,7 @@ fn msgids() -> Vec<&'static str> {
         .chain(dialogs::msgids())
         .chain(machine_control::msgids())
         .chain(console::msgids())
+        .chain(editor::msgids())
         .chain(status_bar::MSGIDS.iter().copied())
         .collect()
 }

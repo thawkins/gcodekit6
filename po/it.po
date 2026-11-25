@@ -3197,3 +3197,24 @@ msgstr "Dispositivo disconnesso"
 
 msgid "Error"
 msgstr "Errore"
+
+msgid "Matches:"
+msgstr "Corrispondenze:"
+
+msgid "Line:"
+msgstr "Riga:"
+
+msgid "Edit anyway"
+msgstr "Modifica comunque"
+
+msgid "Large file: shown read-only to stay fast."
+msgstr "File di grandi dimensioni: mostrato in sola lettura per restare veloce."
+
+msgid "Could not open file"
+msgstr "Impossibile aprire il file"
+
+msgid "Could not save file"
+msgstr "Impossibile salvare il file"
+
+msgid "Cannot stream this program"
+msgstr "Impossibile inviare questo programma"

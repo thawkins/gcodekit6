@@ -330,9 +330,14 @@ impl Machine {
         self.program.as_ref()
     }
 
+    /// Forgets the program, so Start has nothing to stream (the editor's text is empty).
+    pub fn clear_program(&mut self) {
+        self.program = None;
+    }
+
     /// Prepares `gcode` for streaming (comments removed, empty lines dropped, line length
-    /// checked) and keeps it as the program to stream. The editor loads its text here once it
-    /// exists (Task 9).
+    /// checked) and keeps it as the program to stream. The app hands the editor's text here
+    /// (see `GcodeKitApp`).
     ///
     /// # Arguments
     /// * `gcode` - The program text.
