@@ -180,6 +180,17 @@ impl ConfirmChoice {
     }
 }
 
+/// What a dialog was asked for; an [`DialogAnswer::Unavailable`] answer carries it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Asked {
+    /// A file dialog ([`Dialogs::open_file`], [`Dialogs::save_file`]).
+    File(FilePurpose),
+    /// A confirmation asked by a feature ([`Dialogs::confirm`]).
+    Confirm(ConfirmRequest),
+    /// A confirmation asked by the quit flow ([`Dialogs::confirm_quit`]).
+    Quit(ConfirmRequest),
+}
+
 /// A dialog's answer, with what it was asked for.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum DialogAnswer {
@@ -195,8 +206,16 @@ pub enum DialogAnswer {
         /// What the dialog was for.
         purpose: FilePurpose,
     },
-    /// A confirmation was answered.
+    /// A confirmation asked by a feature ([`Dialogs::confirm`]) was answered.
     Confirm {
+        /// The question.
+        request: ConfirmRequest,
+        /// The answer.
+        choice: ConfirmChoice,
+    },
+    /// A confirmation asked by the quit flow ([`Dialogs::confirm_quit`]) was answered; kept
+    /// apart so the same question asked by another feature never decides a quit.
+    QuitConfirm {
         /// The question.
         request: ConfirmRequest,
         /// The answer.
@@ -204,6 +223,8 @@ pub enum DialogAnswer {
     },
     /// No dialog could be shown, or it stopped without an answer.
     Unavailable {
+        /// What the dialog was asked for.
+        asked: Asked,
         /// Why, as craft-dialogs reports it.
         reason: String,
     },
@@ -214,6 +235,8 @@ pub enum DialogAnswer {
 enum Then {
     File(FilePurpose),
     Confirm {
+        /// [`Asked::Confirm`] or [`Asked::Quit`].
+        asked: Asked,
         request: ConfirmRequest,
         save: String,
         discard: String,
@@ -279,11 +302,24 @@ impl Dialogs {
         self.inner.ask(dialog, Then::File(purpose));
     }
 
-    /// Queues a confirmation.
+    /// Queues a confirmation for a feature; it is answered with [`DialogAnswer::Confirm`].
     ///
     /// # Arguments
     /// * `request` - The question; it comes back with the answer.
     pub fn confirm(&mut self, request: ConfirmRequest) {
+        self.ask_confirm(Asked::Confirm(request), request);
+    }
+
+    /// Queues a confirmation for the quit flow; it is answered with
+    /// [`DialogAnswer::QuitConfirm`].
+    ///
+    /// # Arguments
+    /// * `request` - The question; it comes back with the answer.
+    pub fn confirm_quit(&mut self, request: ConfirmRequest) {
+        self.ask_confirm(Asked::Quit(request), request);
+    }
+
+    fn ask_confirm(&mut self, asked: Asked, request: ConfirmRequest) {
         let tr = &self.translator;
         let (title, description) = request.msgids();
         let save = tr.tr(n_!("Save")).into_owned();
@@ -309,6 +345,7 @@ impl Dialogs {
         self.inner.ask_message(
             message,
             Then::Confirm {
+                asked,
                 request,
                 save,
                 discard,
@@ -354,7 +391,13 @@ impl Dialogs {
 /// The app's answer for craft-dialogs' `answer` to the request `then` continues.
 fn convert(then: Then, answer: Answer) -> DialogAnswer {
     match (then, answer) {
-        (_, Answer::Unavailable(reason)) => DialogAnswer::Unavailable { reason },
+        (Then::File(purpose), Answer::Unavailable(reason)) => DialogAnswer::Unavailable {
+            asked: Asked::File(purpose),
+            reason,
+        },
+        (Then::Confirm { asked, .. }, Answer::Unavailable(reason)) => {
+            DialogAnswer::Unavailable { asked, reason }
+        }
         (Then::File(purpose), Answer::Paths(paths)) => match paths.into_iter().next() {
             Some(path) => DialogAnswer::File { purpose, path },
             None => DialogAnswer::Cancelled { purpose },
@@ -364,6 +407,7 @@ fn convert(then: Then, answer: Answer) -> DialogAnswer {
         }
         (
             Then::Confirm {
+                asked,
                 request,
                 save,
                 discard,
@@ -384,7 +428,10 @@ fn convert(then: Then, answer: Answer) -> DialogAnswer {
                 | Answer::Paths(_)
                 | Answer::Unavailable(_) => ConfirmChoice::Cancel,
             };
-            DialogAnswer::Confirm { request, choice }
+            match asked {
+                Asked::Quit(_) => DialogAnswer::QuitConfirm { request, choice },
+                Asked::Confirm(_) | Asked::File(_) => DialogAnswer::Confirm { request, choice },
+            }
         }
     }
 }

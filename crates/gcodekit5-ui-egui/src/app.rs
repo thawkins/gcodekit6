@@ -16,7 +16,8 @@
 //! Preferences and About windows are drawn over the workspace while open.
 //!
 //! Quitting goes through [`GcodeKitApp::request_quit`] whatever asked for it (the window's
-//! close button, the Quit command, the OS, a confirmed restart). A running job is asked about
+//! close button, the Quit command, a confirmed restart; session end is not hooked, see
+//! [`QuitSource`]). A running job is asked about
 //! first, then unsaved work; while a prompt is up the window is held open with
 //! `ViewportCommand::CancelClose`. Once quitting is decided the app sends
 //! `ViewportCommand::Close`, and `craft_quit::on_close_request` (in `eframe::App::logic`)
@@ -40,7 +41,7 @@ use gcodekit5_settings::SettingsManager;
 use gcodekit5_settings::config::Config;
 
 use crate::commands::{self, Command};
-use crate::dialogs::{ConfirmChoice, ConfirmRequest, DialogAnswer, Dialogs, FilePurpose};
+use crate::dialogs::{Asked, ConfirmChoice, ConfirmRequest, DialogAnswer, Dialogs, FilePurpose};
 use crate::menu::Menus;
 use crate::theme;
 use crate::windows::{AboutWindow, SettingsOutcome, SettingsWindow};
@@ -48,14 +49,29 @@ use crate::workspace::{PaneContext, Workspace};
 
 /// What asked the app to quit. Every source goes through [`GcodeKitApp::request_quit`] and is
 /// treated the same; the source is logged.
+// `Os` is a real, reserved source hidden from the docs, not a non-exhaustive marker.
+#[allow(clippy::manual_non_exhaustive)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum QuitSource {
     /// The window's close button (a close request from the window system).
     WindowClose,
     /// The Quit command (menu, keyboard shortcut) or a confirmed restart.
     MenuQuit,
-    /// The operating system, through a hook of its own (session end, a signal). On the
-    /// platforms supported today the OS reaches the app as a window close request instead.
+    /// Reserved for a session-end hook (log-off, shutdown); nothing sends it yet.
+    ///
+    /// What happens on session end today, with no hook (winit 0.30 handles none):
+    /// - Windows: winit does not handle `WM_QUERYENDSESSION` / `WM_ENDSESSION`, so log-off
+    ///   ends the process without a close request and nothing is asked. A hook through
+    ///   eframe's `with_msg_hook` would have to read a raw `MSG` pointer, which needs
+    ///   `unsafe`, so it is not added.
+    /// - macOS: winit implements no `applicationShouldTerminate:`, so logout goes straight
+    ///   to `-[NSApplication terminate:]` without asking. The hook (answering
+    ///   `NSTerminateCancel` while a prompt is up) belongs in craft-quit upstream.
+    /// - Linux and the BSDs: the compositor closes the window (a close request, handled as
+    ///   [`QuitSource::WindowClose`]) or the session ends the process.
+    ///
+    /// The GTK front end did not handle session end either.
+    #[doc(hidden)]
     Os,
 }
 
@@ -320,7 +336,13 @@ impl GcodeKitApp {
         match next {
             Some(request) => {
                 self.quit.asking = Some(request);
-                self.dialogs.confirm(request);
+                self.dialogs.confirm_quit(request);
+                // A minimized or hidden window cannot show its prompt: bring it back first.
+                self.viewport_commands.extend([
+                    egui::ViewportCommand::Minimized(false),
+                    egui::ViewportCommand::Visible(true),
+                    egui::ViewportCommand::Focus,
+                ]);
             }
             None => {
                 self.quit = QuitFlow {
@@ -554,7 +576,7 @@ impl GcodeKitApp {
     /// saving files, Task 9) are kept in [`GcodeKitApp::last_dialog_answer`].
     fn handle_answer(&mut self, answer: DialogAnswer) {
         match &answer {
-            DialogAnswer::Confirm { request, choice } if self.quit.asking == Some(*request) => {
+            DialogAnswer::QuitConfirm { request, choice } if self.quit.asking == Some(*request) => {
                 self.quit_answer(*request, *choice);
             }
             DialogAnswer::Confirm {
@@ -566,11 +588,21 @@ impl GcodeKitApp {
                     self.request_quit(QuitSource::MenuQuit);
                 }
             }
-            DialogAnswer::Unavailable { reason } => {
+            DialogAnswer::Unavailable {
+                asked: Asked::Quit(request),
+                reason,
+            } if self.quit.asking == Some(*request) => {
+                // Quitting without the answer could lose unsaved work: stay open, and the
+                // next quit asks again.
+                tracing::warn!(?request, %reason, "quit prompt unavailable; quit cancelled");
+                self.cancel_quit();
+            }
+            DialogAnswer::Unavailable { reason, .. } => {
                 tracing::warn!(%reason, "dialog unavailable");
             }
             DialogAnswer::File { .. }
             | DialogAnswer::Cancelled { .. }
+            | DialogAnswer::QuitConfirm { .. }
             | DialogAnswer::Confirm { .. } => {
                 tracing::debug!(?answer, "dialog answer not consumed yet");
             }
@@ -640,6 +672,11 @@ impl eframe::App for GcodeKitApp {
     /// Relaunches the app when the user asked to restart. Runs here, not after
     /// `eframe::run_native` returns, because on macOS the process ends inside
     /// `-[NSApplication terminate:]` once eframe's exit handling has run.
+    ///
+    /// Edge case: eframe calls this on every shutdown it runs itself, so if the event loop
+    /// ends with an error after a restart was confirmed (the flag is set from the confirmation
+    /// until the window closes), the app is still relaunched. A panic or a kill skips this
+    /// and nothing is relaunched.
     fn on_exit(&mut self) {
         if self.state.restart.swap(false, Ordering::SeqCst)
             && let Err(error) = crate::relaunch_command().and_then(|mut command| command.spawn())

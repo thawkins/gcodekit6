@@ -7,7 +7,7 @@ use std::sync::Arc;
 use craft_dialogs::{Answer, Kind, MessageResult, Request};
 use gcodekit5_app::i18n::Translator;
 use gcodekit5_ui_egui::dialogs::{
-    ConfirmChoice, ConfirmRequest, DialogAnswer, Dialogs, FileFilter, FilePurpose,
+    Asked, ConfirmChoice, ConfirmRequest, DialogAnswer, Dialogs, FileFilter, FilePurpose,
 };
 
 fn dialogs() -> Dialogs {
@@ -149,5 +149,55 @@ fn test_all_files_matches_extensionless_on_portal_and_zenity() {
     assert!(
         zenity.split_whitespace().any(|glob| glob == "*"),
         "zenity: {zenity:?}"
+    );
+}
+
+/// Quit prompts come back tagged as the quit's, apart from the same question asked by any
+/// other feature; an `Unavailable` answer says which request it was for.
+#[test]
+fn test_quit_confirm_tagged_and_unavailable_carries_request() {
+    let mut dialogs = dialogs();
+    dialogs.set_override(Some(Box::new(|_: &Request| {
+        Answer::Message(MessageResult::No)
+    })));
+    dialogs.confirm_quit(ConfirmRequest::UnsavedGcode);
+    dialogs.confirm(ConfirmRequest::UnsavedGcode);
+    end_frame(&mut dialogs);
+    end_frame(&mut dialogs);
+    assert_eq!(
+        dialogs.poll(),
+        Some(DialogAnswer::QuitConfirm {
+            request: ConfirmRequest::UnsavedGcode,
+            choice: ConfirmChoice::No,
+        })
+    );
+    assert_eq!(
+        dialogs.poll(),
+        Some(DialogAnswer::Confirm {
+            request: ConfirmRequest::UnsavedGcode,
+            choice: ConfirmChoice::No,
+        })
+    );
+
+    dialogs.set_override(Some(Box::new(|_: &Request| {
+        Answer::Unavailable("stopped".into())
+    })));
+    dialogs.confirm_quit(ConfirmRequest::StopJob);
+    dialogs.save_file(FilePurpose::SaveGcode, &[FileFilter::GCODE]);
+    end_frame(&mut dialogs);
+    end_frame(&mut dialogs);
+    assert_eq!(
+        dialogs.poll(),
+        Some(DialogAnswer::Unavailable {
+            asked: Asked::Quit(ConfirmRequest::StopJob),
+            reason: "stopped".into(),
+        })
+    );
+    assert_eq!(
+        dialogs.poll(),
+        Some(DialogAnswer::Unavailable {
+            asked: Asked::File(FilePurpose::SaveGcode),
+            reason: "stopped".into(),
+        })
     );
 }

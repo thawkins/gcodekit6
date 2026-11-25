@@ -13,7 +13,7 @@ use gcodekit5_app::UnsavedChangesChoice;
 use gcodekit5_settings::SettingsManager;
 use gcodekit5_settings::config::Config;
 use gcodekit5_ui_egui::app::{DirtyState, QuitSource};
-use gcodekit5_ui_egui::dialogs::ConfirmChoice;
+use gcodekit5_ui_egui::dialogs::{ConfirmChoice, ConfirmRequest};
 use gcodekit5_ui_egui::{AppState, GcodeKitApp};
 
 /// What the app has open when the user quits.
@@ -197,8 +197,86 @@ fn test_quit_prompts_and_cancel_keeps_app_open() {
                 commands.contains(&ViewportCommand::CancelClose),
                 "{source:?} {work:?}: {commands:?}"
             );
+            assert_eq!(shown.lock().expect("shown").len(), 2, "{source:?} {work:?}");
         }
     }
+}
+
+/// A queued quit prompt brings the window back (unminimized, visible, focused) so the user
+/// can answer it, also when the window was minimized.
+#[test]
+fn test_quit_prompt_brings_window_back() {
+    for source in SOURCES {
+        let (mut harness, _shown) = harness(Work::EditorDirty, MessageResult::Cancel);
+        let commands = quit_from(&mut harness, source);
+        for expected in [
+            ViewportCommand::Minimized(false),
+            ViewportCommand::Visible(true),
+            ViewportCommand::Focus,
+        ] {
+            assert!(
+                commands.contains(&expected),
+                "{source:?}: {expected:?} missing from {commands:?}"
+            );
+        }
+    }
+}
+
+/// No dialog can be shown (craft-dialogs answers `Unavailable`): the quit is cancelled, the
+/// app stays open and the next close asks again instead of being stuck.
+#[test]
+fn test_quit_prompt_unavailable_cancels_and_asks_again() {
+    let (mut harness, shown) = harness(Work::EditorDirty, MessageResult::Cancel);
+    {
+        let shown = Arc::clone(&shown);
+        harness
+            .state_mut()
+            .dialogs_mut()
+            .set_override(Some(Box::new(move |request: &Request| {
+                if let Request::Message(message) = request {
+                    shown
+                        .lock()
+                        .expect("shown lock")
+                        .push(message.title.clone());
+                }
+                Answer::Unavailable("no parent window".into())
+            })));
+    }
+    harness
+        .state_mut()
+        .state_mut()
+        .restart
+        .store(true, Ordering::SeqCst);
+    quit_from(&mut harness, QuitSource::WindowClose);
+    let commands = frame(&mut harness, false);
+    assert!(!commands.contains(&ViewportCommand::Close), "{commands:?}");
+    assert!(!harness.state().quit_confirmed());
+    assert!(!harness.state().state().restart.load(Ordering::SeqCst));
+    let commands = frame(&mut harness, true);
+    assert!(
+        commands.contains(&ViewportCommand::CancelClose),
+        "{commands:?}"
+    );
+    assert_eq!(
+        shown.lock().expect("shown").len(),
+        2,
+        "a new prompt is queued"
+    );
+}
+
+/// An unsaved-changes prompt that the quit flow did not ask (another feature's) never
+/// decides a quit.
+#[test]
+fn test_unsaved_prompt_outside_quit_does_not_quit() {
+    let (mut harness, _shown) = harness(Work::EditorDirty, discard());
+    harness
+        .state_mut()
+        .dialogs_mut()
+        .confirm(ConfirmRequest::UnsavedGcode);
+    frame(&mut harness, false);
+    let commands = frame(&mut harness, false);
+    assert!(!commands.contains(&ViewportCommand::Close), "{commands:?}");
+    assert!(!harness.state().quit_confirmed());
 }
 
 /// Discard (unsaved changes) and Yes (stop job) quit; our own confirmed close does not ask
