@@ -168,6 +168,8 @@ pub fn menu_bar(tr: &Translator) -> MenuBar {
                 Some(C::OpenDeviceManager),
                 Some(C::OpenToolsManager),
                 Some(C::OpenMaterialsManager),
+                None,
+                Some(C::OpenDeviceInfo),
             ],
         ),
         menu(

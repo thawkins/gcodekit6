@@ -297,6 +297,7 @@ impl MachineControlPane {
             | Command::OpenDeviceManager
             | Command::OpenToolsManager
             | Command::OpenMaterialsManager
+            | Command::OpenDeviceInfo
             | Command::OpenHelp
             | Command::About => return false,
         }

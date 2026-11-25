@@ -3848,3 +3848,12 @@ msgstr "già connesso"
 
 msgid "a program is already streaming"
 msgstr "è già in corso l'invio di un programma"
+
+msgid "Device Info"
+msgstr "Informazioni dispositivo"
+
+msgid "a job is running"
+msgstr "un lavoro è in esecuzione"
+
+msgid "Build"
+msgstr "Compilazione"

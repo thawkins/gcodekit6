@@ -38,6 +38,7 @@
 
 mod cam_presets;
 pub mod designer_files;
+mod machine_windows;
 
 use std::cell::RefCell;
 use std::path::{Path, PathBuf};
@@ -72,7 +73,7 @@ use crate::panes::editor::{EditorPane, SharedEditor};
 use crate::panes::machine_control::MachineControlPane;
 use crate::panes::visualizer::VisualizerPane;
 use crate::theme;
-use crate::windows::{AboutWindow, SettingsOutcome, SettingsWindow};
+use crate::windows::{AboutWindow, DeviceInfoWindow, SettingsOutcome, SettingsWindow};
 use crate::workspace::{PaneContext, PaneId, Workspace};
 use designer_files::{DesignFlow, DesignNext, EditorNext, OPEN_BEHIND_HANDOFF};
 use gcodekit5_app::materials_manager_backend::MaterialsManagerBackend;
@@ -270,6 +271,8 @@ pub struct GcodeKitApp {
     settings_window: SettingsWindow,
     /// The About window.
     about_window: AboutWindow,
+    /// The Device Info window.
+    device_info: DeviceInfoWindow,
     /// The last command dispatched.
     last_dispatched: Option<Command>,
     /// The quit being decided, if any.
@@ -403,6 +406,7 @@ impl GcodeKitApp {
             last_dialog_answer: None,
             settings_window,
             about_window,
+            device_info: DeviceInfoWindow::default(),
             last_dispatched: None,
             quit: QuitFlow::default(),
             editor,
@@ -706,6 +710,7 @@ impl GcodeKitApp {
         if !events.is_empty() {
             self.workspace
                 .machine_events(&events, &self.state.translator);
+            self.machine_windows_events(&events);
         }
     }
 
@@ -804,6 +809,7 @@ impl GcodeKitApp {
             }
             Command::OpenSettings => self.settings_window.open(&self.state.settings),
             Command::About => self.about_window.open(),
+            Command::OpenDeviceInfo => self.device_info.open(),
             Command::Quit => self.request_quit(QuitSource::MenuQuit),
             Command::Cut => self
                 .viewport_commands
@@ -884,6 +890,7 @@ impl GcodeKitApp {
             | SettingsOutcome::Failed(_) => {}
         }
         self.about_window.show(ctx, &self.state.translator);
+        self.show_machine_windows(ctx);
     }
 
     /// Acts on a dialog's answer; every answer is also kept in

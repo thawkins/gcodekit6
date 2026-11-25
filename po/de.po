@@ -3845,3 +3845,12 @@ msgstr "bereits verbunden"
 
 msgid "a program is already streaming"
 msgstr "es wird bereits ein Programm gesendet"
+
+msgid "Device Info"
+msgstr "Geräteinfo"
+
+msgid "a job is running"
+msgstr "ein Auftrag läuft"
+
+msgid "Build"
+msgstr "Build-Datum"

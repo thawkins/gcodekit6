@@ -3840,3 +3840,12 @@ msgstr "já conectado"
 
 msgid "a program is already streaming"
 msgstr "um programa já está sendo enviado"
+
+msgid "Device Info"
+msgstr "Informações do dispositivo"
+
+msgid "a job is running"
+msgstr "um trabalho está em execução"
+
+msgid "Build"
+msgstr "Compilação"

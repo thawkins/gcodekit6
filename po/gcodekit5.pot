@@ -3769,3 +3769,12 @@ msgstr ""
 
 msgid "a program is already streaming"
 msgstr ""
+
+msgid "Device Info"
+msgstr ""
+
+msgid "a job is running"
+msgstr ""
+
+msgid "Build"
+msgstr ""

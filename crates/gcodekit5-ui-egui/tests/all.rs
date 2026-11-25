@@ -90,6 +90,8 @@ mod test_designer_text_tool;
 mod test_designer_toolbox;
 #[path = "test_designer_toolpath.rs"]
 mod test_designer_toolpath;
+#[path = "test_device_info.rs"]
+mod test_device_info;
 #[path = "test_dialogs.rs"]
 mod test_dialogs;
 #[path = "test_editor.rs"]

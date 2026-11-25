@@ -404,6 +404,7 @@ impl Pane for VisualizerPane {
             | Command::OpenDeviceManager
             | Command::OpenToolsManager
             | Command::OpenMaterialsManager
+            | Command::OpenDeviceInfo
             | Command::OpenHelp
             | Command::About => return false,
         };
