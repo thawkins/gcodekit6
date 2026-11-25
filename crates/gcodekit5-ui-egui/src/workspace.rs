@@ -417,6 +417,14 @@ impl Workspace {
         self.active.filter(|id| self.drawn.contains(id))
     }
 
+    /// Whether the last frame drew the pane `id`'s body (its tab is the one shown).
+    ///
+    /// # Arguments
+    /// * `id` - The pane.
+    pub fn is_drawn(&self, id: PaneId) -> bool {
+        self.drawn.contains(&id)
+    }
+
     /// Draws the workspace into the rest of `ui` and applies the user's layout changes.
     ///
     /// # Arguments

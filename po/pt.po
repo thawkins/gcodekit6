@@ -3330,3 +3330,45 @@ msgstr "O ficheiro é demasiado grande para importar."
 
 msgid "The file has no shapes to import."
 msgstr "O ficheiro não contém formas para importar."
+
+msgid "Generators"
+msgstr "Geradores"
+
+msgid "Engraving"
+msgstr "Gravação"
+
+msgid "Calculators"
+msgstr "Calculadoras"
+
+msgid "Maintenance"
+msgstr "Manutenção"
+
+msgid "Generated G-Code"
+msgstr "Código G gerado"
+
+msgid "Not a valid length"
+msgstr "Comprimento inválido"
+
+msgid "Not a number"
+msgstr "Não é um número"
+
+msgid "Must be greater than 0"
+msgstr "Deve ser maior que 0"
+
+msgid "Must not be negative"
+msgstr "Não pode ser negativo"
+
+msgid "Out of range"
+msgstr "Fora do intervalo"
+
+msgid "This tool needs at least 3 axes (X, Y, Z); the active device has fewer."
+msgstr "Esta ferramenta precisa de pelo menos 3 eixos (X, Y, Z); o dispositivo ativo tem menos."
+
+msgid "Send to Editor"
+msgstr "Enviar para o editor"
+
+msgid "Preview"
+msgstr "Pré-visualizar"
+
+msgid "Generation failed"
+msgstr "Falha na geração"

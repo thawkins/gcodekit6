@@ -3342,3 +3342,45 @@ msgstr "Le fichier est trop volumineux pour être importé."
 
 msgid "The file has no shapes to import."
 msgstr "Le fichier ne contient aucune forme à importer."
+
+msgid "Generators"
+msgstr "Générateurs"
+
+msgid "Engraving"
+msgstr "Gravure"
+
+msgid "Calculators"
+msgstr "Calculateurs"
+
+msgid "Maintenance"
+msgstr "Maintenance"
+
+msgid "Generated G-Code"
+msgstr "Code G généré"
+
+msgid "Not a valid length"
+msgstr "Longueur non valide"
+
+msgid "Not a number"
+msgstr "Pas un nombre"
+
+msgid "Must be greater than 0"
+msgstr "Doit être supérieur à 0"
+
+msgid "Must not be negative"
+msgstr "Ne doit pas être négatif"
+
+msgid "Out of range"
+msgstr "Hors limites"
+
+msgid "This tool needs at least 3 axes (X, Y, Z); the active device has fewer."
+msgstr "Cet outil nécessite au moins 3 axes (X, Y, Z) ; l'appareil actif en a moins."
+
+msgid "Send to Editor"
+msgstr "Envoyer à l'éditeur"
+
+msgid "Preview"
+msgstr "Aperçu"
+
+msgid "Generation failed"
+msgstr "Échec de la génération"

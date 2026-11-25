@@ -13,11 +13,13 @@
 //! way: the quit continues after a successful save, and a failed or cancelled save cancels
 //! it. After every save the app's dirty cache and `AppState::dirty.designer` are cleared.
 //!
-//! Generate G-Code and Frame replace the editor's program, and the editor forgets its file
-//! (GTK cleared it too), so the next editor Save asks where. Unsaved editor edits are asked
-//! about first (Save / Discard / Cancel; a deliberate change: GTK replaced them silently).
-//! While a job streams the request is refused before anything is generated: it would swap
-//! the program under the running job, like File > Open.
+//! The editor handoff ([`Handoff`]): the designer's Generate G-Code and Frame, and a CAM
+//! tool's Send to Editor and Preview, replace the editor's program, and the editor forgets
+//! its file (GTK cleared it too), so the next editor Save asks where. Unsaved editor edits are
+//! asked about first (Save / Discard / Cancel; a deliberate change: GTK replaced them
+//! silently). While a job streams the request is refused before anything is generated: it
+//! would swap the program under the running job, like File > Open. The refusal is shown on
+//! the pane that asked. A CAM Preview then brings the visualizer to the front.
 //!
 //! Dependencies: `gcodekit5-designer` (machine mode), `gcodekit5-app` (translations).
 
@@ -29,8 +31,18 @@ use gcodekit5_designer::designer_state::MachineMode;
 use super::{AfterSave, GcodeKitApp};
 use crate::commands::Command;
 use crate::dialogs::{Asked, ConfirmRequest, DialogAnswer, FilePurpose};
+use crate::panes::cam_tools::CamDelivery;
 use crate::panes::designer::ToEditor;
 use crate::workspace::PaneId;
+
+/// A request to replace the editor's program, and who made it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Handoff {
+    /// The designer's Generate G-Code or Frame (generated when it is delivered).
+    Designer(ToEditor),
+    /// A CAM tool's Send to Editor or Preview (the program waits in the CAM pane).
+    Cam(CamDelivery),
+}
 
 /// What runs once the design's unsaved changes are dealt with.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -50,8 +62,8 @@ pub(super) struct DesignFlow {
     pub(super) after_confirm: Option<DesignNext>,
     /// What waits for the design's save dialog; `Some(None)` is a plain Save As.
     pub(super) after_save: Option<Option<DesignNext>>,
-    /// Generate / Frame waiting for the editor's unsaved-changes answer.
-    pub(super) editor_after_confirm: Option<ToEditor>,
+    /// A handoff waiting for the editor's unsaved-changes answer.
+    pub(super) editor_after_confirm: Option<Handoff>,
 }
 
 /// The msgids the app shows for the designer, for the translation check.
@@ -309,27 +321,47 @@ impl GcodeKitApp {
         true
     }
 
-    /// Runs the designer's Generate G-Code / Frame request: refused while a job streams
-    /// (before anything is generated); with unsaved editor edits it asks first (Save /
-    /// Discard / Cancel, as the controller ruled: GTK replaced them silently).
-    pub(super) fn deliver_designer_gcode(&mut self) {
-        let Some(what) = self.designer.borrow_mut().take_editor_request() else {
+    /// Runs the designer's Generate G-Code / Frame request and a CAM tool's Send to Editor /
+    /// Preview: refused while a job streams (before anything is generated); with unsaved
+    /// editor edits it asks first (Save / Discard / Cancel, as the controller ruled: GTK
+    /// replaced them silently).
+    pub(super) fn deliver_editor_gcode(&mut self) {
+        let designer = self
+            .designer
+            .borrow_mut()
+            .take_editor_request()
+            .map(Handoff::Designer);
+        let cam = self
+            .cam_tools
+            .borrow_mut()
+            .take_editor_request()
+            .map(Handoff::Cam);
+        for handoff in [designer, cam].into_iter().flatten() {
+            self.deliver_handoff(handoff);
+        }
+    }
+
+    /// Delivers one handoff, or asks first about the editor's unsaved edits.
+    fn deliver_handoff(&mut self, handoff: Handoff) {
+        if self.refuse_editor_gcode_during_job(handoff) {
             return;
-        };
-        if self.refuse_editor_gcode_during_job() {
+        }
+        if self.design.editor_after_confirm.is_some() {
+            // One question at a time: a second request while one waits is dropped.
+            tracing::warn!(?handoff, "editor handoff already waiting; request dropped");
             return;
         }
         if self.editor.borrow().buffer().is_dirty() {
-            self.design.editor_after_confirm = Some(what);
+            self.design.editor_after_confirm = Some(handoff);
             self.dialogs.confirm(ConfirmRequest::UnsavedGcode);
         } else {
-            self.send_to_editor(what);
+            self.send_to_editor(handoff);
         }
     }
 
     /// While a job streams, replacing the editor's program would swap it under the job:
-    /// says so in the designer and returns `true`.
-    fn refuse_editor_gcode_during_job(&mut self) -> bool {
+    /// says so on the pane that asked and returns `true`.
+    fn refuse_editor_gcode_during_job(&mut self, handoff: Handoff) -> bool {
         if !self.state.job_running() {
             return false;
         }
@@ -338,32 +370,52 @@ impl GcodeKitApp {
             .translator
             .tr("Stop the running job before sending G-code to the editor.")
             .into_owned();
-        self.designer.borrow_mut().set_notice(message);
+        match handoff {
+            Handoff::Designer(_) => self.designer.borrow_mut().set_notice(message),
+            Handoff::Cam(_) => {
+                let mut cam = self.cam_tools.borrow_mut();
+                cam.take_editor_gcode();
+                cam.set_notice(message);
+            }
+        }
         true
     }
 
-    /// Generates `what` and replaces the editor's program with it; the editor forgets its
-    /// file, so its next Save asks where.
-    pub(super) fn send_to_editor(&mut self, what: ToEditor) {
+    /// Replaces the editor's program with the handoff's (generating the designer's now);
+    /// the editor forgets its file, so its next Save asks where. A CAM Preview then brings
+    /// the visualizer to the front.
+    pub(super) fn send_to_editor(&mut self, handoff: Handoff) {
         // A job may have started while the question was up.
-        if self.refuse_editor_gcode_during_job() {
+        if self.refuse_editor_gcode_during_job(handoff) {
             return;
         }
         let tr = self.state.translator;
-        let gcode = {
-            let mut designer = self.designer.borrow_mut();
-            match what {
-                ToEditor::Generate => designer.generate_to_editor(&tr),
-                ToEditor::Frame => designer.frame_to_editor(),
+        let gcode = match handoff {
+            Handoff::Designer(what) => {
+                let mut designer = self.designer.borrow_mut();
+                match what {
+                    ToEditor::Generate => designer.generate_to_editor(&tr),
+                    ToEditor::Frame => designer.frame_to_editor(),
+                }
+                designer.take_editor_gcode()
             }
-            designer.take_editor_gcode()
+            Handoff::Cam(_) => self.cam_tools.borrow_mut().take_editor_gcode(),
         };
-        if let Some(gcode) = gcode {
-            self.editor
-                .borrow_mut()
-                .buffer_mut()
-                .replace_with_generated(gcode);
-            self.sync_editor(true);
+        let Some(gcode) = gcode else {
+            return;
+        };
+        self.editor
+            .borrow_mut()
+            .buffer_mut()
+            .replace_with_generated(gcode);
+        self.sync_editor(true);
+        if handoff == Handoff::Cam(CamDelivery::Preview) {
+            let shown = self.workspace.apply(craft_ui::docking::Action::Activate {
+                panel: PaneId::Visualizer,
+            });
+            if let Err(error) = shown {
+                tracing::warn!(?error, "visualizer not brought to the front");
+            }
         }
     }
 }

@@ -61,6 +61,7 @@ use crate::dialogs::{
 };
 use crate::machine::{Machine, lock};
 use crate::menu::Menus;
+use crate::panes::cam_tools::{CamToolsPane, SharedCamTools};
 use crate::panes::console::ConsolePane;
 use crate::panes::designer::layers::LayersPane;
 use crate::panes::designer::properties::PropertiesPane;
@@ -211,8 +212,9 @@ pub(crate) enum AfterSave {
     Quit,
     /// Ask for a file to open (Open with unsaved changes, Save chosen).
     Open,
-    /// Hand the designer's G-code to the editor (Generate / Frame over unsaved edits).
-    ToEditor(crate::panes::designer::ToEditor),
+    /// Hand a program to the editor (the designer's Generate / Frame, or a CAM tool's Send
+    /// to Editor / Preview, over unsaved edits).
+    ToEditor(designer_files::Handoff),
 }
 
 /// Root application of the egui front end.
@@ -252,6 +254,8 @@ pub struct GcodeKitApp {
     designer: Rc<RefCell<DesignerPane>>,
     /// The design's modified flag as last copied to [`AppState::dirty`].
     designer_dirty: bool,
+    /// The CAM tools, also drawn by the workspace.
+    cam_tools: Rc<RefCell<CamToolsPane>>,
     /// What waits for the editor's save dialog to be answered.
     after_save: Option<AfterSave>,
     /// An Open asked first about the editor's unsaved changes.
@@ -341,6 +345,8 @@ impl GcodeKitApp {
         workspace.set_pane(Box::new(SharedDesigner(Rc::clone(&designer))));
         workspace.set_pane(Box::new(LayersPane::new(Rc::clone(&designer))));
         workspace.set_pane(Box::new(PropertiesPane::new(Rc::clone(&designer))));
+        let cam_tools = Rc::new(RefCell::new(CamToolsPane::new()));
+        workspace.set_pane(Box::new(SharedCamTools(Rc::clone(&cam_tools))));
         workspace.configure(state.config());
         {
             // Wake the event loop whenever the machine reports something.
@@ -371,6 +377,7 @@ impl GcodeKitApp {
             editor_dirty: false,
             designer,
             designer_dirty: false,
+            cam_tools,
             after_save: None,
             open_after_confirm: false,
             design: DesignFlow::default(),
@@ -584,7 +591,7 @@ impl GcodeKitApp {
         }
         self.sync_editor(false);
         self.sync_designer();
-        self.deliver_designer_gcode();
+        self.deliver_editor_gcode();
         self.deliver_machine_events();
         self.queue = queue;
         self.show_windows(&ctx);
@@ -967,6 +974,11 @@ impl GcodeKitApp {
         &self.designer
     }
 
+    /// The CAM tools pane.
+    pub fn cam_tools(&self) -> &Rc<RefCell<CamToolsPane>> {
+        &self.cam_tools
+    }
+
     /// Copies the design's modified flag to [`AppState::dirty`] when it changed.
     fn sync_designer(&mut self) {
         let modified = match self.designer.try_borrow() {
@@ -1111,6 +1123,11 @@ impl GcodeKitApp {
     /// for tests.
     pub fn state_mut(&mut self) -> &mut AppState {
         &mut self.state
+    }
+
+    /// The docking workspace, for tests.
+    pub fn workspace(&self) -> &Workspace {
+        &self.workspace
     }
 
     /// The docking workspace, for layout changes and tests.
