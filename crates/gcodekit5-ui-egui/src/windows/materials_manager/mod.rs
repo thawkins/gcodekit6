@@ -220,7 +220,8 @@ impl MaterialsManagerWindow {
     fn is_dirty(&self) -> bool {
         self.edit.as_ref().is_some_and(|e| match &e.original {
             Some(original) => e.form != MaterialForm::from_material(original),
-            None => true,
+            // A new material's form counts as changed once anything was typed.
+            None => e.form != MaterialForm::default(),
         })
     }
 

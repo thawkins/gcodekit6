@@ -392,8 +392,14 @@ fn basic(ui: &mut egui::Ui, f: &mut ToolForm, creating: bool, tr: &Translator) {
         .show(ui, |ui| {
             field(ui, &tr.tr(n_!("ID:")), &mut f.id, creating, "tool_id");
             let label = ui.label(tr.tr(n_!("Tool Number:")));
-            ui.add(egui::DragValue::new(&mut f.number).range(1..=999))
-                .labelled_by(label.id);
+            ui.add(
+                egui::DragValue::new(&mut f.number)
+                    .range(1..=999)
+                    // A stored value outside the range (a loaded tool has number 0) is
+                    // kept until the user edits it.
+                    .clamp_existing_to_range(false),
+            )
+            .labelled_by(label.id);
             ui.end_row();
             field(ui, &tr.tr(n_!("Name:")), &mut f.name, true, "");
             let mut tool_type = f.tool_type;
@@ -456,8 +462,13 @@ fn geometry(ui: &mut egui::Ui, f: &mut ToolForm, tr: &Translator) {
                 "",
             );
             let label = ui.label(tr.tr(n_!("Number of Flutes:")));
-            ui.add(egui::DragValue::new(&mut f.flutes).range(1..=8))
-                .labelled_by(label.id);
+            ui.add(
+                egui::DragValue::new(&mut f.flutes)
+                    .range(1..=8)
+                    // An imported tool may have more flutes; drawing must not change it.
+                    .clamp_existing_to_range(false),
+            )
+            .labelled_by(label.id);
             ui.end_row();
             field(
                 ui,

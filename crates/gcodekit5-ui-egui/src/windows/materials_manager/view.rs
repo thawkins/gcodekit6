@@ -331,12 +331,21 @@ fn properties(ui: &mut egui::Ui, f: &mut MaterialForm, tr: &Translator) {
         .num_columns(2)
         .show(ui, |ui| {
             let label = ui.label(tr.tr(n_!("Density (kg/m3):")));
-            ui.add(egui::DragValue::new(&mut f.density).range(DENSITY_RANGE))
-                .labelled_by(label.id);
+            ui.add(
+                egui::DragValue::new(&mut f.density)
+                    .range(DENSITY_RANGE)
+                    .clamp_existing_to_range(false),
+            )
+            .labelled_by(label.id);
             ui.end_row();
             let label = ui.label(tr.tr(n_!("Machinability (1-10):")));
-            ui.add(egui::DragValue::new(&mut f.machinability).range(MACHINABILITY_RANGE))
-                .labelled_by(label.id);
+            ui.add(
+                egui::DragValue::new(&mut f.machinability)
+                    .range(MACHINABILITY_RANGE)
+                    // A stored value outside the range is kept until the user edits it.
+                    .clamp_existing_to_range(false),
+            )
+            .labelled_by(label.id);
             ui.end_row();
             let optional = tr.tr(n_!("Optional"));
             field(

@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 
 use egui::accesskit::Role;
 use egui_kittest::Harness;
-use egui_kittest::kittest::Queryable;
+use egui_kittest::kittest::{NodeT, Queryable};
 use gcodekit5_app::i18n::Translator;
 use gcodekit5_app::tools_manager_backend::ToolsManagerBackend;
 use gcodekit5_core::data::tools::{ShankType, Tool, ToolId, ToolType};
@@ -48,6 +48,35 @@ const GTK_TOOLS: &str = r#"[
     "part_number": "A-31",
     "cost": 12.5,
     "notes": "Keep sharp",
+    "custom": true
+  },
+  {
+    "id": "my_odd_bit",
+    "name": "My Odd Bit",
+    "description": "",
+    "tool_type": "EndMillFlat",
+    "diameter": 10.0,
+    "shaft_diameter": null,
+    "length": 60.0,
+    "flute_length": 30.0,
+    "flutes": 12,
+    "corner_radius": null,
+    "tip_angle": null,
+    "material": "HSS",
+    "coating": null,
+    "shank": "Collet",
+    "params": {
+      "rpm": 8000,
+      "rpm_range": [6000, 10000],
+      "feed_rate": 500.0,
+      "plunge_rate": 100.0,
+      "stepover_percent": 40.0,
+      "depth_per_pass": 1.0
+    },
+    "manufacturer": null,
+    "part_number": null,
+    "cost": null,
+    "notes": "",
     "custom": true
   }
 ]"#;
@@ -342,4 +371,36 @@ fn test_tools_manager_gtc_import_and_export() {
     click(&mut h, "Yes");
     assert!(!file.exists(), "custom tools file removed");
     assert!(!calculator_has(&h, "Acme Ball 2mm"));
+}
+
+/// Whether the action bar's Save is disabled.
+fn save_disabled(h: &Harness<'_, GcodeKitApp>) -> bool {
+    h.get_by_label("Save").accesskit_node().is_disabled()
+}
+
+#[test]
+fn test_tools_manager_showing_a_stored_tool_is_not_an_edit() {
+    // The file never stores the tool number (0 after loading), and a 12-flute tool is
+    // outside the flutes field's range: drawing them must not change the form.
+    let file = tools_file("not_dirty", Some(GTK_TOOLS));
+    let mut h = app_with(&file);
+    search(&mut h, "my_");
+    click(&mut h, "My Router Bit");
+    assert!(save_disabled(&h), "Save enabled without an edit");
+    click(&mut h, "Geometry");
+    click(&mut h, "My Odd Bit");
+    assert!(h.query_by_label("Unsaved changes").is_none(), "asked");
+    assert!(save_disabled(&h), "Save enabled without an edit");
+    click(&mut h, "Basic Info");
+    click(&mut h, "My Router Bit");
+    assert!(h.query_by_label("Unsaved changes").is_none(), "asked");
+    click(&mut h, "New Tool");
+    assert!(h.query_by_label("Unsaved changes").is_none(), "asked");
+    click(&mut h, "Cancel");
+    assert!(h.query_by_label("Unsaved changes").is_none(), "asked");
+    assert_eq!(
+        stored(&file, "my_odd_bit").map(|t| t.flutes),
+        Some(12),
+        "file untouched"
+    );
 }

@@ -381,10 +381,11 @@ impl ToolForm {
     /// build counts as changed.
     ///
     /// # Arguments
-    /// * `original` - The tool being edited, or `None` for a new tool (always changed).
+    /// * `original` - The tool being edited, or `None` for a new tool (changed once it
+    ///   differs from the new tool form).
     pub fn is_dirty(&self, original: Option<&Tool>) -> bool {
         let Some(original) = original else {
-            return true;
+            return *self != Self::default();
         };
         match self.build(Some(original)) {
             Ok(current) => !tool_contents_equal(original, &current),
