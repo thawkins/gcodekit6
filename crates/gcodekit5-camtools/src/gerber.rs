@@ -26,6 +26,7 @@ use lyon::path::Path as LyonPath;
 use nalgebra::{Matrix4, Vector3};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::fmt::Write;
 use std::fs;
 use std::io::BufReader;
@@ -130,6 +131,60 @@ impl Default for GerberParameters {
             num_axes: 3,
         }
     }
+}
+
+/// The layer files of a Gerber project folder, found by the usual file extensions and name
+/// conventions (KiCad, Eagle and protel); a layer with several matching files keeps the
+/// last one read.
+///
+/// # Arguments
+/// * `dir` - The project folder; an unreadable folder has no layers.
+///
+/// # Returns
+/// The layer file of each layer found.
+pub fn detect_layer_files(dir: &std::path::Path) -> HashMap<GerberLayerType, PathBuf> {
+    let mut map = HashMap::new();
+    let Ok(entries) = fs::read_dir(dir) else {
+        return map;
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if !path.is_file() {
+            continue;
+        }
+        let name = path
+            .file_name()
+            .map(|n| n.to_string_lossy())
+            .unwrap_or_default()
+            .to_lowercase();
+        let ext = path
+            .extension()
+            .map(|e| e.to_string_lossy().to_lowercase())
+            .unwrap_or_default();
+
+        if ext == "gtl" || name.contains("f.cu") || name.contains("top.gbr") {
+            map.insert(GerberLayerType::TopCopper, path.clone());
+        } else if ext == "gbl" || name.contains("b.cu") || name.contains("bot.gbr") {
+            map.insert(GerberLayerType::BottomCopper, path.clone());
+        } else if ext == "gts" || name.contains("f.mask") || name.contains("smask_top") {
+            map.insert(GerberLayerType::TopSolderMask, path.clone());
+        } else if ext == "gbs" || name.contains("b.mask") || name.contains("smask_bot") {
+            map.insert(GerberLayerType::BottomSolderMask, path.clone());
+        } else if ext == "gto" || name.contains("f.silks") || name.contains("legend_top") {
+            map.insert(GerberLayerType::TopScreenPrint, path.clone());
+        } else if ext == "gbo" || name.contains("b.silks") || name.contains("legend_bot") {
+            map.insert(GerberLayerType::BottomScreenPrint, path.clone());
+        } else if ext == "drl" || ext == "txt" || name.contains("drill") {
+            map.insert(GerberLayerType::DrillHoles, path.clone());
+        } else if ext == "gko"
+            || ext == "gm1"
+            || name.contains("edge.cuts")
+            || name.contains("outline")
+        {
+            map.insert(GerberLayerType::BoardOutline, path.clone());
+        }
+    }
+    map
 }
 
 pub struct GerberConverter;

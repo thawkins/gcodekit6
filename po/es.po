@@ -2146,7 +2146,7 @@ msgid "Fast Shape Gallery"
 msgstr "Galería de formas rápidas"
 
 msgid "Click on a shape to quickly insert it with default parameters."
-msgstr ""
+msgstr "Haga clic en una forma para insertarla rápidamente con los parámetros predeterminados."
 "Haga clic en una forma para insertarla rápidamente con los parámetros "
 "predeterminados."
 
@@ -3260,3 +3260,546 @@ msgstr "No se pudo dibujar esta trayectoria."
 
 msgid "Stop the running job before opening a file."
 msgstr "Detenga el trabajo en curso antes de abrir un archivo."
+
+msgid "Rotate"
+msgstr "Rotar"
+
+msgid "90° CW"
+msgstr "90° en sentido horario"
+
+msgid "90° CCW"
+msgstr "90° en sentido antihorario"
+
+msgid "45° CW"
+msgstr "45° en sentido horario"
+
+msgid "45° CCW"
+msgstr "45° en sentido antihorario"
+
+msgid "180°"
+msgstr "180°"
+
+msgid "Show"
+msgstr "Mostrar"
+
+msgid "Lock"
+msgstr "Bloquear"
+
+msgid "Rotated object: Dimensions locked"
+msgstr "Objeto girado: dimensiones bloqueadas"
+
+msgid "0 = no raster, 100 = full length"
+msgstr "0 = sin raster, 100 = longitud completa"
+
+msgid "Enter a number"
+msgstr "Introduzca un número"
+
+msgid "Enter a value greater than 0"
+msgstr "Introduzca un valor mayor que 0"
+
+msgid "Enter a value of 0 or more"
+msgstr "Introduzca un valor de 0 o más"
+
+msgid "Enter an angle from 0 to 90"
+msgstr "Introduzca un ángulo de 0 a 90"
+
+msgid "Enter a whole number of 1 or more"
+msgstr "Introduzca un número entero de 1 o más"
+
+msgid "Value out of range"
+msgstr "Valor fuera de rango"
+
+msgid "Text cannot be empty"
+msgstr "El texto no puede estar vacío"
+
+msgid "The edited shapes were deleted or locked; the change was not applied."
+msgstr "Las formas editadas se eliminaron o bloquearon; el cambio no se aplicó."
+
+msgid "Enter a whole number of 2 or more"
+msgstr "Introduzca un número entero de 2 o más"
+
+msgid "Enter a non-zero angle"
+msgstr "Introduzca un ángulo distinto de cero"
+
+msgid "The array would create more than 10000 objects"
+msgstr "La matriz crearía más de 10000 objetos"
+
+msgid "Show Toolpaths"
+msgstr "Mostrar trayectorias"
+
+msgid "Nothing to export: all shapes are hidden"
+msgstr "Nada que exportar: todas las formas están ocultas"
+
+msgid "Stop the running job before sending G-code to the editor."
+msgstr "Detenga el trabajo en curso antes de enviar G-code al editor."
+
+msgid "The file is too large to import."
+msgstr "El archivo es demasiado grande para importarlo."
+
+msgid "The file has no shapes to import."
+msgstr "El archivo no contiene formas para importar."
+
+msgid "Generators"
+msgstr "Generadores"
+
+msgid "Engraving"
+msgstr "Grabado"
+
+msgid "Calculators"
+msgstr "Calculadoras"
+
+msgid "Maintenance"
+msgstr "Mantenimiento"
+
+msgid "Generated G-Code"
+msgstr "Código G generado"
+
+msgid "Not a valid length"
+msgstr "No es una longitud válida"
+
+msgid "Not a number"
+msgstr "No es un número"
+
+msgid "Must be greater than 0"
+msgstr "Debe ser mayor que 0"
+
+msgid "Must not be negative"
+msgstr "No debe ser negativo"
+
+msgid "Out of range"
+msgstr "Fuera de rango"
+
+msgid "This tool needs at least 3 axes (X, Y, Z); the active device has fewer."
+msgstr "Esta herramienta necesita al menos 3 ejes (X, Y, Z); el dispositivo activo tiene menos."
+
+msgid "Send to Editor"
+msgstr "Enviar al editor"
+
+msgid "Preview"
+msgstr "Vista previa"
+
+msgid "Generation failed"
+msgstr "La generación falló"
+
+msgid "Hole Diameter:"
+msgstr "Diámetro del agujero:"
+
+msgid "Tool Diameter:"
+msgstr "Diámetro de la herramienta:"
+
+msgid "Center X:"
+msgstr "Centro X:"
+
+msgid "Center Y:"
+msgstr "Centro Y:"
+
+msgid "Top Z (Surface):"
+msgstr "Z superior (superficie):"
+
+msgid "Bottom Z (Depth):"
+msgstr "Z inferior (profundidad):"
+
+msgid "Peck Depth (0 for none):"
+msgstr "Profundidad de picoteo (0 para ninguna):"
+
+msgid "Plunge Rate (mm/min):"
+msgstr "Velocidad de penetración (mm/min):"
+
+msgid "Safe Z:"
+msgstr "Z seguro:"
+
+msgid "Must be below Top Z"
+msgstr "Debe estar por debajo del Z superior"
+
+msgid "Must be above Top Z"
+msgstr "Debe estar por encima del Z superior"
+
+msgid "Emulate a drill press on your CNC. Supports standard drilling, peck drilling for chip clearing, and helical interpolation for holes larger than the tool."
+msgstr "Emula un taladro de columna en su CNC. Admite taladrado estándar, taladrado por picoteo para evacuar virutas e interpolación helicoidal para agujeros más grandes que la herramienta."
+
+msgid "Hole Geometry"
+msgstr "Geometría del agujero"
+
+msgid "Depth and Pecking"
+msgstr "Profundidad y picoteo"
+
+msgid "Machine Settings"
+msgstr "Ajustes de la máquina"
+
+msgid "Cut Depth:"
+msgstr "Profundidad de corte:"
+
+msgid "Stepover (%):"
+msgstr "Paso lateral (%):"
+
+msgid "Safe Z Height:"
+msgstr "Altura Z segura:"
+
+msgid "Generate G-code for surfacing your CNC spoilboard to ensure a flat, level work surface."
+msgstr "Genera código G para planear el tablero de sacrificio de su CNC y obtener una superficie de trabajo plana y nivelada."
+
+msgid "Spoilboard Dimensions"
+msgstr "Dimensiones del tablero de sacrificio"
+
+msgid "Grid Spacing:"
+msgstr "Espaciado de la cuadrícula:"
+
+msgid "Laser Power (S):"
+msgstr "Potencia del láser (S):"
+
+msgid "Laser Mode:"
+msgstr "Modo láser:"
+
+msgid "M3 (Constant Power)"
+msgstr "M3 (potencia constante)"
+
+msgid "M4 (Dynamic Power)"
+msgstr "M4 (potencia dinámica)"
+
+msgid "Create a grid pattern on your spoilboard for easy workpiece alignment and fixturing."
+msgstr "Crea un patrón de cuadrícula en su tablero de sacrificio para alinear y sujetar piezas fácilmente."
+
+msgid "Set the spindle's maximum RPM and power in the Device Manager."
+msgstr "Configure las RPM máximas y la potencia del husillo en el Administrador de dispositivos."
+
+msgid "Must not be larger than the hole"
+msgstr "No debe ser mayor que el agujero"
+
+msgid "The device is in laser mode ($32=1). Switch it to CNC mode to use the Drill Press."
+msgstr "El dispositivo está en modo láser ($32=1). Cámbielo a modo CNC para usar el taladro."
+
+msgid "Another program is waiting to go to the editor; this one was not sent."
+msgstr "Otro programa está esperando para ir al editor; este no se envió."
+
+msgid "Must be at least 50 mm"
+msgstr "Debe ser de al menos 50 mm"
+
+msgid "Must be a whole number from 2 to 20"
+msgstr "Debe ser un número entero de 2 a 20"
+
+msgid "Pieces would be narrower than 15 mm"
+msgstr "Las piezas serían más estrechas de 15 mm"
+
+msgid "Pieces would be shorter than 15 mm"
+msgstr "Las piezas serían más bajas de 15 mm"
+
+msgid "Must be between 10 and 30"
+msgstr "Debe estar entre 10 y 30"
+
+msgid "Must be between 0 and 13"
+msgstr "Debe estar entre 0 y 13"
+
+msgid "Must be between 0 and 10 mm"
+msgstr "Debe estar entre 0 y 10 mm"
+
+msgid "Must be a whole number from 0 to 4294967295"
+msgstr "Debe ser un número entero de 0 a 4294967295"
+
+msgid "Randomize"
+msgstr "Aleatorio"
+
+msgid "Not a whole number"
+msgstr "No es un número entero"
+
+msgid "Surrounding Spaces:"
+msgstr "Espacios circundantes:"
+
+msgid "Must be at least 20 mm"
+msgstr "Debe ser de al menos 20 mm"
+
+msgid "Must be between 1 and 20 mm"
+msgstr "Debe estar entre 1 y 20 mm"
+
+msgid "Must be more than twice the thickness"
+msgstr "Debe ser más del doble del grosor"
+
+msgid "Finger plus space must be at least 0.1"
+msgstr "Dedo más espacio debe ser de al menos 0.1"
+
+msgid "Must be at least 1"
+msgstr "Debe ser al menos 1"
+
+msgid "Layer Type:"
+msgstr "Tipo de capa:"
+
+msgid "Board Width:"
+msgstr "Ancho de la placa:"
+
+msgid "Board Height:"
+msgstr "Alto de la placa:"
+
+msgid "Isolation Width:"
+msgstr "Ancho de aislamiento:"
+
+msgid "Remove Excess Copper:"
+msgstr "Eliminar cobre sobrante:"
+
+msgid "Use Board Outline for Rubout:"
+msgstr "Usar el contorno de la placa para el desbaste:"
+
+msgid "Generate Alignment Holes:"
+msgstr "Generar agujeros de alineación:"
+
+msgid "Margin:"
+msgstr "Margen:"
+
+msgid "Drill Depth (Z):"
+msgstr "Profundidad de taladrado (Z):"
+
+msgid "Convert standard Gerber files (PCB layers) into G-Code for CNC isolation routing. Supports copper clearing (rubout), alignment holes, and custom tool parameters."
+msgstr "Convierte archivos Gerber estándar (capas de PCB) en G-Code para el fresado de aislamiento CNC. Admite el desbaste de cobre (rubout), los agujeros de alineación y parámetros de herramienta personalizados."
+
+msgid "No directory selected"
+msgstr "Ningún directorio seleccionado"
+
+msgid "Layer not found in directory"
+msgstr "Capa no encontrada en el directorio"
+
+msgid "Please select a Gerber directory."
+msgstr "Seleccione un directorio de Gerber."
+
+msgid "Selected layer not found in directory."
+msgstr "La capa seleccionada no se encontró en el directorio."
+
+msgid "Must be below the surface (negative)"
+msgstr "Debe estar por debajo de la superficie (negativo)"
+
+msgid "Failed to read file"
+msgstr "No se pudo leer el archivo"
+
+msgid "Top Copper"
+msgstr "Cobre superior"
+
+msgid "Bottom Copper"
+msgstr "Cobre inferior"
+
+msgid "Top Solder Mask"
+msgstr "Máscara de soldadura superior"
+
+msgid "Bottom Solder Mask"
+msgstr "Máscara de soldadura inferior"
+
+msgid "Top Screen Print"
+msgstr "Serigrafía superior"
+
+msgid "Bottom Screen Print"
+msgstr "Serigrafía inferior"
+
+msgid "Drill Holes"
+msgstr "Agujeros de taladro"
+
+msgid "Board Outline"
+msgstr "Contorno de la placa"
+
+msgid "Gerber Project"
+msgstr "Proyecto Gerber"
+
+msgid "Parameters"
+msgstr "Parámetros"
+
+msgid "Alignment Holes"
+msgstr "Agujeros de alineación"
+
+msgid "Negative Z for the alignment holes (through the board)"
+msgstr "Z negativo para los agujeros de alineación (a través de la placa)"
+
+msgid "Open Gerber Directory"
+msgstr "Abrir directorio de Gerber"
+
+msgid "Too many dividers: they would not fit the side"
+msgstr "Demasiados divisores: no caben en el lado"
+
+msgid "Must be at most 100"
+msgstr "Debe ser como máximo 100"
+
+msgid "Must be between 0 and 100"
+msgstr "Debe estar entre 0 y 100"
+
+msgid "Must not be more than the maximum power"
+msgstr "No debe superar la potencia máxima"
+
+msgid "Must be between 0 and 255"
+msgstr "Debe estar entre 0 y 255"
+
+msgid "The engraving is too large: at most 10000 pixels per line"
+msgstr "El grabado es demasiado grande: como máximo 10000 píxeles por línea"
+
+msgid "Safe Height:"
+msgstr "Altura de seguridad:"
+
+msgid "Fast Feed Rate:"
+msgstr "Avance rápido:"
+
+msgid "Slow Feed Rate:"
+msgstr "Avance lento:"
+
+msgid "Backoff Distance:"
+msgstr "Distancia de retroceso:"
+
+msgid "Max Probe Depth"
+msgstr "Profundidad máxima de palpado"
+
+msgid "Probe Distance"
+msgstr "Distancia de palpado"
+
+msgid "Diameter (mm)"
+msgstr "Diámetro (mm)"
+
+msgid "Setter Plate X"
+msgstr "Placa de medición X"
+
+msgid "Setter Plate Y"
+msgstr "Placa de medición Y"
+
+msgid "Setter Plate Z"
+msgstr "Placa de medición Z"
+
+msgid "Probe Depth:"
+msgstr "Profundidad de descenso:"
+
+msgid "Probe Tip Radius:"
+msgstr "Radio de la punta:"
+
+msgid "Plate Thickness:"
+msgstr "Grosor de la placa:"
+
+msgid "Z-Touch"
+msgstr "Palpado Z"
+
+msgid "Edge Find"
+msgstr "Buscar borde"
+
+msgid "Corner Find"
+msgstr "Buscar esquina"
+
+msgid "Bore Center"
+msgstr "Centro de agujero"
+
+msgid "Boss Center"
+msgstr "Centro de saliente"
+
+msgid "Tool Length"
+msgstr "Longitud de herramienta"
+
+msgid "Routine"
+msgstr "Rutina"
+
+msgid "Target WCS"
+msgstr "SCT de destino"
+
+msgid "Auto-Update WCS"
+msgstr "Actualizar SCT automáticamente"
+
+msgid "Write the result into the selected WCS (G10 L20) from the generated G-code. Z-touch, edge and corner only; bore/boss centres are not set automatically."
+msgstr "Escribe el resultado en el SCT seleccionado (G10 L20) desde el G-code generado. Solo palpado Z, borde y esquina; los centros de agujero y saliente no se fijan automáticamente."
+
+msgid "Probe Axis"
+msgstr "Eje de palpado"
+
+msgid "Probe Direction"
+msgstr "Dirección de palpado"
+
+msgid "Status:"
+msgstr "Estado:"
+
+msgid "Probe:"
+msgstr "Sonda:"
+
+msgid "Triggered"
+msgstr "Activada"
+
+msgid "Not triggered"
+msgstr "No activada"
+
+msgid "Stop Probe"
+msgstr "Detener palpado"
+
+msgid "Routine Selection"
+msgstr "Selección de rutina"
+
+msgid "Routine Settings"
+msgstr "Ajustes de la rutina"
+
+msgid "Results"
+msgstr "Resultados"
+
+msgid "X Axis"
+msgstr "Eje X"
+
+msgid "Y Axis"
+msgstr "Eje Y"
+
+msgid "Z Axis"
+msgstr "Eje Z"
+
+msgid "Negative"
+msgstr "Negativa"
+
+msgid "Positive"
+msgstr "Positiva"
+
+msgid "X-min / Y-min"
+msgstr "X mín. / Y mín."
+
+msgid "X-max / Y-min"
+msgstr "X máx. / Y mín."
+
+msgid "X-min / Y-max"
+msgstr "X mín. / Y máx."
+
+msgid "X-max / Y-max"
+msgstr "X máx. / Y máx."
+
+msgid "The probe input is already triggered."
+msgstr "La entrada de la sonda ya está activada."
+
+msgid "Waiting for the machine's next status report."
+msgstr "Esperando el siguiente informe de estado de la máquina."
+
+msgid "The probe program was stopped."
+msgstr "Se detuvo el programa de palpado."
+
+msgid "Surface at machine"
+msgstr "Superficie en máquina"
+
+msgid "Edge at machine"
+msgstr "Borde en máquina"
+
+msgid "Corner at machine"
+msgstr "Esquina en máquina"
+
+msgid "Centre at machine"
+msgstr "Centro en máquina"
+
+msgid "Measured diameter:"
+msgstr "Diámetro medido:"
+
+msgid "Tool length offset:"
+msgstr "Corrección de longitud:"
+
+msgid "probe report(s) received."
+msgstr "informe(s) de palpado recibido(s)."
+
+msgid "Program halted (feed hold, then reset)"
+msgstr "Programa detenido (retención de avance y reinicio)"
+
+msgid "Diameter:"
+msgstr "Diámetro:"
+
+msgid "The engraving is too large: at most 25 million pixels"
+msgstr "El grabado es demasiado grande: como máximo 25 millones de píxeles"
+
+msgid "The cancelled engraving is still finishing; try again in a moment."
+msgstr "El grabado cancelado aún está terminando; inténtelo de nuevo en un momento."
+
+msgid "A file is waiting to open in the editor; this program was not sent."
+msgstr "Un archivo está esperando para abrirse en el editor; este programa no se envió."
+
+msgid "Answer the question about the editor's unsaved changes before opening a file."
+msgstr "Responda a la pregunta sobre los cambios sin guardar del editor antes de abrir un archivo."
+
+msgid "Stop the running job before generating."
+msgstr "Detenga el trabajo en curso antes de generar."
+
+msgid "Must be at most 2000 mm"
+msgstr "Debe ser como máximo 2000 mm"

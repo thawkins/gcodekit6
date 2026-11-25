@@ -1,0 +1,31 @@
+{
+  "x": 120.0,
+  "y": 90.5,
+  "h": 60.0,
+  "thickness": 4.0,
+  "outside": true,
+  "box_type": "NoBottom",
+  "finger_joint": {
+    "finger": 1.5,
+    "space": 2.5,
+    "surrounding_spaces": 1.0,
+    "play": 0.05,
+    "extra_length": 0.25,
+    "style": "Rectangular",
+    "dimple_height": 0.0,
+    "dimple_length": 0.0
+  },
+  "burn": 0.15,
+  "laser_passes": 2,
+  "z_step_down": 0.2,
+  "laser_power": 800,
+  "feed_rate": 400.0,
+  "offset_x": 12.0,
+  "offset_y": 8.0,
+  "dividers_x": 1,
+  "dividers_y": 2,
+  "optimize_layout": true,
+  "key_divider_type": "None",
+  "num_axes": 3,
+  "home_before_job": true
+}

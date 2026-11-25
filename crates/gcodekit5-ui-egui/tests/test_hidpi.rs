@@ -209,3 +209,133 @@ fn test_jog_buttons_send_same_line_at_every_scale() -> TestResult {
     }
     Ok(())
 }
+
+#[test]
+fn test_designer_click_selects_same_shape_at_every_scale() -> TestResult {
+    use crate::test_designer_canvas::{click, harness_at, pane_with_rects, screen};
+    let _guard = crate::global_env_lock();
+    let rects = [
+        (20.0, 20.0, 30.0, 30.0),
+        (70.0, 20.0, 30.0, 30.0),
+        (20.0, 70.0, 30.0, 30.0),
+    ];
+    for ppp in SCALES {
+        let mut harness = harness_at(pane_with_rects(&rects), ppp);
+        let ids: Vec<u64> = harness
+            .state()
+            .state()
+            .canvas
+            .shape_store
+            .draw_order_iter()
+            .collect();
+        for (i, &(x, y, w, h)) in rects.iter().enumerate() {
+            // The centre and a point just inside the far corner of each shape.
+            for (wx, wy) in [(x + w / 2.0, y + h / 2.0), (x + w - 0.5, y + h - 0.5)] {
+                let pos = screen(&harness, wx as f32, wy as f32);
+                click(&mut harness, pos);
+                let picked: Vec<u64> = harness
+                    .state()
+                    .state()
+                    .canvas
+                    .shapes()
+                    .filter(|o| o.selected)
+                    .map(|o| o.id)
+                    .collect();
+                assert_eq!(picked, vec![ids[i]], "shape {i} at ({wx}, {wy}), ppp {ppp}");
+            }
+        }
+    }
+    Ok(())
+}
+
+#[test]
+fn test_designer_layers_row_click_selects_same_shape_at_every_scale() -> TestResult {
+    use crate::test_designer_layers::{both_at, click_row, order, sel, three};
+    let _guard = crate::global_env_lock();
+    for ppp in SCALES {
+        let mut harness = both_at(three(), ppp);
+        let ids = order(&harness);
+        for id in [ids[2], ids[0], ids[1]] {
+            click_row(&mut harness, id, egui::Modifiers::NONE);
+            assert_eq!(sel(&harness), vec![id], "row {id} at ppp {ppp}");
+        }
+    }
+    Ok(())
+}
+
+#[test]
+fn test_designer_toolbox_button_click_picks_same_tool_at_every_scale() -> TestResult {
+    use crate::test_designer_canvas::{click, harness_at};
+    use gcodekit5_ui_egui::panes::designer::DesignerPane;
+    use gcodekit5_ui_egui::panes::designer::canvas::DesignerTool;
+    let _guard = crate::global_env_lock();
+    for ppp in SCALES {
+        let mut harness = harness_at(DesignerPane::new(), ppp);
+        for (label, tool) in [
+            ("Gear", DesignerTool::Gear),
+            ("Rectangle", DesignerTool::Rectangle),
+            ("Polyline", DesignerTool::Polyline),
+        ] {
+            let pos = harness.get_by_label(label).rect().center();
+            click(&mut harness, pos);
+            assert_eq!(harness.state().tool(), tool, "{label} at ppp {ppp}");
+        }
+    }
+    Ok(())
+}
+
+#[test]
+fn test_designer_properties_field_edit_applies_at_every_scale() -> TestResult {
+    use crate::test_designer_properties::{both_at, first, set_field, two_rects};
+    use gcodekit5_designer::model::Shape;
+    let _guard = crate::global_env_lock();
+    for ppp in SCALES {
+        let mut harness = both_at(two_rects(), ppp);
+        set_field(&mut harness, "Width:", "42.5");
+        set_field(&mut harness, "X:", "60");
+        let Shape::Rectangle(r) = first(&harness) else {
+            panic!("rectangle at ppp {ppp}");
+        };
+        assert!(
+            (r.width - 42.5).abs() < 1e-6,
+            "width {} at ppp {ppp}",
+            r.width
+        );
+        assert!(
+            (r.center.x - 60.0).abs() < 1e-6,
+            "x {} at ppp {ppp}",
+            r.center.x
+        );
+    }
+    Ok(())
+}
+
+#[test]
+fn test_cam_generate_click_makes_the_program_at_every_scale() -> TestResult {
+    use gcodekit5_ui_egui::panes::cam_tools::{CamTool, CamToolsPane, SharedCamTools};
+    use std::cell::RefCell;
+    use std::rc::Rc;
+    let _guard = crate::global_env_lock();
+    let expected = crate::test_cam_drill_press::fixture("drill_press_default.gcode");
+    for ppp in SCALES {
+        let tr = Translator::new("en");
+        let cam = Rc::new(RefCell::new(CamToolsPane::new()));
+        cam.borrow_mut().set_open_tool(Some(CamTool::DrillPress));
+        let mut harness = Harness::builder()
+            .with_size(egui::vec2(640.0, 900.0))
+            .with_pixels_per_point(ppp)
+            .build_ui_state(
+                move |ui, pane: &mut SharedCamTools| {
+                    let mut requested = Vec::new();
+                    let mut ctx = PaneContext::new(&tr, &mut requested);
+                    pane.ui(ui, &mut ctx);
+                },
+                SharedCamTools::new(Rc::clone(&cam)),
+            );
+        harness.run();
+        let pos = harness.get_by_label("Generate").rect().center();
+        click_at(&mut harness, pos);
+        assert_eq!(cam.borrow().output(), Some(expected.as_str()), "ppp {ppp}");
+    }
+    Ok(())
+}

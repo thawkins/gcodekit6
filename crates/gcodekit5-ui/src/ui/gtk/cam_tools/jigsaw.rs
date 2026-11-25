@@ -17,6 +17,93 @@ use gcodekit5_camtools::jigsaw_puzzle::{JigsawPuzzleMaker, PuzzleParameters};
 use gcodekit5_core::units;
 use gcodekit5_settings::SettingsController;
 
+/// Initial width (mm).
+pub const WIDTH_MM: f64 = 200.0;
+/// Initial height (mm).
+pub const HEIGHT_MM: f64 = 150.0;
+/// Initial corner radius (mm).
+pub const CORNER_RADIUS_MM: f64 = 2.0;
+/// Initial pieces across entry text.
+pub const PIECES_ACROSS: &str = "4";
+/// Initial pieces down entry text.
+pub const PIECES_DOWN: &str = "3";
+/// Initial random seed entry text.
+pub const SEED: &str = "42";
+/// Initial tab size entry text (percent).
+pub const TAB_SIZE: &str = "20";
+/// Initial jitter entry text (percent).
+pub const JITTER: &str = "4";
+
+/// The text of the jigsaw page's fields, as the page reads them on Generate.
+#[derive(Debug, Clone, PartialEq)]
+pub struct JigsawEntries {
+    /// Width, a length in the measurement system.
+    pub width: String,
+    /// Height, a length.
+    pub height: String,
+    /// Pieces across.
+    pub pieces_across: String,
+    /// Pieces down.
+    pub pieces_down: String,
+    /// Random seed.
+    pub seed: String,
+    /// Tab size (percent).
+    pub tab_size: String,
+    /// Jitter (percent).
+    pub jitter: String,
+    /// Corner radius, a length.
+    pub corner_radius: String,
+}
+
+impl JigsawEntries {
+    /// The page's initial entries in `system`.
+    ///
+    /// # Arguments
+    /// * `system` - The measurement system the lengths are shown in.
+    pub fn defaults(system: units::MeasurementSystem) -> Self {
+        let len = |mm: f64| units::format_length(mm as f32, system);
+        Self {
+            width: len(WIDTH_MM),
+            height: len(HEIGHT_MM),
+            pieces_across: PIECES_ACROSS.to_string(),
+            pieces_down: PIECES_DOWN.to_string(),
+            seed: SEED.to_string(),
+            tab_size: TAB_SIZE.to_string(),
+            jitter: JITTER.to_string(),
+            corner_radius: len(CORNER_RADIUS_MM),
+        }
+    }
+}
+
+/// Reads the page's entries into generator parameters; a field that does not parse takes
+/// its default value (the page's behaviour).
+///
+/// # Arguments
+/// * `e` - The entries' text.
+/// * `system` - The measurement system the lengths are written in.
+pub fn jigsaw_parameters(e: &JigsawEntries, system: units::MeasurementSystem) -> PuzzleParameters {
+    PuzzleParameters {
+        width: units::parse_length(&e.width, system).unwrap_or(200.0),
+        height: units::parse_length(&e.height, system).unwrap_or(150.0),
+        pieces_across: e.pieces_across.parse().unwrap_or(4),
+        pieces_down: e.pieces_down.parse().unwrap_or(3),
+        seed: e.seed.parse::<u32>().unwrap_or(42), // Handles empty or invalid
+        tab_size_percent: e.tab_size.parse().unwrap_or(20.0),
+        jitter_percent: e.jitter.parse().unwrap_or(4.0),
+        corner_radius: units::parse_length(&e.corner_radius, system).unwrap_or(2.0),
+    }
+}
+
+/// Whether path `index` of `total` is imported into the designer as a closed polygon: the
+/// border, which is the last path; the others are open.
+///
+/// # Arguments
+/// * `index` - The path's index.
+/// * `total` - The number of paths.
+pub fn jigsaw_path_closed(index: usize, total: usize) -> bool {
+    index + 1 == total
+}
+
 struct JigsawWidgets {
     width: Entry,
     height: Entry,
@@ -105,17 +192,27 @@ impl JigsawTool {
             .build();
 
         // Widgets
-        let (width_row, width, width_unit) = create_dimension_row(&t!("Width:"), 200.0, &settings);
+        let (width_row, width, width_unit) =
+            create_dimension_row(&t!("Width:"), WIDTH_MM, &settings);
         let (height_row, height, height_unit) =
-            create_dimension_row(&t!("Height:"), 150.0, &settings);
-        let pieces_across = Entry::builder().text("4").valign(Align::Center).build();
-        let pieces_down = Entry::builder().text("3").valign(Align::Center).build();
+            create_dimension_row(&t!("Height:"), HEIGHT_MM, &settings);
+        let pieces_across = Entry::builder()
+            .text(PIECES_ACROSS)
+            .valign(Align::Center)
+            .build();
+        let pieces_down = Entry::builder()
+            .text(PIECES_DOWN)
+            .valign(Align::Center)
+            .build();
 
-        let seed = Entry::builder().text("42").valign(Align::Center).build();
-        let tab_size = Entry::builder().text("20").valign(Align::Center).build();
-        let jitter = Entry::builder().text("4").valign(Align::Center).build();
+        let seed = Entry::builder().text(SEED).valign(Align::Center).build();
+        let tab_size = Entry::builder()
+            .text(TAB_SIZE)
+            .valign(Align::Center)
+            .build();
+        let jitter = Entry::builder().text(JITTER).valign(Align::Center).build();
         let (corner_radius_row, corner_radius, corner_radius_unit) =
-            create_dimension_row(&t!("Corner Radius:"), 2.0, &settings);
+            create_dimension_row(&t!("Corner Radius:"), CORNER_RADIUS_MM, &settings);
 
         // Groups
         let dim_group = PreferencesGroup::builder()
@@ -338,7 +435,7 @@ impl JigsawTool {
                                             p.iter().map(|(x, y)| gcodekit5_designer::model::Point::new(*x, *y)).collect();
 
                                         // Border is the last path -> closed polygon. Others -> open path.
-                                        let closed = i + 1 == total;
+                                        let closed = jigsaw_path_closed(i, total);
                                         let path_shape = gcodekit5_designer::model::DesignPath::from_points(&vertices, closed);
                                         // Use state.add_shape_with_undo to record undo history and obtain the new id.
                                         let id = state.add_shape_with_undo(gcodekit5_designer::model::Shape::Path(path_shape));
@@ -436,16 +533,17 @@ impl JigsawTool {
 
     fn collect_params(w: &JigsawWidgets, settings: &Rc<SettingsController>) -> PuzzleParameters {
         let system = settings.persistence.borrow().config().ui.measurement_system;
-        PuzzleParameters {
-            width: units::parse_length(&w.width.text(), system).unwrap_or(200.0),
-            height: units::parse_length(&w.height.text(), system).unwrap_or(150.0),
-            pieces_across: w.pieces_across.text().parse().unwrap_or(4),
-            pieces_down: w.pieces_down.text().parse().unwrap_or(3),
-            seed: w.seed.text().parse::<u32>().unwrap_or(42), // Handles empty or invalid
-            tab_size_percent: w.tab_size.text().parse().unwrap_or(20.0),
-            jitter_percent: w.jitter.text().parse().unwrap_or(4.0),
-            corner_radius: units::parse_length(&w.corner_radius.text(), system).unwrap_or(2.0),
-        }
+        let entries = JigsawEntries {
+            width: w.width.text().to_string(),
+            height: w.height.text().to_string(),
+            pieces_across: w.pieces_across.text().to_string(),
+            pieces_down: w.pieces_down.text().to_string(),
+            seed: w.seed.text().to_string(),
+            tab_size: w.tab_size.text().to_string(),
+            jitter: w.jitter.text().to_string(),
+            corner_radius: w.corner_radius.text().to_string(),
+        };
+        jigsaw_parameters(&entries, system)
     }
 
     fn save_params(params: &PuzzleParameters) {

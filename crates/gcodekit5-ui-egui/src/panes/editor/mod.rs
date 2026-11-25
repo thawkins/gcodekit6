@@ -423,6 +423,7 @@ impl Pane for EditorPane {
                 | MachineEvent::Sent(_)
                 | MachineEvent::Error(_)
                 | MachineEvent::StreamFinished { .. }
+                | MachineEvent::StreamHalted { .. }
                 | MachineEvent::StreamStopped { .. } => {}
             }
         }

@@ -20,10 +20,162 @@ use super::common::{
     create_dimension_row, set_paned_initial_fraction, track_measurement_system, write_preset_file,
 };
 use crate::ui::gtk::help_browser;
-use gcodekit5_camtools::gerber::{GerberConverter, GerberLayerType, GerberParameters};
+use gcodekit5_camtools::gerber::{
+    GerberConverter, GerberLayerType, GerberParameters, detect_layer_files,
+};
 use gcodekit5_core::units;
 use gcodekit5_core::{SharedHashMap, shared};
 use gcodekit5_settings::SettingsController;
+
+/// Initial board width and height (mm).
+pub const BOARD_MM: f64 = 100.0;
+/// Initial work origin offsets (mm).
+pub const OFFSET_MM: f64 = 0.0;
+/// Initial feed rate entry text (mm/min).
+pub const FEED_RATE: &str = "100.0";
+/// Initial spindle speed entry text (RPM).
+pub const SPINDLE_SPEED: &str = "10000.0";
+/// Initial cut depth (mm, negative is below the surface).
+pub const CUT_DEPTH_MM: f64 = -0.1;
+/// Initial safe Z (mm).
+pub const SAFE_Z_MM: f64 = 5.0;
+/// Initial tool diameter (mm).
+pub const TOOL_DIAMETER_MM: f64 = 0.1;
+/// Initial isolation width (mm).
+pub const ISOLATION_WIDTH_MM: f64 = 0.0;
+/// Initial alignment hole diameter (mm).
+pub const ALIGNMENT_HOLE_DIAMETER_MM: f64 = 3.175;
+/// Initial alignment hole margin (mm).
+pub const ALIGNMENT_HOLE_MARGIN_MM: f64 = 5.0;
+/// Initial alignment hole depth (mm).
+pub const ALIGNMENT_HOLE_DEPTH_MM: f64 = -1.8;
+/// Initial layer type id.
+pub const LAYER_TYPE: &str = "TopCopper";
+
+/// The layer type of a layer dropdown id (`TopCopper` for an unknown id).
+///
+/// # Arguments
+/// * `id` - The dropdown's id.
+pub fn layer_type_from_id(id: &str) -> GerberLayerType {
+    match id {
+        "TopCopper" => GerberLayerType::TopCopper,
+        "BottomCopper" => GerberLayerType::BottomCopper,
+        "TopSolderMask" => GerberLayerType::TopSolderMask,
+        "BottomSolderMask" => GerberLayerType::BottomSolderMask,
+        "TopScreenPrint" => GerberLayerType::TopScreenPrint,
+        "BottomScreenPrint" => GerberLayerType::BottomScreenPrint,
+        "DrillHoles" => GerberLayerType::DrillHoles,
+        "BoardOutline" => GerberLayerType::BoardOutline,
+        _ => GerberLayerType::TopCopper,
+    }
+}
+
+/// The text of the Gerber page's fields, as the page reads them on Generate.
+#[derive(Debug, Clone, PartialEq)]
+pub struct GerberEntries {
+    /// The layer type's dropdown id.
+    pub layer_type: String,
+    /// Feed rate (mm/min).
+    pub feed_rate: String,
+    /// Spindle speed (RPM).
+    pub spindle_speed: String,
+    /// Board width, a length in the measurement system.
+    pub board_width: String,
+    /// Board height, a length.
+    pub board_height: String,
+    /// Work origin offset X, a length.
+    pub offset_x: String,
+    /// Work origin offset Y, a length.
+    pub offset_y: String,
+    /// Generate alignment holes.
+    pub generate_alignment_holes: bool,
+    /// Alignment hole diameter, a length.
+    pub alignment_hole_diameter: String,
+    /// Alignment hole margin, a length.
+    pub alignment_hole_margin: String,
+    /// Alignment hole depth, a length.
+    pub alignment_hole_depth: String,
+    /// Cut depth, a length.
+    pub cut_depth: String,
+    /// Safe Z, a length.
+    pub safe_z: String,
+    /// Tool diameter, a length.
+    pub tool_diameter: String,
+    /// Isolation width, a length.
+    pub isolation_width: String,
+    /// Remove excess copper.
+    pub rubout: bool,
+    /// Use the board outline for rubout.
+    pub use_board_outline: bool,
+}
+
+impl GerberEntries {
+    /// The page's initial entries in `system`.
+    ///
+    /// # Arguments
+    /// * `system` - The measurement system the lengths are shown in.
+    pub fn defaults(system: units::MeasurementSystem) -> Self {
+        let len = |mm: f64| units::format_length(mm as f32, system);
+        Self {
+            layer_type: LAYER_TYPE.to_string(),
+            feed_rate: FEED_RATE.to_string(),
+            spindle_speed: SPINDLE_SPEED.to_string(),
+            board_width: len(BOARD_MM),
+            board_height: len(BOARD_MM),
+            offset_x: len(OFFSET_MM),
+            offset_y: len(OFFSET_MM),
+            generate_alignment_holes: false,
+            alignment_hole_diameter: len(ALIGNMENT_HOLE_DIAMETER_MM),
+            alignment_hole_margin: len(ALIGNMENT_HOLE_MARGIN_MM),
+            alignment_hole_depth: len(ALIGNMENT_HOLE_DEPTH_MM),
+            cut_depth: len(CUT_DEPTH_MM),
+            safe_z: len(SAFE_Z_MM),
+            tool_diameter: len(TOOL_DIAMETER_MM),
+            isolation_width: len(ISOLATION_WIDTH_MM),
+            rubout: false,
+            use_board_outline: false,
+        }
+    }
+}
+
+/// Reads the page's entries into converter parameters; a field that does not parse takes
+/// its default value (the page's behaviour).
+///
+/// # Arguments
+/// * `e` - The entries' text.
+/// * `system` - The measurement system the lengths are written in.
+/// * `directory` - The Gerber project folder, if one was chosen.
+/// * `num_axes` - The active device's axis count.
+pub fn gerber_parameters(
+    e: &GerberEntries,
+    system: units::MeasurementSystem,
+    directory: Option<String>,
+    num_axes: u8,
+) -> GerberParameters {
+    GerberParameters {
+        layer_type: layer_type_from_id(&e.layer_type),
+        feed_rate: e.feed_rate.parse().unwrap_or(100.0),
+        spindle_speed: e.spindle_speed.parse().unwrap_or(10000.0),
+        board_width: units::parse_length(&e.board_width, system).unwrap_or(100.0) as f32,
+        board_height: units::parse_length(&e.board_height, system).unwrap_or(100.0) as f32,
+        offset_x: units::parse_length(&e.offset_x, system).unwrap_or(0.0) as f32,
+        offset_y: units::parse_length(&e.offset_y, system).unwrap_or(0.0) as f32,
+        generate_alignment_holes: e.generate_alignment_holes,
+        alignment_hole_diameter: units::parse_length(&e.alignment_hole_diameter, system)
+            .unwrap_or(3.175) as f32,
+        alignment_hole_margin: units::parse_length(&e.alignment_hole_margin, system).unwrap_or(5.0)
+            as f32,
+        alignment_hole_depth: units::parse_length(&e.alignment_hole_depth, system).unwrap_or(-1.8),
+        cut_depth: units::parse_length(&e.cut_depth, system).unwrap_or(-0.1) as f32,
+        safe_z: units::parse_length(&e.safe_z, system).unwrap_or(5.0) as f32,
+        tool_diameter: units::parse_length(&e.tool_diameter, system).unwrap_or(0.1) as f32,
+        isolation_width: units::parse_length(&e.isolation_width, system).unwrap_or(0.0) as f32,
+        rubout: e.rubout,
+        use_board_outline: e.use_board_outline,
+        directory,
+        num_axes,
+    }
+}
 
 pub struct GerberTool {
     content: Box,
@@ -124,60 +276,7 @@ impl GerberTool {
         let layer_files_clone = layer_files.clone();
         let file_label_clone = file_label.clone();
 
-        // Helper to detect layers
-        let detect_layers = |path: &std::path::Path| -> HashMap<GerberLayerType, PathBuf> {
-            let mut map = HashMap::new();
-            if let Ok(entries) = fs::read_dir(path) {
-                for entry in entries.flatten() {
-                    let path = entry.path();
-                    if !path.is_file() {
-                        continue;
-                    }
-
-                    let name = path
-                        .file_name()
-                        .map(|n| n.to_string_lossy())
-                        .unwrap_or_default()
-                        .to_lowercase();
-                    let ext = path
-                        .extension()
-                        .map(|e| e.to_string_lossy().to_lowercase())
-                        .unwrap_or_default();
-
-                    // Simple heuristic matching
-                    if ext == "gtl" || name.contains("f.cu") || name.contains("top.gbr") {
-                        map.insert(GerberLayerType::TopCopper, path.clone());
-                    } else if ext == "gbl" || name.contains("b.cu") || name.contains("bot.gbr") {
-                        map.insert(GerberLayerType::BottomCopper, path.clone());
-                    } else if ext == "gts" || name.contains("f.mask") || name.contains("smask_top")
-                    {
-                        map.insert(GerberLayerType::TopSolderMask, path.clone());
-                    } else if ext == "gbs" || name.contains("b.mask") || name.contains("smask_bot")
-                    {
-                        map.insert(GerberLayerType::BottomSolderMask, path.clone());
-                    } else if ext == "gto"
-                        || name.contains("f.silks")
-                        || name.contains("legend_top")
-                    {
-                        map.insert(GerberLayerType::TopScreenPrint, path.clone());
-                    } else if ext == "gbo"
-                        || name.contains("b.silks")
-                        || name.contains("legend_bot")
-                    {
-                        map.insert(GerberLayerType::BottomScreenPrint, path.clone());
-                    } else if ext == "drl" || ext == "txt" || name.contains("drill") {
-                        map.insert(GerberLayerType::DrillHoles, path.clone());
-                    } else if ext == "gko"
-                        || ext == "gm1"
-                        || name.contains("edge.cuts")
-                        || name.contains("outline")
-                    {
-                        map.insert(GerberLayerType::BoardOutline, path.clone());
-                    }
-                }
-            }
-            map
-        };
+        let detect_layers = |path: &std::path::Path| detect_layer_files(path);
 
         file_btn.connect_clicked(move |_| {
             let dialog = crate::ui::gtk::file_dialog::new_file_dialog("Open Gerber Directory");
@@ -211,26 +310,28 @@ impl GerberTool {
         layer_type.append(Some("BottomScreenPrint"), "Bottom Screen Print");
         layer_type.append(Some("DrillHoles"), "Drill Holes");
         layer_type.append(Some("BoardOutline"), "Board Outline");
-        layer_type.set_active_id(Some("TopCopper"));
+        layer_type.set_active_id(Some(LAYER_TYPE));
 
         let layer_row = ActionRow::builder().title("Layer Type").build();
         layer_row.add_suffix(&layer_type);
         params_group.add(&layer_row);
 
         let (w_row, board_width, board_width_unit) =
-            create_dimension_row("Board Width", 100.0, &settings);
+            create_dimension_row("Board Width", BOARD_MM, &settings);
         params_group.add(&w_row);
         let (h_row, board_height, board_height_unit) =
-            create_dimension_row("Board Height", 100.0, &settings);
+            create_dimension_row("Board Height", BOARD_MM, &settings);
         params_group.add(&h_row);
 
-        let (ox_row, offset_x, offset_x_unit) = create_dimension_row("Offset X", 0.0, &settings);
+        let (ox_row, offset_x, offset_x_unit) =
+            create_dimension_row("Offset X", OFFSET_MM, &settings);
         params_group.add(&ox_row);
-        let (oy_row, offset_y, offset_y_unit) = create_dimension_row("Offset Y", 0.0, &settings);
+        let (oy_row, offset_y, offset_y_unit) =
+            create_dimension_row("Offset Y", OFFSET_MM, &settings);
         params_group.add(&oy_row);
 
         let feed_rate = Entry::builder()
-            .text("100.0")
+            .text(FEED_RATE)
             .width_chars(8)
             .valign(Align::Center)
             .build();
@@ -239,7 +340,7 @@ impl GerberTool {
         params_group.add(&fr_row);
 
         let spindle_speed = Entry::builder()
-            .text("10000.0")
+            .text(SPINDLE_SPEED)
             .width_chars(8)
             .valign(Align::Center)
             .build();
@@ -248,18 +349,18 @@ impl GerberTool {
         params_group.add(&ss_row);
 
         let (cd_row, cut_depth, cut_depth_unit) =
-            create_dimension_row("Cut Depth", -0.1, &settings);
+            create_dimension_row("Cut Depth", CUT_DEPTH_MM, &settings);
         params_group.add(&cd_row);
 
-        let (sz_row, safe_z, safe_z_unit) = create_dimension_row("Safe Z", 5.0, &settings);
+        let (sz_row, safe_z, safe_z_unit) = create_dimension_row("Safe Z", SAFE_Z_MM, &settings);
         params_group.add(&sz_row);
 
         let (td_row, tool_diameter, tool_diameter_unit) =
-            create_dimension_row("Tool Diameter", 0.1, &settings);
+            create_dimension_row("Tool Diameter", TOOL_DIAMETER_MM, &settings);
         params_group.add(&td_row);
 
         let (iw_row, isolation_width, isolation_width_unit) =
-            create_dimension_row("Isolation Width", 0.0, &settings);
+            create_dimension_row("Isolation Width", ISOLATION_WIDTH_MM, &settings);
         params_group.add(&iw_row);
 
         let rubout = CheckButton::builder()
@@ -297,15 +398,15 @@ impl GerberTool {
         align_group.add(&ah_row);
 
         let (ahd_row, alignment_hole_diameter, alignment_hole_diameter_unit) =
-            create_dimension_row("Hole Diameter", 3.175, &settings);
+            create_dimension_row("Hole Diameter", ALIGNMENT_HOLE_DIAMETER_MM, &settings);
         align_group.add(&ahd_row);
 
         let (ahm_row, alignment_hole_margin, alignment_hole_margin_unit) =
-            create_dimension_row("Margin", 5.0, &settings);
+            create_dimension_row("Margin", ALIGNMENT_HOLE_MARGIN_MM, &settings);
         align_group.add(&ahm_row);
 
         let (ahz_row, alignment_hole_depth, alignment_hole_depth_unit) =
-            create_dimension_row("Drill Depth (Z)", -1.8, &settings);
+            create_dimension_row("Drill Depth (Z)", ALIGNMENT_HOLE_DEPTH_MM, &settings);
         ahz_row.set_subtitle("Negative Z for the alignment holes (through the board)");
         align_group.add(&ahz_row);
 
@@ -412,17 +513,7 @@ impl GerberTool {
         let w_layer = widgets.clone();
         layer_type.connect_changed(move |c| {
             if let Some(id) = c.active_id() {
-                let layer_type = match id.as_str() {
-                    "TopCopper" => GerberLayerType::TopCopper,
-                    "BottomCopper" => GerberLayerType::BottomCopper,
-                    "TopSolderMask" => GerberLayerType::TopSolderMask,
-                    "BottomSolderMask" => GerberLayerType::BottomSolderMask,
-                    "TopScreenPrint" => GerberLayerType::TopScreenPrint,
-                    "BottomScreenPrint" => GerberLayerType::BottomScreenPrint,
-                    "DrillHoles" => GerberLayerType::DrillHoles,
-                    "BoardOutline" => GerberLayerType::BoardOutline,
-                    _ => GerberLayerType::TopCopper,
-                };
+                let layer_type = layer_type_from_id(id.as_str());
 
                 let files = w_layer.layer_files.borrow();
                 if let Some(path) = files.get(&layer_type) {
@@ -524,53 +615,43 @@ impl GerberTool {
 
     fn collect_params(w: &GerberWidgets, settings: &Rc<SettingsController>) -> GerberParameters {
         let system = settings.persistence.borrow().config().ui.measurement_system;
-
-        let layer_type = match w.layer_type.active_id().as_deref() {
-            Some("TopCopper") => GerberLayerType::TopCopper,
-            Some("BottomCopper") => GerberLayerType::BottomCopper,
-            Some("TopSolderMask") => GerberLayerType::TopSolderMask,
-            Some("BottomSolderMask") => GerberLayerType::BottomSolderMask,
-            Some("TopScreenPrint") => GerberLayerType::TopScreenPrint,
-            Some("BottomScreenPrint") => GerberLayerType::BottomScreenPrint,
-            Some("DrillHoles") => GerberLayerType::DrillHoles,
-            Some("BoardOutline") => GerberLayerType::BoardOutline,
-            _ => GerberLayerType::TopCopper,
-        };
-
-        GerberParameters {
-            layer_type,
-            feed_rate: w.feed_rate.text().parse().unwrap_or(100.0),
-            spindle_speed: w.spindle_speed.text().parse().unwrap_or(10000.0),
-            board_width: units::parse_length(&w.board_width.text(), system).unwrap_or(100.0) as f32,
-            board_height: units::parse_length(&w.board_height.text(), system).unwrap_or(100.0)
-                as f32,
-            offset_x: units::parse_length(&w.offset_x.text(), system).unwrap_or(0.0) as f32,
-            offset_y: units::parse_length(&w.offset_y.text(), system).unwrap_or(0.0) as f32,
+        let entries = GerberEntries {
+            // An unset dropdown keeps the default layer.
+            layer_type: w
+                .layer_type
+                .active_id()
+                .map_or_else(|| LAYER_TYPE.to_string(), |id| id.to_string()),
+            feed_rate: w.feed_rate.text().to_string(),
+            spindle_speed: w.spindle_speed.text().to_string(),
+            board_width: w.board_width.text().to_string(),
+            board_height: w.board_height.text().to_string(),
+            offset_x: w.offset_x.text().to_string(),
+            offset_y: w.offset_y.text().to_string(),
             generate_alignment_holes: w.generate_alignment_holes.is_active(),
-            alignment_hole_diameter: units::parse_length(&w.alignment_hole_diameter.text(), system)
-                .unwrap_or(3.175) as f32,
-            alignment_hole_margin: units::parse_length(&w.alignment_hole_margin.text(), system)
-                .unwrap_or(5.0) as f32,
-            alignment_hole_depth: units::parse_length(&w.alignment_hole_depth.text(), system)
-                .unwrap_or(-1.8),
-            cut_depth: units::parse_length(&w.cut_depth.text(), system).unwrap_or(-0.1) as f32,
-            safe_z: units::parse_length(&w.safe_z.text(), system).unwrap_or(5.0) as f32,
-            tool_diameter: units::parse_length(&w.tool_diameter.text(), system).unwrap_or(0.1)
-                as f32,
-            isolation_width: units::parse_length(&w.isolation_width.text(), system).unwrap_or(0.0)
-                as f32,
+            alignment_hole_diameter: w.alignment_hole_diameter.text().to_string(),
+            alignment_hole_margin: w.alignment_hole_margin.text().to_string(),
+            alignment_hole_depth: w.alignment_hole_depth.text().to_string(),
+            cut_depth: w.cut_depth.text().to_string(),
+            safe_z: w.safe_z.text().to_string(),
+            tool_diameter: w.tool_diameter.text().to_string(),
+            isolation_width: w.isolation_width.text().to_string(),
             rubout: w.rubout.is_active(),
             use_board_outline: w.use_board_outline.is_active(),
-            directory: {
-                let files = w.layer_files.borrow();
-                // Just grab the parent dir of the first file found, or None
-                files
-                    .values()
-                    .next()
-                    .and_then(|p| p.parent().map(|d| d.to_string_lossy().to_string()))
-            },
-            num_axes: crate::device_status::get_active_num_axes(),
-        }
+        };
+        let directory = {
+            let files = w.layer_files.borrow();
+            // Just grab the parent dir of the first file found, or None
+            files
+                .values()
+                .next()
+                .and_then(|p| p.parent().map(|d| d.to_string_lossy().to_string()))
+        };
+        gerber_parameters(
+            &entries,
+            system,
+            directory,
+            crate::device_status::get_active_num_axes(),
+        )
     }
 
     fn save_params(params: &GerberParameters) {
@@ -662,62 +743,7 @@ impl GerberTool {
             let path = PathBuf::from(dir);
             if path.exists() {
                 // Re-run detection
-                // We need access to detect_layers logic here, but it's inside new().
-                // We can duplicate the logic or refactor. Duplication is easier for now as it's small.
-                let mut map = HashMap::new();
-                if let Ok(entries) = fs::read_dir(&path) {
-                    for entry in entries.flatten() {
-                        let path = entry.path();
-                        if !path.is_file() {
-                            continue;
-                        }
-
-                        let name = path
-                            .file_name()
-                            .map(|n| n.to_string_lossy())
-                            .unwrap_or_default()
-                            .to_lowercase();
-                        let ext = path
-                            .extension()
-                            .map(|e| e.to_string_lossy().to_lowercase())
-                            .unwrap_or_default();
-
-                        if ext == "gtl" || name.contains("f.cu") || name.contains("top.gbr") {
-                            map.insert(GerberLayerType::TopCopper, path.clone());
-                        } else if ext == "gbl" || name.contains("b.cu") || name.contains("bot.gbr")
-                        {
-                            map.insert(GerberLayerType::BottomCopper, path.clone());
-                        } else if ext == "gts"
-                            || name.contains("f.mask")
-                            || name.contains("smask_top")
-                        {
-                            map.insert(GerberLayerType::TopSolderMask, path.clone());
-                        } else if ext == "gbs"
-                            || name.contains("b.mask")
-                            || name.contains("smask_bot")
-                        {
-                            map.insert(GerberLayerType::BottomSolderMask, path.clone());
-                        } else if ext == "gto"
-                            || name.contains("f.silks")
-                            || name.contains("legend_top")
-                        {
-                            map.insert(GerberLayerType::TopScreenPrint, path.clone());
-                        } else if ext == "gbo"
-                            || name.contains("b.silks")
-                            || name.contains("legend_bot")
-                        {
-                            map.insert(GerberLayerType::BottomScreenPrint, path.clone());
-                        } else if ext == "drl" || ext == "txt" || name.contains("drill") {
-                            map.insert(GerberLayerType::DrillHoles, path.clone());
-                        } else if ext == "gko"
-                            || ext == "gm1"
-                            || name.contains("edge.cuts")
-                            || name.contains("outline")
-                        {
-                            map.insert(GerberLayerType::BoardOutline, path.clone());
-                        }
-                    }
-                }
+                let map = detect_layer_files(&path);
                 *w.layer_files.borrow_mut() = map;
                 w.file_label.set_text(
                     path.file_name()

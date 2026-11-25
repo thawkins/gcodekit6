@@ -18,7 +18,10 @@ use std::sync::{Arc, Mutex, PoisonError};
 
 use gcodekit5_app::machine::grbl_stream::{MAX_LINE_LENGTH, prepare_program};
 use gcodekit5_app::machine::{MachineController, MachineEvent};
-use gcodekit5_communication::firmware::grbl::status_parser::{FullStatus, WorkCoordinateOffset};
+use gcodekit5_communication::firmware::grbl::status_parser::{
+    FullStatus, WorkCoordinateOffset, parse_probe_report_in,
+};
+use gcodekit5_core::ProbeResult;
 
 /// Stream progress: program lines written and acknowledged out of `total`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -67,12 +70,25 @@ pub struct MachineStatus {
 /// X, Y and Z in millimetres.
 pub type Xyz = [f32; 3];
 
-/// The `$13` report-inches setting a `$$` line reports.
-fn parse_report_inches(line: &str) -> Option<bool> {
+/// The `$13` report-inches setting a `$$` line reports, if the line is one.
+///
+/// # Arguments
+/// * `line` - One line received from the controller.
+pub fn parse_report_inches(line: &str) -> Option<bool> {
     let (key, value) = line.trim().split_once('=')?;
     (key == "$13").then_some(())?;
     let value: f32 = value.trim().parse().ok()?;
     Some(value >= 1.0)
+}
+
+/// A `[PRB:...]` probe report in mm: converted from inches when the controller reports in
+/// inches (`$13=1`), as status reports are.
+///
+/// # Arguments
+/// * `line` - One line received from the controller.
+/// * `report_inches` - Whether the controller reports in inches.
+pub fn probe_report(line: &str, report_inches: bool) -> Option<ProbeResult> {
+    parse_probe_report_in(line.trim(), report_inches)
 }
 
 /// The `$130`-`$132` max-travel setting a `$$` line reports: axis index and value in mm.
@@ -197,6 +213,7 @@ impl MachineStatus {
                 }
                 MachineEvent::Sent(_) => {}
                 MachineEvent::Error(message) => self.last_error = Some(message.clone()),
+                MachineEvent::StreamHalted { reason } => self.last_error = Some(reason.clone()),
             }
         }
     }

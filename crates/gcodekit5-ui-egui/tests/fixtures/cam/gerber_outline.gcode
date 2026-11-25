@@ -1,0 +1,44 @@
+; Initialization sequence
+G21 ; Set units to millimeters
+G90 ; Absolute positioning
+G17 ; XY plane selection
+
+; Set work coordinate system at current position
+G54 ; Select work coordinate system 1
+G10 L20 P1 X0 Y0 Z0 ; Set current position as work zero
+G0 Z5.000 F500 ; Move to safe height
+M3 S10000.0
+G0 Z5.000
+G0 X-0.050 Y0.000
+G1 Z-0.100 F100.0
+G1 X-0.046 Y-0.019
+G1 X-0.035 Y-0.035
+G1 X-0.019 Y-0.046
+G1 X0.000 Y-0.050
+G1 X40.000 Y-0.050
+G1 X40.019 Y-0.046
+G1 X40.035 Y-0.035
+G1 X40.046 Y-0.019
+G1 X40.050 Y0.000
+G1 X40.050 Y30.000
+G1 X40.046 Y30.019
+G1 X40.035 Y30.035
+G1 X40.019 Y30.046
+G1 X40.000 Y30.050
+G1 X0.000 Y30.050
+G1 X-0.019 Y30.046
+G1 X-0.035 Y30.035
+G1 X-0.046 Y30.019
+G1 X-0.050 Y30.000
+G1 X-0.050 Y0.000
+G0 Z5.000
+G0 Z5.000
+G0 X0.050 Y29.950
+G1 Z-0.100 F100.0
+G1 X39.950 Y29.950
+G1 X39.950 Y0.050
+G1 X0.050 Y0.050
+G1 X0.050 Y29.950
+G0 Z5.000
+M5
+G0 X0 Y0

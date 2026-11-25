@@ -7,6 +7,12 @@
 //! - Bore Center (4-point internal)
 //! - Boss Center (4-point external)
 //! - Tool Length measurement
+//!
+//! The page's mapping from its entries to a routine, its options and a preset
+//! ([`probe_routine`], [`probe_options`], [`probe_preset`] over [`ProbeEntries`]), the
+//! reading of a run's console output ([`ProbeRunLog::parse`]) and the result text
+//! ([`describe_probe_result`]) are plain functions, so the egui front end's fixtures can be
+//! made from them.
 
 use crate::ui::gtk::common::text_dropdown::{TextDropDownExt, new_text_dropdown};
 use crate::ui::gtk::file_dialog::FileDialogHelpers;
@@ -95,22 +101,26 @@ struct ProbeSession {
 }
 
 /// Outcome of reading the device-console output of a probe run.
-struct ProbeRunLog {
-    /// Probe reports in the order received (one per `G38.x` cycle).
-    reports: Vec<gcodekit5_core::ProbeResult>,
+#[derive(Debug, Clone, PartialEq)]
+pub struct ProbeRunLog {
+    /// Probe reports in the order received (one per `G38.x` cycle), in mm.
+    pub reports: Vec<gcodekit5_core::ProbeResult>,
     /// First alarm or error line, if any.
-    failure: Option<String>,
+    pub failure: Option<String>,
 }
 
 impl ProbeRunLog {
     /// Collect `[PRB:...]` reports and the first `ALARM:`/`error:` from console text.
-    fn parse(text: &str) -> Self {
+    ///
+    /// # Arguments
+    /// * `text` - The console text of the run.
+    /// * `report_inches` - Whether the controller reports in inches (`$13=1`); the reports
+    ///   are converted to mm.
+    pub fn parse(text: &str, report_inches: bool) -> Self {
         let mut reports = Vec::new();
         let mut failure = None;
         for line in text.lines().map(str::trim) {
-            if let Some(report) =
-                parse_probe_report_in(line, crate::device_status::reports_in_inches())
-            {
+            if let Some(report) = parse_probe_report_in(line, report_inches) {
                 reports.push(report);
             } else if failure.is_none() {
                 let lower = line.to_ascii_lowercase();
@@ -121,6 +131,283 @@ impl ProbeRunLog {
         }
         Self { reports, failure }
     }
+}
+
+/// The text and choices of the page's fields, as the widgets hold them (every length in
+/// mm, feeds in mm/min; the drop-downs' ids, `None` where nothing is chosen).
+#[derive(Debug, Clone, PartialEq)]
+pub struct ProbeEntries {
+    /// Routine id (`z_touch`, `edge_find`, `corner_find`, `bore_center`, `boss_center`,
+    /// `tool_length`).
+    pub routine: Option<String>,
+    /// Safe height.
+    pub safe_height: String,
+    /// Fast feed rate.
+    pub fast_feed: String,
+    /// Slow feed rate.
+    pub slow_feed: String,
+    /// Backoff distance.
+    pub backoff: String,
+    /// Max probe depth.
+    pub max_depth: String,
+    /// Target WCS id (`G54` .. `G59`).
+    pub wcs: Option<String>,
+    /// Auto-Update WCS.
+    pub auto_update: bool,
+    /// Edge probe axis id (`X`, `Y`, `Z`).
+    pub edge_axis: Option<String>,
+    /// Edge probe direction id (`negative`, `positive`).
+    pub edge_dir: Option<String>,
+    /// Probe distance.
+    pub edge_dist: String,
+    /// Corner id (`xmin_ymin`, `xmax_ymin`, `xmin_ymax`, `xmax_ymax`).
+    pub corner: Option<String>,
+    /// Bore / boss diameter.
+    pub diameter: String,
+    /// Setter plate X.
+    pub setter_x: String,
+    /// Setter plate Y.
+    pub setter_y: String,
+    /// Setter plate Z.
+    pub setter_z: String,
+    /// Probe depth.
+    pub probe_depth: String,
+    /// Probe tip radius.
+    pub tip_radius: String,
+    /// Plate thickness.
+    pub plate_thickness: String,
+}
+
+impl Default for ProbeEntries {
+    /// The page's initial entries (the edge axis, direction and corner drop-downs start with
+    /// nothing chosen).
+    fn default() -> Self {
+        let mm = |v: f64| format!("{:.2}", v);
+        Self {
+            routine: Some("z_touch".into()),
+            safe_height: mm(probe_defaults::SAFE_HEIGHT),
+            fast_feed: mm(probe_defaults::FAST_FEED),
+            slow_feed: mm(probe_defaults::SLOW_FEED),
+            backoff: mm(probe_defaults::BACKOFF),
+            max_depth: format!("{:.1}", probe_defaults::MAX_PROBE_DEPTH),
+            wcs: Some("G54".into()),
+            auto_update: false,
+            edge_axis: None,
+            edge_dir: None,
+            edge_dist: format!("{:.1}", probe_defaults::PROBE_DISTANCE),
+            corner: None,
+            diameter: "20.0".into(),
+            setter_x: "100.0".into(),
+            setter_y: "100.0".into(),
+            setter_z: "-50.0".into(),
+            probe_depth: mm(probe_defaults::PROBE_DEPTH),
+            tip_radius: mm(0.0),
+            plate_thickness: mm(0.0),
+        }
+    }
+}
+
+/// Parse a millimetre (or mm/min) entry, naming the field on error.
+fn parse_mm(text: &str, name: &str) -> anyhow::Result<f64> {
+    text.trim()
+        .parse::<f64>()
+        .ok()
+        .filter(|v| v.is_finite())
+        .ok_or_else(|| anyhow::anyhow!("Invalid {}: '{}'", name, text))
+}
+
+/// The routine the entries describe.
+///
+/// # Arguments
+/// * `e` - The entries.
+///
+/// # Errors
+/// The first field that is not a number, or an unknown routine.
+pub fn probe_routine(e: &ProbeEntries) -> anyhow::Result<ProbeRoutine> {
+    let routine_id = e.routine.clone().unwrap_or_default();
+    let safe_height = parse_mm(&e.safe_height, "safe height")?;
+    let fast_feed = parse_mm(&e.fast_feed, "fast feed")?;
+    let slow_feed = parse_mm(&e.slow_feed, "slow feed")?;
+    let backoff = parse_mm(&e.backoff, "backoff")?;
+
+    match routine_id.as_str() {
+        "z_touch" => Ok(ProbeRoutine::ZTouch {
+            safe_height,
+            max_depth: parse_mm(&e.max_depth, "max depth")?,
+            fast_feed,
+            slow_feed,
+            backoff,
+        }),
+        "edge_find" => {
+            let axis = match e.edge_axis.as_deref() {
+                Some("Y") => Axis::Y,
+                Some("Z") => Axis::Z,
+                _ => Axis::X,
+            };
+            let direction = match e.edge_dir.as_deref() {
+                Some("positive") => Direction::Positive,
+                _ => Direction::Negative,
+            };
+            Ok(ProbeRoutine::EdgeFind {
+                axis,
+                direction,
+                safe_height,
+                probe_distance: parse_mm(&e.edge_dist, "probe distance")?,
+                fast_feed,
+                slow_feed,
+                backoff,
+            })
+        }
+        "corner_find" => {
+            let corner = match e.corner.as_deref() {
+                Some("xmax_ymin") => Corner::XmaxYmin,
+                Some("xmin_ymax") => Corner::XminYmax,
+                Some("xmax_ymax") => Corner::XmaxYmax,
+                _ => Corner::XminYmin,
+            };
+            Ok(ProbeRoutine::CornerFind {
+                corner,
+                safe_height,
+                probe_distance: parse_mm(&e.edge_dist, "probe distance")?,
+                fast_feed,
+                slow_feed,
+                backoff,
+            })
+        }
+        "bore_center" => Ok(ProbeRoutine::BoreCenter {
+            diameter: parse_mm(&e.diameter, "diameter")?,
+            safe_height,
+            fast_feed,
+            slow_feed,
+        }),
+        "boss_center" => Ok(ProbeRoutine::BossCenter {
+            diameter: parse_mm(&e.diameter, "diameter")?,
+            safe_height,
+            fast_feed,
+            slow_feed,
+        }),
+        "tool_length" => Ok(ProbeRoutine::ToolLength {
+            plate_xy: (
+                parse_mm(&e.setter_x, "setter X")?,
+                parse_mm(&e.setter_y, "setter Y")?,
+            ),
+            plate_z: parse_mm(&e.setter_z, "setter Z")?,
+            safe_height,
+            max_depth: parse_mm(&e.max_depth, "max depth")?,
+            feed_rate: fast_feed,
+        }),
+        _ => Err(anyhow::anyhow!("Unknown routine")),
+    }
+}
+
+/// The options the entries describe (the WCS is written only with Auto-Update WCS).
+///
+/// # Arguments
+/// * `e` - The entries.
+///
+/// # Errors
+/// The first field that is not a number.
+pub fn probe_options(e: &ProbeEntries) -> anyhow::Result<ProbeOptions> {
+    let set_wcs = if e.auto_update {
+        e.wcs
+            .as_deref()
+            .and_then(|id| id.trim_start_matches('G').parse::<u8>().ok())
+    } else {
+        None
+    };
+    Ok(ProbeOptions {
+        probe_depth: parse_mm(&e.probe_depth, "probe depth")?,
+        tip_radius: parse_mm(&e.tip_radius, "probe tip radius")?,
+        plate_thickness: parse_mm(&e.plate_thickness, "plate thickness")?,
+        set_wcs,
+    })
+}
+
+/// Reads every field into a preset (values in mm).
+///
+/// # Arguments
+/// * `e` - The entries.
+///
+/// # Errors
+/// The first field that is not a number.
+pub fn probe_preset(e: &ProbeEntries) -> anyhow::Result<ProbePreset> {
+    Ok(ProbePreset {
+        routine: e.routine.clone(),
+        safe_height: parse_mm(&e.safe_height, "safe height")?,
+        fast_feed: parse_mm(&e.fast_feed, "fast feed")?,
+        slow_feed: parse_mm(&e.slow_feed, "slow feed")?,
+        backoff: parse_mm(&e.backoff, "backoff")?,
+        max_depth: parse_mm(&e.max_depth, "max depth")?,
+        edge_axis: e.edge_axis.clone(),
+        edge_direction: e.edge_dir.clone(),
+        edge_distance: parse_mm(&e.edge_dist, "probe distance")?,
+        corner: e.corner.clone(),
+        diameter: parse_mm(&e.diameter, "diameter")?,
+        setter_x: parse_mm(&e.setter_x, "setter X")?,
+        setter_y: parse_mm(&e.setter_y, "setter Y")?,
+        setter_z: parse_mm(&e.setter_z, "setter Z")?,
+        probe_depth: parse_mm(&e.probe_depth, "probe depth")?,
+        tip_radius: parse_mm(&e.tip_radius, "probe tip radius")?,
+        plate_thickness: parse_mm(&e.plate_thickness, "plate thickness")?,
+        target_wcs: e.wcs.clone(),
+        auto_update_wcs: e.auto_update,
+        ..ProbePreset::default()
+    })
+}
+
+/// The lines a probe run streams: the generated program without comments or empty lines.
+///
+/// # Arguments
+/// * `gcode` - The generated program.
+pub fn probe_run_program(gcode: &str) -> String {
+    gcode
+        .lines()
+        .map(strip_comments)
+        .filter(|l| !l.is_empty())
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+/// Human-readable result of a successful probe run.
+///
+/// # Arguments
+/// * `report` - The run's probe reports.
+/// * `options` - The run's options.
+/// * `pos` - The computed result.
+pub fn describe_probe_result(
+    report: &ProbeReport,
+    options: &ProbeOptions,
+    pos: Position,
+) -> String {
+    let mut text = match report.routine {
+        ProbeRoutine::ZTouch { .. } => format!("Surface at machine Z{:.3}", pos.z),
+        ProbeRoutine::EdgeFind { axis, .. } => {
+            let v = match axis {
+                Axis::X => pos.x,
+                Axis::Y => pos.y,
+                Axis::Z => pos.z,
+            };
+            format!("Edge at machine {:?}{:.3}", axis, v)
+        }
+        ProbeRoutine::CornerFind { .. } => {
+            format!("Corner at machine X{:.3} Y{:.3}", pos.x, pos.y)
+        }
+        ProbeRoutine::BoreCenter { .. } | ProbeRoutine::BossCenter { .. } => {
+            let mut t = format!("Centre at machine X{:.3} Y{:.3}", pos.x, pos.y);
+            if let Ok(d) = ProbeRoutineEngine::compute_diameter(report, options) {
+                t.push_str(&format!("\nMeasured diameter: {:.3} mm", d));
+            }
+            t
+        }
+        ProbeRoutine::ToolLength { .. } => {
+            format!("Tool length offset: {:.3} mm", pos.z)
+        }
+    };
+    text.push_str(&format!(
+        "\n{} probe report(s) received.",
+        report.triggers.len()
+    ));
+    text
 }
 
 pub struct ProbeRoutinesTool {
@@ -807,13 +1094,7 @@ impl ProbeRoutinesTool {
             }
         };
         // Send code only: the streamer forwards lines as-is.
-        let program: String = output
-            .gcode
-            .lines()
-            .map(strip_comments)
-            .filter(|l| !l.is_empty())
-            .collect::<Vec<_>>()
-            .join("\n");
+        let program = probe_run_program(&output.gcode);
 
         let log_start = console.log_position();
         mc.start_job(&program);
@@ -881,7 +1162,10 @@ impl ProbeRoutinesTool {
                 return glib::ControlFlow::Continue;
             }
 
-            let run = ProbeRunLog::parse(&console.log_text_since(log_start));
+            let run = ProbeRunLog::parse(
+                &console.log_text_since(log_start),
+                crate::device_status::reports_in_inches(),
+            );
             let mut report = ProbeReport::new(routine.clone());
             for r in &run.reports {
                 report.add_trigger(*r);
@@ -893,7 +1177,7 @@ impl ProbeRoutinesTool {
             };
             match outcome {
                 Ok(pos) => {
-                    let text = Self::describe_result(&report, &options, pos);
+                    let text = describe_probe_result(&report, &options, pos);
                     if let Some(t) = result_text.upgrade() {
                         Self::set_result_text(&t, &text);
                     }
@@ -922,39 +1206,6 @@ impl ProbeRoutinesTool {
                 }
             }
         });
-    }
-
-    /// Human-readable result of a successful probe run.
-    fn describe_result(report: &ProbeReport, options: &ProbeOptions, pos: Position) -> String {
-        let mut text = match report.routine {
-            ProbeRoutine::ZTouch { .. } => format!("Surface at machine Z{:.3}", pos.z),
-            ProbeRoutine::EdgeFind { axis, .. } => {
-                let v = match axis {
-                    Axis::X => pos.x,
-                    Axis::Y => pos.y,
-                    Axis::Z => pos.z,
-                };
-                format!("Edge at machine {:?}{:.3}", axis, v)
-            }
-            ProbeRoutine::CornerFind { .. } => {
-                format!("Corner at machine X{:.3} Y{:.3}", pos.x, pos.y)
-            }
-            ProbeRoutine::BoreCenter { .. } | ProbeRoutine::BossCenter { .. } => {
-                let mut t = format!("Centre at machine X{:.3} Y{:.3}", pos.x, pos.y);
-                if let Ok(d) = ProbeRoutineEngine::compute_diameter(report, options) {
-                    t.push_str(&format!("\nMeasured diameter: {:.3} mm", d));
-                }
-                t
-            }
-            ProbeRoutine::ToolLength { .. } => {
-                format!("Tool length offset: {:.3} mm", pos.z)
-            }
-        };
-        text.push_str(&format!(
-            "\n{} probe report(s) received.",
-            report.triggers.len()
-        ));
-        text
     }
 
     /// Send the WCS (or tool-length) command for the last successful probe run.
@@ -1023,134 +1274,44 @@ impl ProbeRoutinesTool {
         (row, entry)
     }
 
-    /// Parse a millimetre (or mm/min) entry, naming the field on error.
-    fn parse_mm(entry: &Entry, name: &str) -> anyhow::Result<f64> {
-        let text = entry.text();
-        text.trim()
-            .parse::<f64>()
-            .ok()
-            .filter(|v| v.is_finite())
-            .ok_or_else(|| anyhow::anyhow!("Invalid {}: '{}'", name, text))
+    /// The widgets' text and choices.
+    fn entries(w: &ProbeWidgets) -> ProbeEntries {
+        let id = |c: &DropDown| c.active_id().map(|s| s.to_string());
+        let text = |e: &Entry| e.text().to_string();
+        ProbeEntries {
+            routine: id(&w.routine),
+            safe_height: text(&w.safe_height),
+            fast_feed: text(&w.fast_feed),
+            slow_feed: text(&w.slow_feed),
+            backoff: text(&w.backoff),
+            max_depth: text(&w.max_depth),
+            wcs: id(&w.wcs),
+            auto_update: w.auto_update.is_active(),
+            edge_axis: id(&w.edge_axis),
+            edge_dir: id(&w.edge_dir),
+            edge_dist: text(&w.edge_dist),
+            corner: id(&w.corner),
+            diameter: text(&w.diameter),
+            setter_x: text(&w.setter_x),
+            setter_y: text(&w.setter_y),
+            setter_z: text(&w.setter_z),
+            probe_depth: text(&w.probe_depth),
+            tip_radius: text(&w.tip_radius),
+            plate_thickness: text(&w.plate_thickness),
+        }
     }
 
     fn build_options(w: &ProbeWidgets) -> anyhow::Result<ProbeOptions> {
-        let set_wcs = if w.auto_update.is_active() {
-            w.wcs
-                .active_id()
-                .and_then(|id| id.trim_start_matches('G').parse::<u8>().ok())
-        } else {
-            None
-        };
-        Ok(ProbeOptions {
-            probe_depth: Self::parse_mm(&w.probe_depth, "probe depth")?,
-            tip_radius: Self::parse_mm(&w.tip_radius, "probe tip radius")?,
-            plate_thickness: Self::parse_mm(&w.plate_thickness, "plate thickness")?,
-            set_wcs,
-        })
+        probe_options(&Self::entries(w))
     }
 
     fn build_routine(w: &ProbeWidgets) -> anyhow::Result<ProbeRoutine> {
-        let routine_id = w.routine.active_id().unwrap_or_default();
-        let safe_height = Self::parse_mm(&w.safe_height, "safe height")?;
-        let fast_feed = Self::parse_mm(&w.fast_feed, "fast feed")?;
-        let slow_feed = Self::parse_mm(&w.slow_feed, "slow feed")?;
-        let backoff = Self::parse_mm(&w.backoff, "backoff")?;
-
-        match routine_id.as_str() {
-            "z_touch" => Ok(ProbeRoutine::ZTouch {
-                safe_height,
-                max_depth: Self::parse_mm(&w.max_depth, "max depth")?,
-                fast_feed,
-                slow_feed,
-                backoff,
-            }),
-            "edge_find" => {
-                let axis = match w.edge_axis.active_id().as_deref() {
-                    Some("Y") => Axis::Y,
-                    Some("Z") => Axis::Z,
-                    _ => Axis::X,
-                };
-                let direction = match w.edge_dir.active_id().as_deref() {
-                    Some("positive") => Direction::Positive,
-                    _ => Direction::Negative,
-                };
-                Ok(ProbeRoutine::EdgeFind {
-                    axis,
-                    direction,
-                    safe_height,
-                    probe_distance: Self::parse_mm(&w.edge_dist, "probe distance")?,
-                    fast_feed,
-                    slow_feed,
-                    backoff,
-                })
-            }
-            "corner_find" => {
-                let corner = match w.corner.active_id().as_deref() {
-                    Some("xmax_ymin") => Corner::XmaxYmin,
-                    Some("xmin_ymax") => Corner::XminYmax,
-                    Some("xmax_ymax") => Corner::XmaxYmax,
-                    _ => Corner::XminYmin,
-                };
-                Ok(ProbeRoutine::CornerFind {
-                    corner,
-                    safe_height,
-                    probe_distance: Self::parse_mm(&w.edge_dist, "probe distance")?,
-                    fast_feed,
-                    slow_feed,
-                    backoff,
-                })
-            }
-            "bore_center" => Ok(ProbeRoutine::BoreCenter {
-                diameter: Self::parse_mm(&w.diameter, "diameter")?,
-                safe_height,
-                fast_feed,
-                slow_feed,
-            }),
-            "boss_center" => Ok(ProbeRoutine::BossCenter {
-                diameter: Self::parse_mm(&w.diameter, "diameter")?,
-                safe_height,
-                fast_feed,
-                slow_feed,
-            }),
-            "tool_length" => Ok(ProbeRoutine::ToolLength {
-                plate_xy: (
-                    Self::parse_mm(&w.setter_x, "setter X")?,
-                    Self::parse_mm(&w.setter_y, "setter Y")?,
-                ),
-                plate_z: Self::parse_mm(&w.setter_z, "setter Z")?,
-                safe_height,
-                max_depth: Self::parse_mm(&w.max_depth, "max depth")?,
-                feed_rate: fast_feed,
-            }),
-            _ => Err(anyhow::anyhow!("Unknown routine")),
-        }
+        probe_routine(&Self::entries(w))
     }
 
     /// Read all fields into a preset (values in mm); fails on the first invalid field.
     fn collect_preset(w: &ProbeWidgets) -> anyhow::Result<ProbePreset> {
-        let id = |c: &DropDown| c.active_id().map(|s| s.to_string());
-        Ok(ProbePreset {
-            routine: id(&w.routine),
-            safe_height: Self::parse_mm(&w.safe_height, "safe height")?,
-            fast_feed: Self::parse_mm(&w.fast_feed, "fast feed")?,
-            slow_feed: Self::parse_mm(&w.slow_feed, "slow feed")?,
-            backoff: Self::parse_mm(&w.backoff, "backoff")?,
-            max_depth: Self::parse_mm(&w.max_depth, "max depth")?,
-            edge_axis: id(&w.edge_axis),
-            edge_direction: id(&w.edge_dir),
-            edge_distance: Self::parse_mm(&w.edge_dist, "probe distance")?,
-            corner: id(&w.corner),
-            diameter: Self::parse_mm(&w.diameter, "diameter")?,
-            setter_x: Self::parse_mm(&w.setter_x, "setter X")?,
-            setter_y: Self::parse_mm(&w.setter_y, "setter Y")?,
-            setter_z: Self::parse_mm(&w.setter_z, "setter Z")?,
-            probe_depth: Self::parse_mm(&w.probe_depth, "probe depth")?,
-            tip_radius: Self::parse_mm(&w.tip_radius, "probe tip radius")?,
-            plate_thickness: Self::parse_mm(&w.plate_thickness, "plate thickness")?,
-            target_wcs: id(&w.wcs),
-            auto_update_wcs: w.auto_update.is_active(),
-            ..ProbePreset::default()
-        })
+        probe_preset(&Self::entries(w))
     }
 
     fn apply_preset(w: &ProbeWidgets, p: &ProbePreset) {

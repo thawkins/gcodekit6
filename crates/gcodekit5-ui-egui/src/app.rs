@@ -28,9 +28,16 @@
 //! `ViewportCommand::Close`, and `craft_quit::on_close_request` (in `eframe::App::logic`)
 //! turns that close into `-[NSApplication terminate:]` on macOS.
 //!
+//! The designer's file commands, its unsaved-changes questions and the G-code it hands to the
+//! editor are in [`designer_files`].
+//! A CAM page's preset Load / Save dialogs are in `cam_presets`.
+//!
 //! Dependencies: `egui`, `eframe`, `craft-window`, `craft-platform`, `craft-keymap`,
 //! `craft-menu`, `craft-dialogs`, `craft-quit`, `gcodekit5-app` (translations, the
 //! unsaved-changes answer), `gcodekit5-settings` (configuration).
+
+mod cam_presets;
+pub mod designer_files;
 
 use std::cell::RefCell;
 use std::path::{Path, PathBuf};
@@ -56,13 +63,20 @@ use crate::dialogs::{
 };
 use crate::machine::{Machine, lock};
 use crate::menu::Menus;
+use crate::panes::cam_tools::{CamToolsPane, SharedCamTools};
 use crate::panes::console::ConsolePane;
+use crate::panes::designer::layers::LayersPane;
+use crate::panes::designer::properties::PropertiesPane;
+use crate::panes::designer::{DesignerPane, SharedDesigner};
 use crate::panes::editor::{EditorPane, SharedEditor};
 use crate::panes::machine_control::MachineControlPane;
 use crate::panes::visualizer::VisualizerPane;
 use crate::theme;
 use crate::windows::{AboutWindow, SettingsOutcome, SettingsWindow};
 use crate::workspace::{PaneContext, PaneId, Workspace};
+use designer_files::{DesignFlow, DesignNext, EditorNext, OPEN_BEHIND_HANDOFF};
+use gcodekit5_app::materials_manager_backend::MaterialsManagerBackend;
+use gcodekit5_app::tools_manager_backend::ToolsManagerBackend;
 
 /// How long quitting waits for a stopped job to be confirmed by the controller.
 const STOP_JOB_TIMEOUT: Duration = Duration::from_secs(2);
@@ -118,7 +132,7 @@ pub struct AppState {
     /// (`eframe::App::on_exit`). Cleared when the quit is cancelled.
     pub restart: Arc<AtomicBool>,
     /// Which documents have unsaved changes; asked about on quit. The app copies the editor's
-    /// flag here whenever it changes; the designer sets its own once it exists (Task 12).
+    /// and the designer's flags here whenever they change.
     pub dirty: DirtyState,
     /// The machine connection: the shared controller, this frame's events and the state
     /// derived from them. Replace it (with [`AppState::with_machine`]) before the app is built
@@ -195,13 +209,40 @@ struct QuitFlow {
     confirmed: bool,
 }
 
+/// Gives the CAM tools the user's tool and material libraries and the active device, from
+/// the files the GTK build keeps in `legacy` (`custom_tools.json`, `custom_materials.json`,
+/// `devices.json`). Nothing is written: without `devices.json` there is no device.
+fn load_cam_libraries(cam: &mut CamToolsPane, legacy: &Path) {
+    let tools = ToolsManagerBackend::with_storage_path(legacy.join("custom_tools.json"));
+    let materials =
+        MaterialsManagerBackend::with_storage_path(legacy.join("custom_materials.json"));
+    let devices = legacy.join("devices.json");
+    let device = if devices.exists() {
+        let manager = gcodekit5_devicedb::DeviceManager::new(devices);
+        if let Err(error) = manager.load() {
+            tracing::warn!(%error, "device profiles not loaded; no active device");
+        }
+        manager.get_active_profile()
+    } else {
+        None
+    };
+    cam.set_libraries(
+        tools.get_all_tools().into_iter().cloned().collect(),
+        materials.get_all_materials().into_iter().cloned().collect(),
+        device,
+    );
+}
+
 /// What to do once the editor's G-code is saved.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum AfterSave {
+pub(crate) enum AfterSave {
     /// Go on quitting (the quit prompt's Save).
     Quit,
     /// Ask for a file to open (Open with unsaved changes, Save chosen).
     Open,
+    /// Hand a program to the editor (the designer's Generate / Frame, or a CAM tool's Send
+    /// to Editor / Preview, over unsaved edits).
+    ToEditor(designer_files::Handoff),
 }
 
 /// Root application of the egui front end.
@@ -237,10 +278,19 @@ pub struct GcodeKitApp {
     editor: Rc<RefCell<EditorPane>>,
     /// The editor's dirty flag as last copied to [`AppState::dirty`].
     editor_dirty: bool,
+    /// The designer, also drawn by the workspace.
+    designer: Rc<RefCell<DesignerPane>>,
+    /// The design's modified flag as last copied to [`AppState::dirty`].
+    designer_dirty: bool,
+    /// The CAM tools, also drawn by the workspace.
+    cam_tools: Rc<RefCell<CamToolsPane>>,
     /// What waits for the editor's save dialog to be answered.
     after_save: Option<AfterSave>,
-    /// An Open asked first about the editor's unsaved changes.
-    open_after_confirm: bool,
+    /// What waits for the editor's unsaved-changes prompt (File > Open or a handoff); one
+    /// at a time.
+    editor_prompt: Option<EditorNext>,
+    /// The design's New / Open / Save waiting for a dialog.
+    design: DesignFlow,
     /// The egui frame whose machine events were last polled.
     machine_polled: Option<u64>,
     /// The `movable` flag last set on the macOS window (`title_bar::sync_movable`).
@@ -320,6 +370,15 @@ impl GcodeKitApp {
         let editor = Rc::new(RefCell::new(EditorPane::new()));
         workspace.set_pane(Box::new(SharedEditor(Rc::clone(&editor))));
         workspace.set_pane(Box::new(VisualizerPane::new()));
+        let designer = Rc::new(RefCell::new(DesignerPane::new()));
+        workspace.set_pane(Box::new(SharedDesigner(Rc::clone(&designer))));
+        workspace.set_pane(Box::new(LayersPane::new(Rc::clone(&designer))));
+        workspace.set_pane(Box::new(PropertiesPane::new(Rc::clone(&designer))));
+        let cam_tools = Rc::new(RefCell::new(CamToolsPane::new()));
+        if let Some(dirs) = state.settings.dirs() {
+            load_cam_libraries(&mut cam_tools.borrow_mut(), &dirs.legacy);
+        }
+        workspace.set_pane(Box::new(SharedCamTools::new(Rc::clone(&cam_tools))));
         workspace.configure(state.config());
         {
             // Wake the event loop whenever the machine reports something.
@@ -348,8 +407,12 @@ impl GcodeKitApp {
             quit: QuitFlow::default(),
             editor,
             editor_dirty: false,
+            designer,
+            designer_dirty: false,
+            cam_tools,
             after_save: None,
-            open_after_confirm: false,
+            editor_prompt: None,
+            design: DesignFlow::default(),
             machine_polled: None,
             #[cfg(target_os = "macos")]
             movable: None,
@@ -395,8 +458,8 @@ impl GcodeKitApp {
             }
             return;
         }
-        // While the editor's save dialog for this quit is up, the quit waits for it.
-        let saving = self.after_save == Some(AfterSave::Quit);
+        // While a save dialog for this quit is up, the quit waits for it.
+        let saving = self.after_save == Some(AfterSave::Quit) || self.design_saving_for_quit();
         if self.quit.asking.is_none() && !saving {
             self.continue_quit();
         }
@@ -464,12 +527,7 @@ impl GcodeKitApp {
                     UnsavedChangesChoice::Save if request == ConfirmRequest::UnsavedGcode => {
                         self.save_editor(Some(AfterSave::Quit));
                     }
-                    UnsavedChangesChoice::Save => {
-                        // The designer cannot save in this front end yet (Task 12), so nothing
-                        // is saved and the app stays open.
-                        tracing::warn!(?request, "cannot save before quitting yet; quit cancelled");
-                        self.cancel_quit();
-                    }
+                    UnsavedChangesChoice::Save => self.save_design(Some(DesignNext::Quit)),
                     UnsavedChangesChoice::Cancel => self.cancel_quit(),
                 }
             }
@@ -564,6 +622,12 @@ impl GcodeKitApp {
             self.dispatch(command);
         }
         self.sync_editor(false);
+        self.sync_designer();
+        self.deliver_editor_gcode();
+        self.deliver_designer_shapes();
+        self.ask_cam_preset();
+        self.ask_cam_folder();
+        self.ask_cam_image();
         self.deliver_machine_events();
         self.queue = queue;
         self.show_windows(&ctx);
@@ -652,6 +716,23 @@ impl GcodeKitApp {
         self.queue.extend(requested);
     }
 
+    /// Hands `cmd` to the designer when it is the pane the user works in
+    /// ([`Workspace::active_pane`]).
+    ///
+    /// # Returns
+    /// Whether the designer ran it.
+    fn route_to_active_designer(&mut self, cmd: Command) -> bool {
+        if self.workspace.active_pane() != Some(PaneId::Designer) {
+            return false;
+        }
+        let mut requested = Vec::new();
+        let mut ctx = PaneContext::new(&self.state.translator, &mut requested)
+            .with_machine(&self.state.machine);
+        let ran = self.workspace.route_to(PaneId::Designer, cmd, &mut ctx);
+        self.queue.extend(requested);
+        ran
+    }
+
     /// Draws the window frame and the in-window menu bar (unless the native menu is up): in
     /// the title-bar strip when the app draws one, else in a top panel of its own.
     fn show_frame_and_menu(&self, ui: &mut egui::Ui, gate: Gate, queue: &mut Vec<Command>) {
@@ -681,13 +762,21 @@ impl GcodeKitApp {
     /// * `cmd` - The command to run.
     pub fn dispatch(&mut self, cmd: Command) {
         self.last_dispatched = Some(cmd);
+        if self.dispatch_design(cmd) {
+            return;
+        }
         match cmd {
             Command::FileOpen => {
                 if self.refuse_open_during_job() {
                     return;
                 }
-                if self.editor.borrow().buffer().is_dirty() {
-                    self.open_after_confirm = true;
+                if self.editor_prompt.is_some() {
+                    // One editor prompt at a time: its answer must not reach this Open.
+                    tracing::warn!("editor prompt already up; open refused");
+                    let message = self.state.translator.tr(OPEN_BEHIND_HANDOFF).into_owned();
+                    self.editor.borrow_mut().set_notice(message);
+                } else if self.editor.borrow().buffer().is_dirty() {
+                    self.editor_prompt = Some(EditorNext::Open);
                     self.dialogs.confirm(ConfirmRequest::UnsavedGcode);
                 } else {
                     self.ask_open_gcode();
@@ -710,15 +799,19 @@ impl GcodeKitApp {
             Command::Paste => self
                 .viewport_commands
                 .push(egui::ViewportCommand::RequestPaste),
+            // Run by `dispatch_design` above.
             Command::FileNew
             | Command::FileNew3d
             | Command::FileImport
             | Command::FileImportImage
             | Command::FileExportGcode
-            | Command::FileExportSvg
-            | Command::FileRun
-            | Command::Undo
-            | Command::Redo => tracing::debug!(?cmd, "document command not available yet"),
+            | Command::FileExportSvg => {}
+            Command::FileRun => tracing::debug!(?cmd, "document command not available yet"),
+            Command::Undo | Command::Redo => {
+                if !self.route_to_active_designer(cmd) {
+                    tracing::debug!(?cmd, "no document to undo in");
+                }
+            }
             Command::StreamStart => {
                 // Stream exactly what the editor shows, also within the typing pause.
                 if self.sync_editor(true) {
@@ -742,13 +835,14 @@ impl GcodeKitApp {
             | Command::JogYNeg
             | Command::JogZPos
             | Command::JogZNeg
-            | Command::ZoomFit
-            | Command::ZoomIn
-            | Command::ZoomOut
-            | Command::ResetView
             | Command::ViewTop
             | Command::ViewFront
             | Command::ViewIso => self.route_pane_command(cmd),
+            Command::ZoomFit | Command::ZoomIn | Command::ZoomOut | Command::ResetView => {
+                if !self.route_to_active_designer(cmd) {
+                    self.route_pane_command(cmd);
+                }
+            }
             Command::OpenDeviceManager
             | Command::OpenToolsManager
             | Command::OpenMaterialsManager
@@ -780,6 +874,10 @@ impl GcodeKitApp {
     /// Acts on a dialog's answer; every answer is also kept in
     /// [`GcodeKitApp::last_dialog_answer`].
     fn handle_answer(&mut self, answer: DialogAnswer) {
+        if self.handle_design_answer(&answer) || self.handle_cam_preset_answer(&answer) {
+            self.last_dialog_answer = Some(answer);
+            return;
+        }
         match &answer {
             DialogAnswer::File {
                 purpose: FilePurpose::OpenGcode,
@@ -802,16 +900,16 @@ impl GcodeKitApp {
             DialogAnswer::Unavailable {
                 asked: Asked::Confirm(ConfirmRequest::UnsavedGcode),
                 reason,
-            } if self.open_after_confirm => {
+            } if self.editor_prompt == Some(EditorNext::Open) => {
                 // Not opening without the answer: unsaved G-code would be lost.
                 tracing::warn!(%reason, "unsaved-changes prompt unavailable; open abandoned");
-                self.open_after_confirm = false;
+                self.editor_prompt = None;
             }
             DialogAnswer::Confirm {
                 request: ConfirmRequest::UnsavedGcode,
                 choice,
-            } if self.open_after_confirm => {
-                self.open_after_confirm = false;
+            } if self.editor_prompt == Some(EditorNext::Open) => {
+                self.editor_prompt = None;
                 match choice.as_unsaved() {
                     UnsavedChangesChoice::Save => self.save_editor(Some(AfterSave::Open)),
                     UnsavedChangesChoice::Discard => self.ask_open_gcode(),
@@ -912,6 +1010,31 @@ impl GcodeKitApp {
         &self.editor
     }
 
+    /// The designer pane.
+    pub fn designer(&self) -> &Rc<RefCell<DesignerPane>> {
+        &self.designer
+    }
+
+    /// The CAM tools pane.
+    pub fn cam_tools(&self) -> &Rc<RefCell<CamToolsPane>> {
+        &self.cam_tools
+    }
+
+    /// Copies the design's modified flag to [`AppState::dirty`] when it changed.
+    fn sync_designer(&mut self) {
+        let modified = match self.designer.try_borrow() {
+            Ok(designer) => designer.is_modified(),
+            Err(error) => {
+                tracing::warn!(%error, "designer busy; dirty flag not synced");
+                return;
+            }
+        };
+        if modified != self.designer_dirty {
+            self.designer_dirty = modified;
+            self.state.dirty.designer = modified;
+        }
+    }
+
     /// Copies the editor's dirty flag to [`AppState::dirty`] when it changed, and hands the
     /// editor's text to the machine when it changed and typing paused (or `force`), unless a
     /// job is streaming. Returns `false` when the editor could not be reached (it is
@@ -962,7 +1085,7 @@ impl GcodeKitApp {
 
     /// Saves the editor's G-code to its file, or asks where when it has none; `then` runs
     /// once it is saved.
-    fn save_editor(&mut self, then: Option<AfterSave>) {
+    pub(super) fn save_editor(&mut self, then: Option<AfterSave>) {
         let has_path = self.editor.borrow().buffer().path().is_some();
         if has_path {
             let result = self.editor.borrow_mut().buffer_mut().save();
@@ -1004,8 +1127,9 @@ impl GcodeKitApp {
         match (saved, then) {
             (true, Some(AfterSave::Quit)) => self.continue_quit(),
             (true, Some(AfterSave::Open)) => self.ask_open_gcode(),
+            (true, Some(AfterSave::ToEditor(what))) => self.send_to_editor(what),
             (false, Some(AfterSave::Quit)) => self.cancel_quit(),
-            (false, Some(AfterSave::Open)) | (_, None) => {}
+            (false, Some(AfterSave::Open | AfterSave::ToEditor(_))) | (_, None) => {}
         }
     }
 
@@ -1040,6 +1164,11 @@ impl GcodeKitApp {
     /// for tests.
     pub fn state_mut(&mut self) -> &mut AppState {
         &mut self.state
+    }
+
+    /// The docking workspace, for tests.
+    pub fn workspace(&self) -> &Workspace {
+        &self.workspace
     }
 
     /// The docking workspace, for layout changes and tests.

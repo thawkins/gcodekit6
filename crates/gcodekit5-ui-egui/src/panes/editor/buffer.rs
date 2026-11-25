@@ -88,7 +88,7 @@ impl EditorBuffer {
     /// # Errors
     /// The file cannot be written.
     pub fn save_as(&mut self, path: &Path) -> anyhow::Result<()> {
-        write_atomic(path, &self.text)
+        crate::files::write_atomic(path, &self.text)
             .with_context(|| format!("cannot write {}", path.display()))?;
         self.path = Some(path.to_path_buf());
         self.dirty = false;
@@ -106,6 +106,18 @@ impl EditorBuffer {
     /// * `text` - The new text.
     pub fn set_text(&mut self, text: String) {
         self.text = text;
+        self.mark_edited();
+    }
+
+    /// Replaces the text with a program generated elsewhere (the designer's Generate G-Code
+    /// or Frame): the buffer becomes dirty and forgets its file, so the next Save asks where
+    /// instead of overwriting the file that was open (GTK cleared the current file too).
+    ///
+    /// # Arguments
+    /// * `text` - The generated program.
+    pub fn replace_with_generated(&mut self, text: String) {
+        self.text = text;
+        self.path = None;
         self.mark_edited();
     }
 
@@ -191,39 +203,6 @@ impl EditorBuffer {
     pub fn generation(&self) -> u64 {
         self.generation
     }
-}
-
-/// Writes `text` to a temporary file beside `path`, then renames it over `path`, so a crash
-/// or a full disk never leaves a half-written program. An existing file's permissions are
-/// kept; the temporary file is removed when anything fails.
-fn write_atomic(path: &Path, text: &str) -> std::io::Result<()> {
-    // The rename below would replace a read-only target, which a plain write refuses.
-    if let Ok(existing) = std::fs::metadata(path)
-        && existing.permissions().readonly()
-    {
-        return Err(std::io::Error::new(
-            std::io::ErrorKind::PermissionDenied,
-            "target file is read-only",
-        ));
-    }
-    let name = path.file_name().map_or_else(
-        || "program".to_string(),
-        |name| name.to_string_lossy().into_owned(),
-    );
-    let temp = path.with_file_name(format!(".{name}.{}.tmp", std::process::id()));
-    let result = std::fs::write(&temp, text)
-        .and_then(|()| match std::fs::metadata(path) {
-            Ok(existing) => std::fs::set_permissions(&temp, existing.permissions()),
-            Err(_) => Ok(()),
-        })
-        .and_then(|()| std::fs::rename(&temp, path));
-    if result.is_err() {
-        // The write error is the one to report; a leftover temp file is only logged.
-        if let Err(error) = std::fs::remove_file(&temp) {
-            tracing::debug!(%error, "temporary save file not removed");
-        }
-    }
-    result
 }
 
 /// For each line the machine streams from `text` (in order), the editor line (0-based) it

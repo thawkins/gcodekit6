@@ -1,0 +1,13 @@
+G04 Top copper of a small test board: one trace and a square pad*
+%FSLAX24Y24*%
+%MOMM*%
+%ADD10C,0.5*%
+%ADD11R,1.5X1.5*%
+G01*
+D10*
+X100000Y100000D02*
+X300000Y100000D01*
+X300000Y200000D01*
+D11*
+X100000Y200000D03*
+M02*

@@ -1,0 +1,21 @@
+{
+  "layer_type": "BottomCopper",
+  "feed_rate": 250.0,
+  "spindle_speed": 9000.0,
+  "board_width": 80.0,
+  "board_height": 60.0,
+  "offset_x": 2.0,
+  "offset_y": 3.0,
+  "generate_alignment_holes": true,
+  "alignment_hole_diameter": 3.0,
+  "alignment_hole_margin": 6.0,
+  "alignment_hole_depth": -2.0,
+  "cut_depth": -0.15,
+  "safe_z": 4.0,
+  "tool_diameter": 0.2,
+  "isolation_width": 0.1,
+  "rubout": true,
+  "use_board_outline": true,
+  "directory": null,
+  "num_axes": 3
+}

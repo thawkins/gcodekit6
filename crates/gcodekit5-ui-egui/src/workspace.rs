@@ -9,7 +9,9 @@
 //! to it through [`Workspace::route`].
 //!
 //! The workspace also tracks which pane the user last pressed the pointer in
-//! ([`Workspace::focused_pane`]), so the app can tell the keymap which pane has the keyboard.
+//! ([`Workspace::focused_pane`]), so the app can tell the keymap which pane has the keyboard,
+//! and the pane the user works in ([`Workspace::active_pane`]), which a press on a menu does
+//! not change, so the app can hand Undo or the zoom commands to the designer.
 //!
 //! Dependencies: `egui`, `craft-ui` (docking, with the `serde` feature), `gcodekit5-app`
 //! (translations).
@@ -234,6 +236,13 @@ pub struct Workspace {
     /// The pane the user last pressed the pointer in; `None` after a press outside every pane.
     #[serde(skip)]
     focused: Option<PaneId>,
+    /// The pane the user last pressed the pointer in, kept through presses outside every
+    /// pane (a menu, a tab bar).
+    #[serde(skip)]
+    active: Option<PaneId>,
+    /// The panes whose bodies the last frame drew.
+    #[serde(skip)]
+    drawn: Drawn,
 }
 
 /// The panes whose bodies a frame drew; the others have their holds cancelled
@@ -312,6 +321,8 @@ impl Workspace {
             }),
             panes: placeholder_panes(),
             focused: None,
+            active: None,
+            drawn: Drawn::new(),
         }
     }
 
@@ -337,6 +348,22 @@ impl Workspace {
     /// Whether a pane ran it.
     pub fn route(&mut self, command: Command, ctx: &mut PaneContext) -> bool {
         self.panes.iter_mut().any(|pane| pane.command(command, ctx))
+    }
+
+    /// Offers `command` to the pane `id` only.
+    ///
+    /// # Arguments
+    /// * `id` - The pane to offer it to.
+    /// * `command` - The command to run.
+    /// * `ctx` - Shared state passed to the pane.
+    ///
+    /// # Returns
+    /// Whether the pane ran it.
+    pub fn route_to(&mut self, id: PaneId, command: Command, ctx: &mut PaneContext) -> bool {
+        self.panes
+            .iter_mut()
+            .find(|pane| pane.id() == id)
+            .is_some_and(|pane| pane.command(command, ctx))
     }
 
     /// Ends every pane's press-and-hold input ([`Pane::cancel_hold`]).
@@ -384,6 +411,20 @@ impl Workspace {
         self.focused
     }
 
+    /// The pane the user works in: the one they last pressed the pointer in (a press outside
+    /// every pane, such as on a menu, keeps it), while the last frame drew it.
+    pub fn active_pane(&self) -> Option<PaneId> {
+        self.active.filter(|id| self.drawn.contains(id))
+    }
+
+    /// Whether the last frame drew the pane `id`'s body (its tab is the one shown).
+    ///
+    /// # Arguments
+    /// * `id` - The pane.
+    pub fn is_drawn(&self, id: PaneId) -> bool {
+        self.drawn.contains(&id)
+    }
+
     /// Draws the workspace into the rest of `ui` and applies the user's layout changes.
     ///
     /// # Arguments
@@ -409,9 +450,14 @@ impl Workspace {
             .show_content(ui, &self.dock.layout, &style, &mut content);
         if press.is_some() {
             self.focused = content.pressed_in;
+            self.active = content.pressed_in.or(self.active);
         }
-        let drawn = content.drawn;
-        for pane in self.panes.iter_mut().filter(|p| !drawn.contains(&p.id())) {
+        self.drawn = content.drawn;
+        for pane in self
+            .panes
+            .iter_mut()
+            .filter(|p| !self.drawn.contains(&p.id()))
+        {
             pane.cancel_hold();
         }
         if let Some(error) = output.error {

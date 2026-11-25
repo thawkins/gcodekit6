@@ -3181,3 +3181,546 @@ msgstr ""
 
 msgid "Stop the running job before opening a file."
 msgstr ""
+
+msgid "Rotate"
+msgstr ""
+
+msgid "90° CW"
+msgstr ""
+
+msgid "90° CCW"
+msgstr ""
+
+msgid "45° CW"
+msgstr ""
+
+msgid "45° CCW"
+msgstr ""
+
+msgid "180°"
+msgstr ""
+
+msgid "Show"
+msgstr ""
+
+msgid "Lock"
+msgstr ""
+
+msgid "Rotated object: Dimensions locked"
+msgstr ""
+
+msgid "0 = no raster, 100 = full length"
+msgstr ""
+
+msgid "Enter a number"
+msgstr ""
+
+msgid "Enter a value greater than 0"
+msgstr ""
+
+msgid "Enter a value of 0 or more"
+msgstr ""
+
+msgid "Enter an angle from 0 to 90"
+msgstr ""
+
+msgid "Enter a whole number of 1 or more"
+msgstr ""
+
+msgid "Value out of range"
+msgstr ""
+
+msgid "Text cannot be empty"
+msgstr ""
+
+msgid "The edited shapes were deleted or locked; the change was not applied."
+msgstr ""
+
+msgid "Enter a whole number of 2 or more"
+msgstr ""
+
+msgid "Enter a non-zero angle"
+msgstr ""
+
+msgid "The array would create more than 10000 objects"
+msgstr ""
+
+msgid "Show Toolpaths"
+msgstr ""
+
+msgid "Nothing to export: all shapes are hidden"
+msgstr ""
+
+msgid "Stop the running job before sending G-code to the editor."
+msgstr ""
+
+msgid "The file is too large to import."
+msgstr ""
+
+msgid "The file has no shapes to import."
+msgstr ""
+
+msgid "Generators"
+msgstr ""
+
+msgid "Engraving"
+msgstr ""
+
+msgid "Calculators"
+msgstr ""
+
+msgid "Maintenance"
+msgstr ""
+
+msgid "Generated G-Code"
+msgstr ""
+
+msgid "Not a valid length"
+msgstr ""
+
+msgid "Not a number"
+msgstr ""
+
+msgid "Must be greater than 0"
+msgstr ""
+
+msgid "Must not be negative"
+msgstr ""
+
+msgid "Out of range"
+msgstr ""
+
+msgid "This tool needs at least 3 axes (X, Y, Z); the active device has fewer."
+msgstr ""
+
+msgid "Send to Editor"
+msgstr ""
+
+msgid "Preview"
+msgstr ""
+
+msgid "Generation failed"
+msgstr ""
+
+msgid "Hole Diameter:"
+msgstr ""
+
+msgid "Tool Diameter:"
+msgstr ""
+
+msgid "Center X:"
+msgstr ""
+
+msgid "Center Y:"
+msgstr ""
+
+msgid "Top Z (Surface):"
+msgstr ""
+
+msgid "Bottom Z (Depth):"
+msgstr ""
+
+msgid "Peck Depth (0 for none):"
+msgstr ""
+
+msgid "Plunge Rate (mm/min):"
+msgstr ""
+
+msgid "Safe Z:"
+msgstr ""
+
+msgid "Must be below Top Z"
+msgstr ""
+
+msgid "Must be above Top Z"
+msgstr ""
+
+msgid "Emulate a drill press on your CNC. Supports standard drilling, peck drilling for chip clearing, and helical interpolation for holes larger than the tool."
+msgstr ""
+
+msgid "Hole Geometry"
+msgstr ""
+
+msgid "Depth and Pecking"
+msgstr ""
+
+msgid "Machine Settings"
+msgstr ""
+
+msgid "Cut Depth:"
+msgstr ""
+
+msgid "Stepover (%):"
+msgstr ""
+
+msgid "Safe Z Height:"
+msgstr ""
+
+msgid "Generate G-code for surfacing your CNC spoilboard to ensure a flat, level work surface."
+msgstr ""
+
+msgid "Spoilboard Dimensions"
+msgstr ""
+
+msgid "Grid Spacing:"
+msgstr ""
+
+msgid "Laser Power (S):"
+msgstr ""
+
+msgid "Laser Mode:"
+msgstr ""
+
+msgid "M3 (Constant Power)"
+msgstr ""
+
+msgid "M4 (Dynamic Power)"
+msgstr ""
+
+msgid "Create a grid pattern on your spoilboard for easy workpiece alignment and fixturing."
+msgstr ""
+
+msgid "Set the spindle's maximum RPM and power in the Device Manager."
+msgstr ""
+
+msgid "Must not be larger than the hole"
+msgstr ""
+
+msgid "The device is in laser mode ($32=1). Switch it to CNC mode to use the Drill Press."
+msgstr ""
+
+msgid "Another program is waiting to go to the editor; this one was not sent."
+msgstr ""
+
+msgid "Must be at least 50 mm"
+msgstr ""
+
+msgid "Must be a whole number from 2 to 20"
+msgstr ""
+
+msgid "Pieces would be narrower than 15 mm"
+msgstr ""
+
+msgid "Pieces would be shorter than 15 mm"
+msgstr ""
+
+msgid "Must be between 10 and 30"
+msgstr ""
+
+msgid "Must be between 0 and 13"
+msgstr ""
+
+msgid "Must be between 0 and 10 mm"
+msgstr ""
+
+msgid "Must be a whole number from 0 to 4294967295"
+msgstr ""
+
+msgid "Randomize"
+msgstr ""
+
+msgid "Not a whole number"
+msgstr ""
+
+msgid "Surrounding Spaces:"
+msgstr ""
+
+msgid "Must be at least 20 mm"
+msgstr ""
+
+msgid "Must be between 1 and 20 mm"
+msgstr ""
+
+msgid "Must be more than twice the thickness"
+msgstr ""
+
+msgid "Finger plus space must be at least 0.1"
+msgstr ""
+
+msgid "Must be at least 1"
+msgstr ""
+
+msgid "Layer Type:"
+msgstr ""
+
+msgid "Board Width:"
+msgstr ""
+
+msgid "Board Height:"
+msgstr ""
+
+msgid "Isolation Width:"
+msgstr ""
+
+msgid "Remove Excess Copper:"
+msgstr ""
+
+msgid "Use Board Outline for Rubout:"
+msgstr ""
+
+msgid "Generate Alignment Holes:"
+msgstr ""
+
+msgid "Margin:"
+msgstr ""
+
+msgid "Drill Depth (Z):"
+msgstr ""
+
+msgid "Convert standard Gerber files (PCB layers) into G-Code for CNC isolation routing. Supports copper clearing (rubout), alignment holes, and custom tool parameters."
+msgstr ""
+
+msgid "No directory selected"
+msgstr ""
+
+msgid "Layer not found in directory"
+msgstr ""
+
+msgid "Please select a Gerber directory."
+msgstr ""
+
+msgid "Selected layer not found in directory."
+msgstr ""
+
+msgid "Must be below the surface (negative)"
+msgstr ""
+
+msgid "Failed to read file"
+msgstr ""
+
+msgid "Top Copper"
+msgstr ""
+
+msgid "Bottom Copper"
+msgstr ""
+
+msgid "Top Solder Mask"
+msgstr ""
+
+msgid "Bottom Solder Mask"
+msgstr ""
+
+msgid "Top Screen Print"
+msgstr ""
+
+msgid "Bottom Screen Print"
+msgstr ""
+
+msgid "Drill Holes"
+msgstr ""
+
+msgid "Board Outline"
+msgstr ""
+
+msgid "Gerber Project"
+msgstr ""
+
+msgid "Parameters"
+msgstr ""
+
+msgid "Alignment Holes"
+msgstr ""
+
+msgid "Negative Z for the alignment holes (through the board)"
+msgstr ""
+
+msgid "Open Gerber Directory"
+msgstr ""
+
+msgid "Too many dividers: they would not fit the side"
+msgstr ""
+
+msgid "Must be at most 100"
+msgstr ""
+
+msgid "Must be between 0 and 100"
+msgstr ""
+
+msgid "Must not be more than the maximum power"
+msgstr ""
+
+msgid "Must be between 0 and 255"
+msgstr ""
+
+msgid "The engraving is too large: at most 10000 pixels per line"
+msgstr ""
+
+msgid "Safe Height:"
+msgstr ""
+
+msgid "Fast Feed Rate:"
+msgstr ""
+
+msgid "Slow Feed Rate:"
+msgstr ""
+
+msgid "Backoff Distance:"
+msgstr ""
+
+msgid "Max Probe Depth"
+msgstr ""
+
+msgid "Probe Distance"
+msgstr ""
+
+msgid "Diameter (mm)"
+msgstr ""
+
+msgid "Setter Plate X"
+msgstr ""
+
+msgid "Setter Plate Y"
+msgstr ""
+
+msgid "Setter Plate Z"
+msgstr ""
+
+msgid "Probe Depth:"
+msgstr ""
+
+msgid "Probe Tip Radius:"
+msgstr ""
+
+msgid "Plate Thickness:"
+msgstr ""
+
+msgid "Z-Touch"
+msgstr ""
+
+msgid "Edge Find"
+msgstr ""
+
+msgid "Corner Find"
+msgstr ""
+
+msgid "Bore Center"
+msgstr ""
+
+msgid "Boss Center"
+msgstr ""
+
+msgid "Tool Length"
+msgstr ""
+
+msgid "Routine"
+msgstr ""
+
+msgid "Target WCS"
+msgstr ""
+
+msgid "Auto-Update WCS"
+msgstr ""
+
+msgid "Write the result into the selected WCS (G10 L20) from the generated G-code. Z-touch, edge and corner only; bore/boss centres are not set automatically."
+msgstr ""
+
+msgid "Probe Axis"
+msgstr ""
+
+msgid "Probe Direction"
+msgstr ""
+
+msgid "Status:"
+msgstr ""
+
+msgid "Probe:"
+msgstr ""
+
+msgid "Triggered"
+msgstr ""
+
+msgid "Not triggered"
+msgstr ""
+
+msgid "Stop Probe"
+msgstr ""
+
+msgid "Routine Selection"
+msgstr ""
+
+msgid "Routine Settings"
+msgstr ""
+
+msgid "Results"
+msgstr ""
+
+msgid "X Axis"
+msgstr ""
+
+msgid "Y Axis"
+msgstr ""
+
+msgid "Z Axis"
+msgstr ""
+
+msgid "Negative"
+msgstr ""
+
+msgid "Positive"
+msgstr ""
+
+msgid "X-min / Y-min"
+msgstr ""
+
+msgid "X-max / Y-min"
+msgstr ""
+
+msgid "X-min / Y-max"
+msgstr ""
+
+msgid "X-max / Y-max"
+msgstr ""
+
+msgid "The probe input is already triggered."
+msgstr ""
+
+msgid "Waiting for the machine's next status report."
+msgstr ""
+
+msgid "The probe program was stopped."
+msgstr ""
+
+msgid "Surface at machine"
+msgstr ""
+
+msgid "Edge at machine"
+msgstr ""
+
+msgid "Corner at machine"
+msgstr ""
+
+msgid "Centre at machine"
+msgstr ""
+
+msgid "Measured diameter:"
+msgstr ""
+
+msgid "Tool length offset:"
+msgstr ""
+
+msgid "probe report(s) received."
+msgstr ""
+
+msgid "Program halted (feed hold, then reset)"
+msgstr ""
+
+msgid "Diameter:"
+msgstr ""
+
+msgid "The engraving is too large: at most 25 million pixels"
+msgstr ""
+
+msgid "The cancelled engraving is still finishing; try again in a moment."
+msgstr ""
+
+msgid "A file is waiting to open in the editor; this program was not sent."
+msgstr ""
+
+msgid "Answer the question about the editor's unsaved changes before opening a file."
+msgstr ""
+
+msgid "Stop the running job before generating."
+msgstr ""
+
+msgid "Must be at most 2000 mm"
+msgstr ""

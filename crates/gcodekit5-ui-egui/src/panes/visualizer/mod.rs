@@ -427,6 +427,7 @@ impl Pane for VisualizerPane {
                 | MachineEvent::StatusReport(_)
                 | MachineEvent::Received(_)
                 | MachineEvent::Sent(_)
+                | MachineEvent::StreamHalted { .. }
                 | MachineEvent::Error(_) => {}
             }
         }

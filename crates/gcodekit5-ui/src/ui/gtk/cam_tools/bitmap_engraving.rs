@@ -1,4 +1,8 @@
 //! Bitmap Image Engraving Tool
+//!
+//! The page's mapping from its entries to the engraver's parameters and to a preset is
+//! [`bitmap_engraving_parameters`] / [`bitmap_engraving_preset`], plain functions over
+//! [`BitmapEngravingEntries`] so the egui front end's fixtures can be made from them.
 
 use crate::ui::gtk::common::text_dropdown::{TextDropDownExt, new_text_dropdown};
 use crate::ui::gtk::file_dialog::FileDialogHelpers;
@@ -26,6 +30,215 @@ use gcodekit5_camtools::laser_engraver::{
 };
 use gcodekit5_core::units;
 use gcodekit5_settings::SettingsController;
+
+/// The page's initial width (mm).
+pub const WIDTH_MM: f64 = 100.0;
+/// The page's initial X and Y offsets (mm).
+pub const OFFSET_MM: f64 = 10.0;
+
+/// The text and choices of the page's fields, as the widgets hold them (lengths in the
+/// measurement system, the drop-downs' ids).
+#[derive(Debug, Clone, PartialEq)]
+pub struct BitmapEngravingEntries {
+    /// Image path.
+    pub image_path: String,
+    /// Width, a length.
+    pub width: String,
+    /// Feed rate (mm/min).
+    pub feed_rate: String,
+    /// Travel rate (mm/min).
+    pub travel_rate: String,
+    /// Minimum power (%).
+    pub min_power: String,
+    /// Maximum power (%).
+    pub max_power: String,
+    /// Pixels per mm.
+    pub pixels_per_mm: String,
+    /// Line spacing (multiplier).
+    pub line_spacing: String,
+    /// Power scale (S at 100 %).
+    pub power_scale: String,
+    /// Offset X, a length.
+    pub offset_x: String,
+    /// Offset Y, a length.
+    pub offset_y: String,
+    /// Scan direction id: `0` horizontal, `1` vertical.
+    pub scan_direction: String,
+    /// Bidirectional scanning.
+    pub bidirectional: bool,
+    /// Invert.
+    pub invert: bool,
+    /// Mirror X.
+    pub mirror_x: bool,
+    /// Mirror Y.
+    pub mirror_y: bool,
+    /// Rotation id: `0`, `90`, `180` or `270`.
+    pub rotation: String,
+    /// Halftone id: `none`, `threshold`, `bayer`, `floyd` or `atkinson`.
+    pub halftone: String,
+    /// Halftone dot size.
+    pub halftone_dot_size: String,
+    /// Halftone threshold.
+    pub halftone_threshold: String,
+    /// Home Device Before Start.
+    pub home_before: bool,
+}
+
+impl BitmapEngravingEntries {
+    /// The page's initial entries in `system` (no image chosen).
+    ///
+    /// # Arguments
+    /// * `system` - The measurement system the lengths are shown in.
+    pub fn defaults(system: units::MeasurementSystem) -> Self {
+        let len = |mm: f64| units::format_length(mm as f32, system);
+        Self {
+            image_path: String::new(),
+            width: len(WIDTH_MM),
+            feed_rate: "1000".into(),
+            travel_rate: "3000".into(),
+            min_power: "0".into(),
+            max_power: "100".into(),
+            pixels_per_mm: "10".into(),
+            line_spacing: "1.0".into(),
+            power_scale: "1000".into(),
+            offset_x: len(OFFSET_MM),
+            offset_y: len(OFFSET_MM),
+            scan_direction: "0".into(),
+            bidirectional: true,
+            invert: false,
+            mirror_x: false,
+            mirror_y: false,
+            rotation: "0".into(),
+            halftone: "none".into(),
+            halftone_dot_size: "4".into(),
+            halftone_threshold: "127".into(),
+            home_before: false,
+        }
+    }
+}
+
+/// Reads the page's entries into engraving parameters; a field that does not parse takes
+/// its default value (the page's behaviour).
+///
+/// # Arguments
+/// * `e` - The entries.
+/// * `system` - The measurement system the lengths are shown in.
+/// * `num_axes` - The active device's axes.
+pub fn bitmap_engraving_parameters(
+    e: &BitmapEngravingEntries,
+    system: units::MeasurementSystem,
+    num_axes: u8,
+) -> EngravingParameters {
+    let rotation = match e.rotation.as_str() {
+        "90" => RotationAngle::Degrees90,
+        "180" => RotationAngle::Degrees180,
+        "270" => RotationAngle::Degrees270,
+        _ => RotationAngle::Degrees0,
+    };
+    let halftone = match e.halftone.as_str() {
+        "threshold" => HalftoneMethod::Threshold,
+        "bayer" => HalftoneMethod::Bayer4x4,
+        "floyd" => HalftoneMethod::FloydSteinberg,
+        "atkinson" => HalftoneMethod::Atkinson,
+        _ => HalftoneMethod::None,
+    };
+    let scan_direction = if e.scan_direction == "1" {
+        ScanDirection::Vertical
+    } else {
+        ScanDirection::Horizontal
+    };
+    EngravingParameters {
+        // Dimension entries are shown in the current measurement system.
+        width_mm: units::parse_length(&e.width, system).unwrap_or(100.0),
+        height_mm: None,
+        feed_rate: e.feed_rate.parse().unwrap_or(1000.0),
+        travel_rate: e.travel_rate.parse().unwrap_or(3000.0),
+        min_power: e.min_power.parse().unwrap_or(0.0),
+        max_power: e.max_power.parse().unwrap_or(100.0),
+        pixels_per_mm: e.pixels_per_mm.parse().unwrap_or(10.0),
+        scan_direction,
+        bidirectional: e.bidirectional,
+        line_spacing: e.line_spacing.parse().unwrap_or(1.0),
+        power_scale: e.power_scale.parse().unwrap_or(1000.0),
+        transformations: ImageTransformations {
+            mirror_x: e.mirror_x,
+            mirror_y: e.mirror_y,
+            rotation,
+            halftone,
+            halftone_dot_size: e.halftone_dot_size.parse().unwrap_or(4),
+            halftone_threshold: e.halftone_threshold.parse().unwrap_or(127),
+            invert: e.invert,
+        },
+        offset_x: units::parse_length(&e.offset_x, system).unwrap_or(10.0),
+        offset_y: units::parse_length(&e.offset_y, system).unwrap_or(10.0),
+        num_axes,
+        home_before_job: e.home_before,
+    }
+}
+
+/// Reads the page's entries into a preset with all lengths converted to mm.
+///
+/// # Arguments
+/// * `e` - The entries.
+/// * `system` - The measurement system the lengths are shown in.
+///
+/// # Errors
+/// The fields that could not be parsed.
+pub fn bitmap_engraving_preset(
+    e: &BitmapEngravingEntries,
+    system: units::MeasurementSystem,
+) -> Result<BitmapEngravingPreset, String> {
+    let mut invalid: Vec<&str> = Vec::new();
+    let mut len = |text: &str, name: &'static str| match units::parse_length(text, system) {
+        Ok(v) if v.is_finite() => v,
+        _ => {
+            invalid.push(name);
+            0.0
+        }
+    };
+    let width_mm = len(&e.width, "Width");
+    let offset_x = len(&e.offset_x, "Offset X");
+    let offset_y = len(&e.offset_y, "Offset Y");
+    fn num<T: std::str::FromStr + Default>(
+        text: &str,
+        name: &'static str,
+        invalid: &mut Vec<&'static str>,
+    ) -> T {
+        text.trim().parse::<T>().unwrap_or_else(|_| {
+            invalid.push(name);
+            T::default()
+        })
+    }
+    let preset = BitmapEngravingPreset {
+        image_path: e.image_path.clone(),
+        width_mm,
+        feed_rate: num(&e.feed_rate, "Feed Rate", &mut invalid),
+        travel_rate: num(&e.travel_rate, "Travel Rate", &mut invalid),
+        min_power: num(&e.min_power, "Min Power", &mut invalid),
+        max_power: num(&e.max_power, "Max Power", &mut invalid),
+        pixels_per_mm: num(&e.pixels_per_mm, "Pixels per mm", &mut invalid),
+        line_spacing: num(&e.line_spacing, "Line Spacing", &mut invalid),
+        power_scale: num(&e.power_scale, "Power Scale", &mut invalid),
+        offset_x,
+        offset_y,
+        scan_direction: e.scan_direction.clone(),
+        bidirectional: e.bidirectional,
+        invert: e.invert,
+        mirror_x: e.mirror_x,
+        mirror_y: e.mirror_y,
+        rotation: e.rotation.clone(),
+        halftone: e.halftone.clone(),
+        halftone_dot_size: num(&e.halftone_dot_size, "Dot Size", &mut invalid),
+        halftone_threshold: num(&e.halftone_threshold, "Threshold", &mut invalid),
+        home_before_job: e.home_before,
+        ..BitmapEngravingPreset::default()
+    };
+    if invalid.is_empty() {
+        Ok(preset)
+    } else {
+        Err(format!("Please correct: {}", invalid.join(", ")))
+    }
+}
 
 struct BitmapEngravingWidgets {
     width_mm: Entry,
@@ -155,7 +368,7 @@ impl BitmapEngravingTool {
             .valign(Align::Center)
             .build();
         let (width_mm_row, width_mm, width_mm_unit) =
-            create_dimension_row(&t!("Width:"), 100.0, &settings);
+            create_dimension_row(&t!("Width:"), WIDTH_MM, &settings);
         let feed_rate = Entry::builder().text("1000").valign(Align::Center).build();
         let travel_rate = Entry::builder().text("3000").valign(Align::Center).build();
         let min_power = Entry::builder().text("0").valign(Align::Center).build();
@@ -164,9 +377,9 @@ impl BitmapEngravingTool {
         let line_spacing = Entry::builder().text("1.0").valign(Align::Center).build();
         let power_scale = Entry::builder().text("1000").valign(Align::Center).build();
         let (offset_x_row, offset_x, offset_x_unit) =
-            create_dimension_row("Offset X:", 10.0, &settings);
+            create_dimension_row("Offset X:", OFFSET_MM, &settings);
         let (offset_y_row, offset_y, offset_y_unit) =
-            create_dimension_row("Offset Y:", 10.0, &settings);
+            create_dimension_row("Offset Y:", OFFSET_MM, &settings);
 
         let scan_direction = new_text_dropdown();
         scan_direction.append(Some("0"), "Horizontal");
@@ -677,59 +890,43 @@ impl BitmapEngravingTool {
         row
     }
 
+    /// The widgets' text and choices.
+    fn entries(w: &BitmapEngravingWidgets) -> BitmapEngravingEntries {
+        let id = |d: &DropDown| d.active_id().unwrap_or_default().to_string();
+        BitmapEngravingEntries {
+            image_path: w.image_path.text().to_string(),
+            width: w.width_mm.text().to_string(),
+            feed_rate: w.feed_rate.text().to_string(),
+            travel_rate: w.travel_rate.text().to_string(),
+            min_power: w.min_power.text().to_string(),
+            max_power: w.max_power.text().to_string(),
+            pixels_per_mm: w.pixels_per_mm.text().to_string(),
+            line_spacing: w.line_spacing.text().to_string(),
+            power_scale: w.power_scale.text().to_string(),
+            offset_x: w.offset_x.text().to_string(),
+            offset_y: w.offset_y.text().to_string(),
+            scan_direction: id(&w.scan_direction),
+            bidirectional: w.bidirectional.is_active(),
+            invert: w.invert.is_active(),
+            mirror_x: w.mirror_x.is_active(),
+            mirror_y: w.mirror_y.is_active(),
+            rotation: id(&w.rotation),
+            halftone: id(&w.halftone),
+            halftone_dot_size: w.halftone_dot_size.text().to_string(),
+            halftone_threshold: w.halftone_threshold.text().to_string(),
+            home_before: w.home_before.is_active(),
+        }
+    }
+
     fn collect_params(
         w: &BitmapEngravingWidgets,
         system: units::MeasurementSystem,
     ) -> EngravingParameters {
-        let rotation = match w.rotation.active_id().as_ref().map(|s| s.as_str()) {
-            Some("90") => RotationAngle::Degrees90,
-            Some("180") => RotationAngle::Degrees180,
-            Some("270") => RotationAngle::Degrees270,
-            _ => RotationAngle::Degrees0,
-        };
-
-        let halftone = match w.halftone.active_id().as_ref().map(|s| s.as_str()) {
-            Some("threshold") => HalftoneMethod::Threshold,
-            Some("bayer") => HalftoneMethod::Bayer4x4,
-            Some("floyd") => HalftoneMethod::FloydSteinberg,
-            Some("atkinson") => HalftoneMethod::Atkinson,
-            _ => HalftoneMethod::None,
-        };
-
-        let scan_direction =
-            if w.scan_direction.active_id().as_ref().map(|s| s.as_str()) == Some("1") {
-                ScanDirection::Vertical
-            } else {
-                ScanDirection::Horizontal
-            };
-
-        EngravingParameters {
-            // Dimension entries are shown in the current measurement system.
-            width_mm: units::parse_length(&w.width_mm.text(), system).unwrap_or(100.0),
-            height_mm: None,
-            feed_rate: w.feed_rate.text().parse().unwrap_or(1000.0),
-            travel_rate: w.travel_rate.text().parse().unwrap_or(3000.0),
-            min_power: w.min_power.text().parse().unwrap_or(0.0),
-            max_power: w.max_power.text().parse().unwrap_or(100.0),
-            pixels_per_mm: w.pixels_per_mm.text().parse().unwrap_or(10.0),
-            scan_direction,
-            bidirectional: w.bidirectional.is_active(),
-            line_spacing: w.line_spacing.text().parse().unwrap_or(1.0),
-            power_scale: w.power_scale.text().parse().unwrap_or(1000.0),
-            transformations: ImageTransformations {
-                mirror_x: w.mirror_x.is_active(),
-                mirror_y: w.mirror_y.is_active(),
-                rotation,
-                halftone,
-                halftone_dot_size: w.halftone_dot_size.text().parse().unwrap_or(4),
-                halftone_threshold: w.halftone_threshold.text().parse().unwrap_or(127),
-                invert: w.invert.is_active(),
-            },
-            offset_x: units::parse_length(&w.offset_x.text(), system).unwrap_or(10.0),
-            offset_y: units::parse_length(&w.offset_y.text(), system).unwrap_or(10.0),
-            num_axes: crate::device_status::get_active_num_axes(),
-            home_before_job: w.home_before.is_active(),
-        }
+        bitmap_engraving_parameters(
+            &Self::entries(w),
+            system,
+            crate::device_status::get_active_num_axes(),
+        )
     }
 
     /// Read the form into a preset with all lengths converted to mm.
@@ -740,56 +937,7 @@ impl BitmapEngravingTool {
         w: &BitmapEngravingWidgets,
         system: units::MeasurementSystem,
     ) -> Result<BitmapEngravingPreset, String> {
-        let mut invalid: Vec<&str> = Vec::new();
-        let mut len = |e: &Entry, name: &'static str| match units::parse_length(&e.text(), system) {
-            Ok(v) if v.is_finite() => v,
-            _ => {
-                invalid.push(name);
-                0.0
-            }
-        };
-        let width_mm = len(&w.width_mm, "Width");
-        let offset_x = len(&w.offset_x, "Offset X");
-        let offset_y = len(&w.offset_y, "Offset Y");
-        fn num<T: std::str::FromStr + Default>(
-            e: &Entry,
-            name: &'static str,
-            invalid: &mut Vec<&'static str>,
-        ) -> T {
-            e.text().trim().parse::<T>().unwrap_or_else(|_| {
-                invalid.push(name);
-                T::default()
-            })
-        }
-        let preset = BitmapEngravingPreset {
-            image_path: w.image_path.text().to_string(),
-            width_mm,
-            feed_rate: num(&w.feed_rate, "Feed Rate", &mut invalid),
-            travel_rate: num(&w.travel_rate, "Travel Rate", &mut invalid),
-            min_power: num(&w.min_power, "Min Power", &mut invalid),
-            max_power: num(&w.max_power, "Max Power", &mut invalid),
-            pixels_per_mm: num(&w.pixels_per_mm, "Pixels per mm", &mut invalid),
-            line_spacing: num(&w.line_spacing, "Line Spacing", &mut invalid),
-            power_scale: num(&w.power_scale, "Power Scale", &mut invalid),
-            offset_x,
-            offset_y,
-            scan_direction: w.scan_direction.active_id().unwrap_or_default().to_string(),
-            bidirectional: w.bidirectional.is_active(),
-            invert: w.invert.is_active(),
-            mirror_x: w.mirror_x.is_active(),
-            mirror_y: w.mirror_y.is_active(),
-            rotation: w.rotation.active_id().unwrap_or_default().to_string(),
-            halftone: w.halftone.active_id().unwrap_or_default().to_string(),
-            halftone_dot_size: num(&w.halftone_dot_size, "Dot Size", &mut invalid),
-            halftone_threshold: num(&w.halftone_threshold, "Threshold", &mut invalid),
-            home_before_job: w.home_before.is_active(),
-            ..BitmapEngravingPreset::default()
-        };
-        if invalid.is_empty() {
-            Ok(preset)
-        } else {
-            Err(format!("Please correct: {}", invalid.join(", ")))
-        }
+        bitmap_engraving_preset(&Self::entries(w), system)
     }
 
     /// Fill the form from a preset (lengths in mm, shown in `system`).

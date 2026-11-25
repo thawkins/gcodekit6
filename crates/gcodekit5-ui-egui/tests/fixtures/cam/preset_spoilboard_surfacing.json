@@ -1,0 +1,10 @@
+{
+  "cut_depth": 0.25,
+  "feed_rate": "1500",
+  "height": 250.5,
+  "safe_z": 8.0,
+  "spindle_speed": "16000",
+  "stepover_percent": "60",
+  "tool_diameter": 19.049999237060547,
+  "width": 500.0
+}
