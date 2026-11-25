@@ -8,7 +8,8 @@ use std::sync::Arc;
 use std::sync::atomic::Ordering;
 use std::time::{Duration, Instant};
 
-use gcodekit5_app::machine::{MachineController, MachineEvent, RealtimeCommand};
+use gcodekit5_app::machine::grbl_stream::MAX_LINE_LENGTH;
+use gcodekit5_app::machine::{MachineController, MachineError, MachineEvent, RealtimeCommand};
 use gcodekit5_app::test_support::{
     Loopback, LoopbackShared, Wrote, loopback_controller, tcp_settings,
 };
@@ -532,7 +533,7 @@ fn test_send_line_writes_line() {
     let shared = Arc::new(LoopbackShared::default());
     let mut controller = loopback_controller(&shared, Duration::from_millis(1));
     connect(&mut controller);
-    controller.send_line("  $H  ");
+    assert_eq!(controller.send_line("  $H  "), Ok(()));
     assert!(
         wait_until(|| shared.log().contains(&Wrote::Line("$H".to_string()))),
         "line not written: {:?}",
@@ -541,24 +542,147 @@ fn test_send_line_writes_line() {
 }
 
 #[test]
-fn test_send_line_refuses_empty_multiline_and_streaming() {
-    let (shared, mut controller) = held_stream(100);
-    controller.send_line("G0 X5");
-    controller.send_line("   ");
-    controller.send_line("G0 X1\nG0 X2");
-    let errors = controller
-        .poll()
-        .into_iter()
-        .filter(|e| matches!(e, MachineEvent::Error(_)))
-        .count();
-    assert_eq!(errors, 3);
+fn test_send_line_rejects_unsafe_lines() {
+    let shared = Arc::new(LoopbackShared::default());
+    let mut controller = loopback_controller(&shared, Duration::from_millis(1));
+    assert_eq!(
+        controller.send_line("G0 X1"),
+        Err(MachineError::NotConnected)
+    );
+    connect(&mut controller);
+    let too_long = format!("G0 X{}", "1".repeat(MAX_LINE_LENGTH));
+    let cases: [(&str, MachineError); 9] = [
+        ("   ", MachineError::EmptyLine),
+        ("G0 X1\nG0 X2", MachineError::NonPrintable(b'\n')),
+        ("G0 X1\rG0", MachineError::NonPrintable(b'\r')),
+        ("G0\u{18}X1", MachineError::NonPrintable(0x18)),
+        ("G0 X1 \u{e9}", MachineError::NonPrintable(0xc3)),
+        ("G0 X1!", MachineError::RealtimeCharacter('!')),
+        ("~", MachineError::RealtimeCharacter('~')),
+        ("G0?", MachineError::RealtimeCharacter('?')),
+        (
+            too_long.as_str(),
+            MachineError::LineTooLong {
+                length: too_long.len(),
+                max: MAX_LINE_LENGTH,
+            },
+        ),
+    ];
+    for (line, expected) in cases {
+        assert_eq!(controller.send_line(line), Err(expected), "{line:?}");
+    }
     std::thread::sleep(Duration::from_millis(50));
     assert!(
         !shared
             .log()
             .iter()
-            .any(|w| matches!(w, Wrote::Line(l) if l.starts_with("G0"))),
+            .any(|w| matches!(w, Wrote::Line(l) if l.starts_with("G0") || l == "~")),
         "refused line written: {:?}",
+        shared.log()
+    );
+}
+
+#[test]
+fn test_send_line_refused_while_streaming() {
+    let (shared, mut controller) = held_stream(100);
+    assert_eq!(
+        controller.send_line("G0 X5"),
+        Err(MachineError::StreamInProgress)
+    );
+    std::thread::sleep(Duration::from_millis(50));
+    assert!(!shared.log().contains(&Wrote::Line("G0 X5".to_string())));
+}
+
+#[test]
+fn test_is_streaming_from_start_stream() {
+    let (_shared, mut controller) = held_stream(100);
+    assert!(controller.is_streaming());
+    controller.stop();
+    assert!(wait_until(|| !controller.is_streaming()));
+}
+
+/// Index of the first jog cancel byte in `log`, and the log length when the transport closed.
+fn cancel_and_close(shared: &LoopbackShared) -> (Option<usize>, Option<usize>) {
+    let log = shared.log();
+    let cancel = log.iter().position(|w| *w == Wrote::Realtime(0x85));
+    let closed = *shared.closed_at.lock().expect("closed_at");
+    (cancel, closed)
+}
+
+/// Connects and starts a jog that the loopback never reports finished.
+fn jogging() -> (Arc<LoopbackShared>, MachineController) {
+    let shared = Arc::new(LoopbackShared::default());
+    let mut controller = loopback_controller(&shared, Duration::from_millis(1));
+    connect(&mut controller);
+    controller.jog(gcodekit5_app::machine::Axis::X, 200.0, 1000.0);
+    assert!(
+        wait_until(|| shared
+            .log()
+            .iter()
+            .any(|w| matches!(w, Wrote::Line(l) if l.starts_with("$J=")))),
+        "jog not written"
+    );
+    (shared, controller)
+}
+
+#[test]
+fn test_disconnect_during_jog_writes_jog_cancel_first() {
+    let (shared, mut controller) = jogging();
+    controller.disconnect();
+    let (cancel, closed) = cancel_and_close(&shared);
+    let cancel = cancel.expect("no jog cancel on disconnect");
+    let closed = closed.expect("transport not closed");
+    assert!(
+        cancel < closed,
+        "jog cancel after the close: {:?}",
+        shared.log()
+    );
+}
+
+#[test]
+fn test_drop_during_jog_writes_jog_cancel_first() {
+    let (shared, controller) = jogging();
+    drop(controller);
+    let (cancel, closed) = cancel_and_close(&shared);
+    let cancel = cancel.expect("no jog cancel on drop");
+    let closed = closed.expect("transport not closed");
+    assert!(
+        cancel < closed,
+        "jog cancel after the close: {:?}",
+        shared.log()
+    );
+}
+
+#[test]
+fn test_jog_cancel_or_idle_clears_outstanding_jog() {
+    // Cancelled by the caller: no second cancel on disconnect.
+    let (shared, mut controller) = jogging();
+    controller.realtime(RealtimeCommand::JogCancel);
+    assert!(wait_until(|| shared.log().contains(&Wrote::Realtime(0x85))));
+    controller.disconnect();
+    let cancels = shared
+        .log()
+        .iter()
+        .filter(|w| **w == Wrote::Realtime(0x85))
+        .count();
+    assert_eq!(cancels, 1, "{:?}", shared.log());
+
+    // Finished: GRBL reported Jog, then Idle.
+    let (shared, mut controller) = jogging();
+    shared.inject("<Jog|MPos:1.000,0.000,0.000|FS:1000,0>\n");
+    shared.inject("<Idle|MPos:200.000,0.000,0.000|FS:0,0>\n");
+    assert!(
+        wait_for(&mut controller, |e| matches!(
+            e,
+            MachineEvent::StatusReport(s) if s.machine_state.as_deref() == Some("Idle")
+        ))
+        .is_some(),
+        "no Idle report"
+    );
+    controller.disconnect();
+    assert!(
+        !shared.log().contains(&Wrote::Realtime(0x85)),
+        "cancel after a finished jog: {:?}",
         shared.log()
     );
 }

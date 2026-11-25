@@ -414,6 +414,10 @@ pub fn network_driver_for(connection_type: &str) -> Option<ConnectionDriver> {
     }
 }
 
+/// Longest line, in characters, the front ends send: grblHAL's line buffer (GRBL's own is
+/// 80 characters, and refuses longer lines with an error).
+pub const MAX_LINE_LENGTH: usize = 256;
+
 /// Prepares a program for streaming according to Preferences > File
 /// Processing: removes comments (`(...)` and `;...`) unless
 /// `preserve_comments` is set, drops lines left empty, and rejects a line

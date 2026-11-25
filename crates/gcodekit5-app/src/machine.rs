@@ -34,7 +34,8 @@ use gcodekit5_communication::{Communicator, ConnectionParams, SerialCommunicator
 use gcodekit5_settings::{ConnectionSettings, ConnectionType};
 
 use grbl_stream::{
-    CharCountWindow, GrblResponseLine, ResponseLineSplitter, classify_response, linear_jog_command,
+    CharCountWindow, GrblResponseLine, MAX_LINE_LENGTH, ResponseLineSplitter, classify_response,
+    linear_jog_command,
 };
 
 /// How often the worker asks the controller for a status report (`?`).
@@ -60,6 +61,25 @@ pub enum MachineError {
     /// The worker thread could not be started.
     #[error("cannot start the machine worker: {0}")]
     WorkerStart(String),
+    /// A command line was empty.
+    #[error("the command line is empty")]
+    EmptyLine,
+    /// A command line held a byte outside printable ASCII (a line break, a control byte, a
+    /// non-ASCII character); GRBL acts on some of them as real-time commands.
+    #[error("the command line holds the byte 0x{0:02X}, which is not printable ASCII")]
+    NonPrintable(u8),
+    /// A command line held `!`, `~` or `?`, which GRBL acts on as real-time commands
+    /// wherever they appear.
+    #[error("the command line holds '{0}', a real-time command character")]
+    RealtimeCharacter(char),
+    /// A command line was longer than the controller's line buffer.
+    #[error("the command line has {length} characters; the maximum is {max}")]
+    LineTooLong {
+        /// The line's length.
+        length: usize,
+        /// The longest line accepted.
+        max: usize,
+    },
 }
 
 /// A machine axis.
@@ -427,26 +447,45 @@ impl MachineController {
         self.send_or_report(Command::Line(line));
     }
 
-    /// Queues one command line (`$H`, `$X`, an MDI line), trimmed, behind any manual line
-    /// still waiting.
+    /// Queues one command line (`$H`, `$X`, an MDI line), trimmed of spaces, behind any
+    /// manual line still waiting.
     ///
-    /// Refused (reported as [`MachineEvent::Error`]) for an empty line, a line holding a
-    /// line break, or while a program streams.
-    pub fn send_line(&mut self, line: &str) {
-        let line = line.trim();
-        if line.is_empty() || line.contains(['\n', '\r']) {
-            self.pending.push(MachineEvent::Error(format!(
-                "line ignored: must be one non-empty line: {line:?}"
-            )));
-            return;
+    /// # Errors
+    /// [`MachineError::EmptyLine`], [`MachineError::NonPrintable`] for a byte outside
+    /// printable ASCII (0x20-0x7E), [`MachineError::RealtimeCharacter`] for `!`, `~` or `?`,
+    /// [`MachineError::LineTooLong`] beyond [`MAX_LINE_LENGTH`],
+    /// [`MachineError::NotConnected`] without a connection, or
+    /// [`MachineError::StreamInProgress`] while a program streams.
+    pub fn send_line(&mut self, line: &str) -> Result<(), MachineError> {
+        let line = line.trim_matches(' ');
+        if line.is_empty() {
+            return Err(MachineError::EmptyLine);
+        }
+        if let Some(&byte) = line.as_bytes().iter().find(|b| !(0x20..=0x7e).contains(*b)) {
+            return Err(MachineError::NonPrintable(byte));
+        }
+        if let Some(c) = line.chars().find(|c| matches!(c, '!' | '~' | '?')) {
+            return Err(MachineError::RealtimeCharacter(c));
+        }
+        if line.len() > MAX_LINE_LENGTH {
+            return Err(MachineError::LineTooLong {
+                length: line.len(),
+                max: MAX_LINE_LENGTH,
+            });
+        }
+        if !self.is_worker_running() {
+            return Err(MachineError::NotConnected);
         }
         if self.streaming.load(Ordering::SeqCst) {
-            self.pending.push(MachineEvent::Error(
-                "line ignored: a program is streaming".to_string(),
-            ));
-            return;
+            return Err(MachineError::StreamInProgress);
         }
-        self.send_or_report(Command::Line(line.to_string()));
+        self.send(Command::Line(line.to_string()))
+    }
+
+    /// Whether a program is streaming: from a successful
+    /// [`start_stream`](Self::start_stream) until it finishes or stops.
+    pub fn is_streaming(&self) -> bool {
+        self.streaming.load(Ordering::SeqCst)
     }
 
     /// Writes a real-time byte ahead of any queued program line.
@@ -583,6 +622,11 @@ struct WorkerState {
     manual: VecDeque<String>,
     stream: Option<Stream>,
     paused: bool,
+    /// A `$J` jog was queued and is not known to be over: set when it is queued, cleared by
+    /// jog cancel (0x85), soft reset (0x18), or an `Idle` report after a `Jog` one.
+    jog_outstanding: bool,
+    /// A `Jog` state was reported since the outstanding jog was queued.
+    jog_seen: bool,
 }
 
 /// Why the worker loop ended.
@@ -611,6 +655,8 @@ impl WorkerState {
             manual: VecDeque::new(),
             stream: None,
             paused: false,
+            jog_outstanding: false,
+            jog_seen: false,
         }
     }
 
@@ -631,6 +677,12 @@ impl WorkerState {
         let exit = self.io_loop();
         if let Exit::TransportError(msg) = exit {
             self.sink.emit(MachineEvent::Error(msg));
+        } else if self.jog_outstanding {
+            // A jog toward the far end of travel must not outlive the connection.
+            if let Err(e) = self.write(&[RealtimeCommand::JogCancel.byte()]) {
+                tracing::warn!("jog cancel on disconnect failed: {e}");
+            }
+            self.jog_outstanding = false;
         }
         self.end_stream(false);
         if let Err(e) = self.comm.disconnect() {
@@ -696,7 +748,14 @@ impl WorkerState {
 
     fn handle_command(&mut self, cmd: Command) -> Result<(), String> {
         match cmd {
-            Command::Realtime(byte) => self.write(&[byte])?,
+            Command::Realtime(byte) => {
+                self.write(&[byte])?;
+                if byte == RealtimeCommand::JogCancel.byte()
+                    || byte == RealtimeCommand::SoftReset.byte()
+                {
+                    self.jog_outstanding = false;
+                }
+            }
             Command::Pause => {
                 self.write(&[RealtimeCommand::FeedHold.byte()])?;
                 self.paused = true;
@@ -707,6 +766,7 @@ impl WorkerState {
             }
             Command::Stop => {
                 self.write(&[RealtimeCommand::SoftReset.byte()])?;
+                self.jog_outstanding = false;
                 self.reset_buffers();
                 self.end_stream(false);
             }
@@ -716,6 +776,10 @@ impl WorkerState {
                         "line too long for the controller buffer: {line}"
                     )));
                 } else {
+                    if line.starts_with("$J=") {
+                        self.jog_outstanding = true;
+                        self.jog_seen = false;
+                    }
                     self.manual.push_back(line);
                 }
             }
@@ -798,6 +862,7 @@ impl WorkerState {
             }
             GrblResponseLine::Status(report) => {
                 let status = StatusParser::parse_full(&report);
+                self.follow_jog(status.machine_state.as_deref());
                 self.sink.emit(MachineEvent::StatusReport(Box::new(status)));
             }
             GrblResponseLine::Reset(banner) => {
@@ -809,6 +874,21 @@ impl WorkerState {
                 self.end_stream(false);
             }
             GrblResponseLine::Other(text) => self.sink.emit(MachineEvent::Received(text)),
+        }
+    }
+
+    /// Clears the outstanding jog once the controller reports `Idle` after `Jog`.
+    fn follow_jog(&mut self, state: Option<&str>) {
+        if !self.jog_outstanding {
+            return;
+        }
+        match state {
+            Some(s) if s.starts_with("Jog") => self.jog_seen = true,
+            Some(s) if s.starts_with("Idle") && self.jog_seen => {
+                self.jog_outstanding = false;
+                self.jog_seen = false;
+            }
+            Some(_) | None => {}
         }
     }
 
@@ -873,6 +953,7 @@ impl WorkerState {
 
     /// Forgets in-flight and queued lines after the controller was reset.
     fn reset_buffers(&mut self) {
+        self.jog_outstanding = false;
         self.window = CharCountWindow::default();
         self.in_flight_is_program.clear();
         self.manual.clear();

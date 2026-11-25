@@ -41,6 +41,9 @@ pub struct LoopbackShared {
     pub inject: Mutex<VecDeque<Vec<u8>>>,
     /// Lines written but not yet answered with `ok`.
     pub outstanding: AtomicUsize,
+    /// The length of [`LoopbackShared::log`] when the transport was last closed, so a test
+    /// can tell what was written before the close.
+    pub closed_at: Mutex<Option<usize>>,
 }
 
 impl LoopbackShared {
@@ -109,6 +112,17 @@ impl Communicator for Loopback {
     }
 
     fn disconnect(&mut self) -> gcodekit5_core::Result<()> {
+        let written = self
+            .shared
+            .log
+            .lock()
+            .expect("loopback log mutex poisoned")
+            .len();
+        *self
+            .shared
+            .closed_at
+            .lock()
+            .expect("loopback closed_at mutex poisoned") = Some(written);
         self.shared.connected.store(false, Ordering::SeqCst);
         Ok(())
     }
