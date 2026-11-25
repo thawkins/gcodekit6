@@ -8,7 +8,7 @@ use std::sync::Arc;
 use std::sync::atomic::Ordering;
 use std::time::{Duration, Instant};
 
-use gcodekit5_app::machine::grbl_stream::MAX_LINE_LENGTH;
+use gcodekit5_app::machine::grbl_stream::GRBL_RX_BUFFER_BYTES;
 use gcodekit5_app::machine::{MachineController, MachineError, MachineEvent, RealtimeCommand};
 use gcodekit5_app::test_support::{
     Loopback, LoopbackShared, Wrote, loopback_controller, tcp_settings,
@@ -550,7 +550,7 @@ fn test_send_line_rejects_unsafe_lines() {
         Err(MachineError::NotConnected)
     );
     connect(&mut controller);
-    let too_long = format!("G0 X{}", "1".repeat(MAX_LINE_LENGTH));
+    let too_long = format!("G0 X{}", "1".repeat(GRBL_RX_BUFFER_BYTES));
     let cases: [(&str, MachineError); 9] = [
         ("   ", MachineError::EmptyLine),
         ("G0 X1\nG0 X2", MachineError::NonPrintable(b'\n')),
@@ -564,7 +564,7 @@ fn test_send_line_rejects_unsafe_lines() {
             too_long.as_str(),
             MachineError::LineTooLong {
                 length: too_long.len(),
-                max: MAX_LINE_LENGTH,
+                max: GRBL_RX_BUFFER_BYTES - 1,
             },
         ),
     ];
@@ -784,6 +784,21 @@ fn wait_report(controller: &mut MachineController) {
     );
 }
 
+/// Polls until the report is fresh or [`EVENTUALLY`] passes. Queries written before the
+/// first injected report go unanswered, so the reply tags lag and freshness may take a few
+/// replies (it errs late, never early).
+fn wait_fresh(controller: &mut MachineController) -> bool {
+    let deadline = Instant::now() + EVENTUALLY;
+    while Instant::now() < deadline {
+        controller.poll();
+        if controller.report_fresh() {
+            return true;
+        }
+        std::thread::sleep(Duration::from_millis(2));
+    }
+    false
+}
+
 /// After a command line, the state is stale until a status report read after the line was
 /// written; a report read while the line still waits in the queue does not count.
 #[test]
@@ -798,32 +813,25 @@ fn test_report_fresh_only_after_line_written() {
         .log()
         .contains(&Wrote::Line("$H".to_string()))));
     shared.inject("<Home|MPos:0.000,0.000,0.000|FS:0,0>\n");
-    wait_report(&mut controller);
-    assert!(
-        controller.report_fresh(),
-        "a report after the write is fresh"
-    );
+    assert!(wait_fresh(&mut controller), "never fresh after the write");
     drop(controller);
 
     // The line held back by a full window: reports meanwhile do not count.
     let (shared, mut controller) = full_window();
     controller.send_line("$X").expect("send");
     shared.inject("<Idle|MPos:0.000,0.000,0.000|FS:0,0>\n");
-    wait_report(&mut controller);
-    assert!(
-        !controller.report_fresh(),
-        "fresh before the line was written"
-    );
+    for _ in 0..3 {
+        wait_report(&mut controller);
+        assert!(
+            !controller.report_fresh(),
+            "fresh before the line was written"
+        );
+    }
     shared.hold_acks.store(false, Ordering::SeqCst);
     assert!(wait_until(|| shared
         .log()
         .contains(&Wrote::Line("$X".to_string()))));
-    shared.inject("<Idle|MPos:0.000,0.000,0.000|FS:0,0>\n");
-    wait_report(&mut controller);
-    assert!(
-        controller.report_fresh(),
-        "a report after the write is fresh"
-    );
+    assert!(wait_fresh(&mut controller), "never fresh after the write");
 }
 
 /// A soft reset written as a raw real-time byte drops a queued jog, like jog cancel.
@@ -848,5 +856,109 @@ fn test_soft_reset_drops_queued_jog() {
             .any(|w| matches!(w, Wrote::Line(l) if l.starts_with("$J="))),
         "jog started after a soft reset: {:?}",
         shared.log()
+    );
+}
+
+/// A line that cannot fit the controller's RX buffer with its newline is refused by
+/// `send_line`, so it never reaches the worker (and cannot mark a queued `$H` fresh).
+#[test]
+fn test_send_line_rejects_line_beyond_rx_buffer() {
+    let (shared, mut controller) = full_window();
+    controller.send_line("$H").expect("send $H");
+    let fits = format!("G0 X{}", "1".repeat(GRBL_RX_BUFFER_BYTES - 1 - 4));
+    let too_long = format!("{fits}1");
+    assert_eq!(too_long.len() + 1, GRBL_RX_BUFFER_BYTES + 1);
+    assert_eq!(
+        controller.send_line(&too_long),
+        Err(MachineError::LineTooLong {
+            length: GRBL_RX_BUFFER_BYTES,
+            max: GRBL_RX_BUFFER_BYTES - 1,
+        })
+    );
+    shared.inject("<Idle|MPos:0.000,0.000,0.000|FS:0,0>\n");
+    wait_report(&mut controller);
+    assert!(!controller.report_fresh(), "a refused line marked $H fresh");
+    assert_eq!(controller.send_line(&fits), Ok(()));
+}
+
+/// A status query written before `$H`, whose reply (Idle) arrives after `$H` is written,
+/// does not make the report fresh; the reply to a query written after `$H` does.
+#[test]
+fn test_reply_to_query_before_line_is_not_fresh() {
+    let shared = Arc::new(LoopbackShared::default());
+    // Answer every query from the first one, so replies match queries one to one.
+    shared.inject("<Idle|MPos:0.000,0.000,0.000|FS:0,0>\n");
+    let mut controller = loopback_controller(&shared, Duration::from_millis(1));
+    connect(&mut controller);
+    wait_report(&mut controller);
+    assert!(controller.report_fresh());
+
+    // Hold the replies; let a query go out, then $H after it.
+    *shared.reply_budget.lock().expect("budget") = Some(0);
+    let queries = shared.status_queries();
+    assert!(wait_until(|| shared.status_queries() > queries), "no query");
+    let before = shared.status_queries();
+    controller.send_line("$H").expect("send");
+    assert!(wait_until(|| shared
+        .log()
+        .contains(&Wrote::Line("$H".to_string()))));
+    let log = shared.log();
+    let h_at = log
+        .iter()
+        .position(|w| *w == Wrote::Line("$H".to_string()))
+        .expect("$H");
+    let queries_before_h = log[..h_at]
+        .iter()
+        .filter(|w| **w == Wrote::Realtime(b'?'))
+        .count();
+    assert!(queries_before_h >= before, "{log:?}");
+
+    // Release one reply: the oldest owed, to a query written before $H.
+    controller.poll();
+    *shared.reply_budget.lock().expect("budget") = Some(1);
+    wait_report(&mut controller);
+    assert!(
+        !controller.report_fresh(),
+        "a reply to a query written before $H counted as fresh"
+    );
+
+    // The next query written after $H: its reply is fresh.
+    *shared.reply_budget.lock().expect("budget") = None;
+    let deadline = Instant::now() + EVENTUALLY;
+    while !controller.report_fresh() && Instant::now() < deadline {
+        controller.poll();
+        std::thread::sleep(Duration::from_millis(2));
+    }
+    assert!(controller.report_fresh(), "never fresh after $H");
+}
+
+/// More unanswered queries than tracked (replies lag): the tags keep the oldest, lower
+/// value, so a late reply to a query written before `$H` still does not count as fresh.
+#[test]
+fn test_lagging_replies_err_stale() {
+    let shared = Arc::new(LoopbackShared::default());
+    shared.inject("<Idle|MPos:0.000,0.000,0.000|FS:0,0>\n");
+    let mut controller = loopback_controller(&shared, Duration::from_millis(1));
+    connect(&mut controller);
+    wait_report(&mut controller);
+    *shared.reply_budget.lock().expect("budget") = Some(0);
+    let queries = shared.status_queries();
+    assert!(wait_until(|| shared.status_queries() > queries), "no query");
+    controller.send_line("$H").expect("send");
+    assert!(wait_until(|| shared
+        .log()
+        .contains(&Wrote::Line("$H".to_string()))));
+    // Four more queries after $H overflow the three tracked tags.
+    let after = shared.status_queries();
+    assert!(
+        wait_until(|| shared.status_queries() >= after + 4),
+        "queries stopped"
+    );
+    controller.poll();
+    *shared.reply_budget.lock().expect("budget") = Some(1);
+    wait_report(&mut controller);
+    assert!(
+        !controller.report_fresh(),
+        "a lagging reply to a query before $H counted as fresh"
     );
 }

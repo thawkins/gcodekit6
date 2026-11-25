@@ -4,6 +4,11 @@
 //!
 //! The loopback records every write in order and answers each complete line with `ok` after
 //! a fixed delay, like a GRBL controller executing a short move.
+//!
+//! Status reports are answers to `?`, as on a real controller: an injected `<...>` report
+//! waits until a `?` is written and is then owed as that `?`'s reply. Once one report has
+//! been injected, every later `?` is answered with the latest injected report. Replies owed
+//! are handed out in order, at most [`LoopbackShared::reply_budget`] of them when it is set.
 
 use std::collections::VecDeque;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
@@ -37,8 +42,17 @@ pub struct LoopbackShared {
     pub connect_delay: Duration,
     /// When set, `connect` fails after `connect_delay`.
     pub fail_connect: bool,
-    /// Response bytes handed out by `receive` before any `ok`.
+    /// Response bytes handed out by `receive` before any `ok` (status reports excepted).
     pub inject: Mutex<VecDeque<Vec<u8>>>,
+    /// Injected status reports waiting for a `?` to answer.
+    pub status_reports: Mutex<VecDeque<Vec<u8>>>,
+    /// The latest status report used as a reply; it answers every `?` once no injected one
+    /// waits.
+    pub sticky_report: Mutex<Option<Vec<u8>>>,
+    /// Replies owed to written `?` bytes, oldest first.
+    pub owed_replies: Mutex<VecDeque<Vec<u8>>>,
+    /// When set, how many more owed replies `receive` may hand out (`None`: all).
+    pub reply_budget: Mutex<Option<usize>>,
     /// Lines written but not yet answered with `ok`.
     pub outstanding: AtomicUsize,
     /// The length of [`LoopbackShared::log`] when the transport was last closed, so a test
@@ -55,12 +69,68 @@ impl LoopbackShared {
             .clone()
     }
 
-    /// Queues `response` to be read before any `ok`.
+    /// Queues `response` to be read before any `ok`; a status report (`<...>`) instead waits
+    /// to answer the next `?` written.
     pub fn inject(&self, response: &str) {
-        self.inject
+        let queue = if response.starts_with('<') {
+            &self.status_reports
+        } else {
+            &self.inject
+        };
+        queue
             .lock()
             .expect("loopback inject mutex poisoned")
             .push_back(response.as_bytes().to_vec());
+    }
+
+    /// How many `?` status queries were written.
+    pub fn status_queries(&self) -> usize {
+        self.log()
+            .iter()
+            .filter(|w| **w == Wrote::Realtime(b'?'))
+            .count()
+    }
+
+    /// Owes the reply to one written `?`: the next injected report, else the latest one.
+    fn answer_status_query(&self) {
+        let next = self
+            .status_reports
+            .lock()
+            .expect("loopback status mutex poisoned")
+            .pop_front();
+        let mut sticky = self
+            .sticky_report
+            .lock()
+            .expect("loopback sticky mutex poisoned");
+        if let Some(report) = next {
+            *sticky = Some(report);
+        }
+        if let Some(report) = sticky.clone() {
+            self.owed_replies
+                .lock()
+                .expect("loopback replies mutex poisoned")
+                .push_back(report);
+        }
+    }
+
+    /// The next owed reply `receive` may hand out.
+    fn take_reply(&self) -> Option<Vec<u8>> {
+        let mut budget = self
+            .reply_budget
+            .lock()
+            .expect("loopback budget mutex poisoned");
+        if *budget == Some(0) {
+            return None;
+        }
+        let reply = self
+            .owed_replies
+            .lock()
+            .expect("loopback replies mutex poisoned")
+            .pop_front()?;
+        if let Some(left) = budget.as_mut() {
+            *left -= 1;
+        }
+        Some(reply)
     }
 
     /// How many complete lines were written.
@@ -138,6 +208,9 @@ impl Communicator for Loopback {
                 .lock()
                 .expect("loopback log mutex poisoned")
                 .push(Wrote::Realtime(data[0]));
+            if data[0] == b'?' {
+                self.shared.answer_status_query();
+            }
             return Ok(1);
         }
         for &b in data {
@@ -169,6 +242,9 @@ impl Communicator for Loopback {
             .pop_front()
         {
             return Ok(data);
+        }
+        if let Some(reply) = self.shared.take_reply() {
+            return Ok(reply);
         }
         if !self.shared.hold_acks.load(Ordering::SeqCst)
             && let Some(&due) = self.pending_acks.front()

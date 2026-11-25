@@ -34,12 +34,14 @@ use gcodekit5_communication::{Communicator, ConnectionParams, SerialCommunicator
 use gcodekit5_settings::{ConnectionSettings, ConnectionType};
 
 use grbl_stream::{
-    CharCountWindow, GrblResponseLine, MAX_LINE_LENGTH, ResponseLineSplitter, classify_response,
-    linear_jog_command,
+    CharCountWindow, GRBL_RX_BUFFER_BYTES, GrblResponseLine, MAX_LINE_LENGTH, ResponseLineSplitter,
+    classify_response, linear_jog_command,
 };
 
 /// How often the worker asks the controller for a status report (`?`).
 const STATUS_INTERVAL: Duration = Duration::from_millis(200);
+/// The most status queries whose replies are tracked; see [`WorkerState::query_tags`].
+const MAX_QUERY_TAGS: usize = 3;
 /// How long an idle worker waits for a command before reading the transport again.
 const IDLE_WAIT: Duration = Duration::from_millis(2);
 
@@ -464,7 +466,8 @@ impl MachineController {
     /// # Errors
     /// [`MachineError::EmptyLine`], [`MachineError::NonPrintable`] for a byte outside
     /// printable ASCII (0x20-0x7E), [`MachineError::RealtimeCharacter`] for `!`, `~` or `?`,
-    /// [`MachineError::LineTooLong`] beyond [`MAX_LINE_LENGTH`],
+    /// [`MachineError::LineTooLong`] for a line that, with its newline, does not fit the
+    /// controller's RX buffer ([`GRBL_RX_BUFFER_BYTES`]; [`MAX_LINE_LENGTH`] is higher),
     /// [`MachineError::NotConnected`] without a connection, or
     /// [`MachineError::StreamInProgress`] while a program streams.
     pub fn send_line(&mut self, line: &str) -> Result<(), MachineError> {
@@ -478,10 +481,13 @@ impl MachineController {
         if let Some(c) = line.chars().find(|c| matches!(c, '!' | '~' | '?')) {
             return Err(MachineError::RealtimeCharacter(c));
         }
-        if line.len() > MAX_LINE_LENGTH {
+        // The line and its newline must fit the controller's RX buffer at once; the worker
+        // would refuse it otherwise.
+        let max = MAX_LINE_LENGTH.min(GRBL_RX_BUFFER_BYTES - 1);
+        if line.len() > max {
             return Err(MachineError::LineTooLong {
                 length: line.len(),
-                max: MAX_LINE_LENGTH,
+                max,
             });
         }
         if !self.is_worker_running() {
@@ -645,8 +651,14 @@ struct WorkerState {
     paused: bool,
     /// The highest state-line sequence number written (or dropped, never to run).
     written_seq: u64,
-    /// Shared with the controller: `written_seq` as of the latest status report.
+    /// Shared with the controller: the `written_seq` tag of the latest status report.
     fresh: Arc<AtomicU64>,
+    /// One tag per `?` written and not yet answered, oldest first: `written_seq` when it was
+    /// written. A status report answers the oldest `?`, so its tag says which state lines it
+    /// can describe; a report to a `?` written before `$H` does not count as after `$H`.
+    /// Capped at [`MAX_QUERY_TAGS`]: on overflow the two oldest tags merge into the lower one,
+    /// so a lagging queue only ever under-states freshness.
+    query_tags: VecDeque<u64>,
     /// A `$J` jog was queued and is not known to be over: set when it is queued and again when
     /// it is written, cleared by jog cancel (0x85, which also drops queued jogs), soft reset
     /// (0x18), or an `Idle` report after a `Jog` one received since it was written.
@@ -684,6 +696,7 @@ impl WorkerState {
             paused: false,
             written_seq: 0,
             fresh,
+            query_tags: VecDeque::new(),
             jog_outstanding: false,
             jog_seen: false,
         }
@@ -749,7 +762,7 @@ impl WorkerState {
             // 3. Periodic status request.
             let now = Instant::now();
             if now >= next_status {
-                if let Err(e) = self.write(&[RealtimeCommand::StatusQuery.byte()]) {
+                if let Err(e) = self.write_status_query() {
                     return Exit::TransportError(e);
                 }
                 next_status = now + STATUS_INTERVAL;
@@ -777,6 +790,9 @@ impl WorkerState {
 
     fn handle_command(&mut self, cmd: Command) -> Result<(), String> {
         match cmd {
+            Command::Realtime(byte) if byte == RealtimeCommand::StatusQuery.byte() => {
+                self.write_status_query()?;
+            }
             Command::Realtime(byte) => {
                 self.write(&[byte])?;
                 if byte == RealtimeCommand::JogCancel.byte()
@@ -819,14 +835,33 @@ impl WorkerState {
         Ok(())
     }
 
+    /// Writes a `?` and tags it with the state lines written so far.
+    fn write_status_query(&mut self) -> Result<(), String> {
+        self.write(&[RealtimeCommand::StatusQuery.byte()])?;
+        if self.query_tags.len() >= MAX_QUERY_TAGS
+            && let Some(oldest) = self.query_tags.pop_front()
+            && let Some(next) = self.query_tags.front_mut()
+        {
+            *next = (*next).min(oldest);
+        }
+        self.query_tags.push_back(self.written_seq);
+        Ok(())
+    }
+
     /// Queues a manual line (`seq` > 0 for a state line), or reports one too long for the
-    /// controller's buffer, which then never runs.
+    /// controller's buffer, which then never runs. (`send_line` already refuses such lines;
+    /// this is defence in depth.)
     fn queue_manual(&mut self, line: String, seq: u64) {
         if !self.window.fits_at_all(&line) {
             self.sink.emit(MachineEvent::Error(format!(
                 "line too long for the controller buffer: {line}"
             )));
-            self.written_seq = self.written_seq.max(seq);
+            // The refused line never runs, but a lower state line still queued must be
+            // written first: hand the sequence number to the last queued state line.
+            match self.manual.iter_mut().rev().find(|(_, s)| *s > 0) {
+                Some((_, queued)) => *queued = (*queued).max(seq),
+                None => self.written_seq = self.written_seq.max(seq),
+            }
             return;
         }
         if line.starts_with("$J=") {
@@ -911,7 +946,10 @@ impl WorkerState {
                 self.follow_jog(status.machine_state.as_deref());
                 self.sink.emit(MachineEvent::StatusReport(Box::new(status)));
                 // After the event: a caller that sees the report fresh has the report too.
-                self.fresh.store(self.written_seq, Ordering::SeqCst);
+                // The report answers the oldest `?`; without one tracked, leave it be.
+                if let Some(tag) = self.query_tags.pop_front() {
+                    self.fresh.store(tag, Ordering::SeqCst);
+                }
             }
             GrblResponseLine::Reset(banner) => {
                 // Report the banner before the stream end it causes, so a consumer
@@ -1002,6 +1040,7 @@ impl WorkerState {
     /// Forgets in-flight and queued lines after the controller was reset.
     fn reset_buffers(&mut self) {
         self.jog_outstanding = false;
+        self.query_tags.clear();
         self.window = CharCountWindow::default();
         self.in_flight_is_program.clear();
         // Dropped state lines never run: a report after the reset describes the machine.
