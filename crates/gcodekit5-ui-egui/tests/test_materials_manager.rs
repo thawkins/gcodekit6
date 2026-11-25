@@ -338,3 +338,22 @@ fn test_materials_manager_unreadable_file_is_backed_up() {
     );
     assert!(stored(&file, "after_broken").is_some());
 }
+
+#[test]
+fn test_materials_manager_quit_discard_drops_the_edit() {
+    let file = materials_file("quit_discard", Some(GTK_MATERIALS));
+    let mut h = app_with(&file);
+    search(&mut h, "bog");
+    click(&mut h, "Bog Oak");
+    set_field(&mut h, "Name:", "Never Saved");
+    let shown = crate::test_tools_manager::quit_answering(
+        &mut h,
+        craft_dialogs::MessageResult::Custom("Discard".into()),
+    );
+    assert_eq!(shown, ["Unsaved changes"]);
+    assert!(h.state().quit_confirmed());
+    assert_eq!(
+        stored(&file, "bog_oak").map(|m| m.name),
+        Some("Bog Oak".to_string())
+    );
+}

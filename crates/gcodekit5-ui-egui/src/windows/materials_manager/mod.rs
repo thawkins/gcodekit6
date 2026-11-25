@@ -158,6 +158,30 @@ impl MaterialsManagerWindow {
         self.open
     }
 
+    /// Closes the window, as its title-bar button does: an unsaved material stays in the
+    /// form (shown again when the window reopens) and the quit flow asks about it.
+    pub fn close(&mut self) {
+        self.open = false;
+        self.question = None;
+    }
+
+    /// Whether the form holds a material with changes not saved yet.
+    pub fn has_unsaved_changes(&self) -> bool {
+        self.is_dirty()
+    }
+
+    /// Saves the form for the quit flow's Save, opening the window so a refusal shows.
+    ///
+    /// # Arguments
+    /// * `tr` - Translator for the notice.
+    ///
+    /// # Returns
+    /// Whether the material was saved.
+    pub fn save_for_quit(&mut self, tr: &Translator) -> bool {
+        self.open = true;
+        self.save(tr)
+    }
+
     /// The latest notice (a save's result, a refusal), if any.
     pub fn notice(&self) -> Option<&str> {
         self.notice.as_ref().map(|(text, _)| text.as_str())

@@ -36,9 +36,8 @@ impl ToolsManagerWindow {
             .open(&mut open)
             .default_size([1000.0, 600.0])
             .show(ctx, |ui| self.contents(ui, tr));
-        self.open = open;
-        if !self.open {
-            self.question = None;
+        if !open {
+            self.close();
         }
     }
 

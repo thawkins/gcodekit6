@@ -37,9 +37,8 @@ impl MaterialsManagerWindow {
             .open(&mut open)
             .default_size([900.0, 600.0])
             .show(ctx, |ui| self.contents(ui, tr));
-        self.open = open;
-        if !self.open {
-            self.question = None;
+        if !open {
+            self.close();
         }
     }
 

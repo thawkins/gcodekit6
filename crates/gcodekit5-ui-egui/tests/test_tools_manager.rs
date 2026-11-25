@@ -445,3 +445,77 @@ fn test_tools_manager_untouched_filters_are_not_written() {
         "settings rewritten without a change"
     );
 }
+
+/// Quits through the menu, answering every message dialog with `reply`.
+///
+/// # Returns
+/// The titles of the dialogs shown.
+pub(crate) fn quit_answering(
+    h: &mut Harness<'_, GcodeKitApp>,
+    reply: craft_dialogs::MessageResult,
+) -> Vec<String> {
+    let shown = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+    let seen = std::sync::Arc::clone(&shown);
+    h.state_mut().dialogs_mut().set_override(Some(Box::new(
+        move |request: &craft_dialogs::Request| match request {
+            craft_dialogs::Request::Message(message) => {
+                seen.lock().expect("shown").push(message.title.clone());
+                craft_dialogs::Answer::Message(reply.clone())
+            }
+            craft_dialogs::Request::File(file) => panic!("unexpected file dialog {file:?}"),
+        },
+    )));
+    h.state_mut()
+        .request_quit(gcodekit5_ui_egui::QuitSource::MenuQuit);
+    for _ in 0..4 {
+        h.step();
+        h.state_mut()
+            .dialogs_mut()
+            .end_frame(None::<&eframe::Frame>);
+    }
+    let titles = shown.lock().expect("shown").clone();
+    titles
+}
+
+#[test]
+fn test_tools_manager_quit_asks_and_saves_an_unsaved_tool() {
+    let file = tools_file("quit_save", Some(GTK_TOOLS));
+    let mut h = app_with(&file);
+    search(&mut h, "router bit");
+    click(&mut h, "My Router Bit");
+    set_field(&mut h, "Name:", "Quit Saved Bit");
+    // Closing the window (its title-bar button) keeps the edit; the quit asks about it.
+    h.state_mut().tools_manager_mut().close();
+    h.run_steps(2);
+    assert!(!h.state().tools_manager().is_open());
+    let shown = quit_answering(&mut h, craft_dialogs::MessageResult::Custom("Save".into()));
+    assert_eq!(shown, ["Unsaved changes"]);
+    assert_eq!(
+        stored(&file, "my_router_bit").map(|t| t.name),
+        Some("Quit Saved Bit".to_string())
+    );
+    assert!(h.state().quit_confirmed());
+}
+
+#[test]
+fn test_tools_manager_quit_cancel_keeps_the_edit() {
+    let file = tools_file("quit_cancel", Some(GTK_TOOLS));
+    let mut h = app_with(&file);
+    search(&mut h, "router bit");
+    click(&mut h, "My Router Bit");
+    set_field(&mut h, "Name:", "Unsaved Bit");
+    let shown = quit_answering(&mut h, craft_dialogs::MessageResult::Cancel);
+    assert_eq!(shown, ["Unsaved changes"]);
+    assert!(!h.state().quit_confirmed());
+    assert_eq!(
+        h.get_by_role_and_label(Role::TextInput, "Name:")
+            .value()
+            .as_deref(),
+        Some("Unsaved Bit"),
+        "the edit is still open"
+    );
+    assert_eq!(
+        stored(&file, "my_router_bit").map(|t| t.name),
+        Some("My Router Bit".to_string())
+    );
+}

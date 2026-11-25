@@ -6,9 +6,10 @@
 //! Dependencies: the app's dialogs, settings and windows.
 
 use super::GcodeKitApp;
-use crate::dialogs::{Asked, DialogAnswer, FilePurpose};
+use crate::dialogs::{Asked, ConfirmRequest, DialogAnswer, FilePurpose};
 use crate::windows::tools_manager::{GtcFile, ToolsFileRequest};
 use crate::windows::{MaterialsManagerWindow, ToolsManagerWindow};
+use gcodekit5_app::UnsavedChangesChoice;
 
 impl GcodeKitApp {
     /// The CNC Tools window.
@@ -82,6 +83,49 @@ impl GcodeKitApp {
         self.tools_manager.store_ui_state(&mut config);
         if let Err(error) = self.state.settings.apply(config) {
             tracing::debug!(%error, "CNC Tools filters not kept");
+        }
+    }
+
+    /// Acts on the quit flow's question about an unsaved tool or material: Save saves it
+    /// and goes on quitting (a refused save stops the quit and shows the window with the
+    /// reason), Discard goes on without it, Cancel stops the quit and shows the window.
+    pub(super) fn library_quit_answer(
+        &mut self,
+        request: ConfirmRequest,
+        choice: UnsavedChangesChoice,
+    ) {
+        let tools = request == ConfirmRequest::UnsavedTool;
+        let tr = &self.state.translator;
+        match choice {
+            UnsavedChangesChoice::Save => {
+                let saved = if tools {
+                    self.tools_manager.save_for_quit(tr)
+                } else {
+                    self.materials_manager.save_for_quit(tr)
+                };
+                self.sync_libraries();
+                if saved {
+                    self.continue_quit();
+                } else {
+                    self.cancel_quit();
+                }
+            }
+            UnsavedChangesChoice::Discard => {
+                if tools {
+                    self.quit.discarded_tool = true;
+                } else {
+                    self.quit.discarded_material = true;
+                }
+                self.continue_quit();
+            }
+            UnsavedChangesChoice::Cancel => {
+                if tools {
+                    self.tools_manager.open(tr);
+                } else {
+                    self.materials_manager.open(tr);
+                }
+                self.cancel_quit();
+            }
         }
     }
 

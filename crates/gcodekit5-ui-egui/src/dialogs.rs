@@ -225,6 +225,10 @@ pub enum ConfirmRequest {
     UnsavedGcode,
     /// The design has unsaved changes: Save, Discard or Cancel.
     UnsavedDesign,
+    /// The CNC Tools window holds an unsaved tool: Save, Discard or Cancel.
+    UnsavedTool,
+    /// The Materials Manager holds an unsaved material: Save, Discard or Cancel.
+    UnsavedMaterial,
     /// Changed settings take effect after a restart: restart now (Yes) or later (No).
     Restart,
     /// A job is running while the user quits: stop it and quit (Yes) or keep running (No).
@@ -242,6 +246,14 @@ impl ConfirmRequest {
             Self::UnsavedDesign => (
                 n_!("Unsaved changes"),
                 n_!("The current design has unsaved changes. Save them before continuing?"),
+            ),
+            Self::UnsavedTool => (
+                n_!("Unsaved changes"),
+                n_!("The tool has unsaved changes. Save them before continuing?"),
+            ),
+            Self::UnsavedMaterial => (
+                n_!("Unsaved changes"),
+                n_!("The material has unsaved changes. Save them before continuing?"),
             ),
             Self::Restart => (
                 n_!("Restart to apply settings?"),
@@ -269,7 +281,8 @@ pub enum ConfirmChoice {
 
 impl ConfirmChoice {
     /// The answer to an unsaved-changes prompt ([`ConfirmRequest::UnsavedGcode`],
-    /// [`ConfirmRequest::UnsavedDesign`]): Yes is Save, No is Discard.
+    /// [`ConfirmRequest::UnsavedDesign`], [`ConfirmRequest::UnsavedTool`],
+    /// [`ConfirmRequest::UnsavedMaterial`]): Yes is Save, No is Discard.
     pub fn as_unsaved(self) -> UnsavedChangesChoice {
         match self {
             Self::Yes => UnsavedChangesChoice::Save,
@@ -447,7 +460,10 @@ impl Dialogs {
         let save = tr.tr(n_!("Save")).into_owned();
         let discard = tr.tr(n_!("Discard")).into_owned();
         let (level, buttons) = match request {
-            ConfirmRequest::UnsavedGcode | ConfirmRequest::UnsavedDesign => (
+            ConfirmRequest::UnsavedGcode
+            | ConfirmRequest::UnsavedDesign
+            | ConfirmRequest::UnsavedTool
+            | ConfirmRequest::UnsavedMaterial => (
                 MessageLevel::Warning,
                 MessageButtons::YesNoCancelCustom(
                     save.clone(),
@@ -595,6 +611,8 @@ pub fn msgids() -> Vec<&'static str> {
     let confirms = [
         ConfirmRequest::UnsavedGcode,
         ConfirmRequest::UnsavedDesign,
+        ConfirmRequest::UnsavedTool,
+        ConfirmRequest::UnsavedMaterial,
         ConfirmRequest::Restart,
         ConfirmRequest::StopJob,
     ]

@@ -259,6 +259,10 @@ struct QuitFlow {
     stop_job: bool,
     /// The documents whose changes the user chose to discard for this quit.
     discarded: DirtyState,
+    /// The user chose to discard the CNC Tools window's unsaved tool for this quit.
+    discarded_tool: bool,
+    /// The user chose to discard the Materials Manager's unsaved material for this quit.
+    discarded_material: bool,
     /// Quitting was decided: the app sent `Close` and lets the close request through.
     confirmed: bool,
 }
@@ -528,6 +532,10 @@ impl GcodeKitApp {
             Some(ConfirmRequest::UnsavedGcode)
         } else if state.dirty.designer && !quit.discarded.designer {
             Some(ConfirmRequest::UnsavedDesign)
+        } else if self.tools_manager.has_unsaved_changes() && !quit.discarded_tool {
+            Some(ConfirmRequest::UnsavedTool)
+        } else if self.materials_manager.has_unsaved_changes() && !quit.discarded_material {
+            Some(ConfirmRequest::UnsavedMaterial)
         } else {
             None
         };
@@ -580,6 +588,9 @@ impl GcodeKitApp {
                     UnsavedChangesChoice::Save => self.save_design(Some(DesignNext::Quit)),
                     UnsavedChangesChoice::Cancel => self.cancel_quit(),
                 }
+            }
+            (ConfirmRequest::UnsavedTool | ConfirmRequest::UnsavedMaterial, choice) => {
+                self.library_quit_answer(request, choice.as_unsaved());
             }
             // The quit flow never asks this; forget the quit rather than act on it.
             (ConfirmRequest::Restart, _) => self.cancel_quit(),
