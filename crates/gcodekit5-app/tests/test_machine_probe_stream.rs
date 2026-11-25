@@ -458,3 +458,75 @@ fn test_probe_stream_halt_forgets_status_replies_that_never_came() {
     );
     check_halt(&shared);
 }
+
+/// Polls until the stream ended, at most `limit`; returns how long that took.
+fn until_stopped(
+    controller: &mut MachineController,
+    events: &mut Vec<MachineEvent>,
+    limit: Duration,
+) -> Duration {
+    let from = Instant::now();
+    while !events
+        .iter()
+        .any(|e| matches!(e, MachineEvent::StreamStopped { .. }))
+    {
+        assert!(from.elapsed() < limit, "no StreamStopped within {limit:?}");
+        events.extend(controller.poll());
+        std::thread::sleep(Duration::from_millis(1));
+    }
+    from.elapsed()
+}
+
+#[test]
+fn test_probe_stream_halt_ends_on_a_user_soft_reset() {
+    let (shared, mut controller) = connected();
+    let mut events = Vec::new();
+    error_mid_stream(&shared, &mut controller, &mut events);
+    controller.realtime(RealtimeCommand::SoftReset);
+    let waited = until_stopped(&mut controller, &mut events, EVENTUALLY);
+    assert!(
+        waited < Duration::from_millis(500),
+        "the soft reset waited for the halt: {waited:?}"
+    );
+    assert!(!controller.is_streaming());
+    // The halt is over: it does not reset a second time or report itself later.
+    std::thread::sleep(Duration::from_millis(1500));
+    events.extend(controller.poll());
+    let resets = shared
+        .log()
+        .iter()
+        .filter(|w| **w == Wrote::Realtime(0x18))
+        .count();
+    assert_eq!(resets, 1, "{:?}", shared.log());
+    assert!(
+        !events
+            .iter()
+            .any(|e| matches!(e, MachineEvent::StreamHalted { .. })),
+        "{events:?}"
+    );
+    check_halt(&shared);
+}
+
+#[test]
+fn test_stream_ends_on_a_user_soft_reset() {
+    let (shared, mut controller) = connected();
+    let mut events = Vec::new();
+    controller.start_stream(program()).expect("start");
+    until(&mut controller, &mut events, "5 lines", || {
+        lines(&shared) >= 5
+    });
+    controller.realtime(RealtimeCommand::SoftReset);
+    until_stopped(&mut controller, &mut events, EVENTUALLY);
+    assert!(!controller.is_streaming());
+    let log = shared.log();
+    let reset = realtime_at(&log, 0x18).expect("a soft reset");
+    assert!(
+        !log[reset..].iter().any(|w| matches!(w, Wrote::Line(_))),
+        "a line was written after the reset: {:?}",
+        &log[reset..]
+    );
+    let written = lines(&shared);
+    std::thread::sleep(Duration::from_millis(200));
+    controller.poll();
+    assert_eq!(lines(&shared), written);
+}

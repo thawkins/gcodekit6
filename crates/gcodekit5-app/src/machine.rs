@@ -923,6 +923,11 @@ impl WorkerState {
                     self.manual.retain(|(line, _)| !line.starts_with("$J="));
                     self.jog_outstanding = false;
                 }
+                if byte == RealtimeCommand::SoftReset.byte() {
+                    // The reset drops the controller's buffered program lines: end the
+                    // stream (and any halt) now rather than feed a resetting controller.
+                    self.end_stream(false);
+                }
             }
             Command::Pause => {
                 self.write(&[RealtimeCommand::FeedHold.byte()])?;
