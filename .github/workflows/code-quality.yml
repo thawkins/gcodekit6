@@ -118,6 +118,13 @@ jobs:
         env:
           WGPU_BACKEND: vulkan
 
+      # Review Focus 2: the egui editor draws a 1,000,000-line file within its frame budget.
+      # Ignored in the default run (generating the file is slow), so it runs here on its own.
+      - name: Run large-file frame-time test
+        run: cargo nextest run -p gcodekit5-ui-egui --profile ci --run-ignored only -E 'test(test_large_file_frame_time)'
+        env:
+          WGPU_BACKEND: vulkan
+
       - name: Upload kittest snapshot diffs
         if: failure()
         uses: actions/upload-artifact@v7

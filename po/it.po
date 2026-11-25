@@ -3218,3 +3218,6 @@ msgstr "Impossibile salvare il file"
 
 msgid "Cannot stream this program"
 msgstr "Impossibile inviare questo programma"
+
+msgid "Read-only while a job is running."
+msgstr "Sola lettura mentre è in esecuzione un lavoro."

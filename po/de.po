@@ -3215,3 +3215,6 @@ msgstr "Datei konnte nicht gespeichert werden"
 
 msgid "Cannot stream this program"
 msgstr "Dieses Programm kann nicht gesendet werden"
+
+msgid "Read-only while a job is running."
+msgstr "Schreibgeschützt, solange ein Auftrag läuft."

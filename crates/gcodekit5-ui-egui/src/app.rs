@@ -51,7 +51,9 @@ use gcodekit5_settings::SettingsManager;
 use gcodekit5_settings::config::Config;
 
 use crate::commands::{self, Command};
-use crate::dialogs::{Asked, ConfirmChoice, ConfirmRequest, DialogAnswer, Dialogs, FilePurpose};
+use crate::dialogs::{
+    Asked, ConfirmChoice, ConfirmRequest, DialogAnswer, Dialogs, FileFilter, FilePurpose,
+};
 use crate::machine::{Machine, lock};
 use crate::menu::Menus;
 use crate::panes::console::ConsolePane;
@@ -784,6 +786,14 @@ impl GcodeKitApp {
                 tracing::warn!(%reason, "save dialog unavailable");
                 self.abandon_after_save();
             }
+            DialogAnswer::Unavailable {
+                asked: Asked::Confirm(ConfirmRequest::UnsavedGcode),
+                reason,
+            } if self.open_after_confirm => {
+                // Not opening without the answer: unsaved G-code would be lost.
+                tracing::warn!(%reason, "unsaved-changes prompt unavailable; open abandoned");
+                self.open_after_confirm = false;
+            }
             DialogAnswer::Confirm {
                 request: ConfirmRequest::UnsavedGcode,
                 choice,
@@ -846,16 +856,22 @@ impl GcodeKitApp {
         self.sync_editor(true);
     }
 
-    /// Opens the first of the files named on the command line in the editor.
+    /// Opens the first G-code file named on the command line in the editor: the first path
+    /// whose extension is one of the Open dialog's G-code types (any case). Every other path
+    /// is logged and skipped, so a design, an image or a stray argument never becomes the
+    /// program to stream.
     ///
     /// # Arguments
-    /// * `files` - The files to open; only the first is opened (the editor holds one).
+    /// * `files` - The paths from the command line.
     pub fn open_startup_files(&mut self, files: &[PathBuf]) {
-        if let Some(first) = files.first() {
-            if files.len() > 1 {
-                tracing::warn!(count = files.len(), "only the first file is opened");
+        let mut opened = false;
+        for path in files {
+            if !opened && is_gcode_path(path) {
+                opened = true;
+                self.open_gcode(path);
+            } else {
+                tracing::warn!(path = %path.display(), "startup file skipped: not the first G-code file");
             }
-            self.open_gcode(first);
         }
     }
 
@@ -938,6 +954,7 @@ impl GcodeKitApp {
                 // thought it dirty).
                 self.editor_dirty = false;
                 self.state.dirty.editor = false;
+                self.editor.borrow_mut().clear_notice();
                 true
             }
             Err(error) => {
@@ -1035,6 +1052,20 @@ impl GcodeKitApp {
             ctx.set_theme(mode);
         }
     }
+}
+
+/// Whether `path` has one of the G-code extensions the Open dialog offers
+/// ([`FileFilter::GCODE`], any case). The filter itself is used rather than
+/// `FilePurpose::OpenGcode.filters()`, which is empty on macOS and adds "All Files" elsewhere.
+fn is_gcode_path(path: &Path) -> bool {
+    path.extension()
+        .and_then(|e| e.to_str())
+        .is_some_and(|extension| {
+            FileFilter::GCODE
+                .extensions
+                .iter()
+                .any(|known| known.eq_ignore_ascii_case(extension))
+        })
 }
 
 /// The Machine Control pane over `state`'s controller, with the configured connection and jog

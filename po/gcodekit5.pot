@@ -3139,3 +3139,6 @@ msgstr ""
 
 msgid "Cannot stream this program"
 msgstr ""
+
+msgid "Read-only while a job is running."
+msgstr ""

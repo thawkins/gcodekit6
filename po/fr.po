@@ -3222,3 +3222,6 @@ msgstr "Impossible d'enregistrer le fichier"
 
 msgid "Cannot stream this program"
 msgstr "Impossible d'envoyer ce programme"
+
+msgid "Read-only while a job is running."
+msgstr "Lecture seule pendant l'exécution d'une tâche."

@@ -328,11 +328,17 @@ fn test_large_file_is_read_only_until_edit_anyway() -> TestResult {
     Ok(())
 }
 
-/// Review Focus 2: a 1,000,000-line file draws a frame in under 50 ms. Timing is only
-/// meaningful in an optimised build, so the test is ignored in debug builds; run it with
-/// `cargo nextest run --release -p gcodekit5-ui-egui -E 'test(test_large_file_frame_time)'`.
+/// Frame budget of the 1,000,000-line test (Review Focus 2), in debug and release alike: the
+/// workspace's dev profile is optimised (`opt-level = 1`) and the virtualised view measures
+/// about 3 ms per frame there, so 50 ms leaves room for a slow CI runner while a whole-text
+/// layout (seconds at this size) still fails.
+const FRAME_BUDGET: Duration = Duration::from_millis(50);
+
+/// Review Focus 2: a 1,000,000-line file draws a frame within [`FRAME_BUDGET`]. Ignored in
+/// the default run because generating the file is slow; CI runs it with
+/// `cargo nextest run -p gcodekit5-ui-egui --run-ignored only -E 'test(test_large_file_frame_time)'`.
 #[test]
-#[cfg_attr(debug_assertions, ignore = "timing needs a release build")]
+#[ignore = "1M-line file; CI runs it with --run-ignored only"]
 fn test_large_file_frame_time() -> TestResult {
     let dir = scratch("large_frame")?;
     let text: String = (0..1_000_000)
@@ -372,7 +378,10 @@ fn test_large_file_frame_time() -> TestResult {
         "{:?}",
         harness.state().visible_lines()
     );
-    assert!(worst < Duration::from_millis(50), "slowest frame {worst:?}");
+    assert!(
+        worst < FRAME_BUDGET,
+        "slowest frame {worst:?}, budget {FRAME_BUDGET:?}"
+    );
     Ok(())
 }
 
@@ -453,4 +462,135 @@ fn test_launch_files_open_in_editor() -> TestResult {
     app.open_startup_files(std::slice::from_ref(&path));
     assert_eq!(app.editor().borrow().buffer().text(), "G0 X1\n");
     Ok(())
+}
+
+#[test]
+fn test_launch_files_skip_non_gcode() -> TestResult {
+    let dir = scratch("launch_filter")?;
+    // Content that would stream if it were taken for G-code.
+    let svg = write(&dir, "design.svg", "G1 X99\n<svg/>\n")?;
+    let gcode = write(&dir, "part.NC", "G0 X1\n")?;
+    let mut app = GcodeKitApp::from_state(AppState::new(
+        SettingsManager::detached(Config::default()),
+        crate::test_smoke::native_decision(),
+    ));
+    app.open_startup_files(&[svg.clone(), gcode.clone()]);
+    assert_eq!(app.editor().borrow().buffer().path(), Some(gcode.as_path()));
+    let program: Vec<String> = app
+        .state()
+        .machine
+        .program()
+        .map(|p| p.to_vec())
+        .unwrap_or_default();
+    assert_eq!(program, ["G0 X1"]);
+
+    // Only non-G-code paths: nothing is opened and nothing is handed to the machine.
+    let mut app = GcodeKitApp::from_state(AppState::new(
+        SettingsManager::detached(Config::default()),
+        crate::test_smoke::native_decision(),
+    ));
+    app.open_startup_files(&[svg, PathBuf::from("--stray-argument")]);
+    assert_eq!(app.editor().borrow().buffer().path(), None);
+    assert!(app.state().machine.program().is_none());
+    Ok(())
+}
+
+/// An Open whose unsaved-changes prompt could not be shown is abandoned: the same prompt
+/// answered later for another feature does not open a file dialog.
+#[test]
+fn test_open_prompt_unavailable_abandons_open() {
+    let mut harness = app_harness();
+    harness
+        .state()
+        .editor()
+        .borrow_mut()
+        .buffer_mut()
+        .set_text("G1 X1\n".to_string());
+    harness
+        .state_mut()
+        .dialogs_mut()
+        .set_override(Some(Box::new(|_: &Request| {
+            Answer::Unavailable("no parent window".into())
+        })));
+    harness.state_mut().dispatch(Command::FileOpen);
+    app_frame(&mut harness);
+    app_frame(&mut harness);
+
+    let files = std::sync::Arc::new(std::sync::Mutex::new(0usize));
+    let seen = std::sync::Arc::clone(&files);
+    harness
+        .state_mut()
+        .dialogs_mut()
+        .set_override(Some(Box::new(move |request: &Request| match request {
+            Request::File(_) => {
+                if let Ok(mut n) = seen.lock() {
+                    *n += 1;
+                }
+                Answer::Cancelled
+            }
+            Request::Message(_) => {
+                Answer::Message(craft_dialogs::MessageResult::Custom("Discard".into()))
+            }
+        })));
+    harness
+        .state_mut()
+        .dialogs_mut()
+        .confirm(gcodekit5_ui_egui::dialogs::ConfirmRequest::UnsavedGcode);
+    app_frame(&mut harness);
+    app_frame(&mut harness);
+    app_frame(&mut harness);
+    assert_eq!(files.lock().map(|n| *n).unwrap_or(usize::MAX), 0);
+}
+
+/// While a job streams the text is read-only, saying why, so its lines keep matching the
+/// stream.
+#[test]
+fn test_editor_read_only_while_job_runs() {
+    let (mut state, shared) = crate::machine_support::loopback_state(Duration::from_millis(1));
+    crate::machine_support::start_held_stream(&mut state, &shared, 50);
+    let mut harness = crate::machine_support::app_harness(GcodeKitApp::from_state(state));
+    harness
+        .state()
+        .editor()
+        .borrow_mut()
+        .buffer_mut()
+        .set_text("G1 X1\n".to_string());
+    // The Editor tab is behind the Visualizer: show it.
+    let shown = harness
+        .state_mut()
+        .workspace_mut()
+        .apply(craft_ui::docking::Action::Activate {
+            panel: gcodekit5_ui_egui::workspace::PaneId::Editor,
+        });
+    assert!(shown.is_ok(), "{shown:?}");
+    harness.step();
+    harness.step();
+    assert!(harness.state().editor().borrow().is_locked());
+    assert!(
+        harness
+            .query_by_label("Read-only while a job is running.")
+            .is_some()
+    );
+    let before = harness.state().editor().borrow().buffer().generation();
+    let field = harness.get_by_role_and_label(egui::accesskit::Role::TextInput, "G-Code Editor");
+    field.focus();
+    field.type_text("M3 ");
+    harness.step();
+    harness.step();
+    assert_eq!(
+        harness.state().editor().borrow().buffer().generation(),
+        before,
+        "no edit while the job runs"
+    );
+    // The edit made before the job is not handed to the machine mid-job either.
+    assert!(harness.state().editor().borrow().program_stale());
+}
+
+#[test]
+fn test_notice_cleared_by_success() {
+    let mut pane = EditorPane::new();
+    pane.program_rejected("Cannot stream this program: too long".to_string());
+    assert!(pane.notice().is_some());
+    pane.program_fed();
+    assert_eq!(pane.notice(), None);
 }
