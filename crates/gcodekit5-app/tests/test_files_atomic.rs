@@ -56,3 +56,26 @@ fn test_write_atomic_refuses_a_read_only_target() {
     perms.set_readonly(false);
     std::fs::set_permissions(&file, perms).expect("writable");
 }
+
+#[test]
+fn test_write_atomic_with_writes_flushes_and_renames() {
+    let dir = scratch("with");
+    let file = dir.join("design.gckd");
+    write_atomic_with(&file, |temp| std::fs::write(temp, "design")).expect("save");
+    assert_eq!(std::fs::read_to_string(&file).expect("read"), "design");
+    assert_eq!(names(&dir), ["design.gckd"], "no temporary file left");
+}
+
+#[test]
+fn test_write_atomic_error_after_writing_removes_the_temporary_file() {
+    let dir = scratch("late_error");
+    let file = dir.join("a.json");
+    // The data is written, then the writer fails: nothing replaces the target.
+    let failed = write_atomic_with(&file, |temp| {
+        std::fs::write(temp, "partial")?;
+        Err(std::io::Error::other("failed after writing"))
+    });
+    assert!(failed.is_err());
+    assert!(!file.exists());
+    assert!(names(&dir).is_empty(), "{:?}", names(&dir));
+}
