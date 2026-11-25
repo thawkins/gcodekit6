@@ -432,3 +432,45 @@ fn test_firmware_settings_invalid_value_is_not_sent() {
         shared.log()
     );
 }
+
+#[test]
+fn test_firmware_settings_unreported_rows_are_not_editable() {
+    let (mut h, shared) = open_window(|_| {});
+    // `$111` is listed from the definitions but the controller never reported it.
+    h.run_steps(3);
+    set_field(&mut h, "Filter:", "$111");
+    h.run_steps(2);
+    h.get_by_label("$111").click();
+    h.run_steps(2);
+    assert!(
+        h.query_by_role_and_label(Role::TextInput, "Value:")
+            .is_none(),
+        "the placeholder row opened an editor"
+    );
+
+    // A Retrieve starts from placeholders: `$110` is editable again only once reported.
+    shared.hold_acks.store(true, Ordering::SeqCst);
+    h.get_by_label("Retrieve").click();
+    h.run_steps(2);
+    set_field(&mut h, "Filter:", "$110");
+    h.run_steps(2);
+    h.get_by_label("$110").click();
+    h.run_steps(2);
+    assert!(
+        h.query_by_role_and_label(Role::TextInput, "Value:")
+            .is_none()
+    );
+    shared.inject("$110=500.000\n");
+    assert!(step_until(&mut h, |app| app
+        .firmware_settings()
+        .visible_rows()
+        .iter()
+        .any(|r| r.number == 110 && r.value == "500.000")));
+    h.run_steps(2);
+    h.get_by_label("$110").click();
+    h.run_steps(2);
+    assert!(
+        h.query_by_role_and_label(Role::TextInput, "Value:")
+            .is_some()
+    );
+}

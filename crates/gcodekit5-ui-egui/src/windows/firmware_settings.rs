@@ -8,8 +8,10 @@
 //!   as incomplete.
 //! - `$n=v` lines update the list whenever they arrive (a `$$` typed in the console too);
 //!   the GRBL definitions are loaded first when the list is empty.
-//! - Clicking a writable row opens its editor; **Apply** writes `$n=v` (or Repetier's
-//!   `M206`) through [`PendingWrite`], which confirms it by reading the settings back.
+//! - Clicking a writable row the controller has reported (on this connection, since the
+//!   last Retrieve; never a definition's placeholder) opens its editor. **Apply** checks
+//!   the value and writes `$n=v` (or Repetier's `M206`) through [`PendingWrite`], which
+//!   confirms it by reading the settings back.
 //! - Every command is refused, with a notice, while disconnected, while a job runs or while
 //!   the machine is not Idle ([`setting_write::blocked`]).
 //! - **Save** and **Load** ask the app for a file dialog ([`FileRequest`]); the app hands
@@ -20,6 +22,7 @@
 //! Dependencies: `egui`, `gcodekit5-app` (settings model, controller, translations),
 //! `gcodekit5-communication` (`SettingsManager`).
 
+use std::collections::BTreeSet;
 use std::path::Path;
 use std::time::{Duration, Instant};
 
@@ -82,6 +85,9 @@ struct Write {
 pub struct FirmwareSettingsWindow {
     open: bool,
     table: SettingsManager,
+    /// The settings whose value the controller reported (on this connection, since the
+    /// last Retrieve): only these can be edited, never a definition's placeholder `0`.
+    reported: BTreeSet<u16>,
     search: String,
     category: &'static str,
     /// The latest notice and whether it reports a failure.
@@ -97,6 +103,7 @@ impl Default for FirmwareSettingsWindow {
         Self {
             open: false,
             table: SettingsManager::new(),
+            reported: BTreeSet::new(),
             search: String::new(),
             category: "All",
             notice: None,
@@ -149,6 +156,7 @@ impl FirmwareSettingsWindow {
                 MachineEvent::Received(line) => self.received(line.trim()),
                 MachineEvent::Disconnected => {
                     self.retrieval = None;
+                    self.reported.clear();
                     self.say(tr.tr(n_!("Not connected")).into_owned(), false);
                 }
                 MachineEvent::Connected
@@ -175,6 +183,7 @@ impl FirmwareSettingsWindow {
             && retrieval.repetier
         {
             if let Some(setting) = parse_repetier_epr_line(line) {
+                self.reported.insert(setting.number);
                 self.table.set_setting(setting);
                 retrieval.count += 1;
             }
@@ -185,10 +194,11 @@ impl FirmwareSettingsWindow {
             if self.table.count() == 0 {
                 load_definitions(&mut self.table, grbl_definitions());
             }
-            if apply_value(&mut self.table, number, &value)
-                && let Some(retrieval) = self.retrieval.as_mut()
-            {
-                retrieval.count += 1;
+            if apply_value(&mut self.table, number, &value) {
+                self.reported.insert(number);
+                if let Some(retrieval) = self.retrieval.as_mut() {
+                    retrieval.count += 1;
+                }
             }
         } else if line.starts_with("[VER:")
             && let Some(retrieval) = self.retrieval.as_mut()
@@ -287,6 +297,7 @@ impl FirmwareSettingsWindow {
             return;
         }
         load_definitions(&mut self.table, definitions);
+        self.reported.clear();
         self.retrieval = Some(Retrieval {
             started: Instant::now(),
             repetier,
@@ -302,7 +313,11 @@ impl FirmwareSettingsWindow {
         let Some(edit) = self.edit.take() else {
             return;
         };
-        let Some(setting) = self.table.get_setting(edit.number) else {
+        let Some(setting) = self
+            .table
+            .get_setting(edit.number)
+            .filter(|s| self.reported.contains(&s.number))
+        else {
             return;
         };
         // A Repetier position is written as the type the controller reported for it.
@@ -362,6 +377,8 @@ impl FirmwareSettingsWindow {
     pub fn load_from(&mut self, path: &Path, tr: &Translator) {
         match self.table.import_from_file(path) {
             Ok(()) => {
+                // A file's values are not the controller's.
+                self.reported.clear();
                 let title = tr.tr(n_!("Imported settings from"));
                 self.say(format!("{title} {}", path.display()), false);
             }
@@ -497,7 +514,7 @@ impl FirmwareSettingsWindow {
                 }
                 ui.end_row();
                 for row in rows {
-                    if row.read_only {
+                    if row.read_only || !self.reported.contains(&row.number) {
                         ui.weak(row.id());
                     } else if ui.selectable_label(false, row.id()).clicked() {
                         self.edit = Some(Edit {
