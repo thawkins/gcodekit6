@@ -9,6 +9,15 @@
 //! `gcodekit5-settings` (which holds the shared translation tables).
 #![deny(unsafe_code)]
 
+/// Marks a string literal for translation extraction without translating it, for msgids
+/// translated later through a variable. `scripts/update-po.sh` passes `--keyword=n_!`, as
+/// for the front ends' macros of the same name.
+macro_rules! n_ {
+    ($s:literal) => {
+        $s
+    };
+}
+
 pub mod command_history;
 pub mod console;
 pub mod device_console_manager;

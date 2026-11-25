@@ -24,28 +24,29 @@ pub type SettingDefinition = (u16, &'static str, &'static str, bool, &'static st
 pub const REPETIER_OFFSET: u16 = 1000;
 
 /// The category filter's choices, which are also the category ids; "All" matches every
-/// category. Each is an English msgid, translated where it is shown.
+/// category. Each is an English msgid, translated where it is shown through a variable, so
+/// each is marked with `n_!` for `scripts/update-po.sh` to extract.
 pub const SETTING_CATEGORIES: &[&str] = &[
-    "All",
-    "System",
-    "Motion",
-    "Steps Per Unit",
-    "Max Rate",
-    "Acceleration",
-    "Max Travel",
-    "Homing",
-    "Spindle",
-    "Network",
-    "Drivers",
-    "Tool",
-    "I/O",
-    "Startup",
-    "Plasma",
-    "Encoder",
-    "Modbus",
-    "RS485",
-    "Repetier EEPROM",
-    "Other",
+    n_!("All"),
+    n_!("System"),
+    n_!("Motion"),
+    n_!("Steps Per Unit"),
+    n_!("Max Rate"),
+    n_!("Acceleration"),
+    n_!("Max Travel"),
+    n_!("Homing"),
+    n_!("Spindle"),
+    n_!("Network"),
+    n_!("Drivers"),
+    n_!("Tool"),
+    n_!("I/O"),
+    n_!("Startup"),
+    n_!("Plasma"),
+    n_!("Encoder"),
+    n_!("Modbus"),
+    n_!("RS485"),
+    n_!("Repetier EEPROM"),
+    n_!("Other"),
 ];
 
 /// The category (an id of [`SETTING_CATEGORIES`]) a setting number belongs to.
