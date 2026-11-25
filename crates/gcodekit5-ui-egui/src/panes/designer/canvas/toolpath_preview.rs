@@ -7,10 +7,11 @@
 //! in laser mode the shape's own values apply. Hidden shapes are left out, as the export
 //! leaves them out.
 //!
-//! The toolpaths are built on a worker thread from a copy of the design, so a large design
-//! never stalls the frame. Each frame the design's fingerprint (its visible shapes and the
-//! settings that shape the toolpaths) is compared with the one the preview was built for;
-//! a change starts a new build, and a build whose design has changed since is discarded.
+//! The toolpaths are built on a worker thread from a copy of the visible shapes, so a large
+//! design never stalls the frame. The pane counts changes to the design (its revision); a
+//! revision newer than the preview's starts a build, at most one at a time: changes made
+//! while a build runs coalesce into the next build, which starts when the running one
+//! finishes. No build starts during a canvas drag; the release starts one.
 //! Rapid moves are dashed in the warning colour at 50%; cuts and arcs are in the success
 //! colour at 70% (GTK's colours).
 //!
@@ -18,7 +19,6 @@
 //!
 //! Dependencies: `egui`, `gcodekit5-designer` (toolpath generator, model).
 
-use std::hash::{Hash, Hasher};
 use std::sync::mpsc::{Receiver, TryRecvError, channel};
 
 use egui::{Painter, Pos2, Shape as EguiShape, Stroke};
@@ -196,55 +196,16 @@ fn visible(state: &DesignerState, flags: &ShapeFlags) -> Vec<DrawingObject> {
         .collect()
 }
 
-/// Feeds a value's `Debug` text to a hasher without building a string.
-struct HashWriter<'a, H: Hasher>(&'a mut H);
-
-impl<H: Hasher> std::fmt::Write for HashWriter<'_, H> {
-    fn write_str(&mut self, s: &str) -> std::fmt::Result {
-        s.hash(self.0);
-        Ok(())
-    }
-}
-
-/// A fingerprint of what the preview depends on: the visible shapes (a raster image by its
-/// id and bounds, since it has no vector toolpath) and the settings.
-fn fingerprint(state: &DesignerState, flags: &ShapeFlags) -> u64 {
-    use std::fmt::Write;
-    let mut hasher = std::collections::hash_map::DefaultHasher::new();
-    let mut w = HashWriter(&mut hasher);
-    for obj in state.canvas.shapes().filter(|o| !flags.is_hidden(o.id)) {
-        let written = match &obj.shape {
-            Shape::RasterImage(r) => write!(w, "{}{:?}", obj.id, r.bounds()),
-            _ => {
-                // Selection does not change toolpaths.
-                let mut copy = obj.clone();
-                copy.selected = false;
-                write!(w, "{copy:?}")
-            }
-        };
-        if written.is_err() {
-            tracing::debug!("preview fingerprint incomplete");
-        }
-    }
-    let settings = write!(
-        w,
-        "{:?}{:?}{:?}",
-        state.tool_settings, state.stock_material, state.default_properties_shape
-    );
-    if settings.is_err() {
-        tracing::debug!("preview fingerprint incomplete");
-    }
-    hasher.finish()
-}
-
 /// The preview's toolpaths and the build in progress.
 #[derive(Debug, Default)]
 pub struct ToolpathPreview {
     toolpaths: Vec<Toolpath>,
-    /// The fingerprint `toolpaths` were built for.
+    /// The design revision `toolpaths` were built for.
     built_for: Option<u64>,
-    /// The build on the worker thread and the fingerprint it builds for.
+    /// The build on the worker thread and the revision it builds for (at most one).
     running: Option<(u64, Receiver<Vec<Toolpath>>)>,
+    /// How many builds were started (for tests).
+    started: u64,
 }
 
 impl ToolpathPreview {
@@ -253,26 +214,49 @@ impl ToolpathPreview {
         &self.toolpaths
     }
 
-    /// Whether the toolpaths match the design as it is now (always true while the preview
-    /// is off).
+    /// Whether the toolpaths were built for design revision `revision` (always true while
+    /// the preview is off).
     ///
     /// # Arguments
-    /// * `state` - The design.
-    /// * `flags` - The hidden shapes.
-    pub fn is_current(&self, state: &DesignerState, flags: &ShapeFlags) -> bool {
-        !state.show_toolpaths || self.built_for == Some(fingerprint(state, flags))
+    /// * `state` - The design (whether the preview is on).
+    /// * `revision` - The design's current revision.
+    pub fn is_current(&self, state: &DesignerState, revision: u64) -> bool {
+        !state.show_toolpaths || (self.built_for == Some(revision) && self.running.is_none())
     }
 
-    /// Takes a finished build and starts a new one when the design changed; does nothing
-    /// while the preview is off.
+    /// Builds running: 0 or 1.
+    pub fn running(&self) -> usize {
+        usize::from(self.running.is_some())
+    }
+
+    /// Builds started so far.
+    pub fn started(&self) -> u64 {
+        self.started
+    }
+
+    /// Takes a finished build, then starts one for `revision` when the toolpaths are older
+    /// and no build is running. Requests made while a build runs coalesce: the next build
+    /// starts from the design as it is when the running one finishes. Nothing starts while
+    /// a canvas drag is in progress (the release changes the revision). Does nothing while
+    /// the preview is off.
     ///
     /// # Arguments
     /// * `ctx` - Repainted while a build runs, so its result is picked up.
     /// * `state` - The design.
     /// * `flags` - The hidden shapes, which are not previewed.
-    pub fn update(&mut self, ctx: &egui::Context, state: &DesignerState, flags: &ShapeFlags) {
+    /// * `revision` - The design's revision ([`super::super::DesignerPane`] counts changes).
+    /// * `dragging` - A canvas drag is in progress.
+    pub fn update(
+        &mut self,
+        ctx: &egui::Context,
+        state: &DesignerState,
+        flags: &ShapeFlags,
+        revision: u64,
+        dragging: bool,
+    ) {
         if !state.show_toolpaths {
             self.running = None;
+            self.built_for = None;
             return;
         }
         if let Some((key, receiver)) = &self.running {
@@ -289,22 +273,21 @@ impl ToolpathPreview {
                 }
             }
         }
-        let key = fingerprint(state, flags);
-        let wanted = self.built_for != Some(key);
-        let started = self.running.as_ref().is_some_and(|(k, _)| *k == key);
-        if wanted && !started {
-            // A build for an older design is dropped: its result is never read.
+        if self.running.is_none() && !dragging && self.built_for != Some(revision) {
             let (sender, receiver) = channel();
             let shapes = visible(state, flags);
             let settings = PreviewSettings::of(state);
             let spawned = std::thread::Builder::new()
                 .name("designer-toolpath-preview".into())
                 .spawn(move || {
-                    // The receiver is gone when a newer build replaced this one.
+                    // The receiver is gone when the preview was switched off meanwhile.
                     let _ = sender.send(build(&shapes, &settings));
                 });
             match spawned {
-                Ok(_) => self.running = Some((key, receiver)),
+                Ok(_) => {
+                    self.running = Some((revision, receiver));
+                    self.started += 1;
+                }
                 Err(error) => tracing::warn!(%error, "toolpath preview not built"),
             }
         }

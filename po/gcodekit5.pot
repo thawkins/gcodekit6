@@ -3253,3 +3253,9 @@ msgstr ""
 
 msgid "Stop the running job before sending G-code to the editor."
 msgstr ""
+
+msgid "The file is too large to import."
+msgstr ""
+
+msgid "The file has no shapes to import."
+msgstr ""

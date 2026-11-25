@@ -13,9 +13,11 @@
 //! way: the quit continues after a successful save, and a failed or cancelled save cancels
 //! it. After every save the app's dirty cache and `AppState::dirty.designer` are cleared.
 //!
-//! Generate G-Code and Frame replace the editor's program (as GTK did), except while a job
-//! streams: that would swap the program under the running job, like File > Open, so it is
-//! refused with a notice in the designer.
+//! Generate G-Code and Frame replace the editor's program, and the editor forgets its file
+//! (GTK cleared it too), so the next editor Save asks where. Unsaved editor edits are asked
+//! about first (Save / Discard / Cancel; a deliberate change: GTK replaced them silently).
+//! While a job streams the request is refused before anything is generated: it would swap
+//! the program under the running job, like File > Open.
 //!
 //! Dependencies: `gcodekit5-designer` (machine mode), `gcodekit5-app` (translations).
 
@@ -24,9 +26,10 @@ use std::path::Path;
 use gcodekit5_app::UnsavedChangesChoice;
 use gcodekit5_designer::designer_state::MachineMode;
 
-use super::GcodeKitApp;
+use super::{AfterSave, GcodeKitApp};
 use crate::commands::Command;
 use crate::dialogs::{Asked, ConfirmRequest, DialogAnswer, FilePurpose};
+use crate::panes::designer::ToEditor;
 use crate::workspace::PaneId;
 
 /// What runs once the design's unsaved changes are dealt with.
@@ -47,6 +50,8 @@ pub(super) struct DesignFlow {
     pub(super) after_confirm: Option<DesignNext>,
     /// What waits for the design's save dialog; `Some(None)` is a plain Save As.
     pub(super) after_save: Option<Option<DesignNext>>,
+    /// Generate / Frame waiting for the editor's unsaved-changes answer.
+    pub(super) editor_after_confirm: Option<ToEditor>,
 }
 
 /// The msgids the app shows for the designer, for the translation check.
@@ -95,8 +100,9 @@ impl GcodeKitApp {
                 }
             }
             Command::FileExportGcode => {
-                // Refused before asking where, so no dialog is shown for nothing.
-                let refusal = self.designer.borrow().export_gcode(None).err();
+                // Refused before asking where (a cheap check, no generation), so no dialog is
+                // shown for nothing.
+                let refusal = self.designer.borrow().export_check().err();
                 match refusal {
                     Some(refusal) => {
                         let message = refusal.message(&self.state.translator, true);
@@ -266,6 +272,27 @@ impl GcodeKitApp {
                     UnsavedChangesChoice::Cancel => {}
                 }
             }
+            DialogAnswer::Confirm {
+                request: ConfirmRequest::UnsavedGcode,
+                choice,
+            } if self.design.editor_after_confirm.is_some() => {
+                let Some(what) = self.design.editor_after_confirm.take() else {
+                    return true;
+                };
+                match choice.as_unsaved() {
+                    UnsavedChangesChoice::Save => self.save_editor(Some(AfterSave::ToEditor(what))),
+                    UnsavedChangesChoice::Discard => self.send_to_editor(what),
+                    UnsavedChangesChoice::Cancel => {}
+                }
+            }
+            DialogAnswer::Unavailable {
+                asked: Asked::Confirm(ConfirmRequest::UnsavedGcode),
+                reason,
+            } if self.design.editor_after_confirm.is_some() => {
+                // Without the answer the editor's edits could be lost: send nothing.
+                tracing::warn!(%reason, "unsaved-changes prompt unavailable; G-code not sent");
+                self.design.editor_after_confirm = None;
+            }
             DialogAnswer::Unavailable {
                 asked: Asked::Confirm(ConfirmRequest::UnsavedDesign),
                 reason,
@@ -282,22 +309,61 @@ impl GcodeKitApp {
         true
     }
 
-    /// Hands the designer's Generate G-Code / Frame output to the editor, unless a job
-    /// streams (then the designer says why and the editor keeps its program).
+    /// Runs the designer's Generate G-Code / Frame request: refused while a job streams
+    /// (before anything is generated); with unsaved editor edits it asks first (Save /
+    /// Discard / Cancel, as the controller ruled: GTK replaced them silently).
     pub(super) fn deliver_designer_gcode(&mut self) {
-        let Some(gcode) = self.designer.borrow_mut().take_editor_gcode() else {
+        let Some(what) = self.designer.borrow_mut().take_editor_request() else {
             return;
         };
-        if self.state.job_running() {
-            let message = self
-                .state
-                .translator
-                .tr("Stop the running job before sending G-code to the editor.")
-                .into_owned();
-            self.designer.borrow_mut().set_notice(message);
+        if self.refuse_editor_gcode_during_job() {
             return;
         }
-        self.editor.borrow_mut().buffer_mut().set_text(gcode);
-        self.sync_editor(true);
+        if self.editor.borrow().buffer().is_dirty() {
+            self.design.editor_after_confirm = Some(what);
+            self.dialogs.confirm(ConfirmRequest::UnsavedGcode);
+        } else {
+            self.send_to_editor(what);
+        }
+    }
+
+    /// While a job streams, replacing the editor's program would swap it under the job:
+    /// says so in the designer and returns `true`.
+    fn refuse_editor_gcode_during_job(&mut self) -> bool {
+        if !self.state.job_running() {
+            return false;
+        }
+        let message = self
+            .state
+            .translator
+            .tr("Stop the running job before sending G-code to the editor.")
+            .into_owned();
+        self.designer.borrow_mut().set_notice(message);
+        true
+    }
+
+    /// Generates `what` and replaces the editor's program with it; the editor forgets its
+    /// file, so its next Save asks where.
+    pub(super) fn send_to_editor(&mut self, what: ToEditor) {
+        // A job may have started while the question was up.
+        if self.refuse_editor_gcode_during_job() {
+            return;
+        }
+        let tr = self.state.translator;
+        let gcode = {
+            let mut designer = self.designer.borrow_mut();
+            match what {
+                ToEditor::Generate => designer.generate_to_editor(&tr),
+                ToEditor::Frame => designer.frame_to_editor(),
+            }
+            designer.take_editor_gcode()
+        };
+        if let Some(gcode) = gcode {
+            self.editor
+                .borrow_mut()
+                .buffer_mut()
+                .replace_with_generated(gcode);
+            self.sync_editor(true);
+        }
     }
 }

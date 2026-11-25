@@ -111,3 +111,81 @@ fn test_exported_gcode_cuts_what_the_preview_shows() {
         );
     }
 }
+
+/// Many quick changes: at most one build runs at a time, and the preview ends up matching
+/// the final design.
+#[test]
+fn test_rapid_changes_run_one_build_at_a_time_and_end_current() {
+    let mut pane = pane_with_rects(&[(10.0, 10.0, 10.0, 10.0)]);
+    pane.state_mut().show_toolpaths = true;
+    let mut h = harness(pane);
+    for i in 0..20 {
+        h.state_mut()
+            .state_mut()
+            .add_shape_with_undo(gcodekit5_designer::model::Shape::Rectangle(
+                gcodekit5_designer::model::DesignRectangle::new(
+                    10.0 + 6.0 * f64::from(i),
+                    40.0,
+                    5.0,
+                    5.0,
+                ),
+            ));
+        h.step();
+        assert!(h.state().toolpath_builds_running() <= 1);
+    }
+    wait_for_preview(&mut h);
+    let rapid = cut_points(h.state());
+    // The same design previewed from scratch.
+    let mut fresh = DesignerPane::new();
+    for obj in h.state().state().canvas.shapes() {
+        fresh.state_mut().add_shape_with_undo(obj.shape.clone());
+    }
+    fresh.state_mut().show_toolpaths = true;
+    let mut f = harness(fresh);
+    wait_for_preview(&mut f);
+    let mut a = rapid.clone();
+    let mut b = cut_points(f.state());
+    a.sort_by(|x, y| x.partial_cmp(y).unwrap_or(std::cmp::Ordering::Equal));
+    b.sort_by(|x, y| x.partial_cmp(y).unwrap_or(std::cmp::Ordering::Equal));
+    assert_eq!(a, b);
+}
+
+/// No build starts while a shape is dragged; one runs after the release.
+#[test]
+fn test_no_preview_build_during_a_drag() {
+    use crate::test_designer_canvas::{button, screen};
+    use egui::{Modifiers, PointerButton};
+    let mut pane = pane_with_rects(&[(20.0, 20.0, 40.0, 30.0)]);
+    pane.state_mut().show_toolpaths = true;
+    let mut h = harness(pane);
+    wait_for_preview(&mut h);
+    let before = h.state().toolpath_builds_started();
+    let from = screen(&h, 40.0, 35.0);
+    h.event(egui::Event::PointerMoved(from));
+    h.step();
+    button(&h, from, PointerButton::Primary, true, Modifiers::NONE);
+    h.step();
+    for t in 1..=8 {
+        let to = screen(&h, 40.0 + 5.0 * t as f32, 35.0);
+        h.event(egui::Event::PointerMoved(to));
+        h.step();
+        std::thread::sleep(Duration::from_millis(2));
+    }
+    assert!(h.state().dragging());
+    assert_eq!(
+        h.state().toolpath_builds_started(),
+        before,
+        "no build mid-drag"
+    );
+    let to = screen(&h, 80.0, 35.0);
+    button(&h, to, PointerButton::Primary, false, Modifiers::NONE);
+    h.step();
+    wait_for_preview(&mut h);
+    assert!(h.state().toolpath_builds_started() > before);
+    assert!(
+        cut_points(h.state())
+            .iter()
+            .any(|&(x, _)| (x - 100.0).abs() < 0.01),
+        "the preview follows the moved shape"
+    );
+}

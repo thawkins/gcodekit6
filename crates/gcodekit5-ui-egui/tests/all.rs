@@ -30,12 +30,16 @@ mod test_designer_array;
 mod test_designer_canvas;
 #[path = "test_designer_editing.rs"]
 mod test_designer_editing;
+#[path = "test_designer_editor_handoff.rs"]
+mod test_designer_editor_handoff;
 #[path = "test_designer_files.rs"]
 mod test_designer_files;
 #[path = "test_designer_files_app.rs"]
 mod test_designer_files_app;
 #[path = "test_designer_gallery.rs"]
 mod test_designer_gallery;
+#[path = "test_designer_import.rs"]
+mod test_designer_import;
 #[path = "test_designer_layers.rs"]
 mod test_designer_layers;
 #[path = "test_designer_properties.rs"]

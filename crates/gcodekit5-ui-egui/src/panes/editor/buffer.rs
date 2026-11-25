@@ -109,6 +109,18 @@ impl EditorBuffer {
         self.mark_edited();
     }
 
+    /// Replaces the text with a program generated elsewhere (the designer's Generate G-Code
+    /// or Frame): the buffer becomes dirty and forgets its file, so the next Save asks where
+    /// instead of overwriting the file that was open (GTK cleared the current file too).
+    ///
+    /// # Arguments
+    /// * `text` - The generated program.
+    pub fn replace_with_generated(&mut self, text: String) {
+        self.text = text;
+        self.path = None;
+        self.mark_edited();
+    }
+
     /// The text for a widget to edit in place; call [`EditorBuffer::mark_edited`] after it
     /// changed.
     pub(crate) fn text_mut(&mut self) -> &mut String {

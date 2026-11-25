@@ -12,10 +12,11 @@
 //! - Save writes through the model's serialization to a temporary file beside the target,
 //!   then renames it ([`crate::files`]): a read-only target is refused and a failed save
 //!   leaves the design modified.
-//! - Import adds the shapes of an SVG or DXF file (each as its own undo step), applies a
+//! - Import adds the shapes of an SVG or DXF file as one undo step, applies a
 //!   DXF entity's elevation and thickness, switches to CNC mode when any shape has depth,
 //!   fits the view and reports discarded solids and replaced numbers. An image becomes a
-//!   raster shape, in laser mode only.
+//!   raster shape, in laser mode only. Files over [`MAX_IMPORT_BYTES`] are refused before
+//!   they are read.
 //!
 //! New and Open also forget the layers panel's hidden and locked shapes: they are view state
 //! keyed by shape id, and ids repeat between documents. The outcome is shown as the pane's
@@ -30,12 +31,18 @@
 use std::path::Path;
 
 use gcodekit5_app::i18n::Translator;
+use gcodekit5_designer::DesignerState;
+use gcodekit5_designer::commands::{DesignerCommand, PasteShapes};
 use gcodekit5_designer::designer_state::MachineMode;
 use gcodekit5_designer::image_importer::ImageImporter;
 use gcodekit5_designer::import::{DxfImporter, ImportedDesign, SvgImporter};
 
 use super::DesignerPane;
 use super::canvas::editing;
+
+/// The largest file Import reads (64 MiB): imports run on the UI thread, and a larger
+/// drawing or image would stall the window.
+pub const MAX_IMPORT_BYTES: u64 = 64 * 1024 * 1024;
 
 /// The msgids the document operations show, for the translation check.
 pub fn msgids() -> Vec<&'static str> {
@@ -61,6 +68,8 @@ pub fn msgids() -> Vec<&'static str> {
         n_!("Raster image import is only available in 2D mode"),
         n_!("Image imported successfully"),
         n_!("Import error"),
+        n_!("The file is too large to import."),
+        n_!("The file has no shapes to import."),
         n_!("Close"),
     ]
 }
@@ -90,6 +99,7 @@ impl DesignerPane {
     /// * `mode` - Laser 2D (File > New 2D) or CNC 3D (File > New 3D).
     /// * `tr` - Translator for the notice.
     pub fn new_design(&mut self, mode: MachineMode, tr: &Translator) {
+        self.touch();
         self.state.new_design();
         self.state.set_machine_mode(mode);
         self.state.is_modified = false;
@@ -131,6 +141,7 @@ impl DesignerPane {
         next.canvas.set_next_id(max_id + 1);
         next.is_modified = false;
         self.state = next;
+        self.touch();
         self.forget_view_state();
         let zoom = self.state.canvas.zoom();
         if !(zoom.is_finite() && zoom > 0.0001) && self.state.canvas.shape_count() > 0 {
@@ -150,7 +161,11 @@ impl DesignerPane {
     /// # Returns
     /// Whether the file was written.
     pub fn save_design(&mut self, path: &Path, tr: &Translator) -> bool {
-        let (file, modified) = (self.state.current_file_path.clone(), self.state.is_modified);
+        let (file, modified, name) = (
+            self.state.current_file_path.clone(),
+            self.state.is_modified,
+            self.state.design_name.clone(),
+        );
         if let Some(stem) = path.file_stem() {
             self.state.design_name = stem.to_string_lossy().into_owned();
         }
@@ -170,6 +185,7 @@ impl DesignerPane {
                 // The model's save names the temporary file as the design's file.
                 self.state.current_file_path = file;
                 self.state.is_modified = modified;
+                self.state.design_name = name;
                 self.notice = Some(format!(
                     "{}: {}: {error}",
                     tr.tr("Save Failed"),
@@ -189,6 +205,9 @@ impl DesignerPane {
     /// # Returns
     /// Whether anything was imported.
     pub fn import_file(&mut self, path: &Path, tr: &Translator) -> bool {
+        if self.refuse_large_import(path, tr) {
+            return false;
+        }
         let extension = path
             .extension()
             .and_then(|e| e.to_str())
@@ -202,7 +221,17 @@ impl DesignerPane {
             None => Err(anyhow::anyhow!("Unknown file extension")),
         };
         match result {
+            Ok(design) if design.shapes.is_empty() => {
+                // A reader that skips what it cannot parse may find nothing at all.
+                self.notice = Some(format!(
+                    "{} {}",
+                    tr.tr("Error importing file:"),
+                    tr.tr("The file has no shapes to import.")
+                ));
+                false
+            }
             Ok(design) => {
+                self.touch();
                 let messages = self.add_imported(design, tr);
                 let mut notice = format!("{} {}", tr.tr("Imported:"), path.display());
                 for message in messages {
@@ -230,18 +259,35 @@ impl DesignerPane {
         if z.len() != design.shapes.len() {
             z = vec![(0.0, 0.0); design.shapes.len()];
         }
+        // The model gives a new shape its mode defaults only through `add_shape_with_undo*`,
+        // so each shape is made in a scratch design with the same defaults, then every
+        // shape is added here with one `PasteShapes` command: one import is one undo step.
+        let mut scratch = DesignerState::new();
+        scratch.default_properties_shape = self.state.default_properties_shape.clone();
         let mut with_depth = false;
+        let mut objects = Vec::new();
         for (shape, (elevation, thickness)) in design.shapes.into_iter().zip(z) {
-            if elevation.abs() > f64::EPSILON || thickness.abs() > f64::EPSILON {
+            let id = if elevation.abs() > f64::EPSILON || thickness.abs() > f64::EPSILON {
                 with_depth = true;
-                self.state
-                    .add_shape_with_undo_and_depth(shape, elevation, thickness.abs());
+                scratch.add_shape_with_undo_and_depth(shape, elevation, thickness.abs())
             } else {
-                self.state.add_shape_with_undo(shape);
+                scratch.add_shape_with_undo(shape)
+            };
+            if let Some(mut obj) = scratch.canvas.get_shape(id).cloned() {
+                obj.id = self.state.canvas.generate_id();
+                objects.push(obj);
             }
         }
+        if !objects.is_empty() {
+            self.state
+                .push_command(DesignerCommand::PasteShapes(PasteShapes {
+                    ids: objects.iter().map(|o| o.id).collect(),
+                    objects: objects.into_iter().map(Some).collect(),
+                }));
+        }
         let mut messages = Vec::new();
-        // Laser 2D ignores per-shape Z, so geometry with depth switches to CNC 3D.
+        // Laser 2D ignores per-shape Z, so geometry with depth switches to CNC 3D. The model
+        // has no undoable machine-mode command, so undo removes the shapes and keeps the mode.
         if with_depth && self.state.machine_mode() != MachineMode::Cnc3D {
             self.state.set_machine_mode(MachineMode::Cnc3D);
             messages.push(format!(
@@ -290,8 +336,12 @@ impl DesignerPane {
             );
             return false;
         }
+        if self.refuse_large_import(path, tr) {
+            return false;
+        }
         match ImageImporter::import(path) {
             Ok(shape) => {
+                self.touch();
                 self.state.add_shape_with_undo(shape);
                 self.notice = Some(tr.tr("Image imported successfully").into_owned());
                 true
@@ -302,6 +352,23 @@ impl DesignerPane {
                 false
             }
         }
+    }
+
+    /// Refuses a file over [`MAX_IMPORT_BYTES`] with a notice; an unreadable size is left to
+    /// the importer's own error.
+    ///
+    /// # Returns
+    /// Whether the file was refused.
+    fn refuse_large_import(&mut self, path: &Path, tr: &Translator) -> bool {
+        let too_large = std::fs::metadata(path).is_ok_and(|m| m.len() > MAX_IMPORT_BYTES);
+        if too_large {
+            self.notice = Some(format!(
+                "{} {}",
+                tr.tr("Error importing file:"),
+                tr.tr("The file is too large to import.")
+            ));
+        }
+        too_large
     }
 
     /// Forgets the view state of the previous document: hidden and locked shapes, a drag or

@@ -4,13 +4,16 @@
 //! Every G-code export goes through [`DesignerPane::generate_gcode`], which works on a copy
 //! of the design without the layers panel's hidden shapes, so a hidden shape is never cut
 //! (it reads nothing back from the live design: the copy's `generated_gcode` is discarded).
-//! Before generating, GTK's checks apply: nothing to export, every shape hidden ("Nothing to
+//! Before generating, GTK's checks apply ([`DesignerPane::export_check`], which generates
+//! nothing): nothing to export, every shape hidden ("Nothing to
 //! export: all shapes are hidden"), or objects at or above Safe Z in CNC mode (export
 //! blocked, with the counts). Toolpaths outside the machine limits still export, with GTK's
 //! warning. Generate G-Code with one raster image selected engraves that image instead.
 //!
-//! The G-code for the editor waits in [`DesignerPane::take_editor_gcode`] for the app, which
-//! replaces the editor's program with it (refused while a job runs).
+//! The toolbox's buttons only ask ([`DesignerPane::request_to_editor`]); the app checks for a
+//! running job and unsaved editor edits first, then calls [`DesignerPane::generate_to_editor`]
+//! or [`DesignerPane::frame_to_editor`] and takes the result from
+//! [`DesignerPane::take_editor_gcode`].
 //!
 //! Ported from the GTK `designer/file_ops.rs` (`export_gcode`, `export_svg`),
 //! `designer/mod.rs` (Generate G-Code, frame bounds) and `designer_toolbox.rs`
@@ -23,14 +26,24 @@ use std::path::Path;
 
 use gcodekit5_app::i18n::Translator;
 use gcodekit5_designer::DesignerState;
+use gcodekit5_designer::designer_state::MachineMode;
 use gcodekit5_designer::engraving::image_engraver::{
     EngravingParams, HalftoneMethod, ImageEngraver, OVERSCAN_MM, RotationAngle, ScanDirection,
 };
 use gcodekit5_designer::gcode_gen::MachineLimits;
-use gcodekit5_designer::model::{RasterImage, Shape};
+use gcodekit5_designer::model::{DesignerShape, RasterImage, Shape};
 
 use super::DesignerPane;
 use super::svg_export;
+
+/// What the toolbox asks to send to the editor.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ToEditor {
+    /// Generate G-Code: the design's program.
+    Generate,
+    /// Frame: a low-power frame around the design.
+    Frame,
+}
 
 /// Why a G-code export did not run.
 #[derive(Clone, Debug, PartialEq)]
@@ -153,6 +166,20 @@ fn frame_gcode(x1: f64, y1: f64, x2: f64, y2: f64) -> String {
 }
 
 impl DesignerPane {
+    /// Asks for G-code for the editor (the toolbox's Generate G-Code or Frame); the app
+    /// takes the request ([`DesignerPane::take_editor_request`]) and decides when to run it.
+    ///
+    /// # Arguments
+    /// * `what` - Generate G-Code or Frame.
+    pub fn request_to_editor(&mut self, what: ToEditor) {
+        self.editor_request = Some(what);
+    }
+
+    /// Takes the pending request for editor G-code, once.
+    pub fn take_editor_request(&mut self) -> Option<ToEditor> {
+        self.editor_request.take()
+    }
+
     /// A copy of the design without the hidden shapes, with the toolpath generator set from
     /// the tool settings as GTK did before generating.
     fn export_copy(&self) -> DesignerState {
@@ -197,25 +224,52 @@ impl DesignerPane {
         &self,
         machine_limits: Option<MachineLimits>,
     ) -> Result<GcodeExport, ExportRefusal> {
-        if self.state.canvas.shape_count() == 0 {
+        self.export_check()?;
+        let (gcode, out_of_limits) = self
+            .export_copy()
+            .generate_gcode_with_warning_info(machine_limits);
+        Ok(GcodeExport {
+            gcode,
+            out_of_limits,
+        })
+    }
+
+    /// The export's refusals without generating anything (cheap, for asking before a file
+    /// dialog): no shapes, every shape hidden, or visible objects at or above Safe Z in CNC
+    /// mode (the model's rule: an object starts at stock thickness minus its start depth).
+    ///
+    /// # Errors
+    /// Why the export would be refused.
+    pub fn export_check(&self) -> Result<(), ExportRefusal> {
+        let canvas = &self.state.canvas;
+        if canvas.shape_count() == 0 {
             return Err(ExportRefusal::Empty);
         }
-        let mut copy = self.export_copy();
-        if copy.canvas.shape_count() == 0 {
+        let mut visible = canvas
+            .shapes()
+            .filter(|o| !self.flags.is_hidden(o.id))
+            .peekable();
+        if visible.peek().is_none() {
             return Err(ExportRefusal::AllHidden);
         }
-        if let Some((safe_z, count, max_start_z)) = copy.safe_z_clearance_violation_summary() {
+        if self.state.machine_mode() != MachineMode::Cnc3D {
+            return Ok(());
+        }
+        let stock = self.state.stock_material.as_ref();
+        let safe_z = stock.map_or(10.0, |s| f64::from(s.safe_z));
+        let thickness = stock.map_or(10.0, |s| f64::from(s.thickness));
+        let (count, max_start_z) = visible
+            .map(|o| thickness - o.start_depth)
+            .filter(|z| *z >= safe_z)
+            .fold((0, f64::NEG_INFINITY), |(n, m), z| (n + 1, m.max(z)));
+        if count > 0 {
             return Err(ExportRefusal::AboveSafeZ {
                 safe_z,
                 count,
                 max_start_z,
             });
         }
-        let (gcode, out_of_limits) = copy.generate_gcode_with_warning_info(machine_limits);
-        Ok(GcodeExport {
-            gcode,
-            out_of_limits,
-        })
+        Ok(())
     }
 
     /// Exports the design's G-code to `path` (File > Export G-Code).
@@ -312,19 +366,24 @@ impl DesignerPane {
         }
     }
 
-    /// The toolbox's Frame: a low-power laser frame around the selection, or the visible
-    /// shapes, for the editor; nothing when there is nothing to frame. A selected raster
+    /// The toolbox's Frame: a low-power laser frame around the visible selection, or the
+    /// visible shapes, for the editor; nothing when there is nothing to frame. A selected raster
     /// image's frame is moved by its overscan, as its engraving is.
     pub fn frame_to_editor(&mut self) {
-        let selection = self.state.canvas.selection_bounds();
-        let bounds = selection.or_else(|| {
+        let union = |a: (f64, f64, f64, f64), b: (f64, f64, f64, f64)| {
+            (a.0.min(b.0), a.1.min(b.1), a.2.max(b.2), a.3.max(b.3))
+        };
+        let visible = || {
             self.state
                 .canvas
                 .shapes()
                 .filter(|o| !self.flags.is_hidden(o.id))
-                .map(|o| o.get_total_bounds())
-                .reduce(|a, b| (a.0.min(b.0), a.1.min(b.1), a.2.max(b.2), a.3.max(b.3)))
-        });
+        };
+        let selection = visible()
+            .filter(|o| o.selected)
+            .map(|o| o.shape.bounds())
+            .reduce(union);
+        let bounds = selection.or_else(|| visible().map(|o| o.get_total_bounds()).reduce(union));
         let Some((x1, y1, x2, y2)) = bounds else {
             tracing::debug!("frame requested but the canvas is empty");
             return;

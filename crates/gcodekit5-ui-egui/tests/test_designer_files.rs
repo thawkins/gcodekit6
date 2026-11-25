@@ -7,7 +7,8 @@ use std::path::{Path, PathBuf};
 
 use gcodekit5_app::i18n::Translator;
 use gcodekit5_designer::designer_state::MachineMode;
-use gcodekit5_designer::model::{DesignRectangle, DesignerShape, Shape};
+use gcodekit5_designer::model::{DesignRectangle, DesignText, DesignerShape, Shape};
+use gcodekit5_designer::shapes::OperationType;
 use gcodekit5_ui_egui::panes::designer::DesignerPane;
 use gcodekit5_ui_egui::panes::designer::export::ExportRefusal;
 
@@ -110,6 +111,31 @@ fn test_save_then_open_round_trips_the_design() -> std::io::Result<()> {
     let mut pane = pane_with_rects(&[(10.0, 20.0, 30.0, 40.0), (100.0, 50.0, 25.0, 25.0)]);
     pane.state_mut().set_machine_mode(MachineMode::Cnc3D);
     pane.state_mut().set_feed_rate(777.0);
+    {
+        let state = pane.state_mut();
+        state.add_shape_with_undo(Shape::Text(DesignText::new(
+            "Hello".into(),
+            60.0,
+            120.0,
+            10.0,
+        )));
+        state.deselect_all();
+        let ids: Vec<u64> = state.canvas.shapes().map(|o| o.id).collect();
+        if let Some(obj) = state.canvas.get_shape_mut(ids[0]) {
+            obj.name = "Left".into();
+            obj.operation_type = OperationType::Pocket;
+            obj.use_custom_values = true;
+            obj.pocket_depth = 2.5;
+            obj.step_in = 0.75;
+            obj.ramp_angle = 5.0;
+            obj.step_down = 0.5;
+        }
+        for id in &ids[..2] {
+            state.canvas.select_shape(*id, true);
+        }
+        state.group_selected();
+        state.deselect_all();
+    }
     assert!(pane.is_modified());
     assert!(pane.save_design(&path, &en()));
     assert!(!pane.is_modified(), "a save clears the modified flag");
@@ -139,14 +165,60 @@ fn test_save_then_open_round_trips_the_design() -> std::io::Result<()> {
         b
     };
     assert_eq!(bounds(&other), bounds(&pane));
+    // Per-shape properties survive: names, group ids, CAM values and text content.
+    let props = |p: &DesignerPane| {
+        let mut v: Vec<String> = p
+            .state()
+            .canvas
+            .shapes()
+            .map(|o| {
+                let text = match &o.shape {
+                    Shape::Text(t) => t.text.clone(),
+                    _ => String::new(),
+                };
+                format!(
+                    "{} {} {:?} {:?} {} {} {} {} {} {}",
+                    o.id,
+                    o.name,
+                    o.group_id,
+                    o.operation_type,
+                    o.use_custom_values,
+                    o.pocket_depth,
+                    o.step_in,
+                    o.ramp_angle,
+                    o.step_down,
+                    text
+                )
+            })
+            .collect();
+        v.sort();
+        v
+    };
+    assert_eq!(props(&other), props(&pane));
+    assert!(
+        props(&other)
+            .iter()
+            .any(|p| p.contains("Left") && p.contains("Pocket"))
+    );
+    assert!(props(&other).iter().any(|p| p.ends_with("Hello")));
+    assert_eq!(
+        other
+            .state()
+            .canvas
+            .shapes()
+            .filter(|o| o.group_id.is_some())
+            .count(),
+        2,
+        "the group survives"
+    );
     // Ids continue after the loaded shapes: a new shape gets a fresh one.
     let before = ids(&other);
     other
         .state_mut()
         .add_shape_with_undo(Shape::Rectangle(DesignRectangle::new(0.0, 0.0, 5.0, 5.0)));
     let after = ids(&other);
-    assert_eq!(after.len(), 3);
-    assert!(after.iter().filter(|id| before.contains(id)).count() == 2);
+    assert_eq!(after.len(), 4);
+    assert!(after.iter().filter(|id| before.contains(id)).count() == 3);
     // Undo does not reach into the previous document.
     assert!(!other.state().can_redo());
     Ok(())
@@ -176,6 +248,11 @@ fn test_save_refuses_a_read_only_target_and_stays_modified() -> std::io::Result<
     assert_eq!(std::fs::read_to_string(&path)?, "old");
     assert!(pane.notice().is_some_and(|n| n.starts_with("Save Failed")));
     assert_eq!(pane.design_path(), None);
+    assert_eq!(
+        pane.state().design_name,
+        "Untitled",
+        "a failed save keeps the design's name"
+    );
     let mut perms = std::fs::metadata(&path)?.permissions();
     #[allow(clippy::permissions_set_readonly_false)]
     perms.set_readonly(false);
@@ -304,4 +381,19 @@ fn test_generate_and_frame_hand_gcode_to_the_editor() {
     assert!(frame.contains("G0 X10.000 Y20.000"), "{frame}");
     assert!(frame.contains("G1 X40.000 Y20.000"), "{frame}");
     assert!(frame.contains("X40.000 Y60.000"), "{frame}");
+}
+
+/// Frame never includes a hidden shape, even one still flagged selected.
+#[test]
+fn test_frame_leaves_out_hidden_shapes() {
+    let mut pane = pane_with_rects(&[(10.0, 20.0, 30.0, 40.0), (100.0, 100.0, 50.0, 50.0)]);
+    let ids = ids(&pane);
+    pane.set_hidden(ids[1], true);
+    for id in &ids {
+        pane.state_mut().canvas.select_shape(*id, true);
+    }
+    pane.frame_to_editor();
+    let frame = pane.take_editor_gcode().expect("frame G-code");
+    assert!(frame.contains("G1 X40.000 Y20.000"), "{frame}");
+    assert!(!frame.contains("150.000"), "{frame}");
 }

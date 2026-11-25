@@ -3332,3 +3332,9 @@ msgstr "Nada que exportar: todas las formas están ocultas"
 
 msgid "Stop the running job before sending G-code to the editor."
 msgstr "Detenga el trabajo en curso antes de enviar G-code al editor."
+
+msgid "The file is too large to import."
+msgstr "El archivo es demasiado grande para importarlo."
+
+msgid "The file has no shapes to import."
+msgstr "El archivo no contiene formas para importar."

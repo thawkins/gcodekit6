@@ -25,11 +25,12 @@ pub mod file_ops;
 pub mod layers;
 pub mod properties;
 pub mod shape_gallery;
+mod shared;
 pub mod svg_export;
 pub mod toolbox;
 
-use std::cell::RefCell;
-use std::rc::Rc;
+pub use export::ToEditor;
+pub use shared::SharedDesigner;
 
 use gcodekit5_app::i18n::Translator;
 use gcodekit5_core::units::MeasurementSystem;
@@ -92,6 +93,10 @@ pub struct DesignerPane {
     editor_gcode: Option<String>,
     /// The machine's working area from the settings, for the out-of-limits check.
     limits: Option<MachineLimits>,
+    /// The toolbox asked for G-code for the editor; the app runs it.
+    editor_request: Option<ToEditor>,
+    /// Counts changes to the design ([`DesignerPane::revision`]).
+    revision: u64,
 }
 
 impl std::fmt::Debug for DesignerPane {
@@ -130,6 +135,8 @@ impl DesignerPane {
             notice: None,
             editor_gcode: None,
             limits: None,
+            editor_request: None,
+            revision: 0,
         }
     }
 
@@ -140,7 +147,7 @@ impl DesignerPane {
 
     /// Whether the preview matches the design as it is now (true while it is off).
     pub fn toolpath_preview_ready(&self) -> bool {
-        self.toolpaths.is_current(&self.state, &self.flags)
+        self.toolpaths.is_current(&self.state, self.revision)
     }
 
     /// Whether the Array dialog is open.
@@ -195,9 +202,36 @@ impl DesignerPane {
         &self.state
     }
 
-    /// The design, for edits made outside the canvas.
+    /// The design, for edits made outside the canvas; counts as a change to the design
+    /// ([`DesignerPane::revision`]).
     pub fn state_mut(&mut self) -> &mut DesignerState {
+        self.touch();
         &mut self.state
+    }
+
+    /// The design's revision: a counter that grows with every change that can reach the
+    /// toolpaths (an edit through [`DesignerPane::state_mut`], undo and redo, hiding, a file
+    /// operation, and each frame in which the user finished an action in the pane: a button
+    /// release or a key). Spurious increments only cost a preview rebuild.
+    pub fn revision(&self) -> u64 {
+        self.revision
+    }
+
+    /// Records a change to the design.
+    pub(crate) fn touch(&mut self) {
+        self.revision += 1;
+    }
+
+    /// Toolpath preview builds running: 0 or 1.
+    #[doc(hidden)]
+    pub fn toolpath_builds_running(&self) -> usize {
+        self.toolpaths.running()
+    }
+
+    /// Toolpath preview builds started so far.
+    #[doc(hidden)]
+    pub fn toolpath_builds_started(&self) -> u64 {
+        self.toolpaths.started()
     }
 
     /// The current tool.
@@ -227,6 +261,7 @@ impl DesignerPane {
     /// * `id` - The shape.
     /// * `hidden` - Whether it is hidden from now on.
     pub fn set_hidden(&mut self, id: u64, hidden: bool) {
+        self.touch();
         self.flags.set_hidden(id, hidden);
         if hidden {
             self.deselect(id);
@@ -293,6 +328,7 @@ impl DesignerPane {
             tracing::debug!("undo ignored during a canvas drag");
         } else {
             self.state.undo();
+            self.touch();
             self.deselect_unpickable();
         }
     }
@@ -303,6 +339,7 @@ impl DesignerPane {
             tracing::debug!("redo ignored during a canvas drag");
         } else {
             self.state.redo();
+            self.touch();
             self.deselect_unpickable();
         }
     }
@@ -355,7 +392,9 @@ impl DesignerPane {
         }
         self.array.show(ui.ctx(), &mut self.state, self.units, tr);
         self.view = CanvasView::new(rect, self.state.canvas.viewport());
-        self.toolpaths.update(ui.ctx(), &self.state, &self.flags);
+        let dragging = self.dragging();
+        self.toolpaths
+            .update(ui.ctx(), &self.state, &self.flags, self.revision, dragging);
         let palette = crate::theme::palette(ui.ctx().theme());
         let painter = ui.painter_at(rect);
         rendering::paint(
@@ -450,10 +489,25 @@ impl Pane for DesignerPane {
             self.gallery.open();
         }
         if out.generate {
-            self.generate_to_editor(tr);
+            self.request_to_editor(ToEditor::Generate);
         }
         if out.frame {
-            self.frame_to_editor();
+            self.request_to_editor(ToEditor::Frame);
+        }
+        // A finished user action (a release, a key) may have changed the design.
+        let acted = ui.input(|i| {
+            i.pointer.any_released()
+                || i.events.iter().any(|e| {
+                    matches!(
+                        e,
+                        egui::Event::Key { pressed: true, .. }
+                            | egui::Event::Text(_)
+                            | egui::Event::Paste(_)
+                    )
+                })
+        });
+        if acted {
+            self.touch();
         }
         self.show_notice(ui, tr);
         self.show_canvas(ui, tr);
@@ -528,45 +582,5 @@ impl Pane for DesignerPane {
             grid_major: config.ui.grid_major_line_width as f32,
             grid_minor: config.ui.grid_minor_line_width as f32,
         };
-    }
-}
-
-/// The designer pane shared between the workspace, which draws it, and the app, which routes
-/// commands to it and reads its modified flag (and, later, the layers, properties and file
-/// commands).
-#[derive(Debug, Clone)]
-pub struct SharedDesigner(pub Rc<RefCell<DesignerPane>>);
-
-impl Pane for SharedDesigner {
-    fn id(&self) -> PaneId {
-        PaneId::Designer
-    }
-
-    fn title(&self, tr: &Translator) -> String {
-        tr.tr(PaneId::Designer.title_msgid()).into_owned()
-    }
-
-    fn ui(&mut self, ui: &mut egui::Ui, ctx: &mut PaneContext) {
-        match self.0.try_borrow_mut() {
-            Ok(mut pane) => pane.ui(ui, ctx),
-            Err(error) => tracing::warn!(%error, "designer busy; not drawn this frame"),
-        }
-    }
-
-    fn command(&mut self, command: Command, ctx: &mut PaneContext) -> bool {
-        match self.0.try_borrow_mut() {
-            Ok(mut pane) => pane.command(command, ctx),
-            Err(error) => {
-                tracing::warn!(%error, ?command, "designer busy; command dropped");
-                false
-            }
-        }
-    }
-
-    fn configure(&mut self, config: &Config) {
-        match self.0.try_borrow_mut() {
-            Ok(mut pane) => pane.configure(config),
-            Err(error) => tracing::warn!(%error, "designer busy; settings not applied"),
-        }
     }
 }

@@ -206,11 +206,13 @@ struct QuitFlow {
 
 /// What to do once the editor's G-code is saved.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum AfterSave {
+pub(crate) enum AfterSave {
     /// Go on quitting (the quit prompt's Save).
     Quit,
     /// Ask for a file to open (Open with unsaved changes, Save chosen).
     Open,
+    /// Hand the designer's G-code to the editor (Generate / Frame over unsaved edits).
+    ToEditor(crate::panes::designer::ToEditor),
 }
 
 /// Root application of the egui front end.
@@ -1030,7 +1032,7 @@ impl GcodeKitApp {
 
     /// Saves the editor's G-code to its file, or asks where when it has none; `then` runs
     /// once it is saved.
-    fn save_editor(&mut self, then: Option<AfterSave>) {
+    pub(super) fn save_editor(&mut self, then: Option<AfterSave>) {
         let has_path = self.editor.borrow().buffer().path().is_some();
         if has_path {
             let result = self.editor.borrow_mut().buffer_mut().save();
@@ -1072,8 +1074,9 @@ impl GcodeKitApp {
         match (saved, then) {
             (true, Some(AfterSave::Quit)) => self.continue_quit(),
             (true, Some(AfterSave::Open)) => self.ask_open_gcode(),
+            (true, Some(AfterSave::ToEditor(what))) => self.send_to_editor(what),
             (false, Some(AfterSave::Quit)) => self.cancel_quit(),
-            (false, Some(AfterSave::Open)) | (_, None) => {}
+            (false, Some(AfterSave::Open | AfterSave::ToEditor(_))) | (_, None) => {}
         }
     }
 

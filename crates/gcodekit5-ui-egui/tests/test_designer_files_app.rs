@@ -1,11 +1,11 @@
 //! Designer file commands in the app: File > Open / Save / Save As reach the design while a
 //! designer pane is the active one, New asks about unsaved changes first, Save from the quit
-//! prompt saves the design before quitting, Import and Export go through their dialogs, and
-//! Generate G-Code replaces the editor's program (refused while a job runs).
+//! prompt saves the design before quitting (after the editor's prompt; a failed save cancels
+//! the quit), and Import and Export go through their dialogs. The editor hand-off (Generate
+//! G-Code, Frame) is in `test_designer_editor_handoff.rs`.
 
 use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
 
 use craft_dialogs::{Answer, MessageResult, Request};
 use egui::{ViewportCommand, ViewportId};
@@ -23,15 +23,17 @@ use crate::test_designer_files::{fixture, scratch};
 
 /// The dialogs shown (titles) and the answers still to give, in order.
 #[derive(Default)]
-struct Script {
+pub struct Script {
     shown: Vec<String>,
+    /// The message boxes' texts, in order.
+    details: Vec<String>,
     answers: VecDeque<Answer>,
 }
 
-type Shared = Arc<Mutex<Script>>;
+pub type Shared = Arc<Mutex<Script>>;
 
 /// The app with the Designer active, its dialogs answered from a script.
-fn app(state: AppState) -> (Harness<'static, GcodeKitApp>, Shared) {
+pub fn app(state: AppState) -> (Harness<'static, GcodeKitApp>, Shared) {
     let mut app = GcodeKitApp::from_state(state);
     let script: Shared = Arc::default();
     let s = Arc::clone(&script);
@@ -39,7 +41,10 @@ fn app(state: AppState) -> (Harness<'static, GcodeKitApp>, Shared) {
         .set_override(Some(Box::new(move |request: &Request| {
             let mut s = s.lock().unwrap_or_else(std::sync::PoisonError::into_inner);
             let title = match request {
-                Request::Message(m) => m.title.clone(),
+                Request::Message(m) => {
+                    s.details.push(m.description.clone());
+                    m.title.clone()
+                }
                 Request::File(f) => f.title.clone().unwrap_or_default(),
             };
             s.shown.push(title);
@@ -65,7 +70,7 @@ fn app(state: AppState) -> (Harness<'static, GcodeKitApp>, Shared) {
     (h, script)
 }
 
-fn default_state() -> AppState {
+pub fn default_state() -> AppState {
     AppState::new(
         SettingsManager::detached(Config::default()),
         crate::test_smoke::native_decision(),
@@ -73,19 +78,24 @@ fn default_state() -> AppState {
 }
 
 /// Queues the next dialog answers.
-fn answer(script: &Shared, answers: impl IntoIterator<Item = Answer>) {
+pub fn answer(script: &Shared, answers: impl IntoIterator<Item = Answer>) {
     if let Ok(mut s) = script.lock() {
         s.answers.extend(answers);
     }
 }
 
-fn shown(script: &Shared) -> Vec<String> {
+pub fn shown(script: &Shared) -> Vec<String> {
     script.lock().map(|s| s.shown.clone()).unwrap_or_default()
+}
+
+/// The texts of the message boxes shown so far.
+pub fn details(script: &Shared) -> Vec<String> {
+    script.lock().map(|s| s.details.clone()).unwrap_or_default()
 }
 
 /// One frame as eframe runs it (logic, ui, then the dialogs); returns the root viewport's
 /// commands.
-fn frame(h: &mut Harness<'_, GcodeKitApp>) -> Vec<ViewportCommand> {
+pub fn frame(h: &mut Harness<'_, GcodeKitApp>) -> Vec<ViewportCommand> {
     h.step();
     let commands = h
         .output()
@@ -100,11 +110,11 @@ fn frame(h: &mut Harness<'_, GcodeKitApp>) -> Vec<ViewportCommand> {
 }
 
 /// Runs a few frames, collecting their commands.
-fn frames(h: &mut Harness<'_, GcodeKitApp>, n: usize) -> Vec<ViewportCommand> {
+pub fn frames(h: &mut Harness<'_, GcodeKitApp>, n: usize) -> Vec<ViewportCommand> {
     (0..n).flat_map(|_| frame(h)).collect()
 }
 
-fn add_rect(h: &mut Harness<'_, GcodeKitApp>) {
+pub fn add_rect(h: &mut Harness<'_, GcodeKitApp>) {
     h.state()
         .designer()
         .borrow_mut()
@@ -115,13 +125,13 @@ fn add_rect(h: &mut Harness<'_, GcodeKitApp>) {
     frame(h);
 }
 
-fn save() -> Answer {
+pub fn save() -> Answer {
     Answer::Message(MessageResult::Custom("Save".into()))
 }
-fn discard() -> Answer {
+pub fn discard() -> Answer {
     Answer::Message(MessageResult::Custom("Discard".into()))
 }
-fn path(p: &std::path::Path) -> Answer {
+pub fn path(p: &std::path::Path) -> Answer {
     Answer::Paths(vec![p.to_path_buf()])
 }
 
@@ -320,37 +330,54 @@ fn test_export_gcode_with_every_shape_hidden_asks_nothing() {
     );
 }
 
+/// With both documents dirty, the quit asks about the editor first, then the design.
 #[test]
-fn test_generate_replaces_the_editor_program() {
-    let (mut h, _script) = app(default_state());
-    add_rect(&mut h);
+fn test_quit_asks_about_the_editor_then_the_design() {
+    let (mut h, script) = app(default_state());
     h.state()
-        .designer()
+        .editor()
         .borrow_mut()
-        .generate_to_editor(&crate::test_designer_files::en());
-    frames(&mut h, 2);
-    let text = h.state().editor().borrow().buffer().text().to_string();
-    assert!(text.contains("X60.000"), "{text}");
+        .buffer_mut()
+        .set_text("G1 X1\n".to_string());
+    add_rect(&mut h);
+    answer(&script, [discard(), discard()]);
+    h.state_mut().request_quit(QuitSource::MenuQuit);
+    let commands = frames(&mut h, 4);
+    assert_eq!(shown(&script), ["Unsaved changes", "Unsaved changes"]);
+    let details = details(&script);
+    assert!(details[0].contains("G-code in the editor"), "{details:?}");
+    assert!(details[1].contains("current design"), "{details:?}");
+    assert!(commands.contains(&ViewportCommand::Close), "{commands:?}");
 }
 
-/// Carry: like File > Open, sending G-code to the editor while a job streams is refused (it
-/// would replace the program the job is drawing); the editor keeps its text.
+/// A design save that fails during the quit (a read-only file) cancels the quit.
 #[test]
-fn test_generate_is_refused_while_a_job_runs() {
-    let (mut state, shared) = crate::machine_support::loopback_state(Duration::from_millis(1));
-    crate::machine_support::start_held_stream(&mut state, &shared, 100);
-    let (mut h, _script) = app(state);
-    assert!(h.state().state().job_running());
-    let before = h.state().editor().borrow().buffer().text().to_string();
+fn test_quit_save_that_fails_cancels_the_quit() -> std::io::Result<()> {
+    let target = scratch("app_quit_fail")?.join("locked.gckd");
+    let (mut h, script) = app(default_state());
     add_rect(&mut h);
-    h.state()
-        .designer()
-        .borrow_mut()
-        .generate_to_editor(&crate::test_designer_files::en());
-    frames(&mut h, 2);
-    assert_eq!(h.state().editor().borrow().buffer().text(), before);
-    assert_eq!(
-        h.state().designer().borrow().notice(),
-        Some("Stop the running job before sending G-code to the editor.")
+    let tr = crate::test_designer_files::en();
+    assert!(h.state().designer().borrow_mut().save_design(&target, &tr));
+    let mut perms = std::fs::metadata(&target)?.permissions();
+    perms.set_readonly(true);
+    std::fs::set_permissions(&target, perms)?;
+    add_rect(&mut h);
+    answer(&script, [save()]);
+    h.state_mut().request_quit(QuitSource::MenuQuit);
+    let commands = frames(&mut h, 3);
+    assert!(!commands.contains(&ViewportCommand::Close), "{commands:?}");
+    assert!(!h.state().quit_confirmed());
+    assert!(h.state().state().dirty.designer);
+    assert!(
+        h.state()
+            .designer()
+            .borrow()
+            .notice()
+            .is_some_and(|n| n.starts_with("Save Failed"))
     );
+    let mut perms = std::fs::metadata(&target)?.permissions();
+    #[allow(clippy::permissions_set_readonly_false)]
+    perms.set_readonly(false);
+    std::fs::set_permissions(&target, perms)?;
+    Ok(())
 }
