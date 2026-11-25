@@ -32,6 +32,8 @@ mod test_designer_editing;
 mod test_designer_layers;
 #[path = "test_designer_snapshots.rs"]
 mod test_designer_snapshots;
+#[path = "test_designer_text_tool.rs"]
+mod test_designer_text_tool;
 #[path = "test_designer_toolbox.rs"]
 mod test_designer_toolbox;
 #[path = "test_dialogs.rs"]

@@ -8,7 +8,8 @@
 //! [`DesignerPane::is_modified`] into `AppState::dirty.designer` for the quit prompt.
 //!
 //! Ported from the GTK `ui/gtk/designer_canvas/*` and `designer_toolbox.rs` ([`toolbox`]);
-//! [`layers`] is the Layers pane. Not ported here: the properties panel, the Text tool (it needs the text dialog), shape gallery placement,
+//! [`layers`] is the Layers pane. The Text tool opens
+//! the Add Text dialog ([`canvas::text_tool`]). Not ported here: shape gallery placement,
 //! the array dialog, the toolpath preview, file operations, scrollbars, the device's work
 //! area (the default 250 x 250 mm is shown), and the context menu's other entries.
 //!
@@ -26,10 +27,11 @@ use gcodekit5_app::i18n::Translator;
 use gcodekit5_core::units::MeasurementSystem;
 use gcodekit5_designer::DesignerState;
 use gcodekit5_designer::gcode_gen::MachineLimits;
-use gcodekit5_designer::model::Point;
+use gcodekit5_designer::model::{Point, Shape};
 use gcodekit5_settings::config::Config;
 
 use canvas::rendering::{self, LineWidths};
+use canvas::text_tool::{self, TextTool};
 use canvas::{CanvasInput, CanvasView, DesignerTool, ShapeFlags, editing};
 
 use crate::commands::Command;
@@ -40,6 +42,7 @@ pub fn msgids() -> Vec<&'static str> {
     let mut ids = toolbox::msgids();
     ids.extend(canvas::input::msgids());
     ids.extend(layers::msgids());
+    ids.extend(text_tool::msgids());
     ids
 }
 
@@ -55,8 +58,12 @@ pub struct DesignerPane {
     widths: LineWidths,
     /// The shapes the layers panel has hidden or locked.
     flags: ShapeFlags,
-    /// The display units of the toolbox's settings.
+    /// The display units of the toolbox's settings and the properties.
     units: MeasurementSystem,
+    /// The Text tool's Add Text dialog.
+    text_tool: TextTool,
+    /// The properties panel's live offset or chamfer preview.
+    preview: Vec<Shape>,
 }
 
 impl std::fmt::Debug for DesignerPane {
@@ -87,7 +94,41 @@ impl DesignerPane {
             widths: LineWidths::default(),
             flags: ShapeFlags::default(),
             units: MeasurementSystem::default(),
+            text_tool: TextTool::default(),
+            preview: Vec::new(),
         }
+    }
+
+    /// The display units (the Settings window's measurement system).
+    pub fn units(&self) -> MeasurementSystem {
+        self.units
+    }
+
+    /// Sets the display units (normally from the settings, through `configure`).
+    ///
+    /// # Arguments
+    /// * `units` - Metric or imperial.
+    pub fn set_units(&mut self, units: MeasurementSystem) {
+        self.units = units;
+    }
+
+    /// Whether the Text tool's Add Text dialog is open.
+    pub fn text_dialog_open(&self) -> bool {
+        self.text_tool.is_open()
+    }
+
+    /// The live effect preview the canvas paints (the properties panel's offset or chamfer
+    /// being typed).
+    pub fn effect_preview(&self) -> &[Shape] {
+        &self.preview
+    }
+
+    /// Replaces the live effect preview; an empty list clears it.
+    ///
+    /// # Arguments
+    /// * `shapes` - The previewed shapes.
+    pub fn set_effect_preview(&mut self, shapes: Vec<Shape>) {
+        self.preview = shapes;
     }
 
     /// The design.
@@ -260,6 +301,10 @@ impl DesignerPane {
             self.tool,
             tr,
         );
+        if let Some(at) = self.input.take_text_click() {
+            self.text_tool.open(at);
+        }
+        self.text_tool.show(ui.ctx(), &mut self.state, tr);
         self.view = CanvasView::new(rect, self.state.canvas.viewport());
         let palette = crate::theme::palette(ui.ctx().theme());
         rendering::paint(
@@ -270,6 +315,7 @@ impl DesignerPane {
             &self.input,
             palette,
             self.widths,
+            &self.preview,
         );
     }
 }

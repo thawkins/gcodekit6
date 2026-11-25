@@ -1,7 +1,8 @@
 //! Paints the design canvas with `egui::Painter`, as the GTK canvas draws it: the grid
 //! (minor lines at a fifth of the spacing), the work-area bounds, the origin axes, the shapes
 //! (selected in the error colour, grouped in the success colour, with offset/fillet/chamfer
-//! in the warning colour), the selection handles, the dashed box of a drag, and the polyline
+//! in the warning colour), text as its glyph outlines, the properties panel's live effect
+//! preview (warning colour), the selection handles, the dashed box of a drag, and the polyline
 //! being drawn with its rubber band.
 //!
 //! Line widths are in screen points, so they look the same at any zoom. Shapes are the
@@ -15,7 +16,7 @@ use gcodekit5_designer::model::{DesignerShape, Shape};
 use lyon::path::iterator::PathIterator;
 
 use super::editing::{self, HANDLE_SIZE_PT};
-use super::{CanvasInput, CanvasView, ShapeFlags};
+use super::{CanvasInput, CanvasView, ShapeFlags, text_outline};
 use crate::theme::{self, Palette};
 
 /// Grid and line widths, in points.
@@ -53,6 +54,8 @@ const FLATTEN_PT: f32 = 0.25;
 /// * `input` - The drag and polyline in progress.
 /// * `palette` - Theme colours.
 /// * `widths` - Grid line widths.
+/// * `preview` - The properties panel's live offset or chamfer preview, in the warning colour.
+#[allow(clippy::too_many_arguments)] // the frame's whole paint context, called once
 pub fn paint(
     painter: &Painter,
     view: &CanvasView,
@@ -61,6 +64,7 @@ pub fn paint(
     input: &CanvasInput,
     palette: &Palette,
     widths: LineWidths,
+    preview: &[Shape],
 ) {
     painter.rect_filled(view.rect(), 0.0, palette.view_bg);
     if state.show_grid {
@@ -107,6 +111,9 @@ pub fn paint(
         } else {
             paint_shape(painter, view, &obj.shape, stroke);
         }
+    }
+    for shape in preview {
+        paint_shape(painter, view, shape, Stroke::new(2.0, palette.warning));
     }
     if let Some(bounds) = editing::selection_box(state) {
         paint_handles(painter, view, bounds, palette.accent);
@@ -182,7 +189,7 @@ fn paint_grid(painter: &Painter, view: &CanvasView, spacing: f64, fg: Color32, w
     }
 }
 
-/// Strokes `shape`'s outline (a raster image as its box).
+/// Strokes `shape`'s outline (a raster image as its box, text as its glyph outlines).
 fn paint_shape(painter: &Painter, view: &CanvasView, shape: &Shape, stroke: Stroke) {
     if let Shape::RasterImage(raster) = shape {
         let (x0, y0, x1, y1) = raster.bounds();
@@ -193,7 +200,11 @@ fn paint_shape(painter: &Painter, view: &CanvasView, shape: &Shape, stroke: Stro
     let tolerance = FLATTEN_PT / view.zoom().max(1e-6);
     let mut points: Vec<Pos2> = Vec::new();
     let to_screen = |p: lyon::math::Point| view.to_screen(f64::from(p.x), f64::from(p.y));
-    for event in shape.render().iter().flattened(tolerance) {
+    let path = match shape {
+        Shape::Text(text) => text_outline::text_path(text).unwrap_or_else(|| shape.render()),
+        _ => shape.render(),
+    };
+    for event in path.iter().flattened(tolerance) {
         match event {
             lyon::path::Event::Begin { at } => {
                 points.clear();

@@ -17,6 +17,7 @@ egui-wgpu = { workspace = true }
 bytemuck = { workspace = true }
 glam = { workspace = true }
 lyon = "1.0"
+rusttype = "0.9.3"
 craft-ui = { workspace = true, features = ["serde"] }
 craft-window = { workspace = true, features = ["egui"] }
 craft-platform = { workspace = true, features = ["egui", "appearance"] }

@@ -114,3 +114,42 @@ fn test_snapshot_toolbox_cnc() {
         panic!("designer_toolbox_cnc: {error}");
     }
 }
+
+/// The Text tool: text placed by a click and the Add Text dialog, then left unselected.
+/// The family is one no system has, so the model's bundled font draws it on every machine.
+#[test]
+fn test_snapshot_text_tool() {
+    use egui_kittest::kittest::Queryable;
+    use gcodekit5_designer::model::Shape;
+    let mut h = gpu_harness();
+    h.state_mut().set_tool(DesignerTool::Text);
+    let p = screen(&h, 100.0, 90.0);
+    click(&mut h, p);
+    h.event(egui::Event::Text("GCode".to_string()));
+    h.run();
+    let size = h
+        .get_by_role_and_label(egui::accesskit::Role::TextInput, "Size:")
+        .rect()
+        .center();
+    click(&mut h, size);
+    h.key_combination_modifiers(egui::Modifiers::COMMAND, &[egui::Key::A]);
+    h.event(egui::Event::Text("90".to_string()));
+    h.run();
+    h.get_by_label("Add").click();
+    h.run();
+    {
+        let state = h.state_mut().state_mut();
+        for obj in state.canvas.shapes_mut() {
+            if let Shape::Text(t) = &mut obj.shape {
+                t.font_family = "GCodeKit5 Bundled Fallback".to_string();
+            }
+        }
+        state.canvas.deselect_all();
+    }
+    assert_eq!(ids(h.state()).len(), 1);
+    h.event(egui::Event::PointerGone);
+    h.run();
+    if let Err(error) = h.try_snapshot_options("designer_text", &snapshot_options()) {
+        panic!("designer_text: {error}");
+    }
+}

@@ -27,6 +27,7 @@ fn label(tool: DesignerTool) -> &'static str {
         DesignerTool::Gear => "Gear",
         DesignerTool::Sprocket => "Sprocket",
         DesignerTool::Polyline => "Polyline",
+        DesignerTool::Text => "Text",
     }
 }
 

@@ -10,7 +10,9 @@
 //! ([`input`]); [`editing`] has the edits (shape creation, resize, rotate, snap) and
 //! [`rendering`] the painting.
 //!
-//! [`ShapeFlags`] are the layers panel's hidden and locked shapes ([`flags`]).
+//! [`ShapeFlags`] are the layers panel's hidden and locked shapes ([`flags`]). The Text tool's
+//! Add Text dialog is [`text_tool`]; text shapes are painted as their glyph outlines
+//! ([`text_outline`]).
 //!
 //! Dependencies: `egui`, `glam`, `gcodekit5-designer` (model, viewport, undo commands).
 
@@ -19,6 +21,8 @@ pub mod flags;
 pub mod input;
 pub mod picking;
 pub mod rendering;
+pub mod text_outline;
+pub mod text_tool;
 
 use egui::{Pos2, Rect, pos2};
 use gcodekit5_designer::viewport::Viewport;
@@ -53,11 +57,13 @@ pub enum DesignerTool {
     Sprocket,
     /// Click points; Enter finishes an open path, double-click a closed one.
     Polyline,
+    /// Click to place text (the Add Text dialog asks for it).
+    Text,
 }
 
 impl DesignerTool {
     /// Every tool, in tool-strip order.
-    pub const ALL: [DesignerTool; 11] = [
+    pub const ALL: [DesignerTool; 12] = [
         DesignerTool::Select,
         DesignerTool::Pan,
         DesignerTool::Rectangle,
@@ -69,6 +75,7 @@ impl DesignerTool {
         DesignerTool::Gear,
         DesignerTool::Sprocket,
         DesignerTool::Polyline,
+        DesignerTool::Text,
     ];
 
     /// The English msgid of the tool's name, as listed in `po/gcodekit5.pot`.
@@ -85,6 +92,7 @@ impl DesignerTool {
             DesignerTool::Gear => n_!("Gear"),
             DesignerTool::Sprocket => n_!("Sprocket"),
             DesignerTool::Polyline => n_!("Polyline"),
+            DesignerTool::Text => n_!("Text"),
         }
     }
 
@@ -99,7 +107,10 @@ impl DesignerTool {
             | DesignerTool::Polygon
             | DesignerTool::Gear
             | DesignerTool::Sprocket => true,
-            DesignerTool::Select | DesignerTool::Pan | DesignerTool::Polyline => false,
+            DesignerTool::Select
+            | DesignerTool::Pan
+            | DesignerTool::Polyline
+            | DesignerTool::Text => false,
         }
     }
 }

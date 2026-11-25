@@ -2371,6 +2371,7 @@ dependencies = [
  "glam 0.34.3",
  "lyon",
  "raw-window-handle",
+ "rusttype",
  "serde",
  "serde_json",
  "tracing",

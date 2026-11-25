@@ -6,7 +6,8 @@
 //!   moves it (Shift locks the axis), and a drag without one selects with a marquee.
 //! - Drawing tools: a drag draws the shape in the dragged box (Shift squares a rectangle or
 //!   ellipse and snaps a line to 45 degrees). Polyline: clicks add points, Enter finishes an
-//!   open path, a double-click or right-click a closed one, Escape cancels.
+//!   open path, a double-click or right-click a closed one, Escape cancels. Text: a click
+//!   opens the Add Text dialog for the snapped point.
 //! - Pan tool or middle drag pans; the wheel pans; Ctrl/Cmd+wheel or a pinch zooms about the
 //!   pointer.
 //! - With the canvas focused (after a press in it): Delete/Backspace delete the selection,
@@ -70,6 +71,8 @@ pub struct CanvasInput {
     pub(crate) polyline: Vec<Point>,
     /// The world point under the pointer, if it is over the canvas.
     pub(crate) hover: Option<(f64, f64)>,
+    /// Where a Text tool click asked for text (snapped), until the pane opens the dialog.
+    pub(crate) text_click: Option<(f64, f64)>,
 }
 
 /// The world point (mm) under `p`.
@@ -103,6 +106,12 @@ impl CanvasInput {
     pub(crate) fn reset(&mut self) {
         self.polyline.clear();
         self.drag = None;
+        self.text_click = None;
+    }
+
+    /// Takes the point a Text tool click placed, if any.
+    pub(crate) fn take_text_click(&mut self) -> Option<(f64, f64)> {
+        self.text_click.take()
     }
 
     /// Finishes the polyline being drawn (a path when it has two points or more).
@@ -230,6 +239,10 @@ impl CanvasInput {
                 if self.polyline.last() != Some(&Point::new(x, y)) {
                     self.polyline.push(Point::new(x, y));
                 }
+            }
+            // GTK: a click places text at the snapped point, through the Add Text dialog.
+            DesignerTool::Text => {
+                self.text_click = Some(editing::snap(state, at.0, at.1));
             }
             DesignerTool::Select if !modifiers.shift && !modifiers.command => {
                 // A plain click on a selected shape keeps only that shape selected.
@@ -396,7 +409,7 @@ fn begin_drag(
             }
         }
         DesignerTool::Pan => Some(Drag::Pan),
-        DesignerTool::Polyline => None,
+        DesignerTool::Polyline | DesignerTool::Text => None,
         DesignerTool::Rectangle
         | DesignerTool::Circle
         | DesignerTool::Line
