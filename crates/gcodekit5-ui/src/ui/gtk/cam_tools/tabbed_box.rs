@@ -18,11 +18,183 @@ use super::common::{create_dimension_row, set_paned_initial_fraction, write_pres
 use crate::t;
 use crate::ui::gtk::help_browser;
 use gcodekit5_camtools::tabbed_box::{
-    BoxParameters, BoxType, KeyDividerType, TabbedBoxMaker as Generator,
+    BoxParameters, BoxType, FingerJointSettings, KeyDividerType, TabbedBoxMaker as Generator,
 };
 use gcodekit5_core::units;
 use gcodekit5_designer::{PathShape, Point, Shape};
 use gcodekit5_settings::SettingsController;
+
+/// Initial X, Y and H (mm).
+pub const SIZE_MM: f64 = 100.0;
+/// Initial material thickness (mm).
+pub const THICKNESS_MM: f64 = 3.0;
+/// Initial burn / tool diameter (mm).
+pub const BURN_MM: f64 = 0.1;
+/// Initial finger width entry text (multiples of thickness).
+pub const FINGER_WIDTH: &str = "2";
+/// Initial space width entry text (multiples of thickness).
+pub const SPACE_WIDTH: &str = "2";
+/// Initial surrounding spaces entry text.
+pub const SURROUNDING_SPACES: &str = "2";
+/// Initial play (fit tolerance) and extra length (mm).
+pub const PLAY_MM: f64 = 0.0;
+/// Initial box type id (`0`, a full box).
+pub const BOX_TYPE: &str = "0";
+/// Initial dividers entry text.
+pub const DIVIDERS: &str = "0";
+/// Initial divider keying id (`0`, walls and floor).
+pub const DIVIDER_KEYING: &str = "0";
+/// Initial laser passes entry text.
+pub const PASSES: &str = "3";
+/// Initial laser power entry text (S value).
+pub const POWER: &str = "1000";
+/// Initial feed rate entry text (mm/min).
+pub const FEED_RATE: &str = "500";
+/// Initial Z step down (mm).
+pub const Z_STEP_DOWN_MM: f64 = 0.1;
+/// Initial work origin offset X and Y (mm).
+pub const OFFSET_MM: f64 = 10.0;
+
+/// The text of the box page's fields, as the page reads them on Generate.
+#[derive(Debug, Clone, PartialEq)]
+pub struct TabbedBoxEntries {
+    /// X (width), a length in the measurement system.
+    pub width: String,
+    /// Y (depth), a length.
+    pub depth: String,
+    /// H (height), a length.
+    pub height: String,
+    /// The dimensions are outside dimensions.
+    pub outside: bool,
+    /// Material thickness, a length.
+    pub thickness: String,
+    /// Burn / tool diameter, a length.
+    pub burn: String,
+    /// Finger width.
+    pub finger_width: String,
+    /// Space width.
+    pub space_width: String,
+    /// Surrounding spaces.
+    pub surrounding_spaces: String,
+    /// Play (fit tolerance), a length.
+    pub play: String,
+    /// Extra length, a length.
+    pub extra_length: String,
+    /// The box type's id (`0` to `5`).
+    pub box_type: String,
+    /// Dividers along X.
+    pub dividers_x: String,
+    /// Dividers along Y.
+    pub dividers_y: String,
+    /// The divider keying's id (`0` to `3`).
+    pub divider_keying: String,
+    /// Optimize layout.
+    pub optimize_layout: bool,
+    /// Laser passes.
+    pub passes: String,
+    /// Laser power (S value).
+    pub power: String,
+    /// Feed rate (mm/min).
+    pub feed_rate: String,
+    /// Z step down, a length.
+    pub z_step_down: String,
+    /// Work origin offset X, a length.
+    pub offset_x: String,
+    /// Work origin offset Y, a length.
+    pub offset_y: String,
+    /// Home Device Before Start.
+    pub home_before: bool,
+}
+
+impl TabbedBoxEntries {
+    /// The page's initial entries in `system`.
+    ///
+    /// # Arguments
+    /// * `system` - The measurement system the lengths are shown in.
+    pub fn defaults(system: units::MeasurementSystem) -> Self {
+        let len = |mm: f64| units::format_length(mm as f32, system);
+        Self {
+            width: len(SIZE_MM),
+            depth: len(SIZE_MM),
+            height: len(SIZE_MM),
+            outside: false,
+            thickness: len(THICKNESS_MM),
+            burn: len(BURN_MM),
+            finger_width: FINGER_WIDTH.to_string(),
+            space_width: SPACE_WIDTH.to_string(),
+            surrounding_spaces: SURROUNDING_SPACES.to_string(),
+            play: len(PLAY_MM),
+            extra_length: len(PLAY_MM),
+            box_type: BOX_TYPE.to_string(),
+            dividers_x: DIVIDERS.to_string(),
+            dividers_y: DIVIDERS.to_string(),
+            divider_keying: DIVIDER_KEYING.to_string(),
+            optimize_layout: false,
+            passes: PASSES.to_string(),
+            power: POWER.to_string(),
+            feed_rate: FEED_RATE.to_string(),
+            z_step_down: len(Z_STEP_DOWN_MM),
+            offset_x: len(OFFSET_MM),
+            offset_y: len(OFFSET_MM),
+            home_before: false,
+        }
+    }
+}
+
+/// Reads the page's entries into generator parameters; a field that does not parse takes
+/// its default value (the page's behaviour).
+///
+/// # Arguments
+/// * `e` - The entries' text.
+/// * `system` - The measurement system the lengths are written in.
+/// * `num_axes` - The active device's axis count.
+pub fn tabbed_box_parameters(
+    e: &TabbedBoxEntries,
+    system: units::MeasurementSystem,
+    num_axes: u8,
+) -> BoxParameters {
+    BoxParameters {
+        x: units::parse_length(&e.width, system).unwrap_or(100.0),
+        y: units::parse_length(&e.depth, system).unwrap_or(100.0),
+        h: units::parse_length(&e.height, system).unwrap_or(100.0),
+        outside: e.outside,
+        thickness: units::parse_length(&e.thickness, system).unwrap_or(3.0),
+        burn: units::parse_length(&e.burn, system).unwrap_or(0.1),
+        finger_joint: FingerJointSettings {
+            finger: e.finger_width.parse().unwrap_or(2.0),
+            space: e.space_width.parse().unwrap_or(2.0),
+            surrounding_spaces: e.surrounding_spaces.parse().unwrap_or(2.0),
+            play: units::parse_length(&e.play, system).unwrap_or(0.0),
+            extra_length: units::parse_length(&e.extra_length, system).unwrap_or(0.0),
+            ..FingerJointSettings::default()
+        },
+        box_type: BoxType::from(e.box_type.parse::<i32>().unwrap_or(0)),
+        dividers_x: e.dividers_x.parse().unwrap_or(0),
+        dividers_y: e.dividers_y.parse().unwrap_or(0),
+        key_divider_type: KeyDividerType::from(e.divider_keying.parse::<i32>().unwrap_or(0)),
+        optimize_layout: e.optimize_layout,
+        laser_passes: e.passes.parse().unwrap_or(3),
+        laser_power: e.power.parse().unwrap_or(1000),
+        feed_rate: e.feed_rate.parse().unwrap_or(500.0),
+        z_step_down: units::parse_length(&e.z_step_down, system).unwrap_or(0.1),
+        offset_x: units::parse_length(&e.offset_x, system).unwrap_or(10.0),
+        offset_y: units::parse_length(&e.offset_y, system).unwrap_or(10.0),
+        num_axes,
+        home_before_job: e.home_before,
+    }
+}
+
+/// The generated panel outlines as the designer receives them: millimetre points.
+///
+/// # Arguments
+/// * `generator` - A generator that has run.
+pub fn box_path_points(generator: &Generator) -> Vec<Vec<(f64, f64)>> {
+    generator
+        .paths()
+        .iter()
+        .map(|path| path.iter().map(|p| (p.x as f64, p.y as f64)).collect())
+        .collect()
+}
 
 struct TabbedBoxWidgets {
     width: Entry,
@@ -134,26 +306,35 @@ impl TabbedBoxMaker {
 
         // Widgets
         let (width_row, width, width_unit) =
-            create_dimension_row(&t!("X (Width):"), 100.0, &settings);
+            create_dimension_row(&t!("X (Width):"), SIZE_MM, &settings);
         let (depth_row, depth, depth_unit) =
-            create_dimension_row(&t!("Y (Depth):"), 100.0, &settings);
+            create_dimension_row(&t!("Y (Depth):"), SIZE_MM, &settings);
         let (height_row, height, height_unit) =
-            create_dimension_row(&t!("H (Height):"), 100.0, &settings);
+            create_dimension_row(&t!("H (Height):"), SIZE_MM, &settings);
         let outside = CheckButton::builder()
             .active(false)
             .valign(Align::Center)
             .build();
         let (thickness_row, thickness, thickness_unit) =
-            create_dimension_row(&t!("Thickness:"), 3.0, &settings);
+            create_dimension_row(&t!("Thickness:"), THICKNESS_MM, &settings);
         let (burn_row, burn, burn_unit) =
-            create_dimension_row(&t!("Burn / Tool Dia:"), 0.1, &settings);
-        let finger_width = Entry::builder().text("2").valign(Align::Center).build();
-        let space_width = Entry::builder().text("2").valign(Align::Center).build();
-        let surrounding_spaces = Entry::builder().text("2").valign(Align::Center).build();
+            create_dimension_row(&t!("Burn / Tool Dia:"), BURN_MM, &settings);
+        let finger_width = Entry::builder()
+            .text(FINGER_WIDTH)
+            .valign(Align::Center)
+            .build();
+        let space_width = Entry::builder()
+            .text(SPACE_WIDTH)
+            .valign(Align::Center)
+            .build();
+        let surrounding_spaces = Entry::builder()
+            .text(SURROUNDING_SPACES)
+            .valign(Align::Center)
+            .build();
         let (play_row, play, play_unit) =
-            create_dimension_row(&t!("Play (fit tolerance):"), 0.0, &settings);
+            create_dimension_row(&t!("Play (fit tolerance):"), PLAY_MM, &settings);
         let (extra_length_row, extra_length, extra_length_unit) =
-            create_dimension_row(&t!("Extra Length:"), 0.0, &settings);
+            create_dimension_row(&t!("Extra Length:"), PLAY_MM, &settings);
 
         // New Widgets
         let box_type = new_text_dropdown();
@@ -163,18 +344,24 @@ impl TabbedBoxMaker {
         box_type.append(Some("3"), &t!("No Sides"));
         box_type.append(Some("4"), &t!("No Front/Back"));
         box_type.append(Some("5"), &t!("No Left/Right"));
-        box_type.set_active_id(Some("0"));
+        box_type.set_active_id(Some(BOX_TYPE));
         box_type.set_valign(Align::Center);
 
-        let dividers_x = Entry::builder().text("0").valign(Align::Center).build();
-        let dividers_y = Entry::builder().text("0").valign(Align::Center).build();
+        let dividers_x = Entry::builder()
+            .text(DIVIDERS)
+            .valign(Align::Center)
+            .build();
+        let dividers_y = Entry::builder()
+            .text(DIVIDERS)
+            .valign(Align::Center)
+            .build();
 
         let divider_keying = new_text_dropdown();
         divider_keying.append(Some("0"), &t!("Walls and Floor"));
         divider_keying.append(Some("1"), &t!("Walls Only"));
         divider_keying.append(Some("2"), &t!("Floor Only"));
         divider_keying.append(Some("3"), &t!("None"));
-        divider_keying.set_active_id(Some("0"));
+        divider_keying.set_active_id(Some(DIVIDER_KEYING));
         divider_keying.set_valign(Align::Center);
 
         let optimize_layout = CheckButton::builder()
@@ -182,17 +369,20 @@ impl TabbedBoxMaker {
             .valign(Align::Center)
             .build();
 
-        let passes = Entry::builder().text("3").valign(Align::Center).build();
-        let power = Entry::builder().text("1000").valign(Align::Center).build();
-        let feed_rate = Entry::builder().text("500").valign(Align::Center).build();
+        let passes = Entry::builder().text(PASSES).valign(Align::Center).build();
+        let power = Entry::builder().text(POWER).valign(Align::Center).build();
+        let feed_rate = Entry::builder()
+            .text(FEED_RATE)
+            .valign(Align::Center)
+            .build();
 
         let (z_step_down_row, z_step_down, z_step_down_unit) =
-            create_dimension_row(&t!("Z Step Down:"), 0.1, &settings);
+            create_dimension_row(&t!("Z Step Down:"), Z_STEP_DOWN_MM, &settings);
 
         let (offset_x_row, offset_x, offset_x_unit) =
-            create_dimension_row(&t!("Offset X:"), 10.0, &settings);
+            create_dimension_row(&t!("Offset X:"), OFFSET_MM, &settings);
         let (offset_y_row, offset_y, offset_y_unit) =
-            create_dimension_row(&t!("Offset Y:"), 10.0, &settings);
+            create_dimension_row(&t!("Offset Y:"), OFFSET_MM, &settings);
         let home_before = CheckButton::builder()
             .active(false)
             .valign(Align::Center)
@@ -581,15 +771,11 @@ impl TabbedBoxMaker {
                         generator.generate()?;
 
                         // Convert paths to shapes
-                        let shapes: Vec<Shape> = generator
-                            .paths()
+                        let shapes: Vec<Shape> = box_path_points(&generator)
                             .iter()
                             .map(|path| {
-                                // Convert Vec<Point> to Vec<gcodekit5_designer::Point>
-                                let points: Vec<Point> = path
-                                    .iter()
-                                    .map(|p| Point::new(p.x as f64, p.y as f64))
-                                    .collect();
+                                let points: Vec<Point> =
+                                    path.iter().map(|(x, y)| Point::new(*x, *y)).collect();
 
                                 // Create PathShape from points (closed paths for box panels)
                                 let path_shape = PathShape::from_points(&points, true);
@@ -691,45 +877,44 @@ impl TabbedBoxMaker {
     }
 
     fn collect_params(w: &TabbedBoxWidgets, settings: &Rc<SettingsController>) -> BoxParameters {
-        let mut params = BoxParameters::default();
         let system = settings.persistence.borrow().config().ui.measurement_system;
-
-        params.x = units::parse_length(&w.width.text(), system).unwrap_or(100.0);
-        params.y = units::parse_length(&w.depth.text(), system).unwrap_or(100.0);
-        params.h = units::parse_length(&w.height.text(), system).unwrap_or(100.0);
-        params.outside = w.outside.is_active();
-        params.thickness = units::parse_length(&w.thickness.text(), system).unwrap_or(3.0);
-        params.burn = units::parse_length(&w.burn.text(), system).unwrap_or(0.1);
-
-        params.finger_joint.finger = w.finger_width.text().parse().unwrap_or(2.0);
-        params.finger_joint.space = w.space_width.text().parse().unwrap_or(2.0);
-        params.finger_joint.surrounding_spaces = w.surrounding_spaces.text().parse().unwrap_or(2.0);
-        params.finger_joint.play = units::parse_length(&w.play.text(), system).unwrap_or(0.0);
-        params.finger_joint.extra_length =
-            units::parse_length(&w.extra_length.text(), system).unwrap_or(0.0);
-
-        // New params
-        if let Some(id) = w.box_type.active_id() {
-            params.box_type = BoxType::from(id.parse::<i32>().unwrap_or(0));
-        }
-        params.dividers_x = w.dividers_x.text().parse().unwrap_or(0);
-        params.dividers_y = w.dividers_y.text().parse().unwrap_or(0);
-        if let Some(id) = w.divider_keying.active_id() {
-            params.key_divider_type = KeyDividerType::from(id.parse::<i32>().unwrap_or(0));
-        }
-        params.optimize_layout = w.optimize_layout.is_active();
-
-        params.laser_passes = w.passes.text().parse().unwrap_or(3);
-        params.laser_power = w.power.text().parse().unwrap_or(1000);
-        params.feed_rate = w.feed_rate.text().parse().unwrap_or(500.0);
-        params.z_step_down = units::parse_length(&w.z_step_down.text(), system).unwrap_or(0.1);
-
-        params.offset_x = units::parse_length(&w.offset_x.text(), system).unwrap_or(10.0);
-        params.offset_y = units::parse_length(&w.offset_y.text(), system).unwrap_or(10.0);
-        params.num_axes = crate::device_status::get_active_num_axes();
-        params.home_before_job = w.home_before.is_active();
-
-        params
+        let entries = TabbedBoxEntries {
+            width: w.width.text().to_string(),
+            depth: w.depth.text().to_string(),
+            height: w.height.text().to_string(),
+            outside: w.outside.is_active(),
+            thickness: w.thickness.text().to_string(),
+            burn: w.burn.text().to_string(),
+            finger_width: w.finger_width.text().to_string(),
+            space_width: w.space_width.text().to_string(),
+            surrounding_spaces: w.surrounding_spaces.text().to_string(),
+            play: w.play.text().to_string(),
+            extra_length: w.extra_length.text().to_string(),
+            // An unset dropdown keeps the default (a full box, walls and floor).
+            box_type: w
+                .box_type
+                .active_id()
+                .map_or_else(|| BOX_TYPE.to_string(), |id| id.to_string()),
+            dividers_x: w.dividers_x.text().to_string(),
+            dividers_y: w.dividers_y.text().to_string(),
+            divider_keying: w
+                .divider_keying
+                .active_id()
+                .map_or_else(|| DIVIDER_KEYING.to_string(), |id| id.to_string()),
+            optimize_layout: w.optimize_layout.is_active(),
+            passes: w.passes.text().to_string(),
+            power: w.power.text().to_string(),
+            feed_rate: w.feed_rate.text().to_string(),
+            z_step_down: w.z_step_down.text().to_string(),
+            offset_x: w.offset_x.text().to_string(),
+            offset_y: w.offset_y.text().to_string(),
+            home_before: w.home_before.is_active(),
+        };
+        tabbed_box_parameters(
+            &entries,
+            system,
+            crate::device_status::get_active_num_axes(),
+        )
     }
 
     fn save_params(params: &BoxParameters) {

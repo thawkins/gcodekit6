@@ -6,13 +6,13 @@
 mod bitmap_engraving;
 pub mod common;
 pub mod drill_press;
-mod gerber;
-mod jigsaw;
+pub mod gerber;
+pub mod jigsaw;
 mod probe_routines;
 pub mod speeds_feeds_page;
 pub mod spoilboard_grid;
 pub mod spoilboard_surfacing;
-mod tabbed_box;
+pub mod tabbed_box;
 // mod vector_engraving;
 
 // Re-export all tool types

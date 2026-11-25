@@ -5,6 +5,11 @@
 //! `gcodekit5_camtools` generator. The GTK pages apply no post-processing to the generator's
 //! output: Drill Press hands it to the machine, the spoilboard pages to the editor.
 //!
+//! The jigsaw page makes paths for the designer, not a program; its fixture lists each
+//! path with whether the page imports it closed. The tabbed box page also has "Generate
+//! Shapes": its fixture lists the panel outlines. The Gerber pages read the files under
+//! `fixtures/cam/gerber/` (a small top copper layer and a board outline).
+//!
 //! `capture_cam_fixtures` is ignored; run it explicitly to (re)write the fixtures under
 //! `crates/gcodekit5-ui-egui/tests/fixtures/cam/`:
 //! `cargo nextest run -p gcodekit5-ui --run-ignored only -E 'test(capture_cam_fixtures)'`.
@@ -14,14 +19,21 @@
 use std::path::PathBuf;
 
 use gcodekit5_camtools::drill_press::DrillPressGenerator;
+use gcodekit5_camtools::gerber::GerberConverter;
+use gcodekit5_camtools::jigsaw_puzzle::JigsawPuzzleMaker;
 use gcodekit5_camtools::speeds_feeds::OperationType;
 use gcodekit5_camtools::spoilboard_grid::SpoilboardGridGenerator;
 use gcodekit5_camtools::spoilboard_surfacing::SpoilboardSurfacingGenerator;
+use gcodekit5_camtools::tabbed_box::TabbedBoxMaker;
 use gcodekit5_core::data::materials::{MaterialId, init_standard_library as materials};
 use gcodekit5_core::data::tools::{ToolId, init_standard_library as tools};
 use gcodekit5_core::units::MeasurementSystem;
 use gcodekit5_devicedb::model::DeviceProfile;
 use gcodekit5_ui::ui::gtk::cam_tools::drill_press::{DrillPressEntries, drill_press_parameters};
+use gcodekit5_ui::ui::gtk::cam_tools::gerber::{GerberEntries, gerber_parameters};
+use gcodekit5_ui::ui::gtk::cam_tools::jigsaw::{
+    JigsawEntries, jigsaw_parameters, jigsaw_path_closed,
+};
 use gcodekit5_ui::ui::gtk::cam_tools::speeds_feeds_page::{
     CONSERVATIVE, DEPTH_OF_CUT_MM, STEPOVER_MM, SpeedsFeedsSelection, TOOL_STICK_OUT_MM,
     speeds_feeds_texts,
@@ -31,6 +43,10 @@ use gcodekit5_ui::ui::gtk::cam_tools::spoilboard_grid::{
 };
 use gcodekit5_ui::ui::gtk::cam_tools::spoilboard_surfacing::{
     SpoilboardSurfacingEntries, spoilboard_surfacing_parameters,
+};
+
+use gcodekit5_ui::ui::gtk::cam_tools::tabbed_box::{
+    TabbedBoxEntries, box_path_points, tabbed_box_parameters,
 };
 
 /// The egui crate's CAM fixture folder.
@@ -125,6 +141,186 @@ fn grid_cases() -> Vec<(&'static str, String)> {
         .collect()
 }
 
+/// The axes the capture assumes the active device has (the GTK pages ask the device; the
+/// default device has three).
+const AXES: u8 = 3;
+
+/// Paths as the fixtures list them: one `path N closed=B points=P` line each, then one
+/// `x y` line per point (shortest exact `f64` text).
+fn paths_text(paths: &[Vec<(f64, f64)>], closed: impl Fn(usize, usize) -> bool) -> String {
+    let mut text = String::new();
+    for (i, path) in paths.iter().enumerate() {
+        let closed = closed(i, paths.len());
+        text.push_str(&format!("path {i} closed={closed} points={}\n", path.len()));
+        for (x, y) in path {
+            text.push_str(&format!("{x} {y}\n"));
+        }
+    }
+    text
+}
+
+/// The jigsaw page with every field changed, in millimetres.
+fn jigsaw_custom() -> JigsawEntries {
+    JigsawEntries {
+        width: "300".into(),
+        height: "200".into(),
+        pieces_across: "5".into(),
+        pieces_down: "4".into(),
+        seed: "7".into(),
+        tab_size: "25".into(),
+        jitter: "8".into(),
+        corner_radius: "3".into(),
+    }
+}
+
+/// The tabbed box page with every field changed, in millimetres.
+fn tabbed_box_preset_entries() -> TabbedBoxEntries {
+    TabbedBoxEntries {
+        width: "120".into(),
+        depth: "90.5".into(),
+        height: "60".into(),
+        outside: true,
+        thickness: "4".into(),
+        burn: "0.15".into(),
+        finger_width: "1.5".into(),
+        space_width: "2.5".into(),
+        surrounding_spaces: "1".into(),
+        play: "0.05".into(),
+        extra_length: "0.25".into(),
+        box_type: "2".into(),
+        dividers_x: "1".into(),
+        dividers_y: "2".into(),
+        divider_keying: "3".into(),
+        optimize_layout: true,
+        passes: "2".into(),
+        power: "800".into(),
+        feed_rate: "400".into(),
+        z_step_down: "0.2".into(),
+        offset_x: "12".into(),
+        offset_y: "8".into(),
+        home_before: true,
+    }
+}
+
+/// Jigsaw: the page's defaults, and a larger puzzle with another seed, bigger tabs and more
+/// jitter. The page imports the paths into the designer, the last one (the border) closed.
+fn jigsaw_cases() -> Vec<(&'static str, String)> {
+    let default = JigsawEntries::defaults(MeasurementSystem::Metric);
+    [("default", default), ("custom", jigsaw_custom())]
+        .into_iter()
+        .map(|(name, entries)| {
+            let params = jigsaw_parameters(&entries, MeasurementSystem::Metric);
+            let mut maker = JigsawPuzzleMaker::new(params).expect("jigsaw parameters are valid");
+            maker.generate().expect("jigsaw generates");
+            (name, paths_text(&maker.paths_as_f64(), jigsaw_path_closed))
+        })
+        .collect()
+}
+
+/// Tabbed box G-code: the defaults, and an inside-dimension no-top box with dividers, a
+/// bigger material, another joint and a homed start in imperial.
+fn tabbed_box_cases() -> Vec<(&'static str, String)> {
+    let default = (
+        TabbedBoxEntries::defaults(MeasurementSystem::Metric),
+        MeasurementSystem::Metric,
+    );
+    let custom = (
+        TabbedBoxEntries {
+            width: "5".into(),
+            depth: "4".into(),
+            height: "3".into(),
+            outside: true,
+            thickness: "0.2".into(),
+            burn: "0.004".into(),
+            finger_width: "1.5".into(),
+            space_width: "2.5".into(),
+            surrounding_spaces: "1".into(),
+            play: "0.002".into(),
+            extra_length: "0".into(),
+            box_type: "1".into(),
+            dividers_x: "1".into(),
+            dividers_y: "2".into(),
+            divider_keying: "1".into(),
+            optimize_layout: true,
+            passes: "2".into(),
+            power: "800".into(),
+            feed_rate: "400".into(),
+            z_step_down: "0.01".into(),
+            offset_x: "0.5".into(),
+            offset_y: "0.5".into(),
+            home_before: true,
+        },
+        MeasurementSystem::Imperial,
+    );
+    [("default", default), ("custom", custom)]
+        .into_iter()
+        .map(|(name, (entries, system))| {
+            let params = tabbed_box_parameters(&entries, system, AXES);
+            let mut maker = TabbedBoxMaker::new(params).expect("box parameters are valid");
+            maker.generate().expect("box generates");
+            (name, maker.to_gcode())
+        })
+        .collect()
+}
+
+/// The tabbed box's "Generate Shapes" outlines for the defaults, every one closed.
+fn tabbed_box_shapes_cases() -> Vec<(&'static str, String)> {
+    let params = tabbed_box_parameters(
+        &TabbedBoxEntries::defaults(MeasurementSystem::Metric),
+        MeasurementSystem::Metric,
+        AXES,
+    );
+    let mut maker = TabbedBoxMaker::new(params).expect("box parameters are valid");
+    maker.generate().expect("box generates");
+    vec![("default", paths_text(&box_path_points(&maker), |_, _| true))]
+}
+
+/// The Gerber project folder the cases read.
+fn gerber_dir() -> PathBuf {
+    fixture_dir().join("gerber")
+}
+
+/// Gerber: the defaults on the top copper layer; a case with rubout against the board
+/// outline, alignment holes, wider isolation and a bigger tool; and the board outline layer.
+fn gerber_cases() -> Vec<(&'static str, String)> {
+    let system = MeasurementSystem::Metric;
+    let default = GerberEntries::defaults(system);
+    let custom = GerberEntries {
+        feed_rate: "300".into(),
+        spindle_speed: "12000".into(),
+        board_width: "40".into(),
+        board_height: "30".into(),
+        offset_x: "5".into(),
+        offset_y: "5".into(),
+        generate_alignment_holes: true,
+        cut_depth: "-0.2".into(),
+        safe_z: "3".into(),
+        tool_diameter: "0.4".into(),
+        isolation_width: "0.2".into(),
+        rubout: true,
+        use_board_outline: true,
+        ..GerberEntries::defaults(system)
+    };
+    let outline = GerberEntries {
+        layer_type: "BoardOutline".into(),
+        ..GerberEntries::defaults(system)
+    };
+    let directory = Some(gerber_dir().to_string_lossy().to_string());
+    [
+        ("default", "board.gtl", default),
+        ("custom", "board.gtl", custom),
+        ("outline", "board.gko", outline),
+    ]
+    .into_iter()
+    .map(|(name, file, entries)| {
+        let params = gerber_parameters(&entries, system, directory.clone(), AXES);
+        let content = std::fs::read_to_string(gerber_dir().join(file)).expect("a Gerber fixture");
+        let gcode = GerberConverter::generate(&params, &content).expect("Gerber generates");
+        (name, gcode)
+    })
+    .collect()
+}
+
 /// A device with a spindle of `max_rpm` and 1.5 kW, without coolant.
 fn spindle_device(max_rpm: u32) -> DeviceProfile {
     DeviceProfile {
@@ -207,7 +403,9 @@ fn speeds_feeds_cases() -> Vec<(&'static str, String)> {
     .collect()
 }
 
-/// Presets as the GTK pages' Save writes them (metric entries): Drill Press serialises
+/// Presets as the GTK pages' Save writes them (metric entries): the jigsaw, tabbed box and
+/// Gerber pages serialise their generator parameters with `serde_json::to_string_pretty`
+/// (`save_params`; Gerber without a project folder); Drill Press serialises
 /// `DrillPressParameters` with `serde_json::to_string_pretty` (`save_preset_json`, after the
 /// same length and number parsing as `drill_press_parameters`); the spoilboard pages write a
 /// `serde_json::json!` object of the lengths in millimetres as `f32` (`preset_length`) and the
@@ -249,8 +447,41 @@ fn preset_cases() -> Vec<(&'static str, String)> {
         "laser_power": "800",
         "laser_mode": "M3",
     });
+    let system = MeasurementSystem::Metric;
+    let puzzle = jigsaw_parameters(&jigsaw_custom(), system);
+    let tabbed_box = tabbed_box_parameters(&tabbed_box_preset_entries(), system, AXES);
+    let gerber = gerber_parameters(
+        &GerberEntries {
+            layer_type: "BottomCopper".into(),
+            feed_rate: "250".into(),
+            spindle_speed: "9000".into(),
+            board_width: "80".into(),
+            board_height: "60".into(),
+            offset_x: "2".into(),
+            offset_y: "3".into(),
+            generate_alignment_holes: true,
+            alignment_hole_diameter: "3".into(),
+            alignment_hole_margin: "6".into(),
+            alignment_hole_depth: "-2".into(),
+            cut_depth: "-0.15".into(),
+            safe_z: "4".into(),
+            tool_diameter: "0.2".into(),
+            isolation_width: "0.1".into(),
+            rubout: true,
+            use_board_outline: true,
+        },
+        system,
+        None,
+        AXES,
+    );
     let pretty = |value: serde_json::Result<String>| value.expect("serialises");
     vec![
+        ("jigsaw", pretty(serde_json::to_string_pretty(&puzzle))),
+        (
+            "tabbed_box",
+            pretty(serde_json::to_string_pretty(&tabbed_box)),
+        ),
+        ("gerber", pretty(serde_json::to_string_pretty(&gerber))),
         ("drill_press", pretty(serde_json::to_string_pretty(&drill))),
         (
             "spoilboard_surfacing",
@@ -276,6 +507,10 @@ fn fixtures() -> Vec<(String, String)> {
         named("spoilboard_surfacing", "gcode", surfacing_cases()),
         named("spoilboard_grid", "gcode", grid_cases()),
         named("speeds_feeds", "txt", speeds_feeds_cases()),
+        named("jigsaw", "txt", jigsaw_cases()),
+        named("tabbed_box", "gcode", tabbed_box_cases()),
+        named("tabbed_box_shapes", "txt", tabbed_box_shapes_cases()),
+        named("gerber", "gcode", gerber_cases()),
         named("preset", "json", preset_cases()),
     ]
     .concat()

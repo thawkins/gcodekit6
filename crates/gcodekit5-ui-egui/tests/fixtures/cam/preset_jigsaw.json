@@ -1,0 +1,10 @@
+{
+  "width": 300.0,
+  "height": 200.0,
+  "pieces_across": 5,
+  "pieces_down": 4,
+  "seed": 7,
+  "tab_size_percent": 25.0,
+  "jitter_percent": 8.0,
+  "corner_radius": 3.0
+}
