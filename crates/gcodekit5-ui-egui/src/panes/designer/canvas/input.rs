@@ -13,7 +13,8 @@
 //! - With the canvas focused (after a press in it): Delete/Backspace delete the selection,
 //!   Escape cancels a polyline or deselects. A text field elsewhere owns the keyboard
 //!   instead, so these never fire while typing.
-//! - Right-click with a selection: a context menu with Delete and Rotate.
+//! - Right-click with a selection: a context menu with Delete, Rotate and Array... (the pane
+//!   opens the Array dialog).
 //!
 //! Drawing tools and moves snap to the snap step; selection hit tests use the raw pointer.
 //!
@@ -73,6 +74,8 @@ pub struct CanvasInput {
     pub(crate) hover: Option<(f64, f64)>,
     /// Where a Text tool click asked for text (snapped), until the pane opens the dialog.
     pub(crate) text_click: Option<(f64, f64)>,
+    /// The context menu's "Array..." was chosen, until the pane opens the dialog.
+    pub(crate) array_click: bool,
 }
 
 /// The world point (mm) under `p`.
@@ -107,6 +110,11 @@ impl CanvasInput {
         self.polyline.clear();
         self.drag = None;
         self.text_click = None;
+    }
+
+    /// Whether the context menu's "Array..." was chosen since the last call.
+    pub(crate) fn take_array_click(&mut self) -> bool {
+        std::mem::take(&mut self.array_click)
     }
 
     /// Takes the point a Text tool click placed, if any.
@@ -192,7 +200,9 @@ impl CanvasInput {
             && tool == DesignerTool::Polyline
             && self.finish_polyline(state, true);
         if !finished && state.selected_count() > 0 {
-            response.context_menu(|ui| context_menu(ui, state, tr));
+            response.context_menu(|ui| {
+                self.array_click |= context_menu(ui, state, tr);
+            });
         }
     }
 
@@ -490,13 +500,16 @@ const ROTATIONS: [(&str, f64); 5] = [
 
 /// The msgids of the context menu.
 pub fn msgids() -> Vec<&'static str> {
-    let mut ids = vec![n_!("Delete"), n_!("Rotate")];
+    let mut ids = vec![n_!("Delete"), n_!("Rotate"), n_!("Array...")];
     ids.extend(ROTATIONS.iter().map(|(label, _)| *label));
     ids
 }
 
-/// The right-click menu for the selection: Delete, and Rotate by a fixed angle.
-fn context_menu(ui: &mut egui::Ui, state: &mut DesignerState, tr: &Translator) {
+/// The right-click menu for the selection: Delete, Rotate by a fixed angle, and Array...
+///
+/// # Returns
+/// Whether "Array..." was chosen.
+fn context_menu(ui: &mut egui::Ui, state: &mut DesignerState, tr: &Translator) -> bool {
     if ui.button(tr.tr("Delete")).clicked() {
         state.delete_selected();
         ui.close();
@@ -509,4 +522,9 @@ fn context_menu(ui: &mut egui::Ui, state: &mut DesignerState, tr: &Translator) {
             }
         }
     });
+    let array = ui.button(tr.tr("Array...")).clicked();
+    if array {
+        ui.close();
+    }
+    array
 }

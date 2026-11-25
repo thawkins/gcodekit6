@@ -2143,7 +2143,7 @@ msgid "Fast Shape Gallery"
 msgstr "Galleria di forme rapide"
 
 msgid "Click on a shape to quickly insert it with default parameters."
-msgstr ""
+msgstr "Fai clic su una forma per inserirla rapidamente con i parametri predefiniti."
 "Fai clic su una forma per inserirla rapidamente con i parametri predefiniti."
 
 msgid "Spur Gear"
@@ -3314,3 +3314,12 @@ msgstr "Il testo non può essere vuoto"
 
 msgid "The edited shapes were deleted or locked; the change was not applied."
 msgstr "Le forme modificate sono state eliminate o bloccate; la modifica non è stata applicata."
+
+msgid "Enter a whole number of 2 or more"
+msgstr "Inserisci un numero intero pari o superiore a 2"
+
+msgid "Enter a non-zero angle"
+msgstr "Inserisci un angolo diverso da zero"
+
+msgid "The array would create more than 10000 objects"
+msgstr "La serie creerebbe più di 10000 oggetti"

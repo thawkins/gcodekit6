@@ -33,6 +33,7 @@ use gcodekit5_designer::gcode_gen::MachineLimits;
 use gcodekit5_designer::model::{Point, Shape};
 use gcodekit5_settings::config::Config;
 
+use canvas::array_dialog::{self, ArrayDialog};
 use canvas::rendering::{self, LineWidths};
 use canvas::text_tool::{self, TextTool};
 use canvas::{CanvasInput, CanvasView, DesignerTool, ShapeFlags, editing};
@@ -49,6 +50,7 @@ pub fn msgids() -> Vec<&'static str> {
     ids.extend(properties::msgids());
     ids.extend(text_tool::msgids());
     ids.extend(shape_gallery::msgids());
+    ids.extend(array_dialog::msgids());
     ids
 }
 
@@ -72,6 +74,8 @@ pub struct DesignerPane {
     preview: Vec<Shape>,
     /// The Fast Shape Gallery and the shape it armed.
     gallery: ShapeGallery,
+    /// The context menu's Array dialog.
+    array: ArrayDialog,
 }
 
 impl std::fmt::Debug for DesignerPane {
@@ -105,7 +109,13 @@ impl DesignerPane {
             text_tool: TextTool::default(),
             preview: Vec::new(),
             gallery: ShapeGallery::default(),
+            array: ArrayDialog::default(),
         }
+    }
+
+    /// Whether the Array dialog is open.
+    pub fn array_dialog_open(&self) -> bool {
+        self.array.is_open()
     }
 
     /// Whether the Fast Shape Gallery is open.
@@ -328,6 +338,10 @@ impl DesignerPane {
             self.text_tool.open(at);
         }
         self.text_tool.show(ui.ctx(), &mut self.state, tr);
+        if self.input.take_array_click() {
+            self.array.open();
+        }
+        self.array.show(ui.ctx(), &mut self.state, self.units, tr);
         self.view = CanvasView::new(rect, self.state.canvas.viewport());
         let palette = crate::theme::palette(ui.ctx().theme());
         let painter = ui.painter_at(rect);

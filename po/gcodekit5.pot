@@ -3235,3 +3235,12 @@ msgstr ""
 
 msgid "The edited shapes were deleted or locked; the change was not applied."
 msgstr ""
+
+msgid "Enter a whole number of 2 or more"
+msgstr ""
+
+msgid "Enter a non-zero angle"
+msgstr ""
+
+msgid "The array would create more than 10000 objects"
+msgstr ""
