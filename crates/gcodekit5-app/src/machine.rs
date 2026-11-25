@@ -40,8 +40,12 @@ use grbl_stream::{
 
 /// How often the worker asks for a status report while it waits for a feed hold to complete.
 const HALT_QUERY_INTERVAL: Duration = Duration::from_millis(50);
-/// How long the worker waits for a feed hold to complete before it soft-resets anyway.
+/// How long the worker waits for a feed hold to complete before it soft-resets anyway, when
+/// no fresh status report says the machine is still decelerating (`Hold:1`).
 const HALT_TIMEOUT: Duration = Duration::from_secs(1);
+/// The longest a halt waits for a feed hold to complete, however long fresh `Hold:1`
+/// reports say the machine is still decelerating; it soft-resets then.
+pub const HALT_MAX_WAIT: Duration = Duration::from_secs(10);
 /// How often the worker asks the controller for a status report (`?`).
 const STATUS_INTERVAL: Duration = Duration::from_millis(200);
 /// The most status queries whose replies are tracked; see [`WorkerState::query_tags`].
@@ -557,6 +561,15 @@ impl MachineController {
         self.send(Command::StateLine(line.to_string(), self.requested))
     }
 
+    /// Queues `line` for the worker as [`send_line`](Self::send_line) would, without its
+    /// checks (a stream in progress included), so tests can reach the worker's own guards.
+    #[cfg(feature = "test-support")]
+    #[doc(hidden)]
+    pub fn queue_line_unchecked(&mut self, line: &str) {
+        self.requested += 1;
+        self.send_or_report(Command::StateLine(line.to_string(), self.requested));
+    }
+
     /// Whether the latest status report was read after every line sent with
     /// [`send_line`](Self::send_line) had been written. A line such as `$H` changes the
     /// machine state, so until then the last report may describe the machine before it (Idle
@@ -697,7 +710,10 @@ struct Stream {
 struct Halt {
     /// Why (the controller's reply).
     reason: String,
-    /// When to soft-reset without a completed hold.
+    /// When the feed hold was written.
+    started: Instant,
+    /// When to soft-reset without a completed hold: [`HALT_TIMEOUT`] after the hold or the
+    /// latest fresh `Hold:1` report, never later than [`HALT_MAX_WAIT`] after the hold.
     deadline: Instant,
     /// When to ask for the next status report.
     next_query: Instant,
@@ -731,6 +747,9 @@ struct WorkerState {
     /// Capped at [`MAX_QUERY_TAGS`]: on overflow the two oldest tags merge into the lower one,
     /// so a lagging queue only ever under-states freshness.
     query_tags: VecDeque<u64>,
+    /// `?`s written and not yet answered, uncapped (unlike [`Self::query_tags`]): how many
+    /// reports a halt must skip as possibly describing the machine before the hold.
+    queries_outstanding: usize,
     /// A `$J` jog was queued and is not known to be over: set when it is queued and again when
     /// it is written, cleared by jog cancel (0x85, which also drops queued jogs), soft reset
     /// (0x18), or an `Idle` report after a `Jog` one received since it was written.
@@ -771,6 +790,7 @@ impl WorkerState {
             written_seq: 0,
             fresh,
             query_tags: VecDeque::new(),
+            queries_outstanding: 0,
             jog_outstanding: false,
             jog_seen: false,
             halt: None,
@@ -873,6 +893,14 @@ impl WorkerState {
             Command::Realtime(byte) if byte == RealtimeCommand::StatusQuery.byte() => {
                 self.write_status_query()?;
             }
+            // A cycle start during a halt would resume the moves buffered after the refused
+            // line, and the reset that follows would then come in motion.
+            Command::Realtime(byte)
+                if byte == RealtimeCommand::CycleStart.byte() && self.halt.is_some() =>
+            {
+                self.refuse_cycle_start();
+            }
+            Command::Resume if self.halt.is_some() => self.refuse_cycle_start(),
             Command::Realtime(byte) => {
                 self.write(&[byte])?;
                 self.echo_realtime(byte);
@@ -920,6 +948,14 @@ impl WorkerState {
         Ok(())
     }
 
+    /// Reports a cycle start refused while a stream halts.
+    fn refuse_cycle_start(&self) {
+        tracing::warn!("cycle start ignored while a probe stream halts");
+        self.sink.emit(MachineEvent::Error(
+            "cycle start ignored: probe stream halting".to_string(),
+        ));
+    }
+
     /// Reports a written real-time byte as [`MachineEvent::Sent`] when it has a label.
     fn echo_realtime(&self, byte: u8) {
         if let Some(label) = realtime_label(byte) {
@@ -937,6 +973,7 @@ impl WorkerState {
             *next = (*next).min(oldest);
         }
         self.query_tags.push_back(self.written_seq);
+        self.queries_outstanding += 1;
         Ok(())
     }
 
@@ -963,8 +1000,12 @@ impl WorkerState {
         self.manual.push_back((line, seq));
     }
 
-    /// Writes manual lines, then program lines, while they fit in the RX buffer.
+    /// Writes manual lines, then program lines, while they fit in the RX buffer. Nothing is
+    /// written while a stream halts: the reset that ends the halt drops queued manual lines.
     fn feed(&mut self) -> Result<(), String> {
+        if self.halt.is_some() {
+            return Ok(());
+        }
         while let Some((line, seq)) = self.manual.front() {
             if !self.window.can_send(line) {
                 return Ok(());
@@ -986,7 +1027,7 @@ impl WorkerState {
             self.manual.pop_front();
         }
 
-        if self.paused || self.halt.is_some() {
+        if self.paused {
             return Ok(());
         }
         let Some(stream) = self.stream.as_ref() else {
@@ -1037,15 +1078,19 @@ impl WorkerState {
             }
             GrblResponseLine::Status(report) => {
                 let status = StatusParser::parse_full(&report);
-                let held = status
-                    .machine_state
-                    .as_deref()
-                    .is_some_and(|s| s.starts_with("Hold:0") || s.starts_with("Idle"));
+                self.queries_outstanding = self.queries_outstanding.saturating_sub(1);
+                let state = status.machine_state.as_deref();
+                let held = state.is_some_and(|s| s.starts_with("Hold:0") || s.starts_with("Idle"));
+                let decelerating = state.is_some_and(|s| s.starts_with("Hold:1"));
                 if let Some(halt) = self.halt.as_mut() {
                     if halt.stale_reports > 0 {
                         halt.stale_reports -= 1;
                     } else if held {
                         self.finish_halt();
+                    } else if decelerating {
+                        // Still slowing down: a reset now would come in motion.
+                        let cap = halt.started + HALT_MAX_WAIT;
+                        halt.deadline = (Instant::now() + HALT_TIMEOUT).min(cap);
                     }
                 }
                 self.follow_jog(status.machine_state.as_deref());
@@ -1136,9 +1181,10 @@ impl WorkerState {
         let now = Instant::now();
         self.halt = Some(Halt {
             reason,
+            started: now,
             deadline: now + HALT_TIMEOUT,
             next_query: now,
-            stale_reports: self.query_tags.len(),
+            stale_reports: self.queries_outstanding,
         });
         match self.write(&[RealtimeCommand::FeedHold.byte()]) {
             Ok(()) => self.echo_realtime(RealtimeCommand::FeedHold.byte()),
@@ -1147,7 +1193,8 @@ impl WorkerState {
     }
 
     /// While halting: asks for status every [`HALT_QUERY_INTERVAL`], and soft-resets once
-    /// [`HALT_TIMEOUT`] passes without a completed hold.
+    /// the halt's deadline passes without a completed hold ([`HALT_TIMEOUT`] after the hold
+    /// or the latest fresh `Hold:1`, at most [`HALT_MAX_WAIT`] after the hold).
     fn drive_halt(&mut self) -> Result<(), String> {
         let Some(halt) = self.halt.as_mut() else {
             return Ok(());
@@ -1174,6 +1221,13 @@ impl WorkerState {
         match self.write(&[RealtimeCommand::SoftReset.byte()]) {
             Ok(()) => self.echo_realtime(RealtimeCommand::SoftReset.byte()),
             Err(e) => tracing::error!("soft reset of a halted stream failed: {e}"),
+        }
+        // Manual lines queued during the halt were never written; the reset drops them.
+        let dropped: Vec<String> = self.manual.iter().map(|(line, _)| line.clone()).collect();
+        for line in dropped {
+            self.sink.emit(MachineEvent::Error(format!(
+                "dropped: controller reset after probe error: {line}"
+            )));
         }
         self.reset_buffers();
         self.sink.emit(MachineEvent::StreamHalted {
@@ -1206,6 +1260,7 @@ impl WorkerState {
     fn reset_buffers(&mut self) {
         self.jog_outstanding = false;
         self.query_tags.clear();
+        self.queries_outstanding = 0;
         self.window = CharCountWindow::default();
         self.in_flight_is_program.clear();
         // Dropped state lines never run: a report after the reset describes the machine.

@@ -28,7 +28,7 @@ use std::time::{Duration, Instant};
 
 use gcodekit5_app::i18n::Translator;
 use gcodekit5_app::machine::grbl_stream::{MAX_LINE_LENGTH, prepare_program};
-use gcodekit5_app::machine::{MachineController, MachineEvent, StreamMode};
+use gcodekit5_app::machine::{HALT_MAX_WAIT, MachineController, MachineEvent, StreamMode};
 use gcodekit5_camtools::probe_routines::{ProbeOptions, ProbeRoutineEngine};
 use gcodekit5_camtools::wcs_service::{WcsUpdateConfig, WcsUpdateService};
 use gcodekit5_core::{Position, ProbeAxis, ProbeReport, ProbeRoutine};
@@ -37,8 +37,10 @@ use super::ProbeParams;
 use crate::machine::{Machine, lock, parse_report_inches, probe_report};
 
 /// How long after an `error:` reply the run waits for the controller's own halt (a feed
-/// hold, then a reset within a second) before it resets the controller itself.
-pub const BACKSTOP_DELAY: Duration = Duration::from_secs(2);
+/// hold, then a reset once the machine has stopped, at most [`HALT_MAX_WAIT`] later) before
+/// it resets the controller itself. Longer than that cap, so the backstop never resets a
+/// machine the controller is still letting decelerate.
+pub const BACKSTOP_DELAY: Duration = HALT_MAX_WAIT.saturating_add(Duration::from_secs(2));
 
 const NOT_CONNECTED: &str = n_!("The machine is not connected.");
 const RUN_IN_PROGRESS: &str = n_!("A probe run is still in progress.");
