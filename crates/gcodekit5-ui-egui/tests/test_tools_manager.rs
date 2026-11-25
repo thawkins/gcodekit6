@@ -430,18 +430,29 @@ fn test_tools_manager_filters_are_stored_when_they_change() {
 fn test_tools_manager_untouched_filters_are_not_written() {
     let dir = scratch("filters_untouched");
     let dirs = gcodekit5_settings::migrate::ConfigDirs::new(dir.join("legacy"), dir.join("config"));
+    let settings_file = dirs.config.join("config.toml");
     let (settings, _problem) = SettingsManager::open(dirs);
     let state = AppState::new(settings, crate::test_smoke::native_decision())
         .with_tools_file(dir.join("custom_tools.json"));
     let mut h = app_harness(GcodeKitApp::from_state(state));
     h.run_steps(3);
+    assert!(!settings_file.exists(), "settings written at startup");
+    h.state_mut().dispatch(Command::OpenToolsManager);
+    h.run_steps(3);
     assert!(
-        h.state()
-            .state()
-            .config()
-            .ui
-            .tools_manager_type_filter
-            .is_empty(),
+        !settings_file.exists(),
+        "settings written by opening the window"
+    );
+    // A change is written once ...
+    h.state_mut().tools_manager_mut().filter_mut().tool_type = Some(ToolType::VBit);
+    h.run_steps(2);
+    let written = std::fs::read_to_string(&settings_file).expect("settings written");
+    assert!(written.contains("vbit"), "{written}");
+    // ... and frames without a further change write nothing.
+    std::fs::remove_file(&settings_file).expect("remove settings");
+    h.run_steps(3);
+    assert!(
+        !settings_file.exists(),
         "settings rewritten without a change"
     );
 }
