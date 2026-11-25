@@ -2,4 +2,5 @@
 //!
 //! Dependencies: see each pane's module.
 
+pub mod console;
 pub mod machine_control;

@@ -51,6 +51,7 @@ use crate::commands::{self, Command};
 use crate::dialogs::{Asked, ConfirmChoice, ConfirmRequest, DialogAnswer, Dialogs, FilePurpose};
 use crate::machine::{Machine, lock};
 use crate::menu::Menus;
+use crate::panes::console::ConsolePane;
 use crate::panes::machine_control::MachineControlPane;
 use crate::theme;
 use crate::windows::{AboutWindow, SettingsOutcome, SettingsWindow};
@@ -285,6 +286,9 @@ impl GcodeKitApp {
         }
         let mut workspace = Workspace::default_layout();
         workspace.set_pane(Box::new(machine_control_pane(&state)));
+        workspace.set_pane(Box::new(ConsolePane::new(Arc::clone(
+            state.machine.controller(),
+        ))));
         workspace.configure(state.config());
         {
             // Wake the event loop whenever the machine reports something.
@@ -503,12 +507,21 @@ impl GcodeKitApp {
         let mut queue = std::mem::take(&mut self.queue);
         queue.extend(self.menus.take_native(&ctx, gate));
         self.show_frame_and_menu(ui, gate, &mut queue);
+        egui::Panel::bottom("gcodekit5-status-bar").show(ui, |ui| {
+            crate::status_bar::show(
+                ui,
+                &self.state.translator,
+                self.state.machine.status(),
+                self.state.config().ui.measurement_system,
+            );
+        });
         let mut panes =
             PaneContext::new(&self.state.translator, &mut queue).with_machine(&self.state.machine);
         self.workspace.show(ui, &mut panes);
         for command in queue.drain(..) {
             self.dispatch(command);
         }
+        self.deliver_machine_events();
         self.queue = queue;
         self.show_windows(&ctx);
         for command in self.viewport_commands.drain(..) {
@@ -561,6 +574,16 @@ impl GcodeKitApp {
         if self.machine_polled != Some(frame) {
             self.machine_polled = Some(frame);
             self.state.machine.poll();
+        }
+        self.deliver_machine_events();
+    }
+
+    /// Hands the events no pane has seen yet to every pane, drawn or not.
+    fn deliver_machine_events(&mut self) {
+        let events = self.state.machine.take_pending();
+        if !events.is_empty() {
+            self.workspace
+                .machine_events(&events, &self.state.translator);
         }
     }
 

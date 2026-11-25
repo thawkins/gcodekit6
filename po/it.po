@@ -3182,3 +3182,18 @@ msgstr "Jog rifiutato: nessuna corsa residua in quella direzione."
 
 msgid "Jog refused: the machine is not idle."
 msgstr "Jog rifiutato: la macchina non è inattiva."
+
+msgid "Clear"
+msgstr "Cancella"
+
+msgid "Type a command and press Enter..."
+msgstr "Digita un comando e premi Invio..."
+
+msgid "Device connected"
+msgstr "Dispositivo connesso"
+
+msgid "Device disconnected"
+msgstr "Dispositivo disconnesso"
+
+msgid "Error"
+msgstr "Errore"

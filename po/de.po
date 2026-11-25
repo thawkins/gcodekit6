@@ -3179,3 +3179,18 @@ msgstr "Tippen abgelehnt: In dieser Richtung ist kein Verfahrweg mehr frei."
 
 msgid "Jog refused: the machine is not idle."
 msgstr "Tippen abgelehnt: Die Maschine ist nicht im Leerlauf."
+
+msgid "Clear"
+msgstr "Löschen"
+
+msgid "Type a command and press Enter..."
+msgstr "Befehl eingeben und Eingabetaste drücken..."
+
+msgid "Device connected"
+msgstr "Gerät verbunden"
+
+msgid "Device disconnected"
+msgstr "Gerät getrennt"
+
+msgid "Error"
+msgstr "Fehler"

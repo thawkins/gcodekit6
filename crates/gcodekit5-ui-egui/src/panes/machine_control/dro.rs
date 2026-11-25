@@ -35,7 +35,7 @@ pub(super) const MSGIDS: &[&str] = &[
 /// # Arguments
 /// * `value_mm` - Length in millimetres.
 /// * `units` - The measurement system to show.
-pub(super) fn format_length(value_mm: f32, units: MeasurementSystem) -> String {
+pub(crate) fn format_length(value_mm: f32, units: MeasurementSystem) -> String {
     match units {
         MeasurementSystem::Metric => format!("{value_mm:.2}"),
         MeasurementSystem::Imperial => format!("{:.3}", value_mm / 25.4),

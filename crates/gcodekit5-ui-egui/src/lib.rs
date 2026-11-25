@@ -23,6 +23,7 @@ pub mod frame;
 pub mod machine;
 pub mod menu;
 pub mod panes;
+pub mod status_bar;
 pub mod theme;
 pub mod windows;
 pub mod workspace;

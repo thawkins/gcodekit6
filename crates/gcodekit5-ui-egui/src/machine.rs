@@ -234,6 +234,9 @@ pub struct Machine {
     controller: Arc<Mutex<MachineController>>,
     status: MachineStatus,
     events: Vec<MachineEvent>,
+    /// Events not yet handed to the observers (panes that keep a log), see
+    /// [`Machine::take_pending`].
+    pending: Vec<MachineEvent>,
     program: Option<Arc<[String]>>,
     /// Whether the controller's latest report was fresh when this frame polled it.
     report_fresh: bool,
@@ -249,6 +252,7 @@ impl Machine {
             controller: Arc::new(Mutex::new(controller)),
             status: MachineStatus::default(),
             events: Vec::new(),
+            pending: Vec::new(),
             program: None,
             report_fresh: true,
         }
@@ -287,6 +291,15 @@ impl Machine {
         self.report_fresh = fresh;
         self.events = coalesce_progress(events);
         self.status.apply(&self.events);
+        self.pending.extend(self.events.iter().cloned());
+    }
+
+    /// Takes the events that no observer has taken yet: those of [`Machine::poll`] and
+    /// [`Machine::absorb`] since the last call. The app calls this at every point events may
+    /// have arrived and hands them to every pane, drawn or not, so a pane that keeps a log
+    /// (the console) misses nothing while its tab is hidden.
+    pub fn take_pending(&mut self) -> Vec<MachineEvent> {
+        std::mem::take(&mut self.pending)
     }
 
     /// Whether jogging is allowed now: the last status report says Idle or Jog
@@ -306,6 +319,7 @@ impl Machine {
     /// * `events` - Events polled from the controller directly.
     pub fn absorb(&mut self, events: Vec<MachineEvent>) {
         self.status.apply(&events);
+        self.pending.extend(events.iter().cloned());
         self.events.extend(events);
         self.events = coalesce_progress(std::mem::take(&mut self.events));
     }

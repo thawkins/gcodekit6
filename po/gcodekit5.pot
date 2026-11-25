@@ -3103,3 +3103,18 @@ msgstr ""
 
 msgid "Jog refused: the machine is not idle."
 msgstr ""
+
+msgid "Clear"
+msgstr ""
+
+msgid "Type a command and press Enter..."
+msgstr ""
+
+msgid "Device connected"
+msgstr ""
+
+msgid "Device disconnected"
+msgstr ""
+
+msgid "Error"
+msgstr ""

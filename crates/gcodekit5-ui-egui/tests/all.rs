@@ -20,6 +20,8 @@ pub fn global_env_lock() -> std::sync::MutexGuard<'static, ()> {
 mod machine_support;
 #[path = "test_commands.rs"]
 mod test_commands;
+#[path = "test_console_pane.rs"]
+mod test_console_pane;
 #[path = "test_dialogs.rs"]
 mod test_dialogs;
 #[path = "test_frame.rs"]
@@ -34,6 +36,8 @@ mod test_quit;
 mod test_settings_window;
 #[path = "test_smoke.rs"]
 mod test_smoke;
+#[path = "test_status_bar.rs"]
+mod test_status_bar;
 #[path = "test_translations.rs"]
 mod test_translations;
 #[path = "test_workspace.rs"]

@@ -3182,3 +3182,18 @@ msgstr "Jog rechazado: no queda recorrido en esa dirección."
 
 msgid "Jog refused: the machine is not idle."
 msgstr "Jog rechazado: la máquina no está en reposo."
+
+msgid "Clear"
+msgstr "Borrar"
+
+msgid "Type a command and press Enter..."
+msgstr "Escriba un comando y pulse Intro..."
+
+msgid "Device connected"
+msgstr "Dispositivo conectado"
+
+msgid "Device disconnected"
+msgstr "Dispositivo desconectado"
+
+msgid "Error"
+msgstr "Error"

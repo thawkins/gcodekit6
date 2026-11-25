@@ -3186,3 +3186,18 @@ msgstr "Jog refusé : plus de course disponible dans cette direction."
 
 msgid "Jog refused: the machine is not idle."
 msgstr "Jog refusé : la machine n'est pas au repos."
+
+msgid "Clear"
+msgstr "Effacer"
+
+msgid "Type a command and press Enter..."
+msgstr "Saisissez une commande et appuyez sur Entrée..."
+
+msgid "Device connected"
+msgstr "Appareil connecté"
+
+msgid "Device disconnected"
+msgstr "Appareil déconnecté"
+
+msgid "Error"
+msgstr "Erreur"

@@ -17,6 +17,7 @@
 use craft_ui::docking::{self, DockArea, DockContent, DockStyle, Layout, Node, Permissions};
 use craft_ui::layout::{SplitAxis, SplitSize};
 use gcodekit5_app::i18n::Translator;
+use gcodekit5_app::machine::MachineEvent;
 use gcodekit5_settings::config::Config;
 use serde::{Deserialize, Serialize};
 
@@ -176,6 +177,16 @@ pub trait Pane {
     /// * `config` - The current settings.
     fn configure(&mut self, config: &Config) {
         let _ = config;
+    }
+
+    /// Takes machine events (see [`Machine::take_pending`]), whether or not the pane is
+    /// drawn, for a pane that keeps a log.
+    ///
+    /// # Arguments
+    /// * `events` - Events since the last call, oldest first.
+    /// * `tr` - Translator for the current UI language.
+    fn machine_events(&mut self, events: &[MachineEvent], tr: &Translator) {
+        let _ = (events, tr);
     }
 }
 
@@ -342,6 +353,17 @@ impl Workspace {
     pub fn configure(&mut self, config: &Config) {
         for pane in &mut self.panes {
             pane.configure(config);
+        }
+    }
+
+    /// Hands machine `events` to every pane ([`Pane::machine_events`]).
+    ///
+    /// # Arguments
+    /// * `events` - Events since the last call, oldest first.
+    /// * `tr` - Translator for the current UI language.
+    pub fn machine_events(&mut self, events: &[MachineEvent], tr: &Translator) {
+        for pane in &mut self.panes {
+            pane.machine_events(events, tr);
         }
     }
 

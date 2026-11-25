@@ -34,6 +34,8 @@ use gcodekit5_core::units::{FeedRateUnits, MeasurementSystem};
 use gcodekit5_settings::ConnectionSettings;
 use gcodekit5_settings::config::Config;
 
+pub(crate) use dro::format_length;
+
 use crate::commands::Command;
 use crate::machine::{MachineStatus, lock};
 use crate::workspace::{Pane, PaneContext, PaneId};
