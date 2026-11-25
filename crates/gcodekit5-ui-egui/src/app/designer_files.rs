@@ -259,7 +259,10 @@ impl GcodeKitApp {
                     FilePurpose::ExportSvg => {
                         designer.write_svg(&with_default_extension(path, "svg"), &tr);
                     }
-                    FilePurpose::OpenGcode | FilePurpose::SaveGcode => return false,
+                    FilePurpose::OpenGcode
+                    | FilePurpose::SaveGcode
+                    | FilePurpose::LoadCamPreset
+                    | FilePurpose::SaveCamPreset => return false,
                 }
             }
             DialogAnswer::Cancelled {

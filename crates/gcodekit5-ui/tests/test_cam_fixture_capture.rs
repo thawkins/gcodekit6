@@ -207,6 +207,62 @@ fn speeds_feeds_cases() -> Vec<(&'static str, String)> {
     .collect()
 }
 
+/// Presets as the GTK pages' Save writes them (metric entries): Drill Press serialises
+/// `DrillPressParameters` with `serde_json::to_string_pretty` (`save_preset_json`, after the
+/// same length and number parsing as `drill_press_parameters`); the spoilboard pages write a
+/// `serde_json::json!` object of the lengths in millimetres as `f32` (`preset_length`) and the
+/// other fields' text (`save_params` in `spoilboard_surfacing.rs` / `spoilboard_grid.rs`).
+fn preset_cases() -> Vec<(&'static str, String)> {
+    let mm = |text: &str| {
+        gcodekit5_core::units::parse_length(text, MeasurementSystem::Metric).expect("a length")
+    };
+    let drill = DrillPressEntries {
+        hole_diameter: "12.7".into(),
+        tool_diameter: "3.175".into(),
+        top_z: "1".into(),
+        bottom_z: "-7.5".into(),
+        peck_depth: "1.5".into(),
+        safe_z: "4".into(),
+        x: "42".into(),
+        y: "17.25".into(),
+        plunge_rate: "150".into(),
+        feed_rate: "650".into(),
+        spindle_speed: "9000".into(),
+        home_before: true,
+    };
+    let drill = drill_press_parameters(&drill, MeasurementSystem::Metric).expect("entries parse");
+    let surfacing = serde_json::json!({
+        "width": mm("500"),
+        "height": mm("250.5"),
+        "tool_diameter": mm("19.05"),
+        "feed_rate": "1500",
+        "spindle_speed": "16000",
+        "cut_depth": mm("0.25"),
+        "stepover_percent": "60",
+        "safe_z": mm("8"),
+    });
+    let grid = serde_json::json!({
+        "width": mm("600"),
+        "height": mm("400"),
+        "grid_spacing": mm("25.4"),
+        "feed_rate": "2000",
+        "laser_power": "800",
+        "laser_mode": "M3",
+    });
+    let pretty = |value: serde_json::Result<String>| value.expect("serialises");
+    vec![
+        ("drill_press", pretty(serde_json::to_string_pretty(&drill))),
+        (
+            "spoilboard_surfacing",
+            pretty(serde_json::to_string_pretty(&surfacing)),
+        ),
+        (
+            "spoilboard_grid",
+            pretty(serde_json::to_string_pretty(&grid)),
+        ),
+    ]
+}
+
 /// Every fixture: file name and content.
 fn fixtures() -> Vec<(String, String)> {
     let named = |tool: &str, ext: &str, cases: Vec<(&'static str, String)>| {
@@ -220,6 +276,7 @@ fn fixtures() -> Vec<(String, String)> {
         named("spoilboard_surfacing", "gcode", surfacing_cases()),
         named("spoilboard_grid", "gcode", grid_cases()),
         named("speeds_feeds", "txt", speeds_feeds_cases()),
+        named("preset", "json", preset_cases()),
     ]
     .concat()
 }

@@ -35,6 +35,7 @@ gcodekit5-devicedb = { path = "../gcodekit5-devicedb" }
 gcodekit5-settings = { path = "../gcodekit5-settings" }
 gcodekit5-visualizer = { path = "../gcodekit5-visualizer" }
 serde = { workspace = true }
+serde_json = { workspace = true }
 tracing = { workspace = true }
 
 [features]
@@ -45,7 +46,6 @@ test-support = []
 gcodekit5-ui-egui = { path = ".", features = ["test-support"] }
 gcodekit5-app = { path = "../gcodekit5-app", features = ["test-support"] }
 egui_kittest = { workspace = true, features = ["wgpu", "snapshot"] }
-serde_json = { workspace = true }
 
 [[test]]
 name = "all"

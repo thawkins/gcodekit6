@@ -1,0 +1,14 @@
+{
+  "hole_diameter": 12.699999809265137,
+  "tool_diameter": 3.174999952316284,
+  "top_z": 1.0,
+  "bottom_z": -7.5,
+  "peck_depth": 1.5,
+  "plunge_rate": 150.0,
+  "feed_rate": 650.0,
+  "spindle_speed": 9000.0,
+  "safe_z": 4.0,
+  "x": 42.0,
+  "y": 17.25,
+  "home_before_job": true
+}

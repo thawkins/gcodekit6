@@ -153,6 +153,55 @@ impl SpoilboardGridParams {
         })
     }
 
+    /// The page's input as GTK's preset file: lengths in millimetres, feed and power as
+    /// typed, the laser mode's word (GTK's keys; Home is not kept).
+    ///
+    /// # Arguments
+    /// * `tr` - Translator for the current UI language.
+    ///
+    /// # Errors
+    /// The first length that does not parse (GTK refused to save then too).
+    pub fn preset_json(&self, tr: &Translator) -> Result<String, String> {
+        let u = self.units;
+        let len = |label, text: &str| common::preset_len(label, text, u);
+        let preset = (|| {
+            Ok(serde_json::json!({
+                "width": len(WIDTH, &self.width)?,
+                "height": len(HEIGHT, &self.height)?,
+                "grid_spacing": len(GRID_SPACING, &self.grid_spacing)?,
+                "feed_rate": self.feed_rate,
+                "laser_power": self.laser_power,
+                "laser_mode": self.laser_mode.word(),
+            }))
+        })();
+        common::preset_text(preset, tr)
+    }
+
+    /// Sets the page from a preset file in GTK's format ([`Self::preset_json`]); keys it
+    /// does not hold, and a laser mode other than `M3` / `M4`, leave their fields as they
+    /// are.
+    ///
+    /// # Arguments
+    /// * `json` - The file's text.
+    ///
+    /// # Errors
+    /// The text is not a JSON object; the page is left as it was.
+    pub fn apply_preset(&mut self, json: &str) -> Result<(), String> {
+        let map = common::preset_object(json)?;
+        let u = self.units;
+        common::apply_len(&mut self.width, &map, "width", u);
+        common::apply_len(&mut self.height, &map, "height", u);
+        common::apply_len(&mut self.grid_spacing, &map, "grid_spacing", u);
+        common::apply_text(&mut self.feed_rate, &map, "feed_rate");
+        common::apply_text(&mut self.laser_power, &map, "laser_power");
+        match map.get("laser_mode").and_then(serde_json::Value::as_str) {
+            Some("M3") => self.laser_mode = LaserMode::M3,
+            Some("M4") => self.laser_mode = LaserMode::M4,
+            Some(_) | None => {}
+        }
+        Ok(())
+    }
+
     /// Generates the program.
     ///
     /// # Errors

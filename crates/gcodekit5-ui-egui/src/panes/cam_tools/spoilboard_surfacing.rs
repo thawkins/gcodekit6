@@ -164,6 +164,54 @@ impl SpoilboardSurfacingParams {
         })
     }
 
+    /// The page's input as GTK's preset file: lengths in millimetres, feed, speed and
+    /// stepover as typed (GTK's keys; Home is not kept).
+    ///
+    /// # Arguments
+    /// * `tr` - Translator for the current UI language.
+    ///
+    /// # Errors
+    /// The first length that does not parse (GTK refused to save then too).
+    pub fn preset_json(&self, tr: &Translator) -> Result<String, String> {
+        let u = self.units;
+        let len = |label, text: &str| common::preset_len(label, text, u);
+        let preset = (|| {
+            Ok(serde_json::json!({
+                "width": len(WIDTH, &self.width)?,
+                "height": len(HEIGHT, &self.height)?,
+                "tool_diameter": len(TOOL_DIAMETER, &self.tool_diameter)?,
+                "feed_rate": self.feed_rate,
+                "spindle_speed": self.spindle_speed,
+                "cut_depth": len(CUT_DEPTH, &self.cut_depth)?,
+                "stepover_percent": self.stepover_percent,
+                "safe_z": len(SAFE_Z, &self.safe_z)?,
+            }))
+        })();
+        common::preset_text(preset, tr)
+    }
+
+    /// Sets the page from a preset file in GTK's format ([`Self::preset_json`]); keys it
+    /// does not hold leave their fields as they are.
+    ///
+    /// # Arguments
+    /// * `json` - The file's text.
+    ///
+    /// # Errors
+    /// The text is not a JSON object; the page is left as it was.
+    pub fn apply_preset(&mut self, json: &str) -> Result<(), String> {
+        let map = common::preset_object(json)?;
+        let u = self.units;
+        common::apply_len(&mut self.width, &map, "width", u);
+        common::apply_len(&mut self.height, &map, "height", u);
+        common::apply_len(&mut self.tool_diameter, &map, "tool_diameter", u);
+        common::apply_text(&mut self.feed_rate, &map, "feed_rate");
+        common::apply_text(&mut self.spindle_speed, &map, "spindle_speed");
+        common::apply_len(&mut self.cut_depth, &map, "cut_depth", u);
+        common::apply_text(&mut self.stepover_percent, &map, "stepover_percent");
+        common::apply_len(&mut self.safe_z, &map, "safe_z", u);
+        Ok(())
+    }
+
     /// Generates the program.
     ///
     /// # Errors

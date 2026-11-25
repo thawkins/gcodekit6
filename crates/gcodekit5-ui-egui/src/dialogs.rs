@@ -42,6 +42,10 @@ pub enum FilePurpose {
     ExportGcode,
     /// Choose where to export the design as SVG.
     ExportSvg,
+    /// Choose a CAM page's preset file to load.
+    LoadCamPreset,
+    /// Choose where to save a CAM page's preset.
+    SaveCamPreset,
 }
 
 impl FilePurpose {
@@ -56,6 +60,8 @@ impl FilePurpose {
             Self::ImportImage => n_!("Import Image"),
             Self::ExportGcode => n_!("Export G-Code"),
             Self::ExportSvg => n_!("Export SVG"),
+            Self::LoadCamPreset => n_!("Load Parameters"),
+            Self::SaveCamPreset => n_!("Save Parameters"),
         }
     }
 
@@ -82,6 +88,8 @@ impl FilePurpose {
             Self::ImportImage => vec![FileFilter::IMAGE],
             Self::ExportGcode => vec![FileFilter::GCODE_EXPORT],
             Self::ExportSvg => vec![FileFilter::SVG],
+            // GTK's preset dialogs offered no file types.
+            Self::LoadCamPreset | Self::SaveCamPreset => Vec::new(),
         }
     }
 }
@@ -508,6 +516,8 @@ pub fn msgids() -> Vec<&'static str> {
         FilePurpose::ImportImage,
         FilePurpose::ExportGcode,
         FilePurpose::ExportSvg,
+        FilePurpose::LoadCamPreset,
+        FilePurpose::SaveCamPreset,
     ]
     .map(FilePurpose::title_msgid);
     let filters = [

@@ -229,6 +229,62 @@ impl DrillPressParams {
         })
     }
 
+    /// The page's input as GTK's preset file: [`DrillPressParameters`] as serde writes it,
+    /// lengths in millimetres.
+    ///
+    /// # Arguments
+    /// * `tr` - Translator for the current UI language.
+    ///
+    /// # Errors
+    /// The first field that does not parse (GTK refused to save then too).
+    pub fn preset_json(&self, tr: &Translator) -> Result<String, String> {
+        let u = self.units;
+        let len = |label, text: &str| common::preset_len(label, text, u).map(f64::from);
+        let num = common::preset_number;
+        let preset = (|| {
+            Ok(DrillPressParameters {
+                hole_diameter: len(HOLE_DIAMETER, &self.hole_diameter)?,
+                tool_diameter: len(TOOL_DIAMETER, &self.tool_diameter)?,
+                top_z: len(TOP_Z, &self.top_z)?,
+                bottom_z: len(BOTTOM_Z, &self.bottom_z)?,
+                peck_depth: len(PECK_DEPTH, &self.peck_depth)?,
+                plunge_rate: num(PLUNGE_RATE, &self.plunge_rate)?,
+                feed_rate: num(FEED_RATE, &self.feed_rate)?,
+                spindle_speed: num(SPINDLE_SPEED, &self.spindle_speed)?,
+                safe_z: len(SAFE_Z, &self.safe_z)?,
+                x: len(CENTER_X, &self.x)?,
+                y: len(CENTER_Y, &self.y)?,
+                home_before_job: self.home_before,
+            })
+        })();
+        common::preset_text(preset, tr)
+    }
+
+    /// Sets the page from a preset file in GTK's format ([`DrillPressParams::preset_json`]).
+    ///
+    /// # Arguments
+    /// * `json` - The file's text.
+    ///
+    /// # Errors
+    /// The text is not a Drill Press preset; the page is left as it was.
+    pub fn apply_preset(&mut self, json: &str) -> Result<(), String> {
+        let p: DrillPressParameters = serde_json::from_str(json).map_err(|e| e.to_string())?;
+        let len = |mm: f64| common::format_len(mm, self.units);
+        self.hole_diameter = len(p.hole_diameter);
+        self.tool_diameter = len(p.tool_diameter);
+        self.top_z = len(p.top_z);
+        self.bottom_z = len(p.bottom_z);
+        self.peck_depth = len(p.peck_depth);
+        self.plunge_rate = p.plunge_rate.to_string();
+        self.feed_rate = p.feed_rate.to_string();
+        self.spindle_speed = p.spindle_speed.to_string();
+        self.safe_z = len(p.safe_z);
+        self.x = len(p.x);
+        self.y = len(p.y);
+        self.home_before = p.home_before_job;
+        Ok(())
+    }
+
     /// Generates the program.
     ///
     /// # Errors

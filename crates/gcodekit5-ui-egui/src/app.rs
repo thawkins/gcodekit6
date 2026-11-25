@@ -30,11 +30,13 @@
 //!
 //! The designer's file commands, its unsaved-changes questions and the G-code it hands to the
 //! editor are in [`designer_files`].
+//! A CAM page's preset Load / Save dialogs are in `cam_presets`.
 //!
 //! Dependencies: `egui`, `eframe`, `craft-window`, `craft-platform`, `craft-keymap`,
 //! `craft-menu`, `craft-dialogs`, `craft-quit`, `gcodekit5-app` (translations, the
 //! unsaved-changes answer), `gcodekit5-settings` (configuration).
 
+mod cam_presets;
 pub mod designer_files;
 
 use std::cell::RefCell;
@@ -621,6 +623,7 @@ impl GcodeKitApp {
         self.sync_editor(false);
         self.sync_designer();
         self.deliver_editor_gcode();
+        self.ask_cam_preset();
         self.deliver_machine_events();
         self.queue = queue;
         self.show_windows(&ctx);
@@ -862,7 +865,7 @@ impl GcodeKitApp {
     /// Acts on a dialog's answer; every answer is also kept in
     /// [`GcodeKitApp::last_dialog_answer`].
     fn handle_answer(&mut self, answer: DialogAnswer) {
-        if self.handle_design_answer(&answer) {
+        if self.handle_design_answer(&answer) || self.handle_cam_preset_answer(&answer) {
             self.last_dialog_answer = Some(answer);
             return;
         }
