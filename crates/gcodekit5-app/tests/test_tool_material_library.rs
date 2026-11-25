@@ -59,6 +59,9 @@ fn test_tool_form_validation_messages() {
     assert_eq!(form.build(None).expect("valid").tip_angle, None);
 }
 
+/// Picks one text field of a tool form.
+type FormField = fn(&mut ToolForm) -> &mut String;
+
 #[test]
 fn test_tool_form_refuses_lengths_that_are_not_positive() {
     let valid = ToolForm {
@@ -68,7 +71,7 @@ fn test_tool_form_refuses_lengths_that_are_not_positive() {
     };
     assert!(valid.build(None).is_ok());
     for bad in ["NaN", "inf", "0", "-3", "0.0"] {
-        let cases: [(fn(&mut ToolForm) -> &mut String, &str); 4] = [
+        let cases: [(FormField, &str); 4] = [
             (|f| &mut f.diameter, "Invalid diameter"),
             (|f| &mut f.length, "Invalid length"),
             (|f| &mut f.flute_length, "Invalid flute length"),
