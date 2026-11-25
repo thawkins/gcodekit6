@@ -20,6 +20,8 @@ pub fn global_env_lock() -> std::sync::MutexGuard<'static, ()> {
 mod machine_support;
 #[path = "test_cam_drill_press.rs"]
 mod test_cam_drill_press;
+#[path = "test_cam_gerber.rs"]
+mod test_cam_gerber;
 #[path = "test_cam_jigsaw.rs"]
 mod test_cam_jigsaw;
 #[path = "test_cam_presets.rs"]

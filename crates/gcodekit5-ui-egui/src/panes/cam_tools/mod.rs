@@ -19,6 +19,7 @@
 
 pub mod common;
 pub mod drill_press;
+pub mod gerber;
 pub mod jigsaw;
 pub mod requests;
 pub mod speeds_feeds;
@@ -39,6 +40,7 @@ use drill_press::DrillPressParams;
 use gcodekit5_core::data::materials::{Material, init_standard_library as material_library};
 use gcodekit5_core::data::tools::{Tool, init_standard_library as tool_library};
 use gcodekit5_devicedb::model::DeviceProfile;
+use gerber::GerberParams;
 use jigsaw::JigsawParams;
 pub use requests::{DesignerPath, PresetRequest};
 use requests::{DesignerPaths, PendingPreset};
@@ -58,6 +60,8 @@ pub enum CamTool {
     TabbedBox,
     /// Speeds and Feeds Calculator.
     SpeedsFeeds,
+    /// Gerber to G-Code.
+    Gerber,
     /// Create Spoilboard Grid.
     SpoilboardGrid,
     /// Spoilboard Surfacing.
@@ -68,12 +72,13 @@ pub enum CamTool {
 
 impl CamTool {
     /// Every tool, in GTK's list order.
-    pub const ALL: [CamTool; 6] = [
+    pub const ALL: [CamTool; 7] = [
         CamTool::Jigsaw,
         CamTool::TabbedBox,
         CamTool::SpeedsFeeds,
         CamTool::SpoilboardSurfacing,
         CamTool::SpoilboardGrid,
+        CamTool::Gerber,
         CamTool::DrillPress,
     ];
 
@@ -83,6 +88,7 @@ impl CamTool {
             CamTool::Jigsaw => n_!("Jigsaw Puzzle Generator"),
             CamTool::TabbedBox => n_!("Tabbed Box Maker"),
             CamTool::SpeedsFeeds => n_!("Speeds and Feeds Calculator"),
+            CamTool::Gerber => n_!("Gerber to G-Code"),
             CamTool::SpoilboardGrid => n_!("Create Spoilboard Grid"),
             CamTool::SpoilboardSurfacing => n_!("Spoilboard Surfacing"),
             CamTool::DrillPress => n_!("Drill Press"),
@@ -95,6 +101,7 @@ impl CamTool {
             CamTool::Jigsaw => n_!("Create custom jigsaw puzzle patterns from images"),
             CamTool::TabbedBox => n_!("Generate G-code for laser/CNC cut boxes with finger joints"),
             CamTool::SpeedsFeeds => n_!("Calculate cutting speeds and feeds for your materials"),
+            CamTool::Gerber => n_!("Convert Gerber files to G-Code for PCB milling"),
             CamTool::SpoilboardGrid => n_!("Generate grid patterns for spoilboard alignment"),
             CamTool::SpoilboardSurfacing => {
                 n_!("Generate surfacing toolpaths to flatten your spoilboard")
@@ -108,7 +115,7 @@ impl CamTool {
     /// The picker category the tool is listed under.
     pub fn category(self) -> Category {
         match self {
-            CamTool::Jigsaw | CamTool::TabbedBox => Category::Generators,
+            CamTool::Jigsaw | CamTool::TabbedBox | CamTool::Gerber => Category::Generators,
             CamTool::SpeedsFeeds => Category::Calculators,
             CamTool::SpoilboardGrid => Category::Maintenance,
             CamTool::SpoilboardSurfacing => Category::Maintenance,
@@ -189,6 +196,7 @@ pub fn msgids() -> Vec<&'static str> {
     ids.extend(drill_press::msgids());
     ids.extend(jigsaw::msgids());
     ids.extend(tabbed_box::msgids());
+    ids.extend(gerber::msgids());
     ids
 }
 
@@ -232,6 +240,8 @@ pub struct CamToolsPane {
     jigsaw: JigsawParams,
     /// The Tabbed Box Maker page.
     tabbed_box: TabbedBoxParams,
+    /// The Gerber to G-Code page.
+    gerber: GerberParams,
     /// Send to Editor / Preview, waiting for the app.
     editor_request: Option<CamDelivery>,
     /// The program the request hands to the editor.
@@ -280,6 +290,7 @@ impl CamToolsPane {
             ),
             jigsaw: JigsawParams::new(units),
             tabbed_box: TabbedBoxParams::new(units),
+            gerber: GerberParams::new(units),
             output: None,
             notice: None,
             designer_request: None,
@@ -367,6 +378,7 @@ impl CamToolsPane {
         match tool {
             CamTool::SpeedsFeeds | CamTool::Jigsaw => String::new(),
             CamTool::TabbedBox => format!("{:?}", self.tabbed_box),
+            CamTool::Gerber => format!("{:?}", self.gerber),
             CamTool::SpoilboardSurfacing => format!("{:?}", self.spoilboard_surfacing),
             CamTool::SpoilboardGrid => format!("{:?}", self.spoilboard_grid),
             CamTool::DrillPress => format!("{:?}", self.drill_press),
@@ -408,6 +420,7 @@ impl CamToolsPane {
         self.drill_press.set_units(units);
         self.jigsaw.set_units(units);
         self.tabbed_box.set_units(units);
+        self.gerber.set_units(units);
     }
 
     /// The Drill Press page's input.
@@ -433,6 +446,11 @@ impl CamToolsPane {
     /// The Tabbed Box Maker page's input.
     pub fn tabbed_box_mut(&mut self) -> &mut TabbedBoxParams {
         &mut self.tabbed_box
+    }
+
+    /// The Gerber to G-Code page's input.
+    pub fn gerber_mut(&mut self) -> &mut GerberParams {
+        &mut self.gerber
     }
 
     /// The Speeds and Feeds page's input and results.
@@ -486,7 +504,7 @@ impl CamToolsPane {
             CamAction::SendToEditor => Some(CamDelivery::Editor),
             CamAction::Preview => Some(CamDelivery::Preview),
         };
-        match self.generate(tool) {
+        match self.generate(tool, tr) {
             Ok(gcode) => {
                 self.notice = None;
                 match delivery {
@@ -502,13 +520,14 @@ impl CamToolsPane {
     }
 
     /// Generates `tool`'s program from its page.
-    fn generate(&mut self, tool: CamTool) -> Result<String, CamError> {
+    fn generate(&mut self, tool: CamTool, tr: &Translator) -> Result<String, CamError> {
         match tool {
             // The calculator makes numbers and the jigsaw shapes, not a program (see `act`).
             CamTool::SpeedsFeeds | CamTool::Jigsaw => Err(CamError::Invalid),
             CamTool::SpoilboardGrid => self.spoilboard_grid.generate(),
             CamTool::SpoilboardSurfacing => self.spoilboard_surfacing.generate(),
             CamTool::TabbedBox => self.tabbed_box.generate(),
+            CamTool::Gerber => self.gerber.generate(tr),
             CamTool::DrillPress => self.drill_press.generate(),
         }
     }
@@ -518,6 +537,7 @@ impl CamToolsPane {
         match tool {
             CamTool::Jigsaw => jigsaw::show(ui, &mut self.jigsaw, tr),
             CamTool::TabbedBox => tabbed_box::show(ui, &mut self.tabbed_box, tr),
+            CamTool::Gerber => gerber::show(ui, &mut self.gerber, tr),
             CamTool::SpeedsFeeds => speeds_feeds::show(ui, &mut self.speeds_feeds, tr),
             CamTool::SpoilboardGrid => spoilboard_grid::show(ui, &mut self.spoilboard_grid, tr),
             CamTool::SpoilboardSurfacing => {
@@ -534,6 +554,7 @@ impl CamToolsPane {
         self.drill_press.num_axes = axes;
         self.spoilboard_surfacing.num_axes = axes;
         self.tabbed_box.num_axes = axes;
+        self.gerber.num_axes = axes;
         self.drill_press.laser_mode = drill_press::device_in_laser_mode();
         if let Some(notice) = self.notice.clone() {
             ui.horizontal(|ui| {

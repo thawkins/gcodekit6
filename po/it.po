@@ -3518,3 +3518,90 @@ msgstr "Dito più spazio deve essere almeno 0.1"
 
 msgid "Must be at least 1"
 msgstr "Deve essere almeno 1"
+
+msgid "Layer Type:"
+msgstr "Tipo di livello:"
+
+msgid "Board Width:"
+msgstr "Larghezza scheda:"
+
+msgid "Board Height:"
+msgstr "Altezza scheda:"
+
+msgid "Isolation Width:"
+msgstr "Larghezza isolamento:"
+
+msgid "Remove Excess Copper:"
+msgstr "Rimuovi rame in eccesso:"
+
+msgid "Use Board Outline for Rubout:"
+msgstr "Usa il contorno della scheda per la rimozione:"
+
+msgid "Generate Alignment Holes:"
+msgstr "Genera fori di allineamento:"
+
+msgid "Margin:"
+msgstr "Margine:"
+
+msgid "Drill Depth (Z):"
+msgstr "Profondità di foratura (Z):"
+
+msgid "Convert standard Gerber files (PCB layers) into G-Code for CNC isolation routing. Supports copper clearing (rubout), alignment holes, and custom tool parameters."
+msgstr "Converte i file Gerber standard (livelli del PCB) in G-Code per la fresatura di isolamento CNC. Supporta la rimozione del rame (rubout), i fori di allineamento e parametri utensile personalizzati."
+
+msgid "No directory selected"
+msgstr "Nessuna directory selezionata"
+
+msgid "Layer not found in directory"
+msgstr "Livello non trovato nella directory"
+
+msgid "Please select a Gerber directory."
+msgstr "Selezionare una directory Gerber."
+
+msgid "Selected layer not found in directory."
+msgstr "Il livello selezionato non è stato trovato nella directory."
+
+msgid "Must be below the surface (negative)"
+msgstr "Deve essere sotto la superficie (negativo)"
+
+msgid "Failed to read file"
+msgstr "Impossibile leggere il file"
+
+msgid "Top Copper"
+msgstr "Rame superiore"
+
+msgid "Bottom Copper"
+msgstr "Rame inferiore"
+
+msgid "Top Solder Mask"
+msgstr "Maschera di saldatura superiore"
+
+msgid "Bottom Solder Mask"
+msgstr "Maschera di saldatura inferiore"
+
+msgid "Top Screen Print"
+msgstr "Serigrafia superiore"
+
+msgid "Bottom Screen Print"
+msgstr "Serigrafia inferiore"
+
+msgid "Drill Holes"
+msgstr "Fori di foratura"
+
+msgid "Board Outline"
+msgstr "Contorno della scheda"
+
+msgid "Gerber Project"
+msgstr "Progetto Gerber"
+
+msgid "Parameters"
+msgstr "Parametri"
+
+msgid "Alignment Holes"
+msgstr "Fori di allineamento"
+
+msgid "Negative Z for the alignment holes (through the board)"
+msgstr "Z negativo per i fori di allineamento (attraverso la scheda)"
+
+msgid "Open Gerber Directory"
+msgstr "Apri directory Gerber"

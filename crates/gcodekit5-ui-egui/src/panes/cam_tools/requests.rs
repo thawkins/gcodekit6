@@ -83,6 +83,7 @@ impl CamToolsPane {
                 CamTool::SpoilboardGrid => self.spoilboard_grid.apply_preset(&json),
                 CamTool::Jigsaw => self.jigsaw.apply_preset(&json),
                 CamTool::TabbedBox => self.tabbed_box.apply_preset(&json),
+                CamTool::Gerber => self.gerber.apply_preset(&json),
                 // The calculator has no presets (GTK's had none).
                 CamTool::SpeedsFeeds => Ok(()),
             });
@@ -132,6 +133,7 @@ impl CamToolsPane {
             CamTool::SpoilboardGrid => (self.spoilboard_grid.preset_json(tr), "grid_params.json"),
             CamTool::Jigsaw => (self.jigsaw.preset_json(tr), "puzzle_params.json"),
             CamTool::TabbedBox => (self.tabbed_box.preset_json(tr), "box_params.json"),
+            CamTool::Gerber => (self.gerber.preset_json(tr), "gerber_params.json"),
             CamTool::SpeedsFeeds => return,
         };
         match saved {
@@ -157,6 +159,14 @@ impl CamToolsPane {
         std::mem::take(&mut self.folder_request)
     }
 
+    /// Takes `directory` as the Gerber page's project folder (its Browse's answer).
+    ///
+    /// # Arguments
+    /// * `directory` - The chosen folder.
+    pub fn choose_gerber_folder(&mut self, directory: &Path) {
+        self.gerber.set_directory(directory);
+    }
+
     /// Makes `tool`'s shapes for the designer, or shows why not.
     pub(super) fn send_to_designer(&mut self, tool: CamTool, tr: &Translator) {
         let made = match tool {
@@ -165,6 +175,7 @@ impl CamToolsPane {
             CamTool::DrillPress
             | CamTool::SpoilboardSurfacing
             | CamTool::SpoilboardGrid
+            | CamTool::Gerber
             | CamTool::SpeedsFeeds => Err(CamError::Invalid),
         };
         match made {

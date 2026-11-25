@@ -3439,3 +3439,90 @@ msgstr ""
 
 msgid "Must be at least 1"
 msgstr ""
+
+msgid "Layer Type:"
+msgstr ""
+
+msgid "Board Width:"
+msgstr ""
+
+msgid "Board Height:"
+msgstr ""
+
+msgid "Isolation Width:"
+msgstr ""
+
+msgid "Remove Excess Copper:"
+msgstr ""
+
+msgid "Use Board Outline for Rubout:"
+msgstr ""
+
+msgid "Generate Alignment Holes:"
+msgstr ""
+
+msgid "Margin:"
+msgstr ""
+
+msgid "Drill Depth (Z):"
+msgstr ""
+
+msgid "Convert standard Gerber files (PCB layers) into G-Code for CNC isolation routing. Supports copper clearing (rubout), alignment holes, and custom tool parameters."
+msgstr ""
+
+msgid "No directory selected"
+msgstr ""
+
+msgid "Layer not found in directory"
+msgstr ""
+
+msgid "Please select a Gerber directory."
+msgstr ""
+
+msgid "Selected layer not found in directory."
+msgstr ""
+
+msgid "Must be below the surface (negative)"
+msgstr ""
+
+msgid "Failed to read file"
+msgstr ""
+
+msgid "Top Copper"
+msgstr ""
+
+msgid "Bottom Copper"
+msgstr ""
+
+msgid "Top Solder Mask"
+msgstr ""
+
+msgid "Bottom Solder Mask"
+msgstr ""
+
+msgid "Top Screen Print"
+msgstr ""
+
+msgid "Bottom Screen Print"
+msgstr ""
+
+msgid "Drill Holes"
+msgstr ""
+
+msgid "Board Outline"
+msgstr ""
+
+msgid "Gerber Project"
+msgstr ""
+
+msgid "Parameters"
+msgstr ""
+
+msgid "Alignment Holes"
+msgstr ""
+
+msgid "Negative Z for the alignment holes (through the board)"
+msgstr ""
+
+msgid "Open Gerber Directory"
+msgstr ""

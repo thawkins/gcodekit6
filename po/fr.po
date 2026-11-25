@@ -3522,3 +3522,90 @@ msgstr "Doigt plus espace doit être d'au moins 0.1"
 
 msgid "Must be at least 1"
 msgstr "Doit valoir au moins 1"
+
+msgid "Layer Type:"
+msgstr "Type de couche :"
+
+msgid "Board Width:"
+msgstr "Largeur de la carte :"
+
+msgid "Board Height:"
+msgstr "Hauteur de la carte :"
+
+msgid "Isolation Width:"
+msgstr "Largeur d'isolation :"
+
+msgid "Remove Excess Copper:"
+msgstr "Retirer le cuivre en excès :"
+
+msgid "Use Board Outline for Rubout:"
+msgstr "Utiliser le contour de la carte pour le dégagement :"
+
+msgid "Generate Alignment Holes:"
+msgstr "Générer des trous d'alignement :"
+
+msgid "Margin:"
+msgstr "Marge :"
+
+msgid "Drill Depth (Z):"
+msgstr "Profondeur de perçage (Z) :"
+
+msgid "Convert standard Gerber files (PCB layers) into G-Code for CNC isolation routing. Supports copper clearing (rubout), alignment holes, and custom tool parameters."
+msgstr "Convertit les fichiers Gerber standard (couches de circuit imprimé) en G-Code pour le fraisage d'isolation CNC. Prend en charge le dégagement du cuivre (rubout), les trous d'alignement et des paramètres d'outil personnalisés."
+
+msgid "No directory selected"
+msgstr "Aucun répertoire sélectionné"
+
+msgid "Layer not found in directory"
+msgstr "Couche introuvable dans le répertoire"
+
+msgid "Please select a Gerber directory."
+msgstr "Veuillez sélectionner un répertoire Gerber."
+
+msgid "Selected layer not found in directory."
+msgstr "La couche sélectionnée est introuvable dans le répertoire."
+
+msgid "Must be below the surface (negative)"
+msgstr "Doit être sous la surface (négatif)"
+
+msgid "Failed to read file"
+msgstr "Impossible de lire le fichier"
+
+msgid "Top Copper"
+msgstr "Cuivre dessus"
+
+msgid "Bottom Copper"
+msgstr "Cuivre dessous"
+
+msgid "Top Solder Mask"
+msgstr "Masque de soudure dessus"
+
+msgid "Bottom Solder Mask"
+msgstr "Masque de soudure dessous"
+
+msgid "Top Screen Print"
+msgstr "Sérigraphie dessus"
+
+msgid "Bottom Screen Print"
+msgstr "Sérigraphie dessous"
+
+msgid "Drill Holes"
+msgstr "Trous de perçage"
+
+msgid "Board Outline"
+msgstr "Contour de la carte"
+
+msgid "Gerber Project"
+msgstr "Projet Gerber"
+
+msgid "Parameters"
+msgstr "Paramètres"
+
+msgid "Alignment Holes"
+msgstr "Trous d'alignement"
+
+msgid "Negative Z for the alignment holes (through the board)"
+msgstr "Z négatif pour les trous d'alignement (à travers la carte)"
+
+msgid "Open Gerber Directory"
+msgstr "Ouvrir le répertoire Gerber"

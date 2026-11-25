@@ -625,6 +625,7 @@ impl GcodeKitApp {
         self.deliver_editor_gcode();
         self.deliver_designer_shapes();
         self.ask_cam_preset();
+        self.ask_cam_folder();
         self.deliver_machine_events();
         self.queue = queue;
         self.show_windows(&ctx);

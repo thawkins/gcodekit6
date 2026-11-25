@@ -46,6 +46,8 @@ pub enum FilePurpose {
     LoadCamPreset,
     /// Choose where to save a CAM page's preset.
     SaveCamPreset,
+    /// Choose the Gerber page's project folder.
+    OpenGerberFolder,
 }
 
 impl FilePurpose {
@@ -62,6 +64,7 @@ impl FilePurpose {
             Self::ExportSvg => n_!("Export SVG"),
             Self::LoadCamPreset => n_!("Load Parameters"),
             Self::SaveCamPreset => n_!("Save Parameters"),
+            Self::OpenGerberFolder => n_!("Open Gerber Directory"),
         }
     }
 
@@ -90,6 +93,8 @@ impl FilePurpose {
             Self::ExportSvg => vec![FileFilter::SVG],
             // GTK's preset dialogs offered no file types.
             Self::LoadCamPreset | Self::SaveCamPreset => Vec::new(),
+            // A folder has no file types.
+            Self::OpenGerberFolder => Vec::new(),
         }
     }
 }
@@ -338,6 +343,14 @@ impl Dialogs {
         self.ask_file(FileDialog::open(), purpose, filters);
     }
 
+    /// Queues a dialog choosing one folder.
+    ///
+    /// # Arguments
+    /// * `purpose` - What the folder is for; it comes back with the answer.
+    pub fn open_folder(&mut self, purpose: FilePurpose) {
+        self.ask_file(FileDialog::folder(), purpose, &[]);
+    }
+
     /// Queues a dialog choosing where to save a file.
     ///
     /// # Arguments
@@ -518,6 +531,7 @@ pub fn msgids() -> Vec<&'static str> {
         FilePurpose::ExportSvg,
         FilePurpose::LoadCamPreset,
         FilePurpose::SaveCamPreset,
+        FilePurpose::OpenGerberFolder,
     ]
     .map(FilePurpose::title_msgid);
     let filters = [
