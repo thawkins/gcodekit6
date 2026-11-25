@@ -30,6 +30,10 @@ mod test_cam_input_bounds;
 mod test_cam_jigsaw;
 #[path = "test_cam_presets.rs"]
 mod test_cam_presets;
+#[path = "test_cam_probe_routines.rs"]
+mod test_cam_probe_routines;
+#[path = "test_cam_probe_run.rs"]
+mod test_cam_probe_run;
 #[path = "test_cam_speeds_feeds.rs"]
 mod test_cam_speeds_feeds;
 #[path = "test_cam_spoilboard_grid.rs"]

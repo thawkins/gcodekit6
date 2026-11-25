@@ -3620,3 +3620,159 @@ msgstr "Muss zwischen 0 und 255 liegen"
 
 msgid "The engraving is too large: at most 10000 pixels per line"
 msgstr "Die Gravur ist zu groß: höchstens 10000 Pixel pro Zeile"
+
+msgid "Safe Height:"
+msgstr "Sicherheitshöhe:"
+
+msgid "Fast Feed Rate:"
+msgstr "Schneller Vorschub:"
+
+msgid "Slow Feed Rate:"
+msgstr "Langsamer Vorschub:"
+
+msgid "Backoff Distance:"
+msgstr "Rückzugsweg:"
+
+msgid "Max Probe Depth"
+msgstr "Maximale Antasttiefe"
+
+msgid "Probe Distance"
+msgstr "Antastweg"
+
+msgid "Diameter (mm)"
+msgstr "Durchmesser (mm)"
+
+msgid "Setter Plate X"
+msgstr "Längenmesstaster X"
+
+msgid "Setter Plate Y"
+msgstr "Längenmesstaster Y"
+
+msgid "Setter Plate Z"
+msgstr "Längenmesstaster Z"
+
+msgid "Probe Depth:"
+msgstr "Absenktiefe:"
+
+msgid "Probe Tip Radius:"
+msgstr "Tastkugelradius:"
+
+msgid "Plate Thickness:"
+msgstr "Plattendicke:"
+
+msgid "Z-Touch"
+msgstr "Z-Antasten"
+
+msgid "Edge Find"
+msgstr "Kante finden"
+
+msgid "Corner Find"
+msgstr "Ecke finden"
+
+msgid "Bore Center"
+msgstr "Bohrungsmitte"
+
+msgid "Boss Center"
+msgstr "Zapfenmitte"
+
+msgid "Tool Length"
+msgstr "Werkzeuglänge"
+
+msgid "Routine"
+msgstr "Routine"
+
+msgid "Target WCS"
+msgstr "Ziel-WKS"
+
+msgid "Auto-Update WCS"
+msgstr "WKS automatisch setzen"
+
+msgid "Write the result into the selected WCS (G10 L20) from the generated G-code. Z-touch, edge and corner only; bore/boss centres are not set automatically."
+msgstr "Schreibt das Ergebnis aus dem erzeugten G-Code in das gewählte WKS (G10 L20). Nur Z-Antasten, Kante und Ecke; Bohrungs- und Zapfenmitten werden nicht automatisch gesetzt."
+
+msgid "Probe Axis"
+msgstr "Antastachse"
+
+msgid "Probe Direction"
+msgstr "Antastrichtung"
+
+msgid "Status:"
+msgstr "Status:"
+
+msgid "Probe:"
+msgstr "Taster:"
+
+msgid "Triggered"
+msgstr "Ausgelöst"
+
+msgid "Not triggered"
+msgstr "Nicht ausgelöst"
+
+msgid "Stop Probe"
+msgstr "Antasten stoppen"
+
+msgid "Routine Selection"
+msgstr "Routinenauswahl"
+
+msgid "Routine Settings"
+msgstr "Routineneinstellungen"
+
+msgid "Results"
+msgstr "Ergebnisse"
+
+msgid "X Axis"
+msgstr "X-Achse"
+
+msgid "Y Axis"
+msgstr "Y-Achse"
+
+msgid "Z Axis"
+msgstr "Z-Achse"
+
+msgid "Negative"
+msgstr "Negativ"
+
+msgid "Positive"
+msgstr "Positiv"
+
+msgid "X-min / Y-min"
+msgstr "X-min / Y-min"
+
+msgid "X-max / Y-min"
+msgstr "X-max / Y-min"
+
+msgid "X-min / Y-max"
+msgstr "X-min / Y-max"
+
+msgid "X-max / Y-max"
+msgstr "X-max / Y-max"
+
+msgid "The probe input is already triggered."
+msgstr "Der Tastereingang ist bereits ausgelöst."
+
+msgid "Waiting for the machine's next status report."
+msgstr "Warte auf den nächsten Statusbericht der Maschine."
+
+msgid "The probe program was stopped."
+msgstr "Das Antastprogramm wurde gestoppt."
+
+msgid "Surface at machine"
+msgstr "Oberfläche bei Maschine"
+
+msgid "Edge at machine"
+msgstr "Kante bei Maschine"
+
+msgid "Corner at machine"
+msgstr "Ecke bei Maschine"
+
+msgid "Centre at machine"
+msgstr "Mitte bei Maschine"
+
+msgid "Measured diameter:"
+msgstr "Gemessener Durchmesser:"
+
+msgid "Tool length offset:"
+msgstr "Werkzeuglängenkorrektur:"
+
+msgid "probe report(s) received."
+msgstr "Antastbericht(e) empfangen."

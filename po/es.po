@@ -3623,3 +3623,159 @@ msgstr "Debe estar entre 0 y 255"
 
 msgid "The engraving is too large: at most 10000 pixels per line"
 msgstr "El grabado es demasiado grande: como máximo 10000 píxeles por línea"
+
+msgid "Safe Height:"
+msgstr "Altura de seguridad:"
+
+msgid "Fast Feed Rate:"
+msgstr "Avance rápido:"
+
+msgid "Slow Feed Rate:"
+msgstr "Avance lento:"
+
+msgid "Backoff Distance:"
+msgstr "Distancia de retroceso:"
+
+msgid "Max Probe Depth"
+msgstr "Profundidad máxima de palpado"
+
+msgid "Probe Distance"
+msgstr "Distancia de palpado"
+
+msgid "Diameter (mm)"
+msgstr "Diámetro (mm)"
+
+msgid "Setter Plate X"
+msgstr "Placa de medición X"
+
+msgid "Setter Plate Y"
+msgstr "Placa de medición Y"
+
+msgid "Setter Plate Z"
+msgstr "Placa de medición Z"
+
+msgid "Probe Depth:"
+msgstr "Profundidad de descenso:"
+
+msgid "Probe Tip Radius:"
+msgstr "Radio de la punta:"
+
+msgid "Plate Thickness:"
+msgstr "Grosor de la placa:"
+
+msgid "Z-Touch"
+msgstr "Palpado Z"
+
+msgid "Edge Find"
+msgstr "Buscar borde"
+
+msgid "Corner Find"
+msgstr "Buscar esquina"
+
+msgid "Bore Center"
+msgstr "Centro de agujero"
+
+msgid "Boss Center"
+msgstr "Centro de saliente"
+
+msgid "Tool Length"
+msgstr "Longitud de herramienta"
+
+msgid "Routine"
+msgstr "Rutina"
+
+msgid "Target WCS"
+msgstr "SCT de destino"
+
+msgid "Auto-Update WCS"
+msgstr "Actualizar SCT automáticamente"
+
+msgid "Write the result into the selected WCS (G10 L20) from the generated G-code. Z-touch, edge and corner only; bore/boss centres are not set automatically."
+msgstr "Escribe el resultado en el SCT seleccionado (G10 L20) desde el G-code generado. Solo palpado Z, borde y esquina; los centros de agujero y saliente no se fijan automáticamente."
+
+msgid "Probe Axis"
+msgstr "Eje de palpado"
+
+msgid "Probe Direction"
+msgstr "Dirección de palpado"
+
+msgid "Status:"
+msgstr "Estado:"
+
+msgid "Probe:"
+msgstr "Sonda:"
+
+msgid "Triggered"
+msgstr "Activada"
+
+msgid "Not triggered"
+msgstr "No activada"
+
+msgid "Stop Probe"
+msgstr "Detener palpado"
+
+msgid "Routine Selection"
+msgstr "Selección de rutina"
+
+msgid "Routine Settings"
+msgstr "Ajustes de la rutina"
+
+msgid "Results"
+msgstr "Resultados"
+
+msgid "X Axis"
+msgstr "Eje X"
+
+msgid "Y Axis"
+msgstr "Eje Y"
+
+msgid "Z Axis"
+msgstr "Eje Z"
+
+msgid "Negative"
+msgstr "Negativa"
+
+msgid "Positive"
+msgstr "Positiva"
+
+msgid "X-min / Y-min"
+msgstr "X mín. / Y mín."
+
+msgid "X-max / Y-min"
+msgstr "X máx. / Y mín."
+
+msgid "X-min / Y-max"
+msgstr "X mín. / Y máx."
+
+msgid "X-max / Y-max"
+msgstr "X máx. / Y máx."
+
+msgid "The probe input is already triggered."
+msgstr "La entrada de la sonda ya está activada."
+
+msgid "Waiting for the machine's next status report."
+msgstr "Esperando el siguiente informe de estado de la máquina."
+
+msgid "The probe program was stopped."
+msgstr "Se detuvo el programa de palpado."
+
+msgid "Surface at machine"
+msgstr "Superficie en máquina"
+
+msgid "Edge at machine"
+msgstr "Borde en máquina"
+
+msgid "Corner at machine"
+msgstr "Esquina en máquina"
+
+msgid "Centre at machine"
+msgstr "Centro en máquina"
+
+msgid "Measured diameter:"
+msgstr "Diámetro medido:"
+
+msgid "Tool length offset:"
+msgstr "Corrección de longitud:"
+
+msgid "probe report(s) received."
+msgstr "informe(s) de palpado recibido(s)."

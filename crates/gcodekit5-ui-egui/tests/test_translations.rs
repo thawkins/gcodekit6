@@ -14,7 +14,7 @@ const LANGUAGES: [&str; 5] = ["de", "es", "fr", "it", "pt"];
 
 /// Translations that are spelled like the English msgid; the Translator cannot tell them
 /// from a missing entry, so the po file is checked for them instead.
-const IDENTICAL: [(&str, &str); 165] = [
+const IDENTICAL: [(&str, &str); 173] = [
     ("de", "G-Code Editor"),
     ("de", "Designer"),
     ("it", "Designer"),
@@ -187,6 +187,15 @@ const IDENTICAL: [(&str, &str); 165] = [
     ("it", "Offset X:"),
     ("es", "Offset Y:"),
     ("it", "Offset Y:"),
+    // Probe Tools: the routine word and corner names read the same.
+    ("de", "Routine"),
+    ("fr", "Routine"),
+    ("it", "Routine"),
+    ("de", "Status:"),
+    ("de", "X-min / Y-min"),
+    ("de", "X-max / Y-min"),
+    ("de", "X-min / Y-max"),
+    ("de", "X-max / Y-max"),
 ];
 
 fn msgids() -> Vec<&'static str> {

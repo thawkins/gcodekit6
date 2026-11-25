@@ -35,6 +35,12 @@ pub enum CamAction {
     ChooseFolder,
     /// Choose the image to engrave (the Laser Image Engraver's Browse).
     ChooseImage,
+    /// Run the probe routine on the machine.
+    Probe,
+    /// Write the last probe result into the work coordinate system.
+    ApplyWcs,
+    /// Stop the running probe routine (soft reset).
+    StopProbe,
 }
 
 /// Why a page produced no program.

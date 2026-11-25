@@ -3623,3 +3623,159 @@ msgstr "Deve essere tra 0 e 255"
 
 msgid "The engraving is too large: at most 10000 pixels per line"
 msgstr "L'incisione è troppo grande: al massimo 10000 pixel per riga"
+
+msgid "Safe Height:"
+msgstr "Altezza di sicurezza:"
+
+msgid "Fast Feed Rate:"
+msgstr "Avanzamento veloce:"
+
+msgid "Slow Feed Rate:"
+msgstr "Avanzamento lento:"
+
+msgid "Backoff Distance:"
+msgstr "Distanza di arretramento:"
+
+msgid "Max Probe Depth"
+msgstr "Profondità massima di tastatura"
+
+msgid "Probe Distance"
+msgstr "Distanza di tastatura"
+
+msgid "Diameter (mm)"
+msgstr "Diametro (mm)"
+
+msgid "Setter Plate X"
+msgstr "Presetter utensile X"
+
+msgid "Setter Plate Y"
+msgstr "Presetter utensile Y"
+
+msgid "Setter Plate Z"
+msgstr "Presetter utensile Z"
+
+msgid "Probe Depth:"
+msgstr "Profondità di discesa:"
+
+msgid "Probe Tip Radius:"
+msgstr "Raggio della punta:"
+
+msgid "Plate Thickness:"
+msgstr "Spessore della piastra:"
+
+msgid "Z-Touch"
+msgstr "Tastatura Z"
+
+msgid "Edge Find"
+msgstr "Ricerca bordo"
+
+msgid "Corner Find"
+msgstr "Ricerca angolo"
+
+msgid "Bore Center"
+msgstr "Centro foro"
+
+msgid "Boss Center"
+msgstr "Centro perno"
+
+msgid "Tool Length"
+msgstr "Lunghezza utensile"
+
+msgid "Routine"
+msgstr "Routine"
+
+msgid "Target WCS"
+msgstr "WCS di destinazione"
+
+msgid "Auto-Update WCS"
+msgstr "Aggiorna WCS automaticamente"
+
+msgid "Write the result into the selected WCS (G10 L20) from the generated G-code. Z-touch, edge and corner only; bore/boss centres are not set automatically."
+msgstr "Scrive il risultato nel WCS scelto (G10 L20) dal G-code generato. Solo tastatura Z, bordo e angolo; i centri di foro e perno non vengono impostati automaticamente."
+
+msgid "Probe Axis"
+msgstr "Asse di tastatura"
+
+msgid "Probe Direction"
+msgstr "Direzione di tastatura"
+
+msgid "Status:"
+msgstr "Stato:"
+
+msgid "Probe:"
+msgstr "Tastatore:"
+
+msgid "Triggered"
+msgstr "Attivato"
+
+msgid "Not triggered"
+msgstr "Non attivato"
+
+msgid "Stop Probe"
+msgstr "Ferma tastatura"
+
+msgid "Routine Selection"
+msgstr "Scelta della routine"
+
+msgid "Routine Settings"
+msgstr "Impostazioni della routine"
+
+msgid "Results"
+msgstr "Risultati"
+
+msgid "X Axis"
+msgstr "Asse X"
+
+msgid "Y Axis"
+msgstr "Asse Y"
+
+msgid "Z Axis"
+msgstr "Asse Z"
+
+msgid "Negative"
+msgstr "Negativa"
+
+msgid "Positive"
+msgstr "Positiva"
+
+msgid "X-min / Y-min"
+msgstr "X min / Y min"
+
+msgid "X-max / Y-min"
+msgstr "X max / Y min"
+
+msgid "X-min / Y-max"
+msgstr "X min / Y max"
+
+msgid "X-max / Y-max"
+msgstr "X max / Y max"
+
+msgid "The probe input is already triggered."
+msgstr "L'ingresso del tastatore è già attivato."
+
+msgid "Waiting for the machine's next status report."
+msgstr "In attesa del prossimo rapporto di stato della macchina."
+
+msgid "The probe program was stopped."
+msgstr "Il programma di tastatura è stato fermato."
+
+msgid "Surface at machine"
+msgstr "Superficie in macchina"
+
+msgid "Edge at machine"
+msgstr "Bordo in macchina"
+
+msgid "Corner at machine"
+msgstr "Angolo in macchina"
+
+msgid "Centre at machine"
+msgstr "Centro in macchina"
+
+msgid "Measured diameter:"
+msgstr "Diametro misurato:"
+
+msgid "Tool length offset:"
+msgstr "Correzione lunghezza:"
+
+msgid "probe report(s) received."
+msgstr "rapporto/i di tastatura ricevuto/i."

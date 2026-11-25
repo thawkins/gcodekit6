@@ -11,8 +11,9 @@
 //! [`requests`]. Load and Save read and write a page's input as a JSON preset in GTK's file
 //! format.
 //!
-//! The tools of later slices (laser image, probe routines) are not listed until their pages
-//! land.
+//! The Laser Image Engraver engraves on a worker thread ([`bitmap_pane`]); the Probe Tools
+//! page runs its routines on the machine ([`probe_routines::run`], fed the machine events
+//! through [`Pane::machine_events`]).
 //!
 //! Dependencies: `egui`, `gcodekit5-camtools` (generators), `gcodekit5-app` (translations),
 //! `gcodekit5-settings` (units).
@@ -23,6 +24,8 @@ pub mod common;
 pub mod drill_press;
 pub mod gerber;
 pub mod jigsaw;
+mod probe_pane;
+pub mod probe_routines;
 pub mod requests;
 pub mod speeds_feeds;
 pub mod spoilboard_grid;
@@ -42,11 +45,13 @@ use bitmap_engraving::BitmapEngravingParams;
 use bitmap_pane::BitmapRun;
 pub use common::{CamAction, CamError, FieldError};
 use drill_press::DrillPressParams;
+use gcodekit5_app::machine::MachineEvent;
 use gcodekit5_core::data::materials::{Material, init_standard_library as material_library};
 use gcodekit5_core::data::tools::{Tool, init_standard_library as tool_library};
 use gcodekit5_devicedb::model::DeviceProfile;
 use gerber::GerberParams;
 use jigsaw::JigsawParams;
+use probe_pane::ProbeState;
 pub use requests::{DesignerPath, PresetRequest};
 use requests::{DesignerPaths, PendingPreset};
 use speeds_feeds::SpeedsFeedsParams;
@@ -55,6 +60,7 @@ use spoilboard_surfacing::SpoilboardSurfacingParams;
 use tabbed_box::TabbedBoxParams;
 pub use tools::{CamTool, Category};
 
+use crate::machine::Machine;
 use crate::workspace::{Pane, PaneContext, PaneId};
 
 /// How a page's program reaches the editor.
@@ -94,6 +100,7 @@ pub fn msgids() -> Vec<&'static str> {
     ids.extend(tabbed_box::msgids());
     ids.extend(gerber::msgids());
     ids.extend(bitmap_engraving::msgids());
+    ids.extend(probe_routines::msgids());
     ids
 }
 
@@ -143,6 +150,8 @@ pub struct CamToolsPane {
     bitmap_engraving: BitmapEngravingParams,
     /// The Laser Image Engraver's engraving and image preview, running off the UI thread.
     bitmap_run: BitmapRun,
+    /// The Probe Tools page and its run on the machine.
+    probe: ProbeState,
     /// Send to Editor / Preview, waiting for the app.
     editor_request: Option<CamDelivery>,
     /// The program the request hands to the editor.
@@ -194,6 +203,7 @@ impl CamToolsPane {
             gerber: GerberParams::new(units),
             bitmap_engraving: BitmapEngravingParams::new(units),
             bitmap_run: BitmapRun::default(),
+            probe: ProbeState::default(),
             output: None,
             notice: None,
             designer_request: None,
@@ -216,42 +226,6 @@ impl CamToolsPane {
     /// * `tool` - The page to show.
     pub fn set_open_tool(&mut self, tool: Option<CamTool>) {
         self.open = tool;
-    }
-
-    /// The tools the picker lists for its search text and category.
-    ///
-    /// # Arguments
-    /// * `tr` - Translator for the current UI language (the search matches what is shown).
-    pub fn listed_tools(&self, tr: &Translator) -> Vec<CamTool> {
-        let query = self.search.trim().to_lowercase();
-        CamTool::ALL
-            .into_iter()
-            .filter(|tool| self.category == Category::All || tool.category() == self.category)
-            .filter(|tool| {
-                query.is_empty()
-                    || tr.tr(tool.title_msgid()).to_lowercase().contains(&query)
-                    || tr
-                        .tr(tool.description_msgid())
-                        .to_lowercase()
-                        .contains(&query)
-            })
-            .collect()
-    }
-
-    /// Sets the picker's search text.
-    ///
-    /// # Arguments
-    /// * `text` - The search text.
-    pub fn set_search(&mut self, text: &str) {
-        self.search = text.to_string();
-    }
-
-    /// Sets the picker's category filter.
-    ///
-    /// # Arguments
-    /// * `category` - The category.
-    pub fn set_category(&mut self, category: Category) {
-        self.category = category;
     }
 
     /// The message shown above the page, if any.
@@ -283,6 +257,7 @@ impl CamToolsPane {
             CamTool::TabbedBox => format!("{:?}", self.tabbed_box),
             CamTool::Gerber => format!("{:?}", self.gerber),
             CamTool::BitmapEngraving => format!("{:?}", self.bitmap_engraving),
+            CamTool::ProbeRoutines => format!("{:?}", self.probe.params),
             CamTool::SpoilboardSurfacing => format!("{:?}", self.spoilboard_surfacing),
             CamTool::SpoilboardGrid => format!("{:?}", self.spoilboard_grid),
             CamTool::DrillPress => format!("{:?}", self.drill_press),
@@ -380,7 +355,16 @@ impl CamToolsPane {
     }
 
     /// Runs a page's action.
-    fn act(&mut self, tool: CamTool, action: CamAction, tr: &Translator) {
+    fn act(
+        &mut self,
+        tool: CamTool,
+        action: CamAction,
+        tr: &Translator,
+        machine: Option<&Machine>,
+    ) {
+        if self.probe_action(action, machine, tr) {
+            return;
+        }
         if tool == CamTool::SpeedsFeeds {
             // Calculate: the results show on the page; there is no program.
             if action == CamAction::Generate {
@@ -392,7 +376,9 @@ impl CamToolsPane {
             return;
         }
         let delivery = match action {
-            CamAction::None => return,
+            CamAction::None | CamAction::Probe | CamAction::ApplyWcs | CamAction::StopProbe => {
+                return;
+            }
             CamAction::LoadPreset | CamAction::SavePreset => {
                 self.ask_preset(tool, action, tr);
                 return;
@@ -440,6 +426,11 @@ impl CamToolsPane {
             CamTool::SpeedsFeeds | CamTool::Jigsaw => Err(CamError::Invalid),
             // Engraved on a worker thread (see `act`).
             CamTool::BitmapEngraving => Err(CamError::Invalid),
+            CamTool::ProbeRoutines => self
+                .probe
+                .params
+                .generate(self.probe.position)
+                .map(|output| output.gcode),
             CamTool::SpoilboardGrid => self.spoilboard_grid.generate(),
             CamTool::SpoilboardSurfacing => self.spoilboard_surfacing.generate(),
             CamTool::TabbedBox => self.tabbed_box.generate(),
@@ -449,8 +440,18 @@ impl CamToolsPane {
     }
 
     /// Draws `tool`'s page.
-    fn show_page(&mut self, ui: &mut egui::Ui, tool: CamTool, tr: &Translator) -> CamAction {
+    fn show_page(
+        &mut self,
+        ui: &mut egui::Ui,
+        tool: CamTool,
+        tr: &Translator,
+        machine: Option<&Machine>,
+    ) -> CamAction {
         match tool {
+            CamTool::ProbeRoutines => {
+                let view = self.probe_view(machine, tr);
+                probe_routines::show(ui, &mut self.probe.params, &view, tr)
+            }
             CamTool::Jigsaw => jigsaw::show(ui, &mut self.jigsaw, tr),
             CamTool::TabbedBox => tabbed_box::show(ui, &mut self.tabbed_box, tr),
             CamTool::Gerber => gerber::show(ui, &mut self.gerber, tr),
@@ -469,7 +470,7 @@ impl CamToolsPane {
     }
 
     /// Draws the pane.
-    fn ui(&mut self, ui: &mut egui::Ui, tr: &Translator) {
+    fn ui(&mut self, ui: &mut egui::Ui, tr: &Translator, machine: Option<&Machine>) {
         // GTK checked the device's axes when Generate was pressed.
         let axes = device_status::get_active_num_axes();
         self.drill_press.num_axes = axes;
@@ -478,6 +479,7 @@ impl CamToolsPane {
         self.gerber.num_axes = axes;
         self.bitmap_engraving.num_axes = axes;
         self.poll_bitmap(ui.ctx(), tr);
+        self.track_probe_position(machine);
         self.drill_press.laser_mode = drill_press::device_in_laser_mode();
         if let Some(notice) = self.notice.clone() {
             ui.horizontal(|ui| {
@@ -490,12 +492,18 @@ impl CamToolsPane {
         }
         match self.open {
             None => self.show_picker(ui, tr),
-            Some(tool) => self.show_tool(ui, tool, tr),
+            Some(tool) => self.show_tool(ui, tool, tr, machine),
         }
     }
 
     /// Draws `tool`'s page with its header and the generated program.
-    fn show_tool(&mut self, ui: &mut egui::Ui, tool: CamTool, tr: &Translator) {
+    fn show_tool(
+        &mut self,
+        ui: &mut egui::Ui,
+        tool: CamTool,
+        tr: &Translator,
+        machine: Option<&Machine>,
+    ) {
         ui.horizontal(|ui| {
             if ui.button(tr.tr("Back")).clicked() {
                 self.open = None;
@@ -510,8 +518,8 @@ impl CamToolsPane {
                 if tool == CamTool::BitmapEngraving {
                     self.show_bitmap_progress(ui, tr);
                 }
-                let action = self.show_page(ui, tool, tr);
-                self.act(tool, action, tr);
+                let action = self.show_page(ui, tool, tr, machine);
+                self.act(tool, action, tr, machine);
                 if let Some(gcode) = self.output() {
                     let mut text = gcode;
                     ui.add_space(8.0);
@@ -526,65 +534,6 @@ impl CamToolsPane {
                     .labelled_by(name.id);
                 }
             });
-    }
-
-    /// Draws the picker: search and category, the list and the chosen tool's details.
-    fn show_picker(&mut self, ui: &mut egui::Ui, tr: &Translator) {
-        ui.heading(tr.tr(PaneId::CamTools.title_msgid()));
-        ui.horizontal(|ui| {
-            let hint = tr.tr("Search tools...");
-            ui.add(
-                egui::TextEdit::singleline(&mut self.search)
-                    .id_salt("cam-search")
-                    .hint_text(hint.as_ref()),
-            )
-            .widget_info(|| egui::WidgetInfo::labeled(egui::Role::TextInput, true, &hint));
-            let category = ui.label(tr.tr("Category"));
-            egui::ComboBox::from_id_salt("cam-category")
-                .selected_text(tr.tr(self.category.msgid()))
-                .show_ui(ui, |ui| {
-                    for category in Category::ALL {
-                        ui.selectable_value(&mut self.category, category, tr.tr(category.msgid()));
-                    }
-                })
-                .response
-                .labelled_by(category.id);
-        });
-        ui.separator();
-        let listed = self.listed_tools(tr);
-        ui.columns(2, |columns| {
-            egui::ScrollArea::vertical()
-                .id_salt("cam-tool-list")
-                .show(&mut columns[0], |ui| {
-                    for tool in &listed {
-                        let chosen = self.selected == Some(*tool);
-                        let response = ui.selectable_label(chosen, tr.tr(tool.title_msgid()));
-                        ui.weak(tr.tr(tool.description_msgid()));
-                        ui.add_space(4.0);
-                        if response.clicked() {
-                            self.selected = Some(*tool);
-                        }
-                        if response.double_clicked() {
-                            self.open = Some(*tool);
-                        }
-                    }
-                });
-            let ui = &mut columns[1];
-            match self.selected.filter(|tool| listed.contains(tool)) {
-                Some(tool) => {
-                    ui.heading(tr.tr(tool.title_msgid()));
-                    ui.label(tr.tr(tool.description_msgid()));
-                    if ui.button(tr.tr("Open")).clicked() {
-                        self.open = Some(tool);
-                    }
-                }
-                None => {
-                    ui.heading(tr.tr("Select a tool"));
-                    ui.label(tr.tr("Choose a tool from the list to see details."));
-                    ui.add_enabled(false, egui::Button::new(tr.tr("Open")));
-                }
-            }
-        });
     }
 }
 
@@ -604,8 +553,15 @@ impl Pane for SharedCamTools {
 
     fn ui(&mut self, ui: &mut egui::Ui, ctx: &mut PaneContext) {
         match self.0.try_borrow_mut() {
-            Ok(mut pane) => pane.ui(ui, ctx.tr),
+            Ok(mut pane) => pane.ui(ui, ctx.tr, ctx.machine()),
             Err(error) => tracing::warn!(%error, "CAM tools busy; not drawn this frame"),
+        }
+    }
+
+    fn machine_events(&mut self, events: &[MachineEvent], tr: &Translator) {
+        match self.0.try_borrow_mut() {
+            Ok(mut pane) => pane.probe_events(events, tr),
+            Err(error) => tracing::warn!(%error, "CAM tools busy; machine events not taken"),
         }
     }
 

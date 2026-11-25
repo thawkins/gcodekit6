@@ -3627,3 +3627,159 @@ msgstr "Doit être compris entre 0 et 255"
 
 msgid "The engraving is too large: at most 10000 pixels per line"
 msgstr "La gravure est trop grande : au plus 10000 pixels par ligne"
+
+msgid "Safe Height:"
+msgstr "Hauteur de sécurité :"
+
+msgid "Fast Feed Rate:"
+msgstr "Avance rapide :"
+
+msgid "Slow Feed Rate:"
+msgstr "Avance lente :"
+
+msgid "Backoff Distance:"
+msgstr "Distance de recul :"
+
+msgid "Max Probe Depth"
+msgstr "Profondeur de palpage maximale"
+
+msgid "Probe Distance"
+msgstr "Distance de palpage"
+
+msgid "Diameter (mm)"
+msgstr "Diamètre (mm)"
+
+msgid "Setter Plate X"
+msgstr "Palpeur d'outil X"
+
+msgid "Setter Plate Y"
+msgstr "Palpeur d'outil Y"
+
+msgid "Setter Plate Z"
+msgstr "Palpeur d'outil Z"
+
+msgid "Probe Depth:"
+msgstr "Profondeur de descente :"
+
+msgid "Probe Tip Radius:"
+msgstr "Rayon de la bille :"
+
+msgid "Plate Thickness:"
+msgstr "Épaisseur de la plaque :"
+
+msgid "Z-Touch"
+msgstr "Palpage Z"
+
+msgid "Edge Find"
+msgstr "Recherche d'arête"
+
+msgid "Corner Find"
+msgstr "Recherche de coin"
+
+msgid "Bore Center"
+msgstr "Centre d'alésage"
+
+msgid "Boss Center"
+msgstr "Centre de bossage"
+
+msgid "Tool Length"
+msgstr "Longueur d'outil"
+
+msgid "Routine"
+msgstr "Routine"
+
+msgid "Target WCS"
+msgstr "SCP cible"
+
+msgid "Auto-Update WCS"
+msgstr "Mise à jour auto du SCP"
+
+msgid "Write the result into the selected WCS (G10 L20) from the generated G-code. Z-touch, edge and corner only; bore/boss centres are not set automatically."
+msgstr "Écrit le résultat dans le SCP choisi (G10 L20) depuis le G-code généré. Palpage Z, arête et coin uniquement ; les centres d'alésage et de bossage ne sont pas réglés automatiquement."
+
+msgid "Probe Axis"
+msgstr "Axe de palpage"
+
+msgid "Probe Direction"
+msgstr "Sens de palpage"
+
+msgid "Status:"
+msgstr "État :"
+
+msgid "Probe:"
+msgstr "Palpeur :"
+
+msgid "Triggered"
+msgstr "Déclenché"
+
+msgid "Not triggered"
+msgstr "Non déclenché"
+
+msgid "Stop Probe"
+msgstr "Arrêter le palpage"
+
+msgid "Routine Selection"
+msgstr "Choix de la routine"
+
+msgid "Routine Settings"
+msgstr "Réglages de la routine"
+
+msgid "Results"
+msgstr "Résultats"
+
+msgid "X Axis"
+msgstr "Axe X"
+
+msgid "Y Axis"
+msgstr "Axe Y"
+
+msgid "Z Axis"
+msgstr "Axe Z"
+
+msgid "Negative"
+msgstr "Négatif"
+
+msgid "Positive"
+msgstr "Positif"
+
+msgid "X-min / Y-min"
+msgstr "X min / Y min"
+
+msgid "X-max / Y-min"
+msgstr "X max / Y min"
+
+msgid "X-min / Y-max"
+msgstr "X min / Y max"
+
+msgid "X-max / Y-max"
+msgstr "X max / Y max"
+
+msgid "The probe input is already triggered."
+msgstr "L'entrée du palpeur est déjà déclenchée."
+
+msgid "Waiting for the machine's next status report."
+msgstr "En attente du prochain rapport d'état de la machine."
+
+msgid "The probe program was stopped."
+msgstr "Le programme de palpage a été arrêté."
+
+msgid "Surface at machine"
+msgstr "Surface en machine"
+
+msgid "Edge at machine"
+msgstr "Arête en machine"
+
+msgid "Corner at machine"
+msgstr "Coin en machine"
+
+msgid "Centre at machine"
+msgstr "Centre en machine"
+
+msgid "Measured diameter:"
+msgstr "Diamètre mesuré :"
+
+msgid "Tool length offset:"
+msgstr "Correction de longueur :"
+
+msgid "probe report(s) received."
+msgstr "rapport(s) de palpage reçu(s)."

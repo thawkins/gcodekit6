@@ -3615,3 +3615,159 @@ msgstr "Deve estar entre 0 e 255"
 
 msgid "The engraving is too large: at most 10000 pixels per line"
 msgstr "A gravação é grande demais: no máximo 10000 pixels por linha"
+
+msgid "Safe Height:"
+msgstr "Altura de segurança:"
+
+msgid "Fast Feed Rate:"
+msgstr "Avanço rápido:"
+
+msgid "Slow Feed Rate:"
+msgstr "Avanço lento:"
+
+msgid "Backoff Distance:"
+msgstr "Distância de recuo:"
+
+msgid "Max Probe Depth"
+msgstr "Profundidade máxima de sondagem"
+
+msgid "Probe Distance"
+msgstr "Distância de sondagem"
+
+msgid "Diameter (mm)"
+msgstr "Diâmetro (mm)"
+
+msgid "Setter Plate X"
+msgstr "Placa de medição X"
+
+msgid "Setter Plate Y"
+msgstr "Placa de medição Y"
+
+msgid "Setter Plate Z"
+msgstr "Placa de medição Z"
+
+msgid "Probe Depth:"
+msgstr "Profundidade de descida:"
+
+msgid "Probe Tip Radius:"
+msgstr "Raio da ponta:"
+
+msgid "Plate Thickness:"
+msgstr "Espessura da placa:"
+
+msgid "Z-Touch"
+msgstr "Sondagem Z"
+
+msgid "Edge Find"
+msgstr "Localizar borda"
+
+msgid "Corner Find"
+msgstr "Localizar canto"
+
+msgid "Bore Center"
+msgstr "Centro de furo"
+
+msgid "Boss Center"
+msgstr "Centro de ressalto"
+
+msgid "Tool Length"
+msgstr "Comprimento da ferramenta"
+
+msgid "Routine"
+msgstr "Rotina"
+
+msgid "Target WCS"
+msgstr "SCT de destino"
+
+msgid "Auto-Update WCS"
+msgstr "Atualizar SCT automaticamente"
+
+msgid "Write the result into the selected WCS (G10 L20) from the generated G-code. Z-touch, edge and corner only; bore/boss centres are not set automatically."
+msgstr "Grava o resultado no SCT escolhido (G10 L20) a partir do G-code gerado. Apenas sondagem Z, borda e canto; os centros de furo e ressalto não são definidos automaticamente."
+
+msgid "Probe Axis"
+msgstr "Eixo de sondagem"
+
+msgid "Probe Direction"
+msgstr "Direção de sondagem"
+
+msgid "Status:"
+msgstr "Estado:"
+
+msgid "Probe:"
+msgstr "Sonda:"
+
+msgid "Triggered"
+msgstr "Acionada"
+
+msgid "Not triggered"
+msgstr "Não acionada"
+
+msgid "Stop Probe"
+msgstr "Parar sondagem"
+
+msgid "Routine Selection"
+msgstr "Seleção de rotina"
+
+msgid "Routine Settings"
+msgstr "Configurações da rotina"
+
+msgid "Results"
+msgstr "Resultados"
+
+msgid "X Axis"
+msgstr "Eixo X"
+
+msgid "Y Axis"
+msgstr "Eixo Y"
+
+msgid "Z Axis"
+msgstr "Eixo Z"
+
+msgid "Negative"
+msgstr "Negativa"
+
+msgid "Positive"
+msgstr "Positiva"
+
+msgid "X-min / Y-min"
+msgstr "X mín. / Y mín."
+
+msgid "X-max / Y-min"
+msgstr "X máx. / Y mín."
+
+msgid "X-min / Y-max"
+msgstr "X mín. / Y máx."
+
+msgid "X-max / Y-max"
+msgstr "X máx. / Y máx."
+
+msgid "The probe input is already triggered."
+msgstr "A entrada da sonda já está acionada."
+
+msgid "Waiting for the machine's next status report."
+msgstr "Aguardando o próximo relatório de estado da máquina."
+
+msgid "The probe program was stopped."
+msgstr "O programa de sondagem foi parado."
+
+msgid "Surface at machine"
+msgstr "Superfície na máquina"
+
+msgid "Edge at machine"
+msgstr "Borda na máquina"
+
+msgid "Corner at machine"
+msgstr "Canto na máquina"
+
+msgid "Centre at machine"
+msgstr "Centro na máquina"
+
+msgid "Measured diameter:"
+msgstr "Diâmetro medido:"
+
+msgid "Tool length offset:"
+msgstr "Correção de comprimento:"
+
+msgid "probe report(s) received."
+msgstr "relatório(s) de sondagem recebido(s)."
