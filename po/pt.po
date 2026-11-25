@@ -3834,3 +3834,9 @@ msgstr "Falha ao carregar o arquivo de imagem"
 
 msgid "The engraving worker stopped"
 msgstr "O processo de gravação parou"
+
+msgid "already connected"
+msgstr "já conectado"
+
+msgid "a program is already streaming"
+msgstr "um programa já está sendo enviado"

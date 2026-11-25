@@ -252,7 +252,8 @@ impl Pane for ConsolePane {
             .show_separator_line(false)
             .show(ui, |ui| {
                 if let Some(notice) = &self.notice {
-                    ui.colored_label(ui.visuals().error_fg_color, notice);
+                    // A controller refusal is kept in English; translated here.
+                    ui.colored_label(ui.visuals().error_fg_color, worker_message(notice, tr));
                 }
                 ui.horizontal(|ui| {
                     if ui.button(tr.tr("Clear")).clicked() {

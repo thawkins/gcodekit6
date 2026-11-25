@@ -93,3 +93,21 @@ fn test_probe_failure_text_translates_the_controller_message() {
     assert!(text.contains("error:9 "), "{text}");
     assert!(!text.contains("on program line"), "{text}");
 }
+
+#[test]
+fn test_fixed_machine_errors_are_translated() {
+    use gcodekit5_app::machine::MachineError;
+    let tr = Translator::new("de");
+    for error in [
+        MachineError::NotConnected,
+        MachineError::AlreadyConnected,
+        MachineError::StreamInProgress,
+    ] {
+        let english = error.to_string();
+        let shown = gcodekit5_ui_egui::machine::worker_message(&english, &tr);
+        assert_ne!(shown, english, "{error:?} not translated");
+    }
+    // As the console shows a refusal reported as an event (Pause without a connection).
+    let lines = german_console(&[error(&MachineError::NotConnected.to_string())]);
+    assert!(!lines[0].contains("not connected"), "{lines:?}");
+}

@@ -242,7 +242,10 @@ impl ProbeRun {
         let lines: Arc<[String]> = program_lines(&output.gcode)?.into();
         lock(machine.controller())
             .start_stream_with(lines, StreamMode::StopOnError)
-            .map_err(|e| format!("{}: {e}", tr.tr(NOT_STARTED)))?;
+            .map_err(|e| {
+                let e = crate::machine::worker_message(&e.to_string(), tr);
+                format!("{}: {e}", tr.tr(NOT_STARTED))
+            })?;
         tracing::info!(routine = %output.description, "probe run started");
         let run = Self {
             controller: machine.controller().clone(),
@@ -535,7 +538,7 @@ pub fn apply(
         .map_err(|e| e.to_string())?;
     lock(machine.controller())
         .send_line(&result.command)
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| crate::machine::worker_message(&e.to_string(), tr))?;
     tracing::info!(command = %result.command, "applied probe result");
     Ok(result.command)
 }

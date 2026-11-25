@@ -3763,3 +3763,9 @@ msgstr ""
 
 msgid "The engraving worker stopped"
 msgstr ""
+
+msgid "already connected"
+msgstr ""
+
+msgid "a program is already streaming"
+msgstr ""

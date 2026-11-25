@@ -60,7 +60,8 @@ const MAX_UNANSWERED_QUERIES: usize = 256;
 const IDLE_WAIT: Duration = Duration::from_millis(2);
 
 /// The English texts of the messages the controller and its worker word themselves in
-/// [`MachineEvent::Error`] and [`MachineEvent::StreamHalted`]. Each is a msgid: this crate
+/// [`MachineEvent::Error`] and [`MachineEvent::StreamHalted`], and of the fixed
+/// [`MachineError`]s (which also reach the UI as such events). Each is a msgid: this crate
 /// stays toolkit-free and emits English, and a front end translates at display time. A
 /// message is a text alone, or a text followed by `": "` and a detail (a line, a transport
 /// error); [`ON_PROGRAM_LINE`](worker_text::ON_PROGRAM_LINE) joins a controller reply
@@ -88,9 +89,15 @@ pub mod worker_text {
     pub const JOG_INVALID: &str = "jog ignored: invalid distance or feed";
     /// A jog refused while a program streams.
     pub const JOG_WHILE_STREAMING: &str = "jog ignored: a program is streaming";
+    /// [`MachineError::AlreadyConnected`](super::MachineError::AlreadyConnected).
+    pub const ALREADY_CONNECTED: &str = "already connected";
+    /// [`MachineError::NotConnected`](super::MachineError::NotConnected).
+    pub const NOT_CONNECTED: &str = "not connected";
+    /// [`MachineError::StreamInProgress`](super::MachineError::StreamInProgress).
+    pub const STREAM_IN_PROGRESS: &str = "a program is already streaming";
 
     /// Every text above, for a front end's translation table.
-    pub const ALL: [&str; 11] = [
+    pub const ALL: [&str; 14] = [
         CONNECT_FAILED,
         WRITE_FAILED,
         READ_FAILED,
@@ -102,6 +109,9 @@ pub mod worker_text {
         DROPPED_AFTER_PROBE_ERROR,
         JOG_INVALID,
         JOG_WHILE_STREAMING,
+        ALREADY_CONNECTED,
+        NOT_CONNECTED,
+        STREAM_IN_PROGRESS,
     ];
 }
 
@@ -109,13 +119,13 @@ pub mod worker_text {
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum MachineError {
     /// `connect` was called while a connection is open.
-    #[error("already connected")]
+    #[error("{}", worker_text::ALREADY_CONNECTED)]
     AlreadyConnected,
     /// The call needs an open connection.
-    #[error("not connected")]
+    #[error("{}", worker_text::NOT_CONNECTED)]
     NotConnected,
     /// `start_stream` was called while a program is streaming.
-    #[error("a program is already streaming")]
+    #[error("{}", worker_text::STREAM_IN_PROGRESS)]
     StreamInProgress,
     /// The connection settings are not usable.
     #[error("invalid connection settings: {0}")]

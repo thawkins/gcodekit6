@@ -3842,3 +3842,9 @@ msgstr "Impossibile caricare il file immagine"
 
 msgid "The engraving worker stopped"
 msgstr "Il processo di incisione si è interrotto"
+
+msgid "already connected"
+msgstr "già connesso"
+
+msgid "a program is already streaming"
+msgstr "è già in corso l'invio di un programma"

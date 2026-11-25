@@ -3839,3 +3839,9 @@ msgstr "Bilddatei konnte nicht geladen werden"
 
 msgid "The engraving worker stopped"
 msgstr "Der Gravurprozess wurde beendet"
+
+msgid "already connected"
+msgstr "bereits verbunden"
+
+msgid "a program is already streaming"
+msgstr "es wird bereits ein Programm gesendet"
