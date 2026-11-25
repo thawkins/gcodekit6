@@ -3700,3 +3700,6 @@ msgstr ""
 
 msgid "probe report(s) received."
 msgstr ""
+
+msgid "Program halted (feed hold, then reset)"
+msgstr ""

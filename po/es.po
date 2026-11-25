@@ -3779,3 +3779,6 @@ msgstr "Corrección de longitud:"
 
 msgid "probe report(s) received."
 msgstr "informe(s) de palpado recibido(s)."
+
+msgid "Program halted (feed hold, then reset)"
+msgstr "Programa detenido (retención de avance y reinicio)"

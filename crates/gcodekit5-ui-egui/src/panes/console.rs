@@ -31,9 +31,13 @@ use crate::workspace::{Pane, PaneContext, PaneId};
 /// Messages the log keeps; older ones are dropped (the GTK console keeps 5000 lines too).
 pub const MAX_CONSOLE_LINES: usize = 5000;
 
+/// The log's prefix for a program the controller halted after a refused line.
+const PROGRAM_HALTED: &str = n_!("Program halted (feed hold, then reset)");
+
 /// The msgids the pane shows, for the translation check.
 pub fn msgids() -> Vec<&'static str> {
     vec![
+        PROGRAM_HALTED,
         n_!("Clear"),
         n_!("Type a command and press Enter..."),
         n_!("Device connected"),
@@ -116,6 +120,10 @@ impl ConsolePane {
                     format!("{}: {message}", tr.tr("Error")),
                 ),
                 MachineEvent::Sent(line) => self.log.add_command(line),
+                MachineEvent::StreamHalted { reason } => self.log.add_message(
+                    MessageLevel::Error,
+                    format!("{}: {reason}", tr.tr(PROGRAM_HALTED)),
+                ),
                 MachineEvent::Received(line) => {
                     let line = line.trim();
                     if !line.is_empty() && !is_status_report(line) {

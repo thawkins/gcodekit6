@@ -3776,3 +3776,6 @@ msgstr "Werkzeuglängenkorrektur:"
 
 msgid "probe report(s) received."
 msgstr "Antastbericht(e) empfangen."
+
+msgid "Program halted (feed hold, then reset)"
+msgstr "Programm angehalten (Vorschub-Halt, dann Reset)"

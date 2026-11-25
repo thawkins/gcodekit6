@@ -3771,3 +3771,6 @@ msgstr "Correção de comprimento:"
 
 msgid "probe report(s) received."
 msgstr "relatório(s) de sondagem recebido(s)."
+
+msgid "Program halted (feed hold, then reset)"
+msgstr "Programa parado (retenção de avanço e reinício)"

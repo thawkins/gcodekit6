@@ -3779,3 +3779,6 @@ msgstr "Correzione lunghezza:"
 
 msgid "probe report(s) received."
 msgstr "rapporto/i di tastatura ricevuto/i."
+
+msgid "Program halted (feed hold, then reset)"
+msgstr "Programma fermato (sospensione avanzamento, poi reset)"

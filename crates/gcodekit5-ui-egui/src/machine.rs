@@ -220,6 +220,7 @@ impl MachineStatus {
                 }
                 MachineEvent::Sent(_) => {}
                 MachineEvent::Error(message) => self.last_error = Some(message.clone()),
+                MachineEvent::StreamHalted { reason } => self.last_error = Some(reason.clone()),
             }
         }
     }

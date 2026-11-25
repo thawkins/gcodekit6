@@ -299,6 +299,11 @@ impl ProbeRun {
                 }
                 None
             }
+            MachineEvent::StreamHalted { reason } => {
+                // The controller halted the stream itself; the stop that follows says so.
+                self.failure = Some(reason.clone());
+                None
+            }
             MachineEvent::StreamFinished { .. } => Some(self.finish(tr)),
             MachineEvent::StreamStopped { .. } => {
                 let reason = self
