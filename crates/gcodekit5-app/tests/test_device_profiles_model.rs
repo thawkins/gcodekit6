@@ -5,11 +5,13 @@
 use std::collections::HashMap;
 
 use gcodekit5_app::device_profiles::{
-    DeleteRefusal, ProfileForm, ReportedLimits, delete_refusal, matches_search,
-    store_reported_settings,
+    DeleteRefusal, ProfileForm, ReportedLimits, delete_refusal, dump_target, ensure_active_profile,
+    matches_search, store_reported_settings,
 };
 use gcodekit5_core::units::{FeedRateUnits, MeasurementSystem};
+use gcodekit5_devicedb::DeviceManager;
 use gcodekit5_devicedb::{ControllerType, DeviceProfile, DeviceType};
+use gcodekit5_settings::{ConnectionSettings, ConnectionType};
 
 const MM: MeasurementSystem = MeasurementSystem::Metric;
 const MM_MIN: FeedRateUnits = FeedRateUnits::MmPerMin;
@@ -168,4 +170,121 @@ fn test_device_profiles_search_and_delete_rule() {
     );
     assert_eq!(delete_refusal("a", None, 1), Some(DeleteRefusal::Last));
     assert_eq!(delete_refusal("b", Some("a"), 2), None);
+}
+
+#[test]
+fn test_device_profiles_grbl_family_controllers_save() {
+    for controller in [ControllerType::GrblHal, ControllerType::FluidNC] {
+        let profile = DeviceProfile {
+            controller_type: controller.clone(),
+            ..DeviceProfile::default()
+        };
+        let mut form = ProfileForm::from_profile(&profile, MM, MM_MIN);
+        form.name = "Renamed".to_string();
+        let saved = form.apply(&profile, MM, MM_MIN).expect("GRBL family saves");
+        assert_eq!(saved.name, "Renamed");
+        assert_eq!(saved.controller_type, controller);
+    }
+}
+
+fn serial(port: &str) -> ConnectionSettings {
+    ConnectionSettings {
+        port: port.to_string(),
+        ..ConnectionSettings::default()
+    }
+}
+
+fn profile(id: &str, port: &str) -> DeviceProfile {
+    DeviceProfile {
+        id: id.to_string(),
+        name: id.to_string(),
+        port: port.to_string(),
+        ..DeviceProfile::default()
+    }
+}
+
+#[test]
+fn test_device_profiles_dump_target_follows_gtk_port_rule() {
+    let profiles = [
+        profile("router", "/dev/ttyUSB0"),
+        profile("laser", "/dev/ttyACM0"),
+        profile("auto", "Auto"),
+    ];
+    let target = |active: Option<&str>, port: &str| dump_target(&profiles, active, &serial(port));
+    // The active profile on the connected port, or on "Auto".
+    assert_eq!(
+        target(Some("router"), "/dev/ttyUSB0").as_deref(),
+        Some("router")
+    );
+    assert_eq!(
+        target(Some("auto"), "/dev/ttyUSB0").as_deref(),
+        Some("auto")
+    );
+    // Otherwise the profile with that port.
+    assert_eq!(
+        target(Some("router"), "/dev/ttyACM0").as_deref(),
+        Some("laser")
+    );
+    // Otherwise nothing.
+    assert_eq!(target(Some("router"), "/dev/ttyS9"), None);
+    assert_eq!(target(None, "/dev/ttyS9"), None);
+    // A network connection matches a profile's host and port.
+    let net = DeviceProfile {
+        tcp_host: "laser.local".to_string(),
+        tcp_port: 8080,
+        ..profile("net", "/dev/ttyS1")
+    };
+    let conn = ConnectionSettings {
+        connection_type: ConnectionType::Tcp,
+        port: "laser.local".to_string(),
+        tcp_port: 8080,
+        ..ConnectionSettings::default()
+    };
+    let with_net = [profiles[0].clone(), net];
+    assert_eq!(
+        dump_target(&with_net, Some("router"), &conn).as_deref(),
+        Some("net")
+    );
+}
+
+/// A fresh profiles file path under `target/temp/app_device_profiles/<name>-<pid>`.
+fn scratch_file(name: &str) -> std::path::PathBuf {
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../target/temp/app_device_profiles")
+        .join(format!("{name}-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).expect("scratch");
+    dir.join("devices.json")
+}
+
+#[test]
+fn test_device_profiles_ensure_active_profile() {
+    // No profiles: the default one is created and made active.
+    let file = scratch_file("ensure_empty");
+    let manager = DeviceManager::new(file.clone());
+    ensure_active_profile(&manager).expect("ensure");
+    assert_eq!(manager.get_all_profiles().len(), 1);
+    assert!(manager.get_active_profile().is_some());
+
+    // Profiles but none active: the first by name becomes active, on disk too.
+    let file = scratch_file("ensure_none_active");
+    let manager = DeviceManager::new(file.clone());
+    manager.save_profile(profile("b", "Auto")).expect("save");
+    manager
+        .save_profile(DeviceProfile {
+            name: "a".to_string(),
+            ..profile("z", "Auto")
+        })
+        .expect("save");
+    ensure_active_profile(&manager).expect("ensure");
+    assert_eq!(
+        manager.get_active_profile().map(|p| p.id).as_deref(),
+        Some("z")
+    );
+    let reread = DeviceManager::new(file);
+    reread.load().expect("load");
+    assert_eq!(
+        reread.get_active_profile().map(|p| p.id).as_deref(),
+        Some("z")
+    );
 }

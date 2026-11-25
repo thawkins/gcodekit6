@@ -375,6 +375,8 @@ struct Worker {
 /// connect timeout.
 pub struct MachineController {
     factory: TransportFactory,
+    /// The settings of the last connection started (kept after it closes).
+    last_connection: Option<ConnectionSettings>,
     repaint: SharedHook,
     streaming: Arc<AtomicBool>,
     /// Sequence number of the last command line sent with [`send_line`](Self::send_line).
@@ -421,6 +423,7 @@ impl MachineController {
     pub fn with_transport(factory: TransportFactory) -> Self {
         Self {
             factory,
+            last_connection: None,
             repaint: Arc::new(Mutex::new(None)),
             streaming: Arc::new(AtomicBool::new(false)),
             requested: 0,
@@ -491,6 +494,7 @@ impl MachineController {
             handle,
             ready,
         });
+        self.last_connection = Some(cfg.clone());
         Ok(())
     }
 
@@ -647,6 +651,12 @@ impl MachineController {
     /// before homing): a front end must not jog on it. True before any line is sent.
     pub fn report_fresh(&self) -> bool {
         self.fresh.load(Ordering::SeqCst) >= self.requested
+    }
+
+    /// The settings of the last connection started (port or host, type), kept after it
+    /// closes so events read before the close can still be attributed to it.
+    pub fn last_connection(&self) -> Option<&ConnectionSettings> {
+        self.last_connection.as_ref()
     }
 
     /// Whether every line sent with [`send_line`](Self::send_line) has had its reply (`ok` or

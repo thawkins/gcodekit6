@@ -21,6 +21,8 @@ pub struct DeviceManager {
     /// Set when the last load could not read part of an existing file; the next save
     /// backs the original up before overwriting it.
     needs_backup: ThreadSafeRw<bool>,
+    /// Where the last backup of an unreadable file was written, if one was.
+    last_backup: ThreadSafeRw<Option<PathBuf>>,
 }
 
 impl DeviceManager {
@@ -33,6 +35,7 @@ impl DeviceManager {
             config_path,
             file_lock: thread_safe(()),
             needs_backup: thread_safe_rw(false),
+            last_backup: thread_safe_rw(None),
         }
     }
 
@@ -138,6 +141,12 @@ impl DeviceManager {
         *self.needs_backup.read()
     }
 
+    /// Where the last backup of an unreadable profiles file was written (by a save after a
+    /// load that could not read all of it), if one was.
+    pub fn last_backup(&self) -> Option<PathBuf> {
+        self.last_backup.read().clone()
+    }
+
     fn mark_needs_backup(&self) {
         *self.needs_backup.write() = true;
     }
@@ -173,6 +182,7 @@ impl DeviceManager {
                 backup = %backup.display(),
                 "Backed up device profiles file before overwriting unreadable entries"
             );
+            *self.last_backup.write() = Some(backup);
         }
         *needs_backup = false;
         Ok(())

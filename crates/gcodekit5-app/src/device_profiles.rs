@@ -5,11 +5,14 @@
 //!   back into a [`DeviceProfile`], with the GTK Device Manager's Save rules and messages.
 //! - [`ReportedLimits`] reads the values a `$$` dump gives a profile (GTK's Sync from Device)
 //!   and [`store_reported_settings`] keeps a dump in a profile (GTK's Device Config page).
-//! - [`matches_search`] is the device list's search, [`delete_refusal`] the delete rule.
+//! - [`matches_search`] is the device list's search, [`delete_refusal`] the delete rule,
+//!   [`ensure_active_profile`] keeps a valid active profile, and [`dump_target`] picks the
+//!   profile a retrieved dump belongs to (GTK's port rule).
 //!
 //! Profiles are stored by `gcodekit5-devicedb`'s `DeviceManager` (`devices.json`, the GTK
 //! build's file). Depends on `gcodekit5-core` (units), `gcodekit5-devicedb` (profile model)
-//! and `gcodekit5-communication` (which controllers are supported).
+//! `gcodekit5-communication` (which controllers are supported) and `gcodekit5-settings`
+//! (the connection a dump came from).
 
 use std::collections::HashMap;
 
@@ -17,7 +20,8 @@ use gcodekit5_core::units::{
     FeedRateUnits, MeasurementSystem, format_feed_rate, format_length, parse_feed_rate,
     parse_length,
 };
-use gcodekit5_devicedb::{ControllerType, DeviceProfile, DeviceType};
+use gcodekit5_devicedb::{ControllerType, DeviceManager, DeviceProfile, DeviceType};
+use gcodekit5_settings::{ConnectionSettings, ConnectionType};
 
 /// The device types the form offers, in GTK's order.
 pub const DEVICE_TYPES: [DeviceType; 5] = [
@@ -382,7 +386,7 @@ impl ProfileForm {
 
         let protocol =
             gcodekit5_communication::firmware::protocol_profile(p.controller_type.as_str());
-        if !protocol.is_supported {
+        if !saveable(&p.controller_type) {
             return Err(FormError {
                 title: n_!("Unsupported controller"),
                 detail: n_!(
@@ -423,6 +427,15 @@ impl ProfileForm {
             self.has_laser = laser;
         }
     }
+}
+
+/// Whether a profile with `controller` can be saved: a supported protocol, or a GRBL-family
+/// controller the list offers as "supported via GRBL" (grblHAL, FluidNC).
+fn saveable(controller: &ControllerType) -> bool {
+    matches!(
+        controller,
+        ControllerType::GrblHal | ControllerType::FluidNC
+    ) || gcodekit5_communication::firmware::protocol_profile(controller.as_str()).is_supported
 }
 
 /// What a GRBL `$$` dump says about a machine's profile.
@@ -477,6 +490,77 @@ pub fn store_reported_settings(profile: &mut DeviceProfile, settings: &HashMap<u
     if let Some(laser) = numeric(32) {
         profile.has_laser = laser >= 1.0;
     }
+}
+
+/// Whether `profile` names the connection `connection` was opened with: its serial port, or
+/// for a network connection its host and port.
+fn on_connection(profile: &DeviceProfile, connection: &ConnectionSettings) -> bool {
+    let port = connection.port.trim();
+    match connection.connection_type {
+        ConnectionType::Serial => profile.port.trim() == port,
+        ConnectionType::Tcp | ConnectionType::WebSocket => {
+            profile.tcp_host.trim() == port && profile.tcp_port == connection.tcp_port
+        }
+    }
+}
+
+/// The profile a `$$` dump read over `connection` belongs to (GTK's rule): the active
+/// profile when it names that connection or its port is `"Auto"`, else the first profile by
+/// name that names the connection, else none.
+///
+/// # Arguments
+/// * `profiles` - Every profile.
+/// * `active_id` - The active profile, if any.
+/// * `connection` - The connection the dump was read over.
+///
+/// # Returns
+/// The id of the profile to store the dump in.
+pub fn dump_target(
+    profiles: &[DeviceProfile],
+    active_id: Option<&str>,
+    connection: &ConnectionSettings,
+) -> Option<String> {
+    let active = profiles
+        .iter()
+        .find(|p| Some(p.id.as_str()) == active_id)
+        .filter(|p| p.port.trim() == "Auto" || on_connection(p, connection));
+    if let Some(active) = active {
+        return Some(active.id.clone());
+    }
+    let mut matching: Vec<&DeviceProfile> = profiles
+        .iter()
+        .filter(|p| on_connection(p, connection))
+        .collect();
+    matching.sort_by(|a, b| a.name.cmp(&b.name).then_with(|| a.id.cmp(&b.id)));
+    matching.first().map(|p| p.id.clone())
+}
+
+/// Makes sure `manager` has an active profile: without profiles the default one is
+/// created; without a valid active id the first profile by name is made active. Both are
+/// saved (an unreadable file is backed up first, see `DeviceManager::save`).
+///
+/// # Arguments
+/// * `manager` - The loaded profiles.
+///
+/// # Errors
+/// Returns an error if saving fails.
+pub fn ensure_active_profile(manager: &DeviceManager) -> anyhow::Result<()> {
+    if manager.get_active_profile().is_some() {
+        return Ok(());
+    }
+    let mut profiles = manager.get_all_profiles();
+    profiles.sort_by(|a, b| a.name.cmp(&b.name).then_with(|| a.id.cmp(&b.id)));
+    let id = match profiles.first() {
+        Some(first) => first.id.clone(),
+        None => {
+            let profile = DeviceProfile::default();
+            let id = profile.id.clone();
+            manager.save_profile(profile)?;
+            id
+        }
+    };
+    tracing::info!(%id, "no valid active device profile; making one active");
+    manager.set_active_profile(&id)
 }
 
 /// Whether `profile` matches the device list's search text (name, description, device
