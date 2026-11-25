@@ -26,6 +26,8 @@ mod test_console_pane;
 mod test_designer_app;
 #[path = "test_designer_canvas.rs"]
 mod test_designer_canvas;
+#[path = "test_designer_editing.rs"]
+mod test_designer_editing;
 #[path = "test_designer_snapshots.rs"]
 mod test_designer_snapshots;
 #[path = "test_dialogs.rs"]

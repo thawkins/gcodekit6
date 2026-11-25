@@ -92,6 +92,11 @@ impl CanvasInput {
         }
     }
 
+    /// Whether a primary-button drag (move, resize, draw, marquee, pan) is in progress.
+    pub fn dragging(&self) -> bool {
+        self.drag.is_some()
+    }
+
     /// Discards the polyline being drawn and any drag (the tool changed).
     pub(crate) fn reset(&mut self) {
         self.polyline.clear();
@@ -186,7 +191,8 @@ impl CanvasInput {
                 i.key_pressed(egui::Key::Enter),
             )
         });
-        if delete && state.selected_count() > 0 {
+        // Not mid-drag: the drag still holds the shapes it started from.
+        if delete && self.drag.is_none() && state.selected_count() > 0 {
             state.delete_selected();
         }
         if escape && self.polyline.is_empty() {
@@ -214,7 +220,10 @@ impl CanvasInput {
             }
             DesignerTool::Polyline => {
                 let (x, y) = editing::snap(state, at.0, at.1);
-                self.polyline.push(Point::new(x, y));
+                // A click on the last point adds no zero-length segment.
+                if self.polyline.last() != Some(&Point::new(x, y)) {
+                    self.polyline.push(Point::new(x, y));
+                }
             }
             DesignerTool::Select if !modifiers.shift && !modifiers.command => {
                 // A plain click on a selected shape keeps only that shape selected.

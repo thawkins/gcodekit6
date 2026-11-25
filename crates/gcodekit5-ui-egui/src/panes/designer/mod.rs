@@ -125,14 +125,28 @@ impl DesignerPane {
         self.state.is_modified
     }
 
-    /// Undoes the last edit.
+    /// Undoes the last edit; ignored during a canvas drag ([`DesignerPane::dragging`]).
     pub fn undo(&mut self) {
-        self.state.undo();
+        if self.dragging() {
+            tracing::debug!("undo ignored during a canvas drag");
+        } else {
+            self.state.undo();
+        }
     }
 
-    /// Redoes the last undone edit.
+    /// Redoes the last undone edit; ignored during a canvas drag ([`DesignerPane::dragging`]).
     pub fn redo(&mut self) {
-        self.state.redo();
+        if self.dragging() {
+            tracing::debug!("redo ignored during a canvas drag");
+        } else {
+            self.state.redo();
+        }
+    }
+
+    /// Whether a canvas drag is in progress. A move or resize records its own undo step when
+    /// it ends, from the shapes it started with, so undo, redo and delete wait for it.
+    pub fn dragging(&self) -> bool {
+        self.input.dragging()
     }
 
     /// Rotates the selection by `degrees` (counter-clockwise positive), as one undo step.

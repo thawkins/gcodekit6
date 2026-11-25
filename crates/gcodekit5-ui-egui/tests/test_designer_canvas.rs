@@ -1,14 +1,14 @@
 //! Designer canvas: every canvas interaction of the GTK `designer_canvas/input.rs` (draw by
 //! drag with each tool, select, shift multi-select, marquee, move, resize by handle, rotate,
-//! delete, undo/redo, snap-to-grid, zoom at the cursor, pan). The app routing is in
+//! delete, undo/redo, snap-to-grid, zoom at the cursor, pan), with the shared helpers.
+//! Drawing and selection are here; editing and the view (move, resize, rotate, delete,
+//! undo, snap, zoom, pan) in `test_designer_editing.rs`, the app routing in
 //! `test_designer_app.rs`, the snapshots in `test_designer_snapshots.rs`.
 
 use egui::{Modifiers, PointerButton, Pos2, pos2};
 use egui_kittest::Harness;
-use egui_kittest::kittest::Queryable;
 use gcodekit5_app::i18n::Translator;
 use gcodekit5_designer::model::{DesignRectangle, Shape, ShapeType};
-use gcodekit5_ui_egui::commands::Command;
 use gcodekit5_ui_egui::panes::designer::canvas::{CanvasView, DesignerTool};
 use gcodekit5_ui_egui::panes::designer::{DesignerPane, msgids};
 use gcodekit5_ui_egui::workspace::{Pane, PaneContext, PaneId};
@@ -49,7 +49,7 @@ pub fn screen(harness: &Harness<'_, DesignerPane>, x: f32, y: f32) -> Pos2 {
 }
 
 /// Presses or releases `button` at `pos` with `modifiers` held.
-fn button(
+pub fn button(
     harness: &Harness<'_, DesignerPane>,
     pos: Pos2,
     button: PointerButton,
@@ -88,7 +88,7 @@ pub fn click(harness: &mut Harness<'_, DesignerPane>, pos: Pos2) {
 }
 
 /// Drags from `from` to `to` with `which` held, in a few pointer moves.
-fn drag_with(
+pub fn drag_with(
     harness: &mut Harness<'_, DesignerPane>,
     from: Pos2,
     to: Pos2,
@@ -122,7 +122,7 @@ pub fn press(harness: &mut Harness<'_, DesignerPane>, key: egui::Key) {
 }
 
 /// Draws a rectangle from world `(x1, y1)` to `(x2, y2)` with the Rectangle tool.
-fn draw_rect(harness: &mut Harness<'_, DesignerPane>, x1: f32, y1: f32, x2: f32, y2: f32) {
+pub fn draw_rect(harness: &mut Harness<'_, DesignerPane>, x1: f32, y1: f32, x2: f32, y2: f32) {
     harness.state_mut().set_tool(DesignerTool::Rectangle);
     let (from, to) = (screen(harness, x1, y1), screen(harness, x2, y2));
     drag(harness, from, to);
@@ -162,7 +162,7 @@ pub fn ids(pane: &DesignerPane) -> Vec<u64> {
 }
 
 /// The bounds of shape `id`.
-fn bounds(pane: &DesignerPane, id: u64) -> (f64, f64, f64, f64) {
+pub fn bounds(pane: &DesignerPane, id: u64) -> (f64, f64, f64, f64) {
     use gcodekit5_designer::model::DesignerShape;
     pane.state()
         .canvas
@@ -171,11 +171,11 @@ fn bounds(pane: &DesignerPane, id: u64) -> (f64, f64, f64, f64) {
         .expect("shape exists")
 }
 
-fn close(a: f64, b: f64) -> bool {
+pub fn close(a: f64, b: f64) -> bool {
     (a - b).abs() < 1e-3
 }
 
-fn close4(a: (f64, f64, f64, f64), b: (f64, f64, f64, f64)) -> bool {
+pub fn close4(a: (f64, f64, f64, f64), b: (f64, f64, f64, f64)) -> bool {
     close(a.0, b.0) && close(a.1, b.1) && close(a.2, b.2) && close(a.3, b.3)
 }
 
@@ -224,6 +224,39 @@ fn test_tiny_drag_draws_nothing() {
     // Under GTK's 1 mm minimum in one direction.
     draw_rect(&mut h, 20.0, 20.0, 80.0, 20.4);
     assert!(ids(h.state()).is_empty());
+    // A line dragged away and back, so its ends snap to one point.
+    h.state_mut().set_tool(DesignerTool::Line);
+    let (from, away, back) = (
+        screen(&h, 50.2, 50.2),
+        screen(&h, 90.0, 90.0),
+        screen(&h, 50.4, 49.7),
+    );
+    h.event(egui::Event::PointerMoved(from));
+    h.step();
+    button(&h, from, PointerButton::Primary, true, Modifiers::NONE);
+    h.step();
+    for p in [away, back] {
+        h.event(egui::Event::PointerMoved(p));
+        h.step();
+    }
+    button(&h, back, PointerButton::Primary, false, Modifiers::NONE);
+    h.run();
+    assert!(ids(h.state()).is_empty(), "no zero-length line");
+}
+
+#[test]
+fn test_polyline_skips_repeated_points() {
+    let mut h = harness(DesignerPane::new());
+    h.state_mut().set_tool(DesignerTool::Polyline);
+    // Two clicks that snap to the same point, apart in time, then Enter.
+    for (x, y) in [(30.1, 30.1), (29.8, 30.2)] {
+        let p = screen(&h, x, y);
+        click(&mut h, p);
+        h.run_steps(30);
+    }
+    assert_eq!(h.state().polyline_points().len(), 1);
+    press(&mut h, egui::Key::Enter);
+    assert!(ids(h.state()).is_empty(), "no zero-length path");
 }
 
 #[test]
@@ -365,255 +398,6 @@ fn test_marquee_selects_shapes_it_touches() {
     let (from, to) = (screen(&h, 10.0, 10.0), screen(&h, 150.0, 70.0));
     drag(&mut h, from, to);
     assert_eq!(selected(h.state()), vec![all[0], all[1]]);
-}
-
-#[test]
-fn test_drag_moves_selection_and_undo_restores() {
-    let mut h = harness(pane_with_rects(&[(20.0, 20.0, 40.0, 40.0)]));
-    let id = ids(h.state())[0];
-    let (from, to) = (screen(&h, 40.0, 40.0), screen(&h, 50.0, 45.0));
-    drag(&mut h, from, to);
-    assert!(
-        close4(bounds(h.state(), id), (30.0, 25.0, 70.0, 65.0)),
-        "{:?}",
-        bounds(h.state(), id)
-    );
-    // The move is one undo step, and the moved shape is still hit at its new place.
-    h.state_mut().undo();
-    h.run();
-    assert!(close4(bounds(h.state(), id), (20.0, 20.0, 60.0, 60.0)));
-    h.state_mut().redo();
-    h.run();
-    assert!(close4(bounds(h.state(), id), (30.0, 25.0, 70.0, 65.0)));
-}
-
-#[test]
-fn test_resize_by_corner_handle_keeps_aspect() {
-    let mut h = harness(pane_with_rects(&[(20.0, 20.0, 60.0, 40.0)]));
-    let id = ids(h.state())[0];
-    let p = screen(&h, 50.0, 40.0);
-    click(&mut h, p);
-    assert_eq!(selected(h.state()), vec![id]);
-    // Top-right handle at (80, 60), dragged to (100, 70). New shapes lock their aspect
-    // ratio (GTK's default), so the width leads: 80 wide, 80 / 1.5 high, anchored at the
-    // bottom-left corner.
-    let (from, to) = (screen(&h, 80.0, 60.0), screen(&h, 100.0, 70.0));
-    drag(&mut h, from, to);
-    let b = bounds(h.state(), id);
-    assert!(close4(b, (20.0, 20.0, 100.0, 20.0 + 80.0 / 1.5)), "{b:?}");
-    h.state_mut().undo();
-    h.run();
-    assert!(close4(bounds(h.state(), id), (20.0, 20.0, 80.0, 60.0)));
-}
-
-#[test]
-fn test_resize_without_aspect_lock_follows_handle() {
-    let mut pane = pane_with_rects(&[(20.0, 20.0, 60.0, 40.0)]);
-    let id = ids(&pane)[0];
-    if let Some(obj) = pane.state_mut().canvas.get_shape_mut(id) {
-        obj.lock_aspect_ratio = false;
-    }
-    let mut h = harness(pane);
-    let p = screen(&h, 50.0, 40.0);
-    click(&mut h, p);
-    // Bottom-left handle at (20, 20) dragged to (10, 5).
-    let (from, to) = (screen(&h, 20.0, 20.0), screen(&h, 10.0, 5.0));
-    drag(&mut h, from, to);
-    assert!(close4(bounds(h.state(), id), (10.0, 5.0, 80.0, 60.0)));
-}
-
-#[test]
-fn test_rotate_from_context_menu() {
-    let mut h = harness(pane_with_rects(&[(20.0, 20.0, 60.0, 40.0)]));
-    let id = ids(h.state())[0];
-    let p = screen(&h, 50.0, 40.0);
-    click(&mut h, p);
-    click_with(&mut h, p, PointerButton::Secondary, Modifiers::NONE);
-    h.get_by_label("Rotate").click();
-    h.run();
-    h.get_by_label("90° CCW").click();
-    h.run();
-    let rotation = h
-        .state()
-        .state()
-        .canvas
-        .get_shape(id)
-        .map(|o| o.shape.rotation())
-        .expect("shape");
-    assert!(close(rotation, 90.0), "{rotation}");
-    h.state_mut().undo();
-    h.run();
-    let rotation = h
-        .state()
-        .state()
-        .canvas
-        .get_shape(id)
-        .map(|o| o.shape.rotation())
-        .expect("shape");
-    assert!(close(rotation, 0.0));
-}
-
-#[test]
-fn test_rotate_by_is_relative() {
-    let mut pane = pane_with_rects(&[(20.0, 20.0, 60.0, 40.0)]);
-    pane.state_mut().select_all();
-    pane.rotate_selected_by(-90.0);
-    pane.rotate_selected_by(-90.0);
-    let rotation = pane
-        .state()
-        .canvas
-        .shapes()
-        .map(|o| o.shape.rotation())
-        .sum::<f64>();
-    assert!(close(rotation.abs(), 180.0), "{rotation}");
-}
-
-#[test]
-fn test_delete_key_removes_selection_and_undo_restores() {
-    let mut h = harness(pane_with_rects(&[
-        (20.0, 20.0, 40.0, 40.0),
-        (100.0, 20.0, 40.0, 40.0),
-    ]));
-    let all = ids(h.state());
-    let p = screen(&h, 40.0, 40.0);
-    click(&mut h, p);
-    press(&mut h, egui::Key::Delete);
-    assert_eq!(ids(h.state()), vec![all[1]]);
-    h.state_mut().undo();
-    h.run();
-    assert_eq!(
-        ids(h.state()),
-        all,
-        "one undo restores the deleted shape in place"
-    );
-}
-
-#[test]
-fn test_escape_deselects() {
-    let mut h = harness(pane_with_rects(&[(20.0, 20.0, 40.0, 40.0)]));
-    let p = screen(&h, 40.0, 40.0);
-    click(&mut h, p);
-    assert_eq!(selected(h.state()).len(), 1);
-    press(&mut h, egui::Key::Escape);
-    assert!(selected(h.state()).is_empty());
-}
-
-#[test]
-fn test_undo_redo_commands() {
-    let mut h = harness(DesignerPane::new());
-    draw_rect(&mut h, 20.0, 20.0, 80.0, 60.0);
-    assert_eq!(ids(h.state()).len(), 1);
-    let tr = Translator::new("en");
-    let mut requested = Vec::new();
-    let mut ctx = PaneContext::new(&tr, &mut requested);
-    assert!(h.state_mut().command(Command::Undo, &mut ctx));
-    assert!(ids(h.state()).is_empty());
-    assert!(h.state_mut().command(Command::Redo, &mut ctx));
-    assert_eq!(ids(h.state()).len(), 1);
-    assert!(
-        !h.state_mut().command(Command::Home, &mut ctx),
-        "not the designer's"
-    );
-}
-
-#[test]
-fn test_snap_to_grid() {
-    let mut h = harness(DesignerPane::new());
-    assert!(
-        h.state().state().snap_enabled,
-        "snap is on by default (GTK)"
-    );
-    draw_rect(&mut h, 20.3, 20.4, 79.6, 60.2);
-    let b = bounds(h.state(), ids(h.state())[0]);
-    assert!(close4(b, (20.0, 20.0, 80.0, 60.0)), "{b:?}");
-
-    let mut h = harness(DesignerPane::new());
-    h.state_mut().state_mut().snap_enabled = false;
-    draw_rect(&mut h, 20.3, 20.4, 79.6, 60.2);
-    let b = bounds(h.state(), ids(h.state())[0]);
-    assert!(
-        (b.0 - 20.3).abs() < 0.05 && (b.3 - 60.2).abs() < 0.05,
-        "{b:?}"
-    );
-}
-
-#[test]
-fn test_zoom_at_cursor_keeps_world_point_fixed() {
-    let mut h = harness(DesignerPane::new());
-    let p = screen(&h, 60.0, 90.0);
-    h.event(egui::Event::PointerMoved(p));
-    h.run();
-    let before = h.state().view();
-    let world = before.screen_to_world(p);
-    for factor in [1.5, 0.5, 2.0] {
-        h.event(egui::Event::Zoom(factor));
-        h.run();
-        let after = h.state().view();
-        assert!((after.zoom() - before.zoom()).abs() > 1e-3, "zoom changed");
-        let now = after.screen_to_world(p);
-        assert!((now - world).length() < 1e-3, "{now:?} vs {world:?}");
-    }
-}
-
-#[test]
-fn test_zoom_commands_and_fit() {
-    let mut h = harness(pane_with_rects(&[(20.0, 20.0, 40.0, 40.0)]));
-    let tr = Translator::new("en");
-    let mut requested = Vec::new();
-    let mut ctx = PaneContext::new(&tr, &mut requested);
-    let z0 = h.state().view().zoom();
-    assert!(h.state_mut().command(Command::ZoomIn, &mut ctx));
-    h.run();
-    assert!((h.state().view().zoom() - z0 * 1.2).abs() < 1e-3);
-    assert!(h.state_mut().command(Command::ZoomOut, &mut ctx));
-    h.run();
-    assert!((h.state().view().zoom() - z0).abs() < 1e-3);
-    assert!(h.state_mut().command(Command::ZoomFit, &mut ctx));
-    h.run();
-    // The shape fills the view (5% padding each side).
-    let view = h.state().view();
-    let (a, b) = (screen(&h, 20.0, 20.0), screen(&h, 60.0, 60.0));
-    assert!(view.rect().contains(a) && view.rect().contains(b));
-    let side = (b.y - a.y).abs().max((b.x - a.x).abs());
-    assert!(side > view.rect().height() * 0.85, "{side}");
-    assert!(h.state_mut().command(Command::ResetView, &mut ctx));
-    h.run();
-    assert!((h.state().view().zoom() - 1.0).abs() < 1e-6);
-}
-
-#[test]
-fn test_middle_drag_pans() {
-    let mut h = harness(DesignerPane::new());
-    let before = screen(&h, 50.0, 50.0);
-    let from = pos2(300.0, 250.0);
-    drag_with(
-        &mut h,
-        from,
-        from + egui::vec2(40.0, 30.0),
-        PointerButton::Middle,
-        Modifiers::NONE,
-    );
-    let after = screen(&h, 50.0, 50.0);
-    assert!(
-        (after - before - egui::vec2(40.0, 30.0)).length() < 0.5,
-        "{before:?} -> {after:?}"
-    );
-    assert!(ids(h.state()).is_empty());
-}
-
-#[test]
-fn test_pan_tool_pans() {
-    let mut h = harness(pane_with_rects(&[(20.0, 20.0, 40.0, 40.0)]));
-    h.state_mut().set_tool(DesignerTool::Pan);
-    let before = screen(&h, 40.0, 40.0);
-    drag(&mut h, before, before + egui::vec2(-25.0, 15.0));
-    let after = screen(&h, 40.0, 40.0);
-    assert!((after - before - egui::vec2(-25.0, 15.0)).length() < 0.5);
-    let id = ids(h.state())[0];
-    assert!(
-        close4(bounds(h.state(), id), (20.0, 20.0, 60.0, 60.0)),
-        "pan moves no shape"
-    );
 }
 
 #[test]

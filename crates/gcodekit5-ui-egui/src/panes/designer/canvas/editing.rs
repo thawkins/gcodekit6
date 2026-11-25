@@ -30,6 +30,9 @@ pub const HANDLE_SIZE_PT: f64 = 8.0;
 pub const ZOOM_STEP: f64 = 1.2;
 /// Smallest box side (mm) a drag must have to create a shape (GTK's 1 mm).
 const MIN_CREATE_MM: f64 = 1.0;
+/// The zoom range (points per mm). The model's viewport accepts only values strictly inside
+/// 0.1..50 and ignores others, so a zoom past a limit is clamped just inside it.
+pub const ZOOM_LIMITS: (f64, f64) = (0.1 + 1e-6, 50.0 - 1e-6);
 /// Smallest side (mm) a resize may leave (GTK's 5 mm).
 const MIN_RESIZE_MM: f64 = 5.0;
 
@@ -188,7 +191,7 @@ pub fn shape_from_drag(tool: DesignerTool, start: (f64, f64), end: (f64, f64)) -
             h,
         ))),
         DesignerTool::Circle if round => Some(Shape::Circle(DesignCircle::new(center, radius))),
-        DesignerTool::Line => Some(Shape::Line(DesignLine::new(
+        DesignerTool::Line if w.hypot(h) > MIN_CREATE_MM => Some(Shape::Line(DesignLine::new(
             Point::new(start.0, start.1),
             Point::new(end.0, end.1),
         ))),
@@ -519,7 +522,7 @@ pub fn marquee_select(state: &mut DesignerState, a: (f64, f64), b: (f64, f64)) {
 pub fn zoom_at(state: &mut DesignerState, view: &CanvasView, p: egui::Pos2, factor: f64) {
     let world = view.screen_to_world(p);
     let viewport = state.canvas.viewport_mut();
-    viewport.set_zoom(viewport.zoom() * factor);
+    viewport.set_zoom((viewport.zoom() * factor).clamp(ZOOM_LIMITS.0, ZOOM_LIMITS.1));
     let zoom = viewport.zoom();
     let rect = view.rect();
     let pan_x = f64::from(p.x - rect.left()) - f64::from(world.x) * zoom;
