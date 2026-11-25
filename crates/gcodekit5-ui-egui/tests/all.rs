@@ -32,6 +32,8 @@ mod test_cam_input_bounds;
 mod test_cam_jigsaw;
 #[path = "test_cam_presets.rs"]
 mod test_cam_presets;
+#[path = "test_cam_probe_backstop.rs"]
+mod test_cam_probe_backstop;
 #[path = "test_cam_probe_review.rs"]
 mod test_cam_probe_review;
 #[path = "test_cam_probe_routines.rs"]

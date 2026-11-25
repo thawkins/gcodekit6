@@ -12,8 +12,10 @@
 //!   controller's `StreamMode::StopOnError` (beyond GTK, which streamed on): on an
 //!   `error:` reply the worker stops feeding at once, feed-holds, then soft-resets, because
 //!   the routine's remaining lines are relative moves (and maybe a `G10 L20`) that must not
-//!   run after a refused probe line. If the stream is somehow still running
-//!   [`BACKSTOP_DELAY`] after the error, the run resets the controller itself. An alarm,
+//!   run after a refused probe line. If the stream is somehow still running after the
+//!   error, the run resets the controller itself: [`BACKSTOP_DELAY`] after it once the
+//!   controller confirmed the halt (its feed hold echoed as sent), else
+//!   [`UNCONFIRMED_BACKSTOP_DELAY`] after it. An alarm,
 //!   the user's Stop, feed hold then reset, or E-STOP end the stream in the controller, so
 //!   no further line of the routine is sent.
 //! - **After a failure** the controller was left in incremental mode (G91): once it is
@@ -28,7 +30,9 @@ use std::time::{Duration, Instant};
 
 use gcodekit5_app::i18n::Translator;
 use gcodekit5_app::machine::grbl_stream::{MAX_LINE_LENGTH, prepare_program};
-use gcodekit5_app::machine::{HALT_MAX_WAIT, MachineController, MachineEvent, StreamMode};
+use gcodekit5_app::machine::{
+    HALT_MAX_WAIT, MachineController, MachineEvent, StreamMode, realtime_label,
+};
 use gcodekit5_camtools::probe_routines::{ProbeOptions, ProbeRoutineEngine};
 use gcodekit5_camtools::wcs_service::{WcsUpdateConfig, WcsUpdateService};
 use gcodekit5_core::{Position, ProbeAxis, ProbeReport, ProbeRoutine};
@@ -41,6 +45,11 @@ use crate::machine::{Machine, lock, parse_report_inches, probe_report};
 /// it resets the controller itself. Longer than that cap, so the backstop never resets a
 /// machine the controller is still letting decelerate.
 pub const BACKSTOP_DELAY: Duration = HALT_MAX_WAIT.saturating_add(Duration::from_secs(2));
+
+/// How long after an `error:` reply the run waits before it resets the controller itself
+/// when the controller has not confirmed a halt (no feed hold echoed as sent): the stream
+/// may not be halting at all, so there is no deceleration to wait for.
+pub const UNCONFIRMED_BACKSTOP_DELAY: Duration = Duration::from_secs(2);
 
 const NOT_CONNECTED: &str = n_!("The machine is not connected.");
 const RUN_IN_PROGRESS: &str = n_!("A probe run is still in progress.");
@@ -182,6 +191,9 @@ pub struct ProbeRun {
     reset_sent: bool,
     /// When the first `error:` reply arrived, for the backstop.
     error_at: Option<Instant>,
+    /// Whether the controller confirmed it halts the stream after that error: a feed hold
+    /// was echoed as sent after it. Only then does the backstop wait [`BACKSTOP_DELAY`].
+    halt_confirmed: bool,
     phase: Phase,
 }
 
@@ -241,6 +253,7 @@ impl ProbeRun {
             failure: None,
             reset_sent: false,
             error_at: None,
+            halt_confirmed: false,
             phase: Phase::Streaming,
         };
         Ok((run, format!("{}: {}", tr.tr(PROBING), output.description)))
@@ -291,10 +304,16 @@ impl ProbeRun {
 
     fn while_streaming(&mut self, event: &MachineEvent, tr: &Translator) -> Option<Outcome> {
         // Backstop: the controller halts a stop-on-error stream itself; reset only if it has
-        // not ended the stream well after the error.
+        // not ended the stream well after the error. The long wait (the controller's
+        // deceleration cap) applies only once it has confirmed the halt.
+        let delay = if self.halt_confirmed {
+            BACKSTOP_DELAY
+        } else {
+            UNCONFIRMED_BACKSTOP_DELAY
+        };
         if let Some(at) = self.error_at
             && !self.reset_sent
-            && at.elapsed() >= BACKSTOP_DELAY
+            && at.elapsed() >= delay
         {
             tracing::warn!("probe stream still running after an error; stopping it");
             self.stop();
@@ -335,11 +354,17 @@ impl ProbeRun {
                     .unwrap_or_else(|| tr.tr(STOPPED).into_owned());
                 Some(self.fail(reason, tr))
             }
+            MachineEvent::Sent(line) => {
+                // The controller's feed hold after the error: it is halting the stream.
+                if self.error_at.is_some() && Some(line.as_str()) == realtime_label(b'!') {
+                    self.halt_confirmed = true;
+                }
+                None
+            }
             MachineEvent::Connected
             | MachineEvent::Disconnected
             | MachineEvent::StatusReport(_)
-            | MachineEvent::StreamProgress { .. }
-            | MachineEvent::Sent(_) => None,
+            | MachineEvent::StreamProgress { .. } => None,
         }
     }
 
