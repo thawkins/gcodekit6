@@ -43,7 +43,7 @@
 - **Workspace versioning**: bump `[workspace.package].version` in the root `Cargo.toml`; `cargo check` will refresh `Cargo.lock` workspace package versions.
 
 ## In-app Help Browser (Markdown from GResources)
-- **Approach**: Store help topics as markdown files in `crates/gcodekit5-ui/resources/markdown/` and add them to `resources/gresources.xml`.
+- **Approach**: Store help topics as markdown files in `crates/gcodekit5-ui-egui/resources/markdown/` (embedded by the egui crate) and add them to `crates/gcodekit5-ui/resources/gresources.xml`.
 - **Loading**: Use `gio::resources_lookup_data("/com/gcodekit5/help/<topic>.md", ...)` to fetch the document text.
 - **Rendering**: For a lightweight solution without a full markdown renderer, convert a small markdown subset to Pango markup and display using a wrapping `gtk::Label`.
 - **Navigation**: Use `Label::connect_activate_link` with `help:<topic>` links to switch topics (and keep back/forward history in-memory).
