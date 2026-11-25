@@ -686,3 +686,92 @@ fn test_jog_cancel_or_idle_clears_outstanding_jog() {
         shared.log()
     );
 }
+
+/// Connects with acks held and fills the controller's RX window with manual lines, so the
+/// next manual line (a jog) waits in the queue.
+fn full_window() -> (Arc<LoopbackShared>, MachineController) {
+    let shared = Arc::new(LoopbackShared::default());
+    shared.hold_acks.store(true, Ordering::SeqCst);
+    let mut controller = loopback_controller(&shared, Duration::from_millis(1));
+    connect(&mut controller);
+    // Lines of 33 bytes with the newline: three fill the 127-byte window and the fourth
+    // waits in the queue, with any jog queued behind it.
+    for i in 0..4 {
+        controller
+            .send_line(&format!("G4 P0.{i:026}"))
+            .expect("filler line");
+    }
+    assert!(
+        wait_until(|| shared.lines_written() == 3),
+        "{:?}",
+        shared.log()
+    );
+    std::thread::sleep(Duration::from_millis(20));
+    assert_eq!(shared.lines_written(), 3, "{:?}", shared.log());
+    (shared, controller)
+}
+
+/// A queued jog must not start after a jog cancel: the cancel drops it from the queue.
+#[test]
+fn test_jog_cancel_drops_queued_jog() {
+    let (shared, mut controller) = full_window();
+    controller.jog(gcodekit5_app::machine::Axis::X, 100.0, 1000.0);
+    std::thread::sleep(Duration::from_millis(20));
+    assert!(
+        !shared
+            .log()
+            .iter()
+            .any(|w| matches!(w, Wrote::Line(l) if l.starts_with("$J="))),
+        "jog not held back: {:?}",
+        shared.log()
+    );
+    controller.realtime(RealtimeCommand::JogCancel);
+    assert!(wait_until(|| shared.log().contains(&Wrote::Realtime(0x85))));
+    shared.hold_acks.store(false, Ordering::SeqCst);
+    assert!(
+        wait_until(|| shared.lines_written() == 4),
+        "{:?}",
+        shared.log()
+    );
+    std::thread::sleep(Duration::from_millis(50));
+    assert!(
+        !shared
+            .log()
+            .iter()
+            .any(|w| matches!(w, Wrote::Line(l) if l.starts_with("$J="))),
+        "cancelled jog started: {:?}",
+        shared.log()
+    );
+}
+
+/// A Jog then Idle report that arrives while the jog still waits in the queue (left from an
+/// earlier jog) does not count as this jog finishing: once it is written, a disconnect
+/// still cancels it.
+#[test]
+fn test_stale_idle_before_jog_written_keeps_jog_outstanding() {
+    let (shared, mut controller) = full_window();
+    controller.jog(gcodekit5_app::machine::Axis::X, 100.0, 1000.0);
+    shared.inject("<Jog|MPos:1.000,0.000,0.000|FS:1000,0>\n");
+    shared.inject("<Idle|MPos:2.000,0.000,0.000|FS:0,0>\n");
+    assert!(
+        wait_for(&mut controller, |e| matches!(
+            e,
+            MachineEvent::StatusReport(s) if s.machine_state.as_deref() == Some("Idle")
+        ))
+        .is_some(),
+        "no Idle report"
+    );
+    shared.hold_acks.store(false, Ordering::SeqCst);
+    assert!(
+        wait_until(|| shared
+            .log()
+            .iter()
+            .any(|w| matches!(w, Wrote::Line(l) if l.starts_with("$J=")))),
+        "jog never written: {:?}",
+        shared.log()
+    );
+    controller.disconnect();
+    let (cancel, closed) = cancel_and_close(&shared);
+    let cancel = cancel.expect("no jog cancel for the written jog");
+    assert!(cancel < closed.expect("closed"), "{:?}", shared.log());
+}

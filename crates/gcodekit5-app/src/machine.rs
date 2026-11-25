@@ -622,10 +622,11 @@ struct WorkerState {
     manual: VecDeque<String>,
     stream: Option<Stream>,
     paused: bool,
-    /// A `$J` jog was queued and is not known to be over: set when it is queued, cleared by
-    /// jog cancel (0x85), soft reset (0x18), or an `Idle` report after a `Jog` one.
+    /// A `$J` jog was queued and is not known to be over: set when it is queued and again when
+    /// it is written, cleared by jog cancel (0x85, which also drops queued jogs), soft reset
+    /// (0x18), or an `Idle` report after a `Jog` one received since it was written.
     jog_outstanding: bool,
-    /// A `Jog` state was reported since the outstanding jog was queued.
+    /// A `Jog` state was reported since the outstanding jog was written.
     jog_seen: bool,
 }
 
@@ -750,9 +751,11 @@ impl WorkerState {
         match cmd {
             Command::Realtime(byte) => {
                 self.write(&[byte])?;
-                if byte == RealtimeCommand::JogCancel.byte()
-                    || byte == RealtimeCommand::SoftReset.byte()
-                {
+                if byte == RealtimeCommand::JogCancel.byte() {
+                    // A jog still waiting in the queue must not start after the cancel.
+                    self.manual.retain(|line| !line.starts_with("$J="));
+                    self.jog_outstanding = false;
+                } else if byte == RealtimeCommand::SoftReset.byte() {
                     self.jog_outstanding = false;
                 }
             }
@@ -804,8 +807,14 @@ impl WorkerState {
             if !self.window.can_send(line) {
                 return Ok(());
             }
+            let is_jog = line.starts_with("$J=");
             let line = format!("{line}\n");
             self.write(line.as_bytes())?;
+            if is_jog {
+                // Only reports after the jog is written can say it ran and finished.
+                self.jog_outstanding = true;
+                self.jog_seen = false;
+            }
             self.window.on_sent(line.trim_end_matches('\n'));
             self.in_flight_is_program.push_back(false);
             self.manual.pop_front();
