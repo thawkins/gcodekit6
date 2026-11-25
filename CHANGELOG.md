@@ -1,3 +1,23 @@
+## [Unreleased] - 2026-11-26 (egui + craft-libs migration, milestone M4: designer and CAM tools)
+
+### Added
+- **Designer (egui)**: canvas with select, move, resize and rotate; toolbox with shape tools and the Text tool; layers panel with hide and lock; properties panel; shape gallery; array dialog; toolpath preview; New, Open and Save designs; import SVG, DXF and images; export G-code and SVG; Save works from the quit prompt
+- **CAM tools (egui)**: Drill Press, Spoilboard Grid, Spoilboard Surfacing, Speeds and Feeds, Jigsaw, Tabbed Box, Gerber, Bitmap Engraving and Probe Routines; G-code is byte-identical to the GTK pages and GTK presets load
+- **Machine controller**: probe streams stop on the first `error:` with a feed hold, then a soft reset once motion has stopped; Cycle Start is refused during that stop
+- **Tests**: CAM output fixtures captured from the GTK mapping and checked against the egui pages
+
+### Changed
+- Hidden shapes are never cut; hide and lock are view-only (not saved, not undoable)
+- A value typed into a field and left by clicking elsewhere is applied
+- Generate G-Code asks before replacing unsaved editor text and clears the editor file name
+- The Probe Routines page follows the mm/inch setting
+- Input checks: step down and step in must be above 0; a drill bit cannot be larger than the hole; image and jigsaw sizes are capped
+- Drill Press refuses to run in laser mode
+
+### Known gaps
+- craft-libs SVG/DXF readers are not yet used for import
+- M4 has not been run against the grblHAL simulator
+
 ## [Unreleased] - 2026-11-25 (egui + craft-libs migration, milestone M3: editor and visualizer)
 
 ### Added
