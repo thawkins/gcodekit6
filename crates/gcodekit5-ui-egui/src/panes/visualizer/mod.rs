@@ -1,8 +1,10 @@
 //! The Visualizer pane: the program's toolpath in 3D, drawn with wgpu.
 //!
 //! The toolpath is built from the program the machine streams ([`Machine::program`]) when
-//! that program changes (by `Arc` identity), on a background thread, and uploaded to the GPU
-//! once ([`pipeline`]); a frame only writes the camera and the stream progress. Rapids and
+//! that program changes (by `Arc` identity), on one background worker that builds only the
+//! latest program ([`build`]), and uploaded to the GPU once ([`pipeline`]); a frame only
+//! writes the camera and the stream progress. A newly opened program is fitted into an
+//! isometric view; an edit of the shown program keeps the user's view (GTK's rule). Rapids and
 //! moves with the spindle/laser off are grey, cuts are coloured by power, and the lines the
 //! machine has acknowledged are drawn in the accent colour. The tool marker follows the work
 //! position the machine reports.
@@ -22,6 +24,7 @@
 //! Dependencies: `egui`, `egui-wgpu`, `glam`, `gcodekit5-visualizer` (parser, camera),
 //! `gcodekit5-app` (machine events, translations), `gcodekit5-core` (units).
 
+pub mod build;
 pub mod camera;
 pub mod nav_cube;
 pub mod osd;
@@ -29,7 +32,6 @@ pub mod pipeline;
 pub mod toolpath;
 
 use std::sync::Arc;
-use std::sync::mpsc::{Receiver, TryRecvError};
 
 use gcodekit5_app::i18n::Translator;
 use gcodekit5_app::machine::MachineEvent;
@@ -37,10 +39,11 @@ use gcodekit5_core::units::MeasurementSystem;
 use gcodekit5_settings::config::Config;
 use glam::Vec3;
 
+use build::BuildWorker;
 pub use camera::{Aabb, Camera, StdView};
 pub use nav_cube::NavAction;
 pub use pipeline::install;
-use pipeline::{UploadedMesh, VisualizerCallback};
+use pipeline::{Upload, UploadedMesh, VisualizerCallback};
 pub use toolpath::ToolpathMesh;
 
 use crate::commands::Command;
@@ -59,28 +62,30 @@ pub fn msgids() -> Vec<&'static str> {
         .collect()
 }
 
-/// A toolpath being built on a background thread.
-#[derive(Debug)]
-struct PendingBuild {
-    generation: u64,
-    result: Receiver<ToolpathMesh>,
-}
-
 /// The Visualizer pane.
 #[derive(Debug)]
 pub struct VisualizerPane {
     camera: Camera,
     /// The program the toolpath is (being) built from.
     program: Option<Arc<[String]>>,
-    /// The built toolpath.
+    /// The program of the toolpath shown, to tell a newly opened file from an edit.
+    applied: Option<Arc<[String]>>,
+    /// The toolpath shown, until and after its upload.
     mesh: Option<UploadedMesh>,
-    /// The build in progress.
-    pending: Option<PendingBuild>,
+    /// Bounds of every move of the toolpath shown.
+    bounds: Option<Aabb>,
+    /// Bounds of its cutting moves.
+    cut_bounds: Option<Aabb>,
+    worker: BuildWorker,
+    /// A build for `generation` was requested and has not arrived.
+    building: bool,
     /// Counts programs loaded, to tag each mesh.
     generation: u64,
     /// Program lines the machine acknowledged in the current or last stream.
     progress: u32,
     units: MeasurementSystem,
+    /// The view's rectangle on the last frame.
+    view_rect: egui::Rect,
 }
 
 impl Default for VisualizerPane {
@@ -95,11 +100,16 @@ impl VisualizerPane {
         Self {
             camera: Camera::default(),
             program: None,
+            applied: None,
             mesh: None,
-            pending: None,
+            bounds: None,
+            cut_bounds: None,
+            worker: BuildWorker::new(),
+            building: false,
             generation: 0,
             progress: 0,
             units: MeasurementSystem::Metric,
+            view_rect: egui::Rect::NOTHING,
         }
     }
 
@@ -113,14 +123,25 @@ impl VisualizerPane {
         &mut self.camera
     }
 
-    /// The built toolpath, once the current program's build has finished.
-    pub fn mesh(&self) -> Option<&ToolpathMesh> {
-        self.mesh.as_ref().map(|m| m.mesh.as_ref())
+    /// The generation of the toolpath shown, once the current program's build has finished;
+    /// it changes only when a different program is loaded.
+    pub fn toolpath_generation(&self) -> Option<u64> {
+        self.mesh.as_ref().map(|m| m.generation)
+    }
+
+    /// The bounds of every move of the toolpath shown.
+    pub fn bounds(&self) -> Option<Aabb> {
+        self.bounds
+    }
+
+    /// Whether the toolpath's vertices are still held on the CPU (not uploaded yet).
+    pub fn toolpath_on_cpu(&self) -> bool {
+        self.mesh.as_ref().is_some_and(|m| m.upload.pending())
     }
 
     /// Whether a toolpath is still being built.
     pub fn is_building(&self) -> bool {
-        self.pending.is_some()
+        self.building
     }
 
     /// Program lines acknowledged in the current or last stream.
@@ -128,8 +149,15 @@ impl VisualizerPane {
         self.progress
     }
 
-    /// Shows `program` (the program as the machine streams it), building its toolpath on a
-    /// background thread when it is not the program already shown. `None` clears the view.
+    /// The view's rectangle on the last frame.
+    pub fn view_rect(&self) -> egui::Rect {
+        self.view_rect
+    }
+
+    /// Shows `program` (the program as the machine streams it), building its toolpath on the
+    /// background worker when it is not the program already shown. `None` clears the view.
+    /// The view is refitted only when the program replaces the one shown (a newly opened
+    /// file); an edit keeps the user's view, as in GTK.
     ///
     /// # Arguments
     /// * `program` - The program's lines, or `None`.
@@ -146,72 +174,56 @@ impl VisualizerPane {
         self.generation = self.generation.wrapping_add(1);
         self.progress = 0;
         self.program = program.clone();
-        self.pending = None;
-        let Some(lines) = program else {
-            self.mesh = None;
-            return;
-        };
-        let (sender, result) = std::sync::mpsc::channel();
-        let ctx = repaint.clone();
-        let spawned = std::thread::Builder::new()
-            .name("gcodekit5-toolpath".into())
-            .spawn(move || {
-                if sender.send(toolpath::build(&lines)).is_ok() {
-                    ctx.request_repaint();
-                } else {
-                    // The receiver is dropped only when a newer program replaced this one.
-                    tracing::debug!("toolpath of a replaced program discarded");
-                }
-            });
-        if let Err(error) = spawned {
-            tracing::warn!(%error, "toolpath thread not started; building on the UI thread");
-            if let Some(lines) = &self.program {
-                self.set_mesh(toolpath::build(lines));
+        match program {
+            Some(lines) => {
+                self.building = true;
+                self.worker
+                    .request(self.generation, lines, self.applied.clone(), repaint);
             }
-            return;
+            None => {
+                self.worker.cancel(self.generation);
+                self.building = false;
+                self.applied = None;
+                self.mesh = None;
+                self.bounds = None;
+                self.cut_bounds = None;
+            }
         }
-        self.pending = Some(PendingBuild {
-            generation: self.generation,
-            result,
-        });
     }
 
     /// Takes the finished build, if any.
     fn poll_build(&mut self) {
-        let Some(pending) = &self.pending else {
-            return;
-        };
-        match pending.result.try_recv() {
-            Ok(mesh) => {
-                let generation = pending.generation;
-                self.pending = None;
-                if generation == self.generation {
-                    self.set_mesh(mesh);
-                }
-            }
-            Err(TryRecvError::Empty) => {}
-            Err(TryRecvError::Disconnected) => {
-                tracing::warn!("toolpath build ended without a result");
-                self.pending = None;
-            }
+        if let Some(built) = self.worker.take()
+            && built.generation == self.generation
+        {
+            self.building = false;
+            self.applied = self.program.clone();
+            self.set_mesh(built.mesh, built.replaced);
         }
     }
 
-    /// Shows `mesh` and fits it into an isometric view, as GTK does on load.
-    fn set_mesh(&mut self, mesh: ToolpathMesh) {
-        if let Some(bounds) = mesh.bounds {
+    /// Shows `mesh`; for a newly loaded program, fits it into an isometric view, as GTK does.
+    fn set_mesh(&mut self, mesh: ToolpathMesh, refit: bool) {
+        let ToolpathMesh {
+            vertices,
+            bounds,
+            cut_bounds,
+        } = mesh;
+        if refit && let Some(bounds) = bounds {
             self.camera.view(StdView::IsoSe);
             self.camera.fit(bounds);
         }
+        self.bounds = bounds;
+        self.cut_bounds = cut_bounds;
         self.mesh = Some(UploadedMesh {
             generation: self.generation,
-            mesh: Arc::new(mesh),
+            upload: Arc::new(Upload::new(vertices)),
         });
     }
 
     /// Fits the toolpath into the view, or resets the view when there is none.
     fn fit(&mut self) {
-        match self.mesh().and_then(|m| m.bounds) {
+        match self.bounds {
             Some(bounds) => self.camera.fit(bounds),
             None => self.camera.reset(),
         }
@@ -268,6 +280,7 @@ impl Pane for VisualizerPane {
         }
         self.poll_build();
         let rect = ui.available_rect_before_wrap();
+        self.view_rect = rect;
         let response = ui.allocate_rect(rect, egui::Sense::click_and_drag());
         self.camera
             .set_aspect(rect.width() / rect.height().max(1.0));
@@ -299,8 +312,20 @@ impl Pane for VisualizerPane {
             self.apply(action);
         }
         let loaded = self.program.is_some();
-        let bounds = self.mesh().and_then(|m| m.cut_bounds.or(m.bounds));
-        osd::show(ui, rect, loaded, bounds.as_ref(), tool, self.units, ctx.tr);
+        let too_large = self.mesh.as_ref().is_some_and(|m| m.upload.too_large());
+        let bounds = self.cut_bounds.or(self.bounds);
+        osd::show(
+            ui,
+            rect,
+            osd::Overlay {
+                loaded,
+                too_large,
+                bounds: bounds.as_ref(),
+                tool,
+            },
+            self.units,
+            ctx.tr,
+        );
     }
 
     fn command(&mut self, command: Command, _ctx: &mut PaneContext) -> bool {

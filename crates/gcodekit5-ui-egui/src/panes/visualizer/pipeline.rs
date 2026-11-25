@@ -4,22 +4,30 @@
 //! the egui renderer's callback resources (as eframe's custom-3D pattern does). Each frame
 //! the pane adds a [`VisualizerCallback`]; its `prepare` writes one small uniform (camera,
 //! progress) and uploads the toolpath only when a new program was built, so a frame costs the
-//! same for a million-line program as for ten lines. Its `paint` draws, in order: the grid
-//! and origin axes, the toolpath, and the tool marker.
+//! same for a million-line program as for ten lines. The upload takes the vertices out of
+//! their [`Upload`], freeing the CPU copy; a toolpath larger than the device's
+//! `max_buffer_size` is not uploaded ([`toolpath_fits`]) and the pane says so. Its `paint`
+//! draws, in order: the grid and origin axes, the toolpath, and the tool marker.
 //!
 //! The shaders are WGSL ports of the GTK `ui/gtk/shaders.rs` line shader. The callback draws
 //! inside egui's render pass, which has no depth buffer, so later draws cover earlier ones
 //! (the GTK view also draws the grid and the tool marker without depth testing).
 //!
+//! The pipelines are built for egui's pass as eframe sets it up by default: no depth or
+//! stencil attachment and one sample per pixel. Turning on `depth_buffer` or `multisampling`
+//! in the app's `eframe::NativeOptions` (see `crate::run`) makes them incompatible with the
+//! pass; change [`install`] with it.
+//!
 //! Dependencies: `egui-wgpu` (callback, wgpu), `bytemuck`, `glam`.
 
-use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Arc, Mutex, PoisonError};
 
 use egui_wgpu::wgpu;
 use egui_wgpu::wgpu::util::DeviceExt;
 use glam::{Mat4, Vec3};
 
-use super::toolpath::{ToolpathMesh, ToolpathVertex};
+use super::toolpath::ToolpathVertex;
 
 /// Grid size (mm, centred on the origin), as GTK draws it.
 const GRID_SIZE: f32 = 4000.0;
@@ -278,13 +286,62 @@ pub fn install(render_state: &egui_wgpu::RenderState) {
         .insert(resources);
 }
 
+/// Whether `vertex_count` toolpath vertices fit in one vertex buffer of at most
+/// `max_buffer_size` bytes (the device limit) and in a `u32` draw range.
+///
+/// # Arguments
+/// * `vertex_count` - Vertices to upload.
+/// * `max_buffer_size` - The device's `max_buffer_size` limit in bytes.
+pub fn toolpath_fits(vertex_count: usize, max_buffer_size: u64) -> bool {
+    let stride = std::mem::size_of::<ToolpathVertex>() as u64;
+    u32::try_from(vertex_count).is_ok()
+        && (vertex_count as u64)
+            .checked_mul(stride)
+            .is_some_and(|bytes| bytes <= max_buffer_size)
+}
+
+/// A toolpath's vertices waiting for the GPU. The callback takes them when it uploads, so
+/// the CPU copy is freed once it is on the GPU.
+#[derive(Debug, Default)]
+pub struct Upload {
+    vertices: Mutex<Option<Vec<ToolpathVertex>>>,
+    too_large: AtomicBool,
+}
+
+impl Upload {
+    /// Vertices to upload.
+    ///
+    /// # Arguments
+    /// * `vertices` - The toolpath's line-list vertices.
+    pub fn new(vertices: Vec<ToolpathVertex>) -> Self {
+        Self {
+            vertices: Mutex::new(Some(vertices)),
+            too_large: AtomicBool::new(false),
+        }
+    }
+
+    /// Whether the vertices are still on the CPU (not uploaded yet).
+    pub fn pending(&self) -> bool {
+        self.lock().is_some()
+    }
+
+    /// Whether the toolpath was too large for the GPU's buffer limit and is not drawn.
+    pub fn too_large(&self) -> bool {
+        self.too_large.load(Ordering::Relaxed)
+    }
+
+    fn lock(&self) -> std::sync::MutexGuard<'_, Option<Vec<ToolpathVertex>>> {
+        self.vertices.lock().unwrap_or_else(PoisonError::into_inner)
+    }
+}
+
 /// A toolpath built for one program, tagged so it is uploaded once.
 #[derive(Debug, Clone)]
 pub struct UploadedMesh {
     /// Changes whenever a new program's mesh is built.
     pub generation: u64,
-    /// The vertices.
-    pub mesh: Arc<ToolpathMesh>,
+    /// The vertices, until uploaded.
+    pub upload: Arc<Upload>,
 }
 
 /// One frame's drawing of the visualizer.
@@ -325,15 +382,27 @@ impl egui_wgpu::CallbackTrait for VisualizerCallback {
         let generation = self.mesh.as_ref().map(|m| m.generation);
         if gpu.toolpath.as_ref().map(|t| t.0) != generation {
             gpu.toolpath = self.mesh.as_ref().map(|m| {
-                let vertices = &m.mesh.vertices;
+                let vertices = m.upload.lock().take().unwrap_or_default();
+                let limit = device.limits().max_buffer_size;
+                if !toolpath_fits(vertices.len(), limit) {
+                    tracing::warn!(
+                        vertices = vertices.len(),
+                        limit,
+                        "toolpath exceeds the GPU buffer limit; not drawn"
+                    );
+                    m.upload.too_large.store(true, Ordering::Relaxed);
+                    return (m.generation, None, 0);
+                }
                 let buffer = (!vertices.is_empty()).then(|| {
                     device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
                         label: Some("gcodekit5_visualizer_toolpath"),
-                        contents: bytemuck::cast_slice(vertices),
+                        contents: bytemuck::cast_slice(&vertices),
                         usage: wgpu::BufferUsages::VERTEX,
                     })
                 });
-                (m.generation, buffer, vertices.len() as u32)
+                // toolpath_fits checked the count fits in u32.
+                let count = u32::try_from(vertices.len()).unwrap_or(0);
+                (m.generation, buffer, count)
             });
         }
         if let Some(tip) = self.tool {

@@ -55,6 +55,9 @@ pub fn run(options: LaunchOptions) -> anyhow::Result<()> {
         frame::title_bar_pref(&settings.config().ui),
     );
     let state = AppState::new(settings, decision);
+    // Keep eframe's default `depth_buffer: 0` and `multisampling: 0`: the visualizer's wgpu
+    // pipelines (`panes::visualizer::install`) draw inside egui's pass and are built for no
+    // depth attachment and one sample per pixel.
     let native = eframe::NativeOptions {
         viewport: craft_window::policy::apply(main_viewport(), &state.decision.frame),
         ..eframe::NativeOptions::default()

@@ -3245,3 +3245,6 @@ msgstr "Isometrisch (SO)"
 
 msgid "Fit"
 msgstr "Einpassen"
+
+msgid "Toolpath too large to display on this GPU."
+msgstr "Werkzeugbahn zu groß für die Anzeige auf dieser GPU."

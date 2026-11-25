@@ -280,8 +280,8 @@ fn test_program_builds_once_and_fits() -> TestResult {
     harness.run();
     let program = sample();
     load(&mut harness, Arc::clone(&program))?;
-    let mesh = harness.state().mesh().map(|m| m as *const _);
-    assert!(mesh.is_some(), "toolpath built");
+    let generation = harness.state().toolpath_generation();
+    assert!(generation.is_some(), "toolpath built");
     assert_eq!(
         harness.state().camera().target(),
         Vec3::new(20.0, 25.0, 2.0)
@@ -290,11 +290,100 @@ fn test_program_builds_once_and_fits() -> TestResult {
     let ctx = harness.ctx.clone();
     harness.state_mut().load_program(Some(program), &ctx);
     assert!(!harness.state().is_building());
-    assert_eq!(harness.state().mesh().map(|m| m as *const _), mesh);
+    assert_eq!(harness.state().toolpath_generation(), generation);
     // No program: the view is empty again.
     harness.state_mut().load_program(None, &ctx);
-    assert!(harness.state().mesh().is_none());
+    assert_eq!(harness.state().toolpath_generation(), None);
     Ok(())
+}
+
+#[test]
+fn test_edit_keeps_view_new_file_refits() -> TestResult {
+    let mut harness = pane_harness(VisualizerPane::new());
+    harness.run();
+    load(&mut harness, sample())?;
+    harness
+        .state_mut()
+        .apply(visualizer::NavAction::View(StdView::Top));
+    harness.state_mut().camera_mut().pan(40.0, 10.0);
+    let before = *harness.state().camera();
+
+    // An edit (one coordinate changed, as after a typing pause): a new Arc, same program.
+    let mut edited: Vec<String> = SAMPLE.iter().map(|s| s.to_string()).collect();
+    edited[6] = "G1 X45".to_string();
+    load(&mut harness, edited.into())?;
+    let after = *harness.state().camera();
+    assert_eq!(after.angles(), StdView::Top.angles(), "still the top view");
+    assert_eq!(after.target(), before.target(), "not refitted");
+    assert_eq!(after.distance(), before.distance(), "not refitted");
+
+    // A different program (a newly opened file): isometric and fitted.
+    let other: Vec<String> = ["G0 X100 Y100", "G1 X200 Y150 F500 S100 M3", "G1 Y300"]
+        .iter()
+        .map(|s| s.to_string())
+        .collect();
+    load(&mut harness, other.into())?;
+    let fitted = *harness.state().camera();
+    assert_eq!(fitted.angles(), StdView::IsoSe.angles());
+    // The rapid starts at the origin, so the bounds are X 0..200, Y 0..300.
+    assert_eq!(fitted.target(), Vec3::new(100.0, 150.0, 0.0));
+    Ok(())
+}
+
+#[test]
+fn test_stale_builds_are_dropped() -> TestResult {
+    let worker = visualizer::build::BuildWorker::new();
+    let ctx = egui::Context::default();
+    let big: Arc<[String]> = (0..200_000)
+        .map(|i| format!("G1 X{} F500", i % 50))
+        .collect();
+    worker.request(1, big, None, &ctx);
+    worker.request(2, sample(), None, &ctx);
+    let deadline = Instant::now() + Duration::from_secs(20);
+    let built = loop {
+        if let Some(built) = worker.take() {
+            break built;
+        }
+        if Instant::now() > deadline {
+            return Err("no build delivered".into());
+        }
+        std::thread::sleep(Duration::from_millis(2));
+    };
+    assert_eq!(built.generation, 2, "only the latest request is delivered");
+    assert!(built.replaced, "nothing was shown before");
+    worker.cancel(3);
+    worker.request(4, sample(), Some(sample()), &ctx);
+    let deadline = Instant::now() + Duration::from_secs(20);
+    loop {
+        if let Some(built) = worker.take() {
+            assert_eq!(built.generation, 4);
+            assert!(
+                !built.replaced,
+                "the same program is an edit, not a new file"
+            );
+            return Ok(());
+        }
+        if Instant::now() > deadline {
+            return Err("no build delivered".into());
+        }
+        std::thread::sleep(Duration::from_millis(2));
+    }
+}
+
+#[test]
+fn test_toolpath_fits_buffer_limit() {
+    use visualizer::pipeline::toolpath_fits;
+    let stride = std::mem::size_of::<toolpath::ToolpathVertex>() as u64;
+    assert_eq!(stride, 20);
+    let limit = 256 << 20;
+    assert!(toolpath_fits(0, limit));
+    assert!(toolpath_fits((limit / stride) as usize, limit));
+    assert!(!toolpath_fits((limit / stride) as usize + 1, limit));
+    assert!(!toolpath_fits(usize::MAX, u64::MAX), "byte count overflows");
+    assert!(
+        !toolpath_fits(u32::MAX as usize + 1, u64::MAX),
+        "draw range is u32"
+    );
 }
 
 /// The pane in a harness that renders through wgpu with the visualizer installed.
@@ -322,10 +411,89 @@ fn gpu_harness(pane: VisualizerPane) -> Harness<'static, VisualizerPane> {
         )
 }
 
-/// Snapshot options: the checked-in references, with lavapipe's tolerance.
+/// Snapshot options: the checked-in references (made with Mesa lavapipe on Fedora; CI runs
+/// Ubuntu's lavapipe). A pixel fails beyond a YIQ distance of 1.0 (kittest's default is
+/// 0.6), and up to 40 failing pixels of the 172,800 pass: enough for a Mesa line-rasteriser
+/// difference on a few line ends, while a missing, recoloured or moved line (hundreds of
+/// pixels) still fails.
 fn snapshot_options() -> SnapshotOptions {
     SnapshotOptions::new()
+        .threshold(1.0)
+        .max_failed_pixels(40)
         .output_path(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/snapshots"))
+}
+
+/// Whether `image` has a pixel within 2 px of `world`'s projection that `matches`.
+fn pixel_near(
+    image: &dyn Fn(u32, u32) -> Option<[u8; 4]>,
+    pane: &VisualizerPane,
+    world: Vec3,
+    matches: impl Fn([u8; 4]) -> bool,
+) -> bool {
+    let rect = pane.view_rect();
+    let p = ndc(pane.camera().view_proj(rect.width() / rect.height()), world);
+    let x = rect.left() + (p.x + 1.0) / 2.0 * rect.width();
+    let y = rect.top() + (1.0 - p.y) / 2.0 * rect.height();
+    (-2..=2).any(|dx| {
+        (-2..=2).any(|dy| {
+            let (px, py) = (x as i64 + dx, y as i64 + dy);
+            u32::try_from(px)
+                .ok()
+                .zip(u32::try_from(py).ok())
+                .and_then(|(px, py)| image(px, py))
+                .is_some_and(&matches)
+        })
+    })
+}
+
+#[test]
+fn test_progress_colours_acknowledged_lines_only() -> TestResult {
+    let mut harness = gpu_harness(VisualizerPane::new());
+    load(&mut harness, sample())?;
+    harness
+        .state_mut()
+        .apply(visualizer::NavAction::View(StdView::Top));
+    let tr = Translator::new("en");
+    harness.state_mut().machine_events(
+        &[MachineEvent::StreamProgress {
+            sent: 10,
+            acked: 8,
+            total: 13,
+        }],
+        &tr,
+    );
+    harness.run();
+    let rendered = harness.render()?;
+    let image = |x: u32, y: u32| rendered.get_pixel_checked(x, y).map(|p| p.0);
+    let accent = theme::DARK.accent.to_array();
+    let is_accent = |p: [u8; 4]| p == accent;
+    let is_cut = |p: [u8; 4]| p == [255, 255, 0, 255];
+    let pane = harness.state();
+    // Line 7 (G1 Y30, x = 40) is acknowledged at acked = 8.
+    let line7 = Vec3::new(40.0, 15.0, -1.0);
+    assert!(pixel_near(&image, pane, line7, is_accent), "line 7 done");
+    // Line 8 (the arc) is not.
+    let a = std::f32::consts::FRAC_PI_4;
+    let line8 = Vec3::new(20.0 + 20.0 * a.cos(), 30.0 + 20.0 * a.sin(), -1.0);
+    assert!(
+        pixel_near(&image, pane, line8, is_cut),
+        "line 8 still a cut"
+    );
+    assert!(
+        !pixel_near(&image, pane, line8, is_accent),
+        "line 8 not done"
+    );
+    Ok(())
+}
+
+#[test]
+fn test_upload_frees_cpu_vertices() -> TestResult {
+    let mut harness = gpu_harness(VisualizerPane::new());
+    load(&mut harness, sample())?;
+    assert!(harness.state().toolpath_on_cpu(), "held until uploaded");
+    harness.render()?;
+    assert!(!harness.state().toolpath_on_cpu(), "freed once on the GPU");
+    Ok(())
 }
 
 #[test]

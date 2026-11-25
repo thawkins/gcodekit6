@@ -3169,3 +3169,6 @@ msgstr ""
 
 msgid "Fit"
 msgstr ""
+
+msgid "Toolpath too large to display on this GPU."
+msgstr ""

@@ -90,7 +90,7 @@ fn button(ui: &mut egui::Ui, label: &str, name: &str) -> bool {
 /// The action of the button clicked this frame, if any.
 pub fn show(ui: &mut egui::Ui, rect: egui::Rect, tr: &Translator) -> Option<NavAction> {
     let width = 3.0 * BUTTON + 2.0 * GAP;
-    let height = 4.0 * BUTTON + 3.0 * GAP + 2.0 * MARGIN;
+    let height = 4.0 * BUTTON + 3.0 * GAP;
     let area = egui::Rect::from_min_size(
         egui::pos2(rect.right() - MARGIN - width, rect.top() + MARGIN),
         egui::vec2(width, height),

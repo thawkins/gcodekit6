@@ -3252,3 +3252,6 @@ msgstr "Isométrique (SE)"
 
 msgid "Fit"
 msgstr "Ajuster"
+
+msgid "Toolpath too large to display on this GPU."
+msgstr "Parcours d'outil trop grand pour être affiché sur ce GPU."

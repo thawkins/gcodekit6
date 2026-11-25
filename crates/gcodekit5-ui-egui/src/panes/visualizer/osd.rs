@@ -1,5 +1,6 @@
 //! The visualizer's on-screen display: the program's bounds and the tool position in the
-//! bottom-left corner, the mouse help, and the empty-state message when no program is loaded.
+//! bottom-left corner, the mouse help, the empty-state message when no program is loaded,
+//! and a note when the toolpath is too large for the GPU.
 //!
 //! Ported from the GTK `ui/gtk/visualizer/mod.rs`: its inspector's "Bounds X/Y" rows (the
 //! cutting moves' bounds, else every move's), its empty state and its "Mouse Controls" help.
@@ -27,6 +28,7 @@ pub fn msgids() -> Vec<&'static str> {
         n_!("Left Button+Drag: Orbit"),
         n_!("Shift+Left button+Drag: Pan"),
         n_!("Mouse wheel: Zoom+/-"),
+        n_!("Toolpath too large to display on this GPU."),
     ]
 }
 
@@ -94,25 +96,40 @@ fn panel(ui: &mut egui::Ui, pos: egui::Pos2, anchor: egui::Align2, rows: &[Strin
     }
 }
 
+/// What the OSD describes.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct Overlay<'a> {
+    /// Whether a program is loaded; without one the empty-state message shows.
+    pub loaded: bool,
+    /// Whether the toolpath is too large for the GPU and is not drawn.
+    pub too_large: bool,
+    /// The program's bounds, once built, if it moves at all.
+    pub bounds: Option<&'a Aabb>,
+    /// The tool's work position, when the machine reports one.
+    pub tool: Option<Xyz>,
+}
+
 /// Draws the OSD over the view `rect`.
 ///
 /// # Arguments
 /// * `ui` - The visualizer's `Ui`.
 /// * `rect` - The view's rectangle.
-/// * `loaded` - Whether a program is loaded; without one the empty-state message shows.
-/// * `bounds` - The program's bounds, once built, if it moves at all.
-/// * `tool` - The tool's work position, when the machine reports one.
+/// * `overlay` - What to describe.
 /// * `units` - The measurement system to show.
 /// * `tr` - Translator for the current UI language.
 pub fn show(
     ui: &mut egui::Ui,
     rect: egui::Rect,
-    loaded: bool,
-    bounds: Option<&Aabb>,
-    tool: Option<Xyz>,
+    overlay: Overlay<'_>,
     units: MeasurementSystem,
     tr: &Translator,
 ) {
+    let Overlay {
+        loaded,
+        too_large,
+        bounds,
+        tool,
+    } = overlay;
     let margin = 10.0;
     let mut rows = bounds.map_or_else(Vec::new, |b| bounds_lines(b, units, tr));
     if let Some(xyz) = tool {
@@ -137,6 +154,12 @@ pub fn show(
         .put(help_rect, egui::Button::new("?"))
         .on_hover_text(format!("{name}\n{help}"));
     response.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, &name));
+    if too_large {
+        let note = [tr
+            .tr("Toolpath too large to display on this GPU.")
+            .into_owned()];
+        panel(ui, rect.center(), egui::Align2::CENTER_CENTER, &note);
+    }
     if !loaded {
         let empty = [
             tr.tr("No G-code loaded").into_owned(),
