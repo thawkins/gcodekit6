@@ -12,6 +12,7 @@ autotests = false
 [dependencies]
 gcodekit5-core = { path = "../gcodekit5-core" }
 gcodekit5-communication = { path = "../gcodekit5-communication" }
+gcodekit5-devicedb = { path = "../gcodekit5-devicedb" }
 gcodekit5-settings = { path = "../gcodekit5-settings" }
 thiserror = { workspace = true }
 once_cell = "1.20"

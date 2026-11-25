@@ -2,6 +2,9 @@
 //! Event handlers and operations for the device manager window.
 
 use super::*;
+use crate::t;
+use gcodekit5_app::device_profiles::{self, ProfileForm, ReportedLimits};
+use gcodekit5_devicedb::ControllerType;
 
 impl DeviceManagerWindow {
     pub(crate) fn setup_event_handlers(self: &Rc<Self>) {
@@ -266,208 +269,81 @@ impl DeviceManagerWindow {
     pub(crate) fn save_device(&self) {
         // Collect model first, then drop the borrow
         let model_opt = self.selected_device.borrow().clone();
+        let Some(model) = model_opt else {
+            return;
+        };
+        let text = |entry: &Entry| entry.text().to_string();
+        let device_type = self
+            .edit_device_type
+            .active_text()
+            .and_then(|t| device_profiles::device_type_from_label(&t))
+            .unwrap_or_default();
+        let controller_type = self
+            .edit_controller_type
+            .active_id()
+            .and_then(|id| ControllerType::from_name(&id))
+            .unwrap_or_default();
+        let connection_type = self
+            .edit_connection_type
+            .active_text()
+            .map_or_else(|| "Serial".to_string(), |t| t.to_string());
+        let baud_rate = self
+            .edit_baud_rate
+            .active_text()
+            .and_then(|t| t.parse().ok())
+            .unwrap_or(115_200);
+        let form = ProfileForm {
+            name: text(&self.edit_name),
+            description: text(&self.edit_description),
+            device_type,
+            controller_type,
+            connection_type,
+            port: text(&self.edit_port),
+            baud_rate,
+            tcp_host: text(&self.edit_tcp_host),
+            tcp_port: text(&self.edit_tcp_port),
+            timeout_ms: text(&self.edit_timeout),
+            auto_reconnect: self.edit_auto_reconnect.is_active(),
+            x_min: text(&self.edit_x_min),
+            x_max: text(&self.edit_x_max),
+            y_min: text(&self.edit_y_min),
+            y_max: text(&self.edit_y_max),
+            z_min: text(&self.edit_z_min),
+            z_max: text(&self.edit_z_max),
+            has_spindle: self.edit_has_spindle.is_active(),
+            has_laser: self.edit_has_laser.is_active(),
+            has_coolant: self.edit_has_coolant.is_active(),
+            pen_mode: self.edit_pen_mode.is_active(),
+            num_axes: text(&self.edit_num_axes),
+            max_feed_rate: text(&self.edit_max_feed_rate),
+            max_s_value: text(&self.edit_max_s_value),
+            spindle_watts: text(&self.edit_spindle_watts),
+            max_spindle_speed_rpm: text(&self.edit_max_spindle_speed_rpm),
+            laser_watts: text(&self.edit_laser_watts),
+        };
 
-        if let Some(mut model) = model_opt {
-            // General
-            model.name = self.edit_name.text().to_string();
-            model.description = self.edit_description.text().to_string();
-            if let Some(txt) = self.edit_device_type.active_text() {
-                model.device_type = txt.to_string();
-            }
-            if let Some(id) = self.edit_controller_type.active_id() {
-                model.controller_type = id.to_string();
-            }
-
-            // Connection
-            if let Some(txt) = self.edit_connection_type.active_text() {
-                model.connection_type = txt.to_string();
-            }
-            model.port = self.edit_port.text().to_string();
-            if let Some(txt) = self.edit_baud_rate.active_text() {
-                model.baud_rate = txt.to_string();
-            }
-            let tcp_port: u16 = match self.edit_tcp_port.text().trim().parse() {
-                Ok(v) => v,
-                Err(_) => {
-                    self.show_error_dialog("Invalid TCP Port", "TCP Port must be a number");
-                    return;
-                }
-            };
-            let timeout_ms: u32 = match self.edit_timeout.text().trim().parse() {
-                Ok(v) => v,
-                Err(_) => {
-                    self.show_error_dialog("Invalid Timeout", "Timeout must be a number (ms)");
-                    return;
-                }
-            };
-            model.tcp_host = self.edit_tcp_host.text().trim().to_string();
-            model.tcp_port = tcp_port.to_string();
-            model.timeout_ms = timeout_ms.to_string();
-            model.auto_reconnect = self.edit_auto_reconnect.is_active();
-
-            // Dimensions
-            let units = *self.current_units.borrow();
-            let feed_units = *self.current_feed_units.borrow();
-
-            let x_min_mm = match parse_length(&self.edit_x_min.text(), units) {
-                Ok(v) => v,
-                Err(e) => {
-                    self.show_error_dialog("Invalid X Min", &e);
-                    return;
-                }
-            };
-            let x_max_mm = match parse_length(&self.edit_x_max.text(), units) {
-                Ok(v) => v,
-                Err(e) => {
-                    self.show_error_dialog("Invalid X Max", &e);
-                    return;
-                }
-            };
-            let y_min_mm = match parse_length(&self.edit_y_min.text(), units) {
-                Ok(v) => v,
-                Err(e) => {
-                    self.show_error_dialog("Invalid Y Min", &e);
-                    return;
-                }
-            };
-            let y_max_mm = match parse_length(&self.edit_y_max.text(), units) {
-                Ok(v) => v,
-                Err(e) => {
-                    self.show_error_dialog("Invalid Y Max", &e);
-                    return;
-                }
-            };
-            let z_min_mm = match parse_length(&self.edit_z_min.text(), units) {
-                Ok(v) => v,
-                Err(e) => {
-                    self.show_error_dialog("Invalid Z Min", &e);
-                    return;
-                }
-            };
-            let z_max_mm = match parse_length(&self.edit_z_max.text(), units) {
-                Ok(v) => v,
-                Err(e) => {
-                    self.show_error_dialog("Invalid Z Max", &e);
-                    return;
-                }
-            };
-            model.x_min = format!("{:.2}", x_min_mm);
-            model.x_max = format!("{:.2}", x_max_mm);
-            model.y_min = format!("{:.2}", y_min_mm);
-            model.y_max = format!("{:.2}", y_max_mm);
-            model.z_min = format!("{:.2}", z_min_mm);
-            model.z_max = format!("{:.2}", z_max_mm);
-
-            // Capabilities
-            model.has_spindle = self.edit_has_spindle.is_active();
-            model.has_laser = self.edit_has_laser.is_active();
-            model.has_coolant = self.edit_has_coolant.is_active();
-            model.pen_mode = self.edit_pen_mode.is_active();
-
-            let num_axes: u8 = match self.edit_num_axes.text().trim().parse() {
-                Ok(v) if (1..=6).contains(&v) => v,
-                _ => {
-                    self.show_error_dialog(
-                        "Invalid No of Axes",
-                        "Number of axes must be an integer between 1 and 6",
-                    );
-                    return;
-                }
-            };
-            model.num_axes = num_axes.to_string();
-
-            let max_feed_mm_per_min =
-                match parse_feed_rate(&self.edit_max_feed_rate.text(), feed_units) {
-                    Ok(v) => v,
-                    Err(e) => {
-                        self.show_error_dialog("Invalid Max Feed Rate", &e);
-                        return;
-                    }
-                };
-            let max_s_value: f32 = match self.edit_max_s_value.text().trim().parse() {
-                Ok(v) => v,
-                Err(_) => {
-                    self.show_error_dialog("Invalid Max S-Value", "Max S-Value must be a number");
-                    return;
-                }
-            };
-            let (spindle_watts, max_spindle_speed_rpm) = if model.has_spindle {
-                let spindle_watts: f32 = match self.edit_spindle_watts.text().trim().parse() {
-                    Ok(v) => v,
-                    Err(_) => {
-                        self.show_error_dialog(
-                            "Invalid Spindle Power",
-                            "Spindle power must be a number (W)",
-                        );
-                        return;
-                    }
-                };
-
-                let max_spindle_speed_rpm: u32 =
-                    match self.edit_max_spindle_speed_rpm.text().trim().parse() {
-                        Ok(v) => v,
-                        Err(_) => {
-                            self.show_error_dialog(
-                                "Invalid Max Spindle Speed",
-                                "Max spindle speed must be an integer (RPM)",
-                            );
-                            return;
-                        }
-                    };
-
-                (spindle_watts, max_spindle_speed_rpm)
-            } else {
-                (0.0, 0)
-            };
-
-            let laser_watts: f32 = if model.has_laser {
-                match self.edit_laser_watts.text().trim().parse() {
-                    Ok(v) => v,
-                    Err(_) => {
-                        self.show_error_dialog(
-                            "Invalid Laser Power",
-                            "Laser power must be a number (W)",
-                        );
-                        return;
-                    }
-                }
-            } else {
-                0.0
-            };
-
-            model.max_feed_rate = format!("{:.0}", max_feed_mm_per_min);
-            model.max_s_value = format!("{:.0}", max_s_value);
-            model.max_spindle_speed_rpm = max_spindle_speed_rpm.to_string();
-            model.cnc_spindle_watts = format!("{:.0}", spindle_watts);
-            model.laser_watts = format!("{:.0}", laser_watts);
-
-            // Validación específica: rechazar protocolos no soportados
-            // antes de intentar guardar. El registro de protocolos es la
-            // fuente de verdad sobre qué está implementado.
-            let protocol =
-                gcodekit5_communication::firmware::protocol_profile(&model.controller_type);
-            if !protocol.is_supported {
-                self.show_error_dialog(
-                    "Unsupported controller",
-                    &format!(
-                        "The selected controller \"{}\" is not supported yet. \
-                         Please choose a supported one and try again.",
-                        protocol.display_name
-                    ),
-                );
+        // The shared form rules (gcodekit5-app) check every field, including whether the
+        // controller is supported, before anything is saved.
+        let units = *self.current_units.borrow();
+        let feed_units = *self.current_feed_units.borrow();
+        let base = self.controller.get_profile(&model.id).unwrap_or_default();
+        let mut profile = match form.apply(&base, units, feed_units) {
+            Ok(profile) => profile,
+            Err(e) => {
+                self.show_error_dialog(&t!(e.title), &e.fill(&t!(e.detail)));
                 return;
             }
+        };
+        profile.id = model.id;
 
-            // Save
-            if let Err(e) = self.controller.update_profile_from_ui(model) {
-                error!("Failed to save device profile: {}", e);
-                self.show_error_dialog("Failed to save device", &e.to_string());
-                return;
-            }
-
-            self.load_devices();
-            self.cancel_edit();
+        if let Err(e) = self.controller.save_profile(profile) {
+            error!("Failed to save device profile: {}", e);
+            self.show_error_dialog("Failed to save device", &e.to_string());
+            return;
         }
+
+        self.load_devices();
+        self.cancel_edit();
     }
 
     pub(crate) fn delete_device(self: &Rc<Self>) {
@@ -542,39 +418,27 @@ impl DeviceManagerWindow {
             return;
         };
 
-        // Update dimensions from $130, $131, $132 (X/Y/Z max travel)
-        if let Some(x_max) = status.grbl_settings.get(&130)
-            && let Ok(val) = x_max.parse::<f64>()
-        {
-            model.x_max = format!("{:.2}", val);
+        // The values the dump gives a profile ($130-$132 travel, $30 spindle speed, $32
+        // laser mode) are read by the shared rule in gcodekit5-app.
+        let limits = ReportedLimits::from_settings(&status.grbl_settings);
+        if let Some(x) = limits.x_max {
+            model.x_max = format!("{:.2}", x);
         }
-        if let Some(y_max) = status.grbl_settings.get(&131)
-            && let Ok(val) = y_max.parse::<f64>()
-        {
-            model.y_max = format!("{:.2}", val);
+        if let Some(y) = limits.y_max {
+            model.y_max = format!("{:.2}", y);
         }
-        if let Some(z_max) = status.grbl_settings.get(&132)
-            && let Ok(val) = z_max.parse::<f64>()
-        {
-            model.z_max = format!("{:.2}", val);
+        if let Some(z) = limits.z_max {
+            model.z_max = format!("{:.2}", z);
         }
-
-        // Update max spindle speed from $30 (Max spindle speed, RPM)
-        if let Some(max_rpm) = status.grbl_settings.get(&30)
-            && let Ok(val) = max_rpm.parse::<u32>()
-        {
-            model.max_spindle_speed_rpm = val.to_string();
-            model.max_s_value = format!("{:.0}", val as f32);
-            if val > 0 {
+        if let Some(rpm) = limits.max_rpm {
+            model.max_spindle_speed_rpm = rpm.to_string();
+            model.max_s_value = rpm.to_string();
+            if rpm > 0 {
                 model.has_spindle = true;
             }
         }
-
-        // Check for laser mode from $32 (Laser mode enable)
-        if let Some(laser_mode) = status.grbl_settings.get(&32)
-            && let Ok(val) = laser_mode.parse::<u32>()
-        {
-            model.has_laser = val == 1;
+        if let Some(laser) = limits.laser {
+            model.has_laser = laser;
         }
 
         // Reload the updated model into the form

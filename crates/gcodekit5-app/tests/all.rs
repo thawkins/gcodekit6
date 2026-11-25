@@ -21,6 +21,8 @@ pub fn global_env_lock() -> std::sync::MutexGuard<'static, ()> {
 mod test_command_history;
 #[path = "test_device_console_manager.rs"]
 mod test_device_console_manager;
+#[path = "test_device_profiles_model.rs"]
+mod test_device_profiles_model;
 #[path = "test_firmware_settings_model.rs"]
 mod test_firmware_settings_model;
 #[path = "test_i18n.rs"]

@@ -261,6 +261,25 @@ impl DeviceUiController {
         self.manager.save_profile(profile)
     }
 
+    /// The stored profile with `id`, if any.
+    ///
+    /// # Arguments
+    /// * `id` - The profile id.
+    pub fn get_profile(&self, id: &str) -> Option<DeviceProfile> {
+        self.manager.get_profile(id)
+    }
+
+    /// Stores `profile` (replacing the one with its id) and saves the file.
+    ///
+    /// # Arguments
+    /// * `profile` - The profile to store.
+    ///
+    /// # Errors
+    /// Returns an error if saving fails.
+    pub fn save_profile(&self, profile: DeviceProfile) -> anyhow::Result<()> {
+        self.manager.save_profile(profile)
+    }
+
     pub fn create_new_profile(&self) -> anyhow::Result<String> {
         let profile = DeviceProfile::default();
         let id = profile.id.clone();

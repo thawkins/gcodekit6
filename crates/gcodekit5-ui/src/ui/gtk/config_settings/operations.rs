@@ -62,15 +62,10 @@ impl ConfigSettingsView {
                 .or_else(|| dm.get_all_profiles().into_iter().find(|p| p.port == port));
 
             if let Some(mut profile) = candidate.take() {
-                profile.grbl_settings = status.grbl_settings.clone();
-
-                if let Some(max_s) = device_status::get_grbl_setting_numeric(30) {
-                    profile.max_s_value = max_s;
-                }
-
-                if let Some(laser) = device_status::get_grbl_setting_numeric(32) {
-                    profile.has_laser = laser >= 1.0;
-                }
+                gcodekit5_app::device_profiles::store_reported_settings(
+                    &mut profile,
+                    &status.grbl_settings,
+                );
 
                 if dm.save_profile(profile).is_ok() {
                     self.last_persisted_settings_count.set(count);

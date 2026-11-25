@@ -215,7 +215,8 @@ pub fn get_grbl_setting(number: u16) -> Option<String> {
     DEVICE_STATUS.read().grbl_settings.get(&number).cloned()
 }
 
-fn parse_numeric_prefix(s: &str) -> Option<f64> {
+/// The number at the start of a reported setting value (`"1000.000"`, `"1 (rpm)"`), if any.
+pub(crate) fn parse_numeric_prefix(s: &str) -> Option<f64> {
     let s = s.trim();
     let mut end = 0usize;
     for (i, ch) in s.char_indices() {
