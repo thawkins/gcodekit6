@@ -19,6 +19,7 @@ macro_rules! n_ {
 pub mod app;
 pub mod commands;
 pub mod dialogs;
+mod files;
 pub mod frame;
 pub mod machine;
 pub mod menu;

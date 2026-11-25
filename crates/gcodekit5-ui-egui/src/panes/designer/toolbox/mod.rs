@@ -6,7 +6,8 @@
 //! the machine mode and settings write straight to the design's `DesignerState`, as in GTK.
 //! The settings follow the display units of the Settings window ([`settings`]).
 //!
-//! The "Shape Gallery…" button is reported in [`ToolboxOutput`]; the pane acts on it.
+//! The "Shape Gallery…", "Generate G-Code" and "Frame" buttons are reported in
+//! [`ToolboxOutput`]; the pane acts on them.
 //!
 //! Not ported: the icons on the tool buttons (names only) and the stock dialog's second Step
 //! Down field (it is the tool settings' Step Down). GTK's tooltips named shortcut keys (S, R, C ...) that no GTK
@@ -56,9 +57,14 @@ pub struct ToolboxOutput {
     pub tool: Option<DesignerTool>,
     /// "Shape Gallery…" was clicked.
     pub gallery: bool,
+    /// "Generate G-Code" was clicked.
+    pub generate: bool,
+    /// "Frame" was clicked.
+    pub frame: bool,
 }
 
-/// The toolbox, top to bottom: tools, the shape gallery, switches, machine mode, settings.
+/// The toolbox, top to bottom: tools, the shape gallery, switches, machine mode with
+/// Generate G-Code and Frame, settings.
 ///
 /// # Arguments
 /// * `ui` - The toolbox panel's `Ui`.
@@ -97,6 +103,13 @@ pub fn show(
             ui.checkbox(&mut state.show_toolpaths, tr.tr("Show Toolpaths"));
             ui.separator();
             machine_mode(ui, state, tr);
+            ui.horizontal(|ui| {
+                out.generate = ui.button(tr.tr("Generate G-Code")).clicked();
+                out.frame = ui
+                    .button(tr.tr("Frame ").trim())
+                    .on_hover_text(tr.tr("Generate low-power frame to position material"))
+                    .clicked();
+            });
             settings::show(ui, state, units, tr);
         });
     out

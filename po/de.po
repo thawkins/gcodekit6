@@ -3323,3 +3323,9 @@ msgstr "Die Anordnung würde mehr als 10000 Objekte erzeugen"
 
 msgid "Show Toolpaths"
 msgstr "Werkzeugbahnen anzeigen"
+
+msgid "Nothing to export: all shapes are hidden"
+msgstr "Nichts zu exportieren: alle Formen sind ausgeblendet"
+
+msgid "Stop the running job before sending G-code to the editor."
+msgstr "Stoppen Sie den laufenden Auftrag, bevor Sie G-Code an den Editor senden."

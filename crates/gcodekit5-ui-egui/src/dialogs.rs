@@ -34,6 +34,14 @@ pub enum FilePurpose {
     OpenDesign,
     /// Choose where to save the design.
     SaveDesign,
+    /// Choose an SVG or DXF file to import into the design.
+    ImportDesign,
+    /// Choose an image to import into the design as a raster shape.
+    ImportImage,
+    /// Choose where to export the design's G-code.
+    ExportGcode,
+    /// Choose where to export the design as SVG.
+    ExportSvg,
 }
 
 impl FilePurpose {
@@ -44,12 +52,17 @@ impl FilePurpose {
             Self::SaveGcode => n_!("Save G-Code File"),
             Self::OpenDesign => n_!("Open Design File"),
             Self::SaveDesign => n_!("Save Design File"),
+            Self::ImportDesign => n_!("Import Design File"),
+            Self::ImportImage => n_!("Import Image"),
+            Self::ExportGcode => n_!("Export G-Code"),
+            Self::ExportSvg => n_!("Export SVG"),
         }
     }
 
     /// The file types the dialog offers, the first one selected: an Open dialog offers its
     /// type and All Files, or nothing (every file) where All Files cannot be a filter
-    /// ([`FileFilter::all_files`]); a Save dialog offers its own type.
+    /// ([`FileFilter::all_files`]); a Save dialog offers its own type. Import offers the
+    /// supported types together, then each, then All Files where it can.
     pub fn filters(self) -> Vec<FileFilter> {
         let open = |own: FileFilter| {
             FileFilter::all_files()
@@ -61,6 +74,14 @@ impl FilePurpose {
             Self::OpenDesign => open(FileFilter::DESIGN),
             Self::SaveGcode => vec![FileFilter::GCODE],
             Self::SaveDesign => vec![FileFilter::DESIGN],
+            Self::ImportDesign => {
+                let mut filters = vec![FileFilter::IMPORT, FileFilter::SVG, FileFilter::DXF];
+                filters.extend(FileFilter::all_files());
+                filters
+            }
+            Self::ImportImage => vec![FileFilter::IMAGE],
+            Self::ExportGcode => vec![FileFilter::GCODE_EXPORT],
+            Self::ExportSvg => vec![FileFilter::SVG],
         }
     }
 }
@@ -84,6 +105,32 @@ impl FileFilter {
     pub const DESIGN: Self = Self {
         name_msgid: n_!("GCodeKit Design Files"),
         extensions: &["gckd", "gck5"],
+    };
+
+    /// The vector files the designer imports (GTK's "Supported Files").
+    pub const IMPORT: Self = Self {
+        name_msgid: n_!("Supported Files"),
+        extensions: &["svg", "dxf"],
+    };
+    /// SVG drawings.
+    pub const SVG: Self = Self {
+        name_msgid: n_!("SVG Files"),
+        extensions: &["svg"],
+    };
+    /// DXF drawings.
+    pub const DXF: Self = Self {
+        name_msgid: n_!("DXF Files"),
+        extensions: &["dxf"],
+    };
+    /// The images the raster import reads (GTK's JPEG, PNG, BMP, TIFF and WebP types).
+    pub const IMAGE: Self = Self {
+        name_msgid: n_!("Image files"),
+        extensions: &["png", "jpg", "jpeg", "bmp", "tif", "tiff", "webp"],
+    };
+    /// The G-code types the designer's export offers (GTK's).
+    pub const GCODE_EXPORT: Self = Self {
+        name_msgid: n_!("G-Code Files"),
+        extensions: &["nc", "gcode", "gc"],
     };
 
     /// The "All Files" choice in a form that matches every file, names without a dot
@@ -292,6 +339,21 @@ impl Dialogs {
         self.ask_file(FileDialog::save(), purpose, filters);
     }
 
+    /// Queues a dialog choosing where to save a file, suggesting `file_name`.
+    ///
+    /// # Arguments
+    /// * `purpose` - What the file is for; it comes back with the answer.
+    /// * `filters` - The file types to offer, in order.
+    /// * `file_name` - The name the dialog starts with.
+    pub fn save_file_named(
+        &mut self,
+        purpose: FilePurpose,
+        filters: &[FileFilter],
+        file_name: &str,
+    ) {
+        self.ask_file(FileDialog::save().file_name(file_name), purpose, filters);
+    }
+
     fn ask_file(&mut self, dialog: FileDialog, purpose: FilePurpose, filters: &[FileFilter]) {
         let tr = &self.translator;
         let dialog = filters.iter().fold(
@@ -442,12 +504,23 @@ pub fn msgids() -> Vec<&'static str> {
         FilePurpose::SaveGcode,
         FilePurpose::OpenDesign,
         FilePurpose::SaveDesign,
+        FilePurpose::ImportDesign,
+        FilePurpose::ImportImage,
+        FilePurpose::ExportGcode,
+        FilePurpose::ExportSvg,
     ]
     .map(FilePurpose::title_msgid);
-    let filters = [FileFilter::GCODE, FileFilter::DESIGN]
-        .map(|f| f.name_msgid)
-        .into_iter()
-        .chain([n_!("All Files")]);
+    let filters = [
+        FileFilter::GCODE,
+        FileFilter::DESIGN,
+        FileFilter::IMPORT,
+        FileFilter::SVG,
+        FileFilter::DXF,
+        FileFilter::IMAGE,
+    ]
+    .map(|f| f.name_msgid)
+    .into_iter()
+    .chain([n_!("All Files")]);
     let confirms = [
         ConfirmRequest::UnsavedGcode,
         ConfirmRequest::UnsavedDesign,

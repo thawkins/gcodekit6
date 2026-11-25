@@ -28,9 +28,14 @@
 //! `ViewportCommand::Close`, and `craft_quit::on_close_request` (in `eframe::App::logic`)
 //! turns that close into `-[NSApplication terminate:]` on macOS.
 //!
+//! The designer's file commands, its unsaved-changes questions and the G-code it hands to the
+//! editor are in [`designer_files`].
+//!
 //! Dependencies: `egui`, `eframe`, `craft-window`, `craft-platform`, `craft-keymap`,
 //! `craft-menu`, `craft-dialogs`, `craft-quit`, `gcodekit5-app` (translations, the
 //! unsaved-changes answer), `gcodekit5-settings` (configuration).
+
+pub mod designer_files;
 
 use std::cell::RefCell;
 use std::path::{Path, PathBuf};
@@ -66,6 +71,7 @@ use crate::panes::visualizer::VisualizerPane;
 use crate::theme;
 use crate::windows::{AboutWindow, SettingsOutcome, SettingsWindow};
 use crate::workspace::{PaneContext, PaneId, Workspace};
+use designer_files::{DesignFlow, DesignNext};
 
 /// How long quitting waits for a stopped job to be confirmed by the controller.
 const STOP_JOB_TIMEOUT: Duration = Duration::from_secs(2);
@@ -248,6 +254,8 @@ pub struct GcodeKitApp {
     after_save: Option<AfterSave>,
     /// An Open asked first about the editor's unsaved changes.
     open_after_confirm: bool,
+    /// The design's New / Open / Save waiting for a dialog.
+    design: DesignFlow,
     /// The egui frame whose machine events were last polled.
     machine_polled: Option<u64>,
     /// The `movable` flag last set on the macOS window (`title_bar::sync_movable`).
@@ -363,6 +371,7 @@ impl GcodeKitApp {
             designer_dirty: false,
             after_save: None,
             open_after_confirm: false,
+            design: DesignFlow::default(),
             machine_polled: None,
             #[cfg(target_os = "macos")]
             movable: None,
@@ -408,8 +417,8 @@ impl GcodeKitApp {
             }
             return;
         }
-        // While the editor's save dialog for this quit is up, the quit waits for it.
-        let saving = self.after_save == Some(AfterSave::Quit);
+        // While a save dialog for this quit is up, the quit waits for it.
+        let saving = self.after_save == Some(AfterSave::Quit) || self.design_saving_for_quit();
         if self.quit.asking.is_none() && !saving {
             self.continue_quit();
         }
@@ -477,12 +486,7 @@ impl GcodeKitApp {
                     UnsavedChangesChoice::Save if request == ConfirmRequest::UnsavedGcode => {
                         self.save_editor(Some(AfterSave::Quit));
                     }
-                    UnsavedChangesChoice::Save => {
-                        // The designer cannot save in this front end yet (Task 12), so nothing
-                        // is saved and the app stays open.
-                        tracing::warn!(?request, "cannot save before quitting yet; quit cancelled");
-                        self.cancel_quit();
-                    }
+                    UnsavedChangesChoice::Save => self.save_design(Some(DesignNext::Quit)),
                     UnsavedChangesChoice::Cancel => self.cancel_quit(),
                 }
             }
@@ -578,6 +582,7 @@ impl GcodeKitApp {
         }
         self.sync_editor(false);
         self.sync_designer();
+        self.deliver_designer_gcode();
         self.deliver_machine_events();
         self.queue = queue;
         self.show_windows(&ctx);
@@ -712,6 +717,9 @@ impl GcodeKitApp {
     /// * `cmd` - The command to run.
     pub fn dispatch(&mut self, cmd: Command) {
         self.last_dispatched = Some(cmd);
+        if self.dispatch_design(cmd) {
+            return;
+        }
         match cmd {
             Command::FileOpen => {
                 if self.refuse_open_during_job() {
@@ -741,13 +749,14 @@ impl GcodeKitApp {
             Command::Paste => self
                 .viewport_commands
                 .push(egui::ViewportCommand::RequestPaste),
+            // Run by `dispatch_design` above.
             Command::FileNew
             | Command::FileNew3d
             | Command::FileImport
             | Command::FileImportImage
             | Command::FileExportGcode
-            | Command::FileExportSvg
-            | Command::FileRun => tracing::debug!(?cmd, "document command not available yet"),
+            | Command::FileExportSvg => {}
+            Command::FileRun => tracing::debug!(?cmd, "document command not available yet"),
             Command::Undo | Command::Redo => {
                 if !self.route_to_active_designer(cmd) {
                     tracing::debug!(?cmd, "no document to undo in");
@@ -815,6 +824,10 @@ impl GcodeKitApp {
     /// Acts on a dialog's answer; every answer is also kept in
     /// [`GcodeKitApp::last_dialog_answer`].
     fn handle_answer(&mut self, answer: DialogAnswer) {
+        if self.handle_design_answer(&answer) {
+            self.last_dialog_answer = Some(answer);
+            return;
+        }
         match &answer {
             DialogAnswer::File {
                 purpose: FilePurpose::OpenGcode,

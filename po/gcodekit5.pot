@@ -3247,3 +3247,9 @@ msgstr ""
 
 msgid "Show Toolpaths"
 msgstr ""
+
+msgid "Nothing to export: all shapes are hidden"
+msgstr ""
+
+msgid "Stop the running job before sending G-code to the editor."
+msgstr ""

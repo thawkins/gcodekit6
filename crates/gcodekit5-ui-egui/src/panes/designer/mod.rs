@@ -10,7 +10,9 @@
 //! Ported from the GTK `ui/gtk/designer_canvas/*` and `designer_toolbox.rs` ([`toolbox`]);
 //! [`layers`] is the Layers pane and [`properties`] the Properties pane. The Text tool opens
 //! the Add Text dialog ([`canvas::text_tool`]). The toolbox's "Shape Gallery…" opens
-//! [`shape_gallery`]; the shape it arms is placed by the next canvas click. Not ported here:
+//! [`shape_gallery`]; the shape it arms is placed by the next canvas click. New, Open, Save
+//! and Import are [`file_ops`]; G-code and SVG output (Export, the toolbox's Generate G-Code
+//! and Frame) are [`export`], the outcome shown as the pane's notice. Not ported here:
 //! scrollbars, the device's work area (the default 250 x 250 mm is shown), and the context
 //! menu's other entries.
 //!
@@ -18,9 +20,12 @@
 //! `gcodekit5-settings` (grid line widths, display units), `gcodekit5-core` (units).
 
 pub mod canvas;
+pub mod export;
+pub mod file_ops;
 pub mod layers;
 pub mod properties;
 pub mod shape_gallery;
+pub mod svg_export;
 pub mod toolbox;
 
 use std::cell::RefCell;
@@ -52,6 +57,8 @@ pub fn msgids() -> Vec<&'static str> {
     ids.extend(text_tool::msgids());
     ids.extend(shape_gallery::msgids());
     ids.extend(array_dialog::msgids());
+    ids.extend(file_ops::msgids());
+    ids.extend(export::msgids());
     ids
 }
 
@@ -79,6 +86,12 @@ pub struct DesignerPane {
     array: ArrayDialog,
     /// The toolpath preview ("Show Toolpaths").
     toolpaths: ToolpathPreview,
+    /// The outcome of the last file operation, shown above the canvas.
+    notice: Option<String>,
+    /// G-code for the editor (Generate G-Code, Frame), until the app takes it.
+    editor_gcode: Option<String>,
+    /// The machine's working area from the settings, for the out-of-limits check.
+    limits: Option<MachineLimits>,
 }
 
 impl std::fmt::Debug for DesignerPane {
@@ -114,6 +127,9 @@ impl DesignerPane {
             gallery: ShapeGallery::default(),
             array: ArrayDialog::default(),
             toolpaths: ToolpathPreview::default(),
+            notice: None,
+            editor_gcode: None,
+            limits: None,
         }
     }
 
@@ -297,24 +313,6 @@ impl DesignerPane {
         self.input.dragging()
     }
 
-    /// Generates G-code for the design, leaving out hidden shapes.
-    ///
-    /// Hidden shapes ([`ShapeFlags`]) are view state the model does not know, so this builds
-    /// the code from a copy of the design without them (the design is untouched). Every
-    /// export must go through here, so a hidden shape is never cut. Locked shapes are cut.
-    ///
-    /// # Arguments
-    /// * `machine_limits` - The machine's limits, if known (as the model's `generate_gcode`).
-    pub fn generate_gcode(&self, machine_limits: Option<MachineLimits>) -> String {
-        let mut copy = self.state.clone();
-        for id in self.state.canvas.shape_store.draw_order_iter() {
-            if self.flags.is_hidden(id) {
-                copy.canvas.remove_shape(id);
-            }
-        }
-        copy.generate_gcode(machine_limits)
-    }
-
     /// Rotates the selection by `degrees` (counter-clockwise positive), as one undo step.
     ///
     /// # Arguments
@@ -451,6 +449,13 @@ impl Pane for DesignerPane {
         if out.gallery {
             self.gallery.open();
         }
+        if out.generate {
+            self.generate_to_editor(tr);
+        }
+        if out.frame {
+            self.frame_to_editor();
+        }
+        self.show_notice(ui, tr);
         self.show_canvas(ui, tr);
     }
 
@@ -511,6 +516,14 @@ impl Pane for DesignerPane {
 
     fn configure(&mut self, config: &Config) {
         self.units = config.ui.measurement_system;
+        // GTK's fallback when no device profile is active: the Preferences limits.
+        let machine = &config.machine;
+        self.limits = (machine.x_limit > 0.0 && machine.y_limit > 0.0).then_some(MachineLimits {
+            x_min: 0.0,
+            x_max: machine.x_limit,
+            y_min: 0.0,
+            y_max: machine.y_limit,
+        });
         self.widths = LineWidths {
             grid_major: config.ui.grid_major_line_width as f32,
             grid_minor: config.ui.grid_minor_line_width as f32,

@@ -3318,3 +3318,9 @@ msgstr "A matriz criaria mais de 10000 objetos"
 
 msgid "Show Toolpaths"
 msgstr "Mostrar percursos da ferramenta"
+
+msgid "Nothing to export: all shapes are hidden"
+msgstr "Nada para exportar: todas as formas estão ocultas"
+
+msgid "Stop the running job before sending G-code to the editor."
+msgstr "Pare o trabalho em curso antes de enviar G-code para o editor."

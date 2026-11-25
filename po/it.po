@@ -3326,3 +3326,9 @@ msgstr "La serie creerebbe più di 10000 oggetti"
 
 msgid "Show Toolpaths"
 msgstr "Mostra percorsi utensile"
+
+msgid "Nothing to export: all shapes are hidden"
+msgstr "Niente da esportare: tutte le forme sono nascoste"
+
+msgid "Stop the running job before sending G-code to the editor."
+msgstr "Arresta il lavoro in corso prima di inviare il G-code all'editor."

@@ -187,6 +187,7 @@ fn msgids() -> Vec<&'static str> {
         .chain(editor::msgids())
         .chain(visualizer::msgids())
         .chain(designer::msgids())
+        .chain(gcodekit5_ui_egui::app::designer_files::msgids())
         .chain(status_bar::MSGIDS.iter().copied())
         .collect()
 }

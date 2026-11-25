@@ -3330,3 +3330,9 @@ msgstr "Le réseau créerait plus de 10000 objets"
 
 msgid "Show Toolpaths"
 msgstr "Afficher les parcours d'outil"
+
+msgid "Nothing to export: all shapes are hidden"
+msgstr "Rien à exporter : toutes les formes sont masquées"
+
+msgid "Stop the running job before sending G-code to the editor."
+msgstr "Arrêtez le travail en cours avant d'envoyer du G-code à l'éditeur."
