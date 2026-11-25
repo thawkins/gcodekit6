@@ -46,13 +46,16 @@ struct LoopbackShared {
 
 impl LoopbackShared {
     fn log(&self) -> Vec<Wrote> {
-        self.log.lock().unwrap().clone()
+        self.log
+            .lock()
+            .expect("loopback log mutex poisoned")
+            .clone()
     }
 
     fn inject(&self, response: &str) {
         self.inject
             .lock()
-            .unwrap()
+            .expect("loopback inject mutex poisoned")
             .push_back(response.as_bytes().to_vec());
     }
 
@@ -116,7 +119,7 @@ impl Communicator for Loopback {
             self.shared
                 .log
                 .lock()
-                .unwrap()
+                .expect("loopback log mutex poisoned")
                 .push(Wrote::Realtime(data[0]));
             return Ok(1);
         }
@@ -124,7 +127,11 @@ impl Communicator for Loopback {
             if b == b'\n' {
                 let line = String::from_utf8_lossy(&self.carry).to_string();
                 self.carry.clear();
-                self.shared.log.lock().unwrap().push(Wrote::Line(line));
+                self.shared
+                    .log
+                    .lock()
+                    .expect("loopback log mutex poisoned")
+                    .push(Wrote::Line(line));
                 let due = self.last_due.max(Instant::now()) + self.ok_delay;
                 self.last_due = due;
                 self.pending_acks.push_back(due);
@@ -137,7 +144,13 @@ impl Communicator for Loopback {
     }
 
     fn receive(&mut self) -> gcodekit5_core::Result<Vec<u8>> {
-        if let Some(data) = self.shared.inject.lock().unwrap().pop_front() {
+        if let Some(data) = self
+            .shared
+            .inject
+            .lock()
+            .expect("loopback inject mutex poisoned")
+            .pop_front()
+        {
             return Ok(data);
         }
         if !self.shared.hold_acks.load(Ordering::SeqCst)
