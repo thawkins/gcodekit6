@@ -25,9 +25,14 @@ pub fn loopback_config() -> Config {
 
 /// App state over a fresh loopback controller that acks each line after `ok_delay`.
 pub fn loopback_state(ok_delay: Duration) -> (AppState, Arc<LoopbackShared>) {
+    loopback_state_with(loopback_config(), ok_delay)
+}
+
+/// [`loopback_state`] with the settings `config`.
+pub fn loopback_state_with(config: Config, ok_delay: Duration) -> (AppState, Arc<LoopbackShared>) {
     let shared = Arc::new(LoopbackShared::default());
     let state = AppState::new(
-        SettingsManager::detached(loopback_config()),
+        SettingsManager::detached(config),
         crate::test_smoke::native_decision(),
     )
     .with_machine(loopback_controller(&shared, ok_delay));

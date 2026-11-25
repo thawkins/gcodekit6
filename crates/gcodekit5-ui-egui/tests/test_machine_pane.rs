@@ -16,18 +16,34 @@ use gcodekit5_ui_egui::GcodeKitApp;
 use gcodekit5_ui_egui::commands::Command;
 use gcodekit5_ui_egui::machine::coalesce_progress;
 
-use crate::machine_support::{app_harness, connect, loopback_state, step_until, wait_until};
+use crate::machine_support::{app_harness, connect, step_until, wait_until};
 
 /// The app on a loopback controller acking after `ok_delay`, connected unless `connected`
 /// is false, in a harness that has drawn one frame.
-fn pane_app(
+pub(crate) fn pane_app(
     ok_delay: Duration,
     connected: bool,
 ) -> (
     Harness<'static, GcodeKitApp>,
     std::sync::Arc<LoopbackShared>,
 ) {
-    let (mut state, shared) = loopback_state(ok_delay);
+    pane_app_with(
+        crate::machine_support::loopback_config(),
+        ok_delay,
+        connected,
+    )
+}
+
+/// [`pane_app`] with the settings `config`.
+pub(crate) fn pane_app_with(
+    config: gcodekit5_settings::config::Config,
+    ok_delay: Duration,
+    connected: bool,
+) -> (
+    Harness<'static, GcodeKitApp>,
+    std::sync::Arc<LoopbackShared>,
+) {
+    let (mut state, shared) = crate::machine_support::loopback_state_with(config, ok_delay);
     if connected {
         connect(&mut state);
     }
@@ -38,7 +54,7 @@ fn pane_app(
 }
 
 /// Whether the loopback saw the real-time byte of `command`.
-fn wrote_realtime(shared: &LoopbackShared, command: RealtimeCommand) -> bool {
+pub(crate) fn wrote_realtime(shared: &LoopbackShared, command: RealtimeCommand) -> bool {
     shared.log().contains(&Wrote::Realtime(command.byte()))
 }
 
@@ -62,7 +78,7 @@ fn focus_entry(harness: &mut Harness<'_, GcodeKitApp>) {
 }
 
 /// Presses (or releases) the primary pointer button at `pos`.
-fn pointer_button(harness: &Harness<'_, GcodeKitApp>, pos: egui::Pos2, pressed: bool) {
+pub(crate) fn pointer_button(harness: &Harness<'_, GcodeKitApp>, pos: egui::Pos2, pressed: bool) {
     harness.event(egui::Event::PointerMoved(pos));
     harness.event(egui::Event::PointerButton {
         pos,
@@ -193,44 +209,8 @@ fn test_stream_progress_updates_while_dialog_open() {
     );
 }
 
-/// Hold-to-jog: pressing a jog button in continuous mode starts one jog; releasing it sends
-/// jog cancel (0x85).
-#[test]
-fn test_hold_to_jog_cancels_on_release() {
-    let (mut harness, shared) = pane_app(Duration::from_millis(1), true);
-    harness.get_by_label("Continuous").click();
-    harness.step();
-    let center = harness.get_by_label("Jog Y-").rect().center();
-    pointer_button(&harness, center, true);
-    harness.step();
-    harness.step();
-    assert!(
-        wait_until(|| shared.log().iter().any(|w| matches!(
-            w,
-            Wrote::Line(line) if line.starts_with("$J=G91 G21 Y-")
-        ))),
-        "no jog on press: {:?}",
-        shared.log()
-    );
-    assert!(!wrote_realtime(&shared, RealtimeCommand::JogCancel));
-    pointer_button(&harness, center, false);
-    harness.step();
-    harness.step();
-    assert!(
-        wait_until(|| wrote_realtime(&shared, RealtimeCommand::JogCancel)),
-        "no jog cancel on release: {:?}",
-        shared.log()
-    );
-    let jogs = shared
-        .log()
-        .iter()
-        .filter(|w| matches!(w, Wrote::Line(line) if line.starts_with("$J=")))
-        .count();
-    assert_eq!(jogs, 1, "one jog per hold: {:?}", shared.log());
-}
-
 /// Plan Review Focus 1: with the command entry focused, Cmd+Shift+H holds the feed and
-/// Cmd+Shift+R soft-resets; a typed `!` goes into the entry and holds nothing.
+/// Cmd+Shift+K soft-resets; a typed `!` goes into the entry and holds nothing.
 #[test]
 fn test_safety_chords_work_in_text_field() {
     let (mut harness, shared) = pane_app(Duration::from_millis(1), true);
@@ -263,7 +243,7 @@ fn test_safety_chords_work_in_text_field() {
     );
     assert!(entry(&harness).is_focused());
 
-    harness.key_press_modifiers(cmd_shift, egui::Key::R);
+    harness.key_press_modifiers(cmd_shift, egui::Key::K);
     harness.step();
     assert_eq!(harness.state().last_dispatched(), Some(Command::SoftReset));
     assert!(

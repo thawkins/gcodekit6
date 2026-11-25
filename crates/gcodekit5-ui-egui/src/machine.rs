@@ -16,12 +16,9 @@
 
 use std::sync::{Arc, Mutex, PoisonError};
 
-use gcodekit5_app::machine::grbl_stream::prepare_program;
+use gcodekit5_app::machine::grbl_stream::{MAX_LINE_LENGTH, prepare_program};
 use gcodekit5_app::machine::{MachineController, MachineEvent};
 use gcodekit5_communication::firmware::grbl::status_parser::{FullStatus, WorkCoordinateOffset};
-
-/// Longest line a program may hold, as grblHAL accepts (GRBL's own limit is 80).
-const MAX_LINE_LENGTH: usize = 256;
 
 /// Stream progress: program lines written and acknowledged out of `total`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -60,9 +57,49 @@ pub struct MachineStatus {
     pub wco: Option<WorkCoordinateOffset>,
     /// The latest error reported by the controller or transport.
     pub last_error: Option<String>,
+    /// X, Y and Z max travel in mm (`$130`-`$132`), once the controller reported them.
+    pub grbl_travel: [Option<f32>; 3],
+}
+
+/// X, Y and Z in millimetres.
+pub type Xyz = [f32; 3];
+
+/// The `$130`-`$132` max-travel setting a `$$` line reports: axis index and value in mm.
+fn parse_travel(line: &str) -> Option<(usize, f32)> {
+    let (key, value) = line.trim().split_once('=')?;
+    let index = match key {
+        "$130" => 0,
+        "$131" => 1,
+        "$132" => 2,
+        _ => return None,
+    };
+    let value: f32 = value.trim().parse().ok()?;
+    (value.is_finite() && value > 0.0).then_some((index, value))
 }
 
 impl MachineStatus {
+    /// The machine position (`MPos`) of the latest report, or `WPos + WCO` when the report
+    /// carries only the work position.
+    pub fn machine_position(&self) -> Option<Xyz> {
+        let report = self.report.as_ref()?;
+        let xyz = |x: f64, y: f64, z: f64| [x as f32, y as f32, z as f32];
+        report.mpos.map(|p| xyz(p.x, p.y, p.z)).or_else(|| {
+            let (w, o) = (report.wpos?, self.wco?);
+            Some(xyz(w.x + o.x, w.y + o.y, w.z + o.z))
+        })
+    }
+
+    /// The work position (`WPos`) of the latest report, or `MPos - WCO` when the report
+    /// carries only the machine position.
+    pub fn work_position(&self) -> Option<Xyz> {
+        let report = self.report.as_ref()?;
+        let xyz = |x: f64, y: f64, z: f64| [x as f32, y as f32, z as f32];
+        report.wpos.map(|p| xyz(p.x, p.y, p.z)).or_else(|| {
+            let (m, o) = (report.mpos?, self.wco?);
+            Some(xyz(m.x - o.x, m.y - o.y, m.z - o.z))
+        })
+    }
+
     /// Folds `events` (oldest first) into the status.
     ///
     /// # Arguments
@@ -82,6 +119,7 @@ impl MachineStatus {
                     self.streaming = false;
                     self.report = None;
                     self.wco = None;
+                    self.grbl_travel = [None; 3];
                 }
                 MachineEvent::StatusReport(report) => {
                     if let Some(wco) = report.wco {
@@ -89,7 +127,11 @@ impl MachineStatus {
                     }
                     self.report = Some((**report).clone());
                 }
-                MachineEvent::Received(_) => {}
+                MachineEvent::Received(line) => {
+                    if let Some((index, travel)) = parse_travel(line) {
+                        self.grbl_travel[index] = Some(travel);
+                    }
+                }
                 MachineEvent::StreamProgress { sent, acked, total } => {
                     if !self.streaming {
                         self.stream_end = None;
@@ -191,9 +233,10 @@ impl Machine {
         &self.events
     }
 
-    /// Whether a program is streaming.
+    /// Whether a program is streaming, also between a successful start and its first
+    /// progress report.
     pub fn job_running(&self) -> bool {
-        self.status.streaming
+        self.status.streaming || lock(&self.controller).is_streaming()
     }
 
     /// Takes the controller's events, replacing the previous frame's, and updates the status.

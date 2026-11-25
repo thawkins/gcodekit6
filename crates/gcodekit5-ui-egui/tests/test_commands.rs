@@ -85,7 +85,7 @@ const GTK_ACCELERATORS: &[(&str, &str, Command, Where)] = &[
 /// stays unbound (it would reset the controller when closing a dropdown) and Ctrl+X is Cut.
 const SAFETY_CHORDS: &[(&str, Command)] = &[
     ("Cmd+Shift+H", Command::FeedHold),
-    ("Cmd+Shift+R", Command::SoftReset),
+    ("Cmd+Shift+K", Command::SoftReset),
 ];
 
 /// Documented safety deviations: GTK chords (or GTK key handling) that get NO default binding
@@ -175,6 +175,52 @@ fn test_safety_chords_bound_everywhere() {
                 Lookup::Run(command.command_ref()),
                 "{text} with {active:?}"
             );
+        }
+    }
+}
+
+/// The safety chords are not one slip from starting motion: each chord without Shift, and
+/// without Cmd (Ctrl off macOS), runs no start, run, jog, cycle-start or motion command.
+#[test]
+fn test_safety_chords_not_near_motion() {
+    let keymap = commands::keymap();
+    let forbidden = |command: Command| {
+        command.is_jog()
+            || matches!(
+                command,
+                Command::FileRun | Command::StreamStart | Command::CycleStart | Command::Home
+            )
+    };
+    let chords: Vec<String> = [Command::FeedHold, Command::SoftReset]
+        .into_iter()
+        .flat_map(|c| keymap.default_bindings(&c.command_ref()))
+        .map(|b| b.text(&craft_keymap::Scope::app()))
+        .filter(|text| text.contains("Shift+"))
+        .collect();
+    assert_eq!(chords.len(), 2, "{chords:?}");
+    for text in &chords {
+        let key = text.rsplit('+').next().expect("key");
+        for near in [
+            format!("Cmd+{key}"),
+            format!("Shift+{key}"),
+            key.to_string(),
+        ] {
+            let chord = Chord::parse(&near).expect("chord");
+            for active in [
+                Active::NONE,
+                Active::panel(commands::MACHINE_CONTROL_SCOPE),
+                Active::panel(commands::VISUALIZER_SCOPE),
+            ] {
+                match keymap.lookup(&chord, false, &active) {
+                    Lookup::Run(command) => {
+                        let command = Command::from_ref(&command).expect("our command");
+                        assert!(!forbidden(command), "{near} (near {text}) runs {command:?}");
+                    }
+                    Lookup::Cycle(commands) => panic!("{near} cycles {commands:?}"),
+                    Lookup::None => {}
+                    other => panic!("{near}: {other:?}"),
+                }
+            }
         }
     }
 }

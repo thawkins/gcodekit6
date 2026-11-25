@@ -1,0 +1,399 @@
+//! Jogging from the Machine Control pane: hold-to-jog lasts as long as the press, is clamped
+//! to the travel left, and every way a hold can end without a release sends jog cancel
+//! (0x85); axis inversion and inch display apply to every jog.
+
+use std::sync::Arc;
+use std::time::Duration;
+
+use craft_ui::docking::{Action, Placement};
+use egui_kittest::Harness;
+use egui_kittest::kittest::Queryable;
+use gcodekit5_app::machine::RealtimeCommand;
+use gcodekit5_app::test_support::{LoopbackShared, Wrote};
+use gcodekit5_core::units::MeasurementSystem;
+use gcodekit5_settings::config::Config;
+use gcodekit5_ui_egui::GcodeKitApp;
+use gcodekit5_ui_egui::commands::Command;
+use gcodekit5_ui_egui::workspace::PaneId;
+
+use crate::machine_support::{loopback_config, step_until, wait_until};
+use crate::test_machine_pane::{pane_app_with, pointer_button, wrote_realtime};
+
+/// The `$J` lines written so far.
+fn jog_lines(shared: &LoopbackShared) -> Vec<String> {
+    shared
+        .log()
+        .into_iter()
+        .filter_map(|w| match w {
+            Wrote::Line(line) if line.starts_with("$J=") => Some(line),
+            Wrote::Line(_) | Wrote::Realtime(_) => None,
+        })
+        .collect()
+}
+
+/// How many jog cancels were written.
+fn cancels(shared: &LoopbackShared) -> usize {
+    shared
+        .log()
+        .iter()
+        .filter(|w| **w == Wrote::Realtime(RealtimeCommand::JogCancel.byte()))
+        .count()
+}
+
+/// A connected app with `config`, a status report at machine position `mpos` (unless
+/// `None`) and continuous jogging switched on.
+fn hold_app(
+    config: Config,
+    mpos: Option<[f32; 3]>,
+) -> (Harness<'static, GcodeKitApp>, Arc<LoopbackShared>) {
+    let (mut harness, shared) = pane_app_with(config, Duration::from_millis(1), true);
+    if let Some([x, y, z]) = mpos {
+        shared.inject(&format!("<Idle|MPos:{x:.3},{y:.3},{z:.3}|FS:0,0>\n"));
+        assert!(
+            step_until(&mut harness, |app| app
+                .state()
+                .machine
+                .status()
+                .machine_position()
+                .is_some()),
+            "no status report"
+        );
+    }
+    harness.get_by_label("Continuous").click();
+    harness.step();
+    (harness, shared)
+}
+
+/// Presses the jog button `label` and keeps the button down; returns where.
+fn press(harness: &mut Harness<'_, GcodeKitApp>, label: &str) -> egui::Pos2 {
+    let center = harness.get_by_label(label).rect().center();
+    pointer_button(harness, center, true);
+    harness.step();
+    center
+}
+
+/// Releases the pointer at `pos`.
+fn release(harness: &mut Harness<'_, GcodeKitApp>, pos: egui::Pos2) {
+    pointer_button(harness, pos, false);
+    harness.step();
+    harness.step();
+}
+
+/// Waits for exactly `n` jog lines and returns them.
+fn wait_jogs(shared: &LoopbackShared, n: usize) -> Vec<String> {
+    assert!(
+        wait_until(|| jog_lines(shared).len() == n),
+        "expected {n} jog lines: {:?}",
+        shared.log()
+    );
+    jog_lines(shared)
+}
+
+/// Lets the worker write whatever it was given, then returns the jog cancel count.
+fn settled_cancels(shared: &LoopbackShared) -> usize {
+    std::thread::sleep(Duration::from_millis(30));
+    cancels(shared)
+}
+
+/// I1: a hold lasts as long as the press (2.5 s here, past egui's click window) and ends with
+/// exactly one jog cancel on release.
+#[test]
+fn test_hold_survives_long_press_and_cancels_once_on_release() {
+    let (mut harness, shared) = hold_app(loopback_config(), Some([-100.0, -100.0, -50.0]));
+    let at = press(&mut harness, "Jog Y-");
+    assert_eq!(wait_jogs(&shared, 1), ["$J=G91 G21 Y-100.00 F1000"]);
+    for _ in 0..10 {
+        harness.step();
+    }
+    assert_eq!(settled_cancels(&shared), 0, "hold ended by itself");
+    release(&mut harness, at);
+    assert!(wait_until(|| cancels(&shared) == 1), "{:?}", shared.log());
+    for _ in 0..4 {
+        harness.step();
+    }
+    assert_eq!(settled_cancels(&shared), 1);
+    assert_eq!(jog_lines(&shared).len(), 1);
+}
+
+/// I2c: the pointer leaving the button while still pressed ends the hold.
+#[test]
+fn test_hold_cancelled_when_pointer_leaves_button() {
+    let (mut harness, shared) = hold_app(loopback_config(), Some([-100.0, -100.0, -50.0]));
+    let at = press(&mut harness, "Jog X+");
+    wait_jogs(&shared, 1);
+    harness.event(egui::Event::PointerMoved(at + egui::vec2(300.0, 300.0)));
+    harness.step();
+    assert!(wait_until(|| cancels(&shared) == 1), "{:?}", shared.log());
+    release(&mut harness, at + egui::vec2(300.0, 300.0));
+    assert_eq!(settled_cancels(&shared), 1);
+}
+
+/// I2a: the window losing focus ends the hold (its release would never arrive).
+#[test]
+fn test_hold_cancelled_when_window_loses_focus() {
+    let (mut harness, shared) = hold_app(loopback_config(), Some([-100.0, -100.0, -50.0]));
+    press(&mut harness, "Jog X+");
+    wait_jogs(&shared, 1);
+    harness.input_mut().focused = false;
+    harness.step();
+    assert!(wait_until(|| cancels(&shared) == 1), "{:?}", shared.log());
+    harness.input_mut().focused = true;
+}
+
+/// I2b: the Machine Control pane hidden behind another tab ends the hold.
+#[test]
+fn test_hold_cancelled_when_pane_hidden() {
+    let (mut harness, shared) = hold_app(loopback_config(), Some([-100.0, -100.0, -50.0]));
+    press(&mut harness, "Jog X+");
+    wait_jogs(&shared, 1);
+    let workspace = harness.state_mut().workspace_mut();
+    workspace
+        .apply(Action::Move {
+            panel: PaneId::MachineControl,
+            anchor: PaneId::Visualizer,
+            placement: Placement::Tab { before: None },
+        })
+        .expect("move the pane into the visualizer's tabs");
+    workspace
+        .apply(Action::Activate {
+            panel: PaneId::Visualizer,
+        })
+        .expect("show the visualizer");
+    harness.step();
+    assert!(wait_until(|| cancels(&shared) == 1), "{:?}", shared.log());
+}
+
+/// I2d: a disconnect ends the hold (the controller writes the cancel itself) and the hold
+/// is forgotten: the release after reconnecting sends nothing.
+#[test]
+fn test_hold_forgotten_on_disconnect() {
+    let (mut harness, shared) = hold_app(loopback_config(), Some([-100.0, -100.0, -50.0]));
+    let at = press(&mut harness, "Jog X+");
+    wait_jogs(&shared, 1);
+    harness.state_mut().dispatch(Command::Disconnect);
+    assert!(wait_until(|| cancels(&shared) == 1), "{:?}", shared.log());
+    harness.state_mut().dispatch(Command::Connect);
+    assert!(
+        step_until(&mut harness, |app| app.state().machine.status().connected),
+        "no reconnect"
+    );
+    release(&mut harness, at);
+    assert_eq!(settled_cancels(&shared), 1, "{:?}", shared.log());
+}
+
+/// I2d: starting a stream ends the hold with a cancel ahead of the program.
+#[test]
+fn test_hold_cancelled_on_stream_start() {
+    let (mut harness, shared) = hold_app(loopback_config(), Some([-100.0, -100.0, -50.0]));
+    let at = press(&mut harness, "Jog X+");
+    wait_jogs(&shared, 1);
+    harness
+        .state_mut()
+        .state_mut()
+        .machine
+        .set_program("G1 X1 F100\nG1 X2 F100\n")
+        .expect("program");
+    harness.state_mut().dispatch(Command::StreamStart);
+    assert!(
+        wait_until(|| shared
+            .log()
+            .contains(&Wrote::Line("G1 X1 F100".to_string()))),
+        "{:?}",
+        shared.log()
+    );
+    let log = shared.log();
+    let cancel = log
+        .iter()
+        .position(|w| *w == Wrote::Realtime(RealtimeCommand::JogCancel.byte()))
+        .expect("jog cancel");
+    let program = log
+        .iter()
+        .position(|w| *w == Wrote::Line("G1 X1 F100".to_string()))
+        .expect("program line");
+    assert!(cancel < program, "{log:?}");
+    release(&mut harness, at);
+    assert_eq!(settled_cancels(&shared), 1);
+}
+
+/// I2d and the soft reset chord: a soft reset during a hold ends it (0x18 stops the jog), so
+/// the release sends no cancel.
+#[test]
+fn test_soft_reset_chord_during_hold_clears_hold() {
+    let (mut harness, shared) = hold_app(loopback_config(), Some([-100.0, -100.0, -50.0]));
+    let at = press(&mut harness, "Jog X+");
+    wait_jogs(&shared, 1);
+    harness.key_press_modifiers(
+        egui::Modifiers::COMMAND | egui::Modifiers::SHIFT,
+        egui::Key::K,
+    );
+    harness.step();
+    assert!(
+        wait_until(|| wrote_realtime(&shared, RealtimeCommand::SoftReset)),
+        "{:?}",
+        shared.log()
+    );
+    release(&mut harness, at);
+    assert_eq!(settled_cancels(&shared), 0, "{:?}", shared.log());
+}
+
+/// I3: a hold moves at most the travel left in its direction, and the controller's
+/// `$130` travel replaces the configured one once reported.
+#[test]
+fn test_hold_clamped_to_remaining_travel() {
+    let (mut harness, shared) = hold_app(loopback_config(), Some([-150.0, -100.0, -50.0]));
+    let at = press(&mut harness, "Jog X+");
+    assert_eq!(wait_jogs(&shared, 1)[0], "$J=G91 G21 X150.00 F1000");
+    release(&mut harness, at);
+    let at = press(&mut harness, "Jog X-");
+    assert_eq!(wait_jogs(&shared, 2)[1], "$J=G91 G21 X-50.00 F1000");
+    release(&mut harness, at);
+
+    shared.inject("$130=300.000\n");
+    assert!(
+        step_until(&mut harness, |app| app.state().machine.status().grbl_travel
+            [0]
+            == Some(300.0)),
+        "no $130"
+    );
+    let at = press(&mut harness, "Jog X-");
+    assert_eq!(wait_jogs(&shared, 3)[2], "$J=G91 G21 X-150.00 F1000");
+    release(&mut harness, at);
+}
+
+/// I3: at the end of travel the hold does not move and the pane says why.
+#[test]
+fn test_hold_refused_at_limit() {
+    let (mut harness, shared) = hold_app(loopback_config(), Some([0.0, -100.0, -50.0]));
+    let at = press(&mut harness, "Jog X+");
+    harness.step();
+    assert!(jog_lines(&shared).is_empty(), "{:?}", shared.log());
+    let _ = harness.get_by_label("Jog refused: no travel left in that direction.");
+    release(&mut harness, at);
+    assert_eq!(settled_cancels(&shared), 0);
+}
+
+/// I3: without a machine position the hold does not move and the pane says why.
+#[test]
+fn test_hold_refused_without_position() {
+    let (mut harness, shared) = hold_app(loopback_config(), None);
+    let at = press(&mut harness, "Jog X+");
+    harness.step();
+    assert!(jog_lines(&shared).is_empty(), "{:?}", shared.log());
+    let _ = harness.get_by_label("Jog refused: the machine position is unknown.");
+    release(&mut harness, at);
+    assert_eq!(settled_cancels(&shared), 0);
+}
+
+/// C2: Preferences > Machine > Invert reverses an axis for step and hold jogs alike.
+#[test]
+fn test_inverted_z_jogs_negative() {
+    let _guard = crate::global_env_lock();
+    let mut config = loopback_config();
+    config
+        .machine
+        .axis_direction_invert
+        .insert("Z".to_string(), true);
+    let (mut harness, shared) = pane_app_with(config.clone(), Duration::from_millis(1), true);
+    harness.get_by_label("Jog Z+").click();
+    harness.step();
+    assert_eq!(wait_jogs(&shared, 1), ["$J=G91 G21 Z-1.00 F1000"]);
+    // The same from a key or menu (the Jog Z+ command).
+    harness.state_mut().dispatch(Command::JogZPos);
+    assert_eq!(wait_jogs(&shared, 2)[1], "$J=G91 G21 Z-1.00 F1000");
+    drop(harness);
+
+    let (mut harness, shared) = hold_app(config, Some([-100.0, -100.0, -40.0]));
+    let at = press(&mut harness, "Jog Z+");
+    assert_eq!(wait_jogs(&shared, 1), ["$J=G91 G21 Z-60.00 F1000"]);
+    release(&mut harness, at);
+    gcodekit5_app::device_status::set_jog_inverted('Z', false);
+}
+
+/// C1 (app): exiting during a hold writes jog cancel before the transport closes.
+#[test]
+fn test_exit_during_hold_cancels_jog() {
+    let (mut harness, shared) = hold_app(loopback_config(), Some([-100.0, -100.0, -50.0]));
+    press(&mut harness, "Jog X+");
+    wait_jogs(&shared, 1);
+    harness.state_mut().on_exit_with(|| Ok(()));
+    let log = shared.log();
+    let cancel = log
+        .iter()
+        .position(|w| *w == Wrote::Realtime(RealtimeCommand::JogCancel.byte()))
+        .expect("no jog cancel on exit");
+    let closed = shared
+        .closed_at
+        .lock()
+        .expect("closed_at")
+        .expect("transport not closed");
+    assert!(cancel < closed, "{log:?}");
+}
+
+/// Settings that show inches.
+fn inch_config() -> Config {
+    let mut config = loopback_config();
+    config.ui.measurement_system = MeasurementSystem::Imperial;
+    config
+}
+
+/// I6: in inch mode the DRO shows inches with two decimals.
+#[test]
+fn test_dro_in_inches() {
+    let (mut harness, shared) = pane_app_with(inch_config(), Duration::from_millis(1), true);
+    shared.inject("<Idle|MPos:25.400,-50.800,0.000|FS:0,0>\n");
+    assert!(
+        step_until(&mut harness, |app| app
+            .state()
+            .machine
+            .status()
+            .report
+            .is_some()),
+        "no status report"
+    );
+    harness.step();
+    assert!(
+        !harness
+            .query_all_by_label("1.00")
+            .collect::<Vec<_>>()
+            .is_empty()
+    );
+    assert!(
+        !harness
+            .query_all_by_label("-2.00")
+            .collect::<Vec<_>>()
+            .is_empty()
+    );
+    assert!(harness.query_by_label("25.40").is_none());
+}
+
+/// I6: inch step presets jog the matching distance in mm (the `$J` line stays G21).
+#[test]
+fn test_jog_step_in_inches() {
+    let (mut harness, shared) = pane_app_with(inch_config(), Duration::from_millis(1), true);
+    harness.get_by_label("Step").click();
+    // The popup's items appear in the accessibility tree a frame after it opens.
+    harness.step();
+    harness.step();
+    harness.get_by_label("0.1 in").click();
+    harness.step();
+    harness.get_by_label("Jog X+").click();
+    harness.step();
+    assert_eq!(wait_jogs(&shared, 1), ["$J=G91 G21 X2.54 F1000"]);
+}
+
+/// A started stream counts as a running job before its first progress report.
+#[test]
+fn test_job_running_right_after_start() {
+    let (mut state, shared) = crate::machine_support::loopback_state(Duration::from_millis(1));
+    shared
+        .hold_acks
+        .store(true, std::sync::atomic::Ordering::SeqCst);
+    crate::machine_support::connect(&mut state);
+    state.machine.set_program("G1 X1 F100\n").expect("program");
+    let program = state.machine.program().cloned().expect("program");
+    gcodekit5_ui_egui::machine::lock(state.machine.controller())
+        .start_stream(program)
+        .expect("start");
+    assert!(!state.machine.status().streaming, "no progress polled yet");
+    assert!(state.job_running());
+}

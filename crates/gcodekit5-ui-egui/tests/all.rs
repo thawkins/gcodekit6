@@ -24,6 +24,8 @@ mod test_commands;
 mod test_dialogs;
 #[path = "test_frame.rs"]
 mod test_frame;
+#[path = "test_machine_jog.rs"]
+mod test_machine_jog;
 #[path = "test_machine_pane.rs"]
 mod test_machine_pane;
 #[path = "test_quit.rs"]

@@ -3174,3 +3174,12 @@ msgstr "Rapide :"
 
 msgid "No program loaded"
 msgstr "Aucun programme chargé"
+
+msgid "Emergency stop (soft reset, {shortcut})"
+msgstr "Arrêt d'urgence (réinitialisation logicielle, {shortcut})"
+
+msgid "Jog refused: the machine position is unknown."
+msgstr "Jog refusé : la position de la machine est inconnue."
+
+msgid "Jog refused: no travel left in that direction."
+msgstr "Jog refusé : plus de course disponible dans cette direction."

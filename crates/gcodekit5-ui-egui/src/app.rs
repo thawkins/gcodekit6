@@ -285,6 +285,7 @@ impl GcodeKitApp {
         }
         let mut workspace = Workspace::default_layout();
         workspace.set_pane(Box::new(machine_control_pane(&state)));
+        workspace.configure(state.config());
         {
             // Wake the event loop whenever the machine reports something.
             let wake_ctx = Arc::clone(&wake_ctx);
@@ -326,6 +327,7 @@ impl GcodeKitApp {
     pub fn logic(&mut self, ctx: &egui::Context) {
         let _ = self.wake_ctx.set(ctx.clone());
         self.poll_machine(ctx);
+        self.cancel_holds_without_focus(ctx);
         while let Some(answer) = self.dialogs.poll() {
             self.handle_answer(answer);
         }
@@ -489,6 +491,7 @@ impl GcodeKitApp {
         let ctx = ui.ctx().clone();
         let _ = self.wake_ctx.set(ctx.clone());
         self.poll_machine(&ctx);
+        self.cancel_holds_without_focus(&ctx);
         while let Some(answer) = self.dialogs.poll() {
             self.handle_answer(answer);
         }
@@ -558,6 +561,16 @@ impl GcodeKitApp {
         if self.machine_polled != Some(frame) {
             self.machine_polled = Some(frame);
             self.state.machine.poll();
+        }
+    }
+
+    /// Ends every press-and-hold input (a hold-to-jog) while the window does not have the
+    /// keyboard focus or is minimized: its button release would never arrive.
+    fn cancel_holds_without_focus(&mut self, ctx: &egui::Context) {
+        let (focused, minimized) =
+            ctx.input(|i| (i.focused, i.viewport().minimized.unwrap_or(false)));
+        if !focused || minimized {
+            self.workspace.cancel_holds();
         }
     }
 
@@ -667,11 +680,15 @@ impl GcodeKitApp {
             self.settings_window
                 .show(ctx, &mut self.state.settings, &self.state.translator);
         match outcome {
-            SettingsOutcome::Applied { restart: true } => self.request_restart(),
+            SettingsOutcome::Applied { restart } => {
+                self.workspace.configure(self.state.config());
+                if restart {
+                    self.request_restart();
+                }
+            }
             SettingsOutcome::Closed
             | SettingsOutcome::Open
             | SettingsOutcome::Cancelled
-            | SettingsOutcome::Applied { restart: false }
             | SettingsOutcome::Failed(_) => {}
         }
         self.about_window.show(ctx, &self.state.translator);
@@ -741,18 +758,26 @@ impl GcodeKitApp {
         &mut self.state
     }
 
+    /// The docking workspace, for layout changes and tests.
+    pub fn workspace_mut(&mut self) -> &mut Workspace {
+        &mut self.workspace
+    }
+
     /// The keymap, for the user's shortcut overrides and for tests.
     pub fn keymap_mut(&mut self) -> &mut Keymap {
         &mut self.keymap
     }
 
-    /// What runs when the app exits: the machine connection is closed first, releasing the
-    /// serial port, and then, when the user asked to restart, `relaunch` starts the app again.
+    /// What runs when the app exits: a hold-to-jog is cancelled (0x85), the machine
+    /// connection is closed (writing 0x85 itself while a jog is outstanding) and the serial
+    /// port released, and then, when the user asked to restart, `relaunch` starts the app
+    /// again.
     ///
     /// # Arguments
     /// * `relaunch` - Starts the new process (`relaunch_command().spawn()` in the app).
     #[doc(hidden)]
     pub fn on_exit_with(&mut self, relaunch: impl FnOnce() -> std::io::Result<()>) {
+        self.workspace.cancel_holds();
         self.state.machine.disconnect();
         if self.state.restart.swap(false, Ordering::SeqCst)
             && let Err(error) = relaunch()

@@ -3091,3 +3091,12 @@ msgstr ""
 
 msgid "No program loaded"
 msgstr ""
+
+msgid "Emergency stop (soft reset, {shortcut})"
+msgstr ""
+
+msgid "Jog refused: the machine position is unknown."
+msgstr ""
+
+msgid "Jog refused: no travel left in that direction."
+msgstr ""

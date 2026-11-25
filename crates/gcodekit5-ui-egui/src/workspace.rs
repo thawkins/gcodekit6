@@ -17,6 +17,7 @@
 use craft_ui::docking::{self, DockArea, DockContent, DockStyle, Layout, Node, Permissions};
 use craft_ui::layout::{SplitAxis, SplitSize};
 use gcodekit5_app::i18n::Translator;
+use gcodekit5_settings::config::Config;
 use serde::{Deserialize, Serialize};
 
 use crate::commands::{Command, MACHINE_CONTROL_SCOPE, VISUALIZER_SCOPE};
@@ -164,6 +165,18 @@ pub trait Pane {
         let _ = (command, ctx);
         false
     }
+
+    /// Ends any press-and-hold input in progress (a hold-to-jog): the window lost focus, the
+    /// pane was not drawn this frame, or the app is exiting.
+    fn cancel_hold(&mut self) {}
+
+    /// Takes the current settings (at start and after Preferences are applied).
+    ///
+    /// # Arguments
+    /// * `config` - The current settings.
+    fn configure(&mut self, config: &Config) {
+        let _ = config;
+    }
 }
 
 /// A pane that shows only its title, until the real pane replaces it.
@@ -211,6 +224,10 @@ pub struct Workspace {
     #[serde(skip)]
     focused: Option<PaneId>,
 }
+
+/// The panes whose bodies a frame drew; the others have their holds cancelled
+/// ([`Pane::cancel_hold`]).
+type Drawn = Vec<PaneId>;
 
 impl std::fmt::Debug for Workspace {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -311,6 +328,34 @@ impl Workspace {
         self.panes.iter_mut().any(|pane| pane.command(command, ctx))
     }
 
+    /// Ends every pane's press-and-hold input ([`Pane::cancel_hold`]).
+    pub fn cancel_holds(&mut self) {
+        for pane in &mut self.panes {
+            pane.cancel_hold();
+        }
+    }
+
+    /// Hands the current settings to every pane ([`Pane::configure`]).
+    ///
+    /// # Arguments
+    /// * `config` - The current settings.
+    pub fn configure(&mut self, config: &Config) {
+        for pane in &mut self.panes {
+            pane.configure(config);
+        }
+    }
+
+    /// Applies a layout change (move, activate, float...) with the workspace's permissions.
+    ///
+    /// # Arguments
+    /// * `action` - The change.
+    ///
+    /// # Errors
+    /// The docking model's refusal.
+    pub fn apply(&mut self, action: docking::Action<PaneId>) -> Result<(), docking::DockError> {
+        self.dock.apply(action, permissions).map(drop)
+    }
+
     /// The pane the user last pressed the pointer in, or `None` when the last press was
     /// outside every pane.
     pub fn focused_pane(&self) -> Option<PaneId> {
@@ -335,12 +380,17 @@ impl Workspace {
             ctx,
             press,
             pressed_in: None,
+            drawn: Drawn::new(),
         };
         let output = DockArea::new(egui::Id::unique("gcodekit5-workspace"))
             .locked(self.dock.locked)
             .show_content(ui, &self.dock.layout, &style, &mut content);
         if press.is_some() {
             self.focused = content.pressed_in;
+        }
+        let drawn = content.drawn;
+        for pane in self.panes.iter_mut().filter(|p| !drawn.contains(&p.id())) {
+            pane.cancel_hold();
         }
         if let Some(error) = output.error {
             tracing::warn!(?error, "workspace layout not drawn");
@@ -361,10 +411,13 @@ struct Content<'p, 'c, 't> {
     press: Option<egui::Pos2>,
     /// The pane whose body holds `press`.
     pressed_in: Option<PaneId>,
+    /// The panes whose bodies were drawn this frame.
+    drawn: Drawn,
 }
 
 impl DockContent<PaneId> for Content<'_, '_, '_> {
     fn body(&mut self, ui: &mut egui::Ui, panel: &PaneId) {
+        self.drawn.push(*panel);
         if self.press.is_some_and(|pos| ui.max_rect().contains(pos)) {
             self.pressed_in = Some(*panel);
         }

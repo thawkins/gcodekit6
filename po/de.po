@@ -3167,3 +3167,12 @@ msgstr "Eilgang:"
 
 msgid "No program loaded"
 msgstr "Kein Programm geladen"
+
+msgid "Emergency stop (soft reset, {shortcut})"
+msgstr "Not-Aus (Soft-Reset, {shortcut})"
+
+msgid "Jog refused: the machine position is unknown."
+msgstr "Tippen abgelehnt: Die Maschinenposition ist unbekannt."
+
+msgid "Jog refused: no travel left in that direction."
+msgstr "Tippen abgelehnt: In dieser Richtung ist kein Verfahrweg mehr frei."

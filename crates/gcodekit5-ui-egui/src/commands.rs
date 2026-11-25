@@ -13,10 +13,13 @@
 //! move or reset the machine, and craft-keymap cannot tell GTK's numeric-keypad jog keys from
 //! the top-row digits. Jogging stays in the Machine Control pane.
 //!
-//! Feed hold and soft reset each have a modifier chord, `Cmd+Shift+H` and `Cmd+Shift+R` (Ctrl
+//! Feed hold and soft reset each have a modifier chord, `Cmd+Shift+H` and `Cmd+Shift+K` (Ctrl
 //! off macOS), that works anywhere in the window, also while a text field has the keyboard:
 //! craft-keymap's typing rule holds back only plain keys and the text-editing chords, so the
 //! chords reach the dispatcher while the bare `!` of feed hold goes to the text being typed.
+//! Neither chord is one modifier away from a start, run, jog or motion command: Cmd+H,
+//! Cmd+K, Shift+H and Shift+K are unbound (Cmd+R, run, is why soft reset is not
+//! Cmd+Shift+R).
 //!
 //! Dependencies: `craft-keymap` (chords, bindings, scopes, the keymap).
 
@@ -231,7 +234,7 @@ impl Command {
             // (German, French, ...) this chord is a different key from the one typing `~`.
             Command::CycleStart => ("machine.cycle_start", n_!("Cycle Start"), App, &["Shift+`"]),
             // Never a bare Escape: it would reset the controller when closing a dropdown.
-            Command::SoftReset => ("machine.soft_reset", n_!("Reset"), App, &["Cmd+Shift+R"]),
+            Command::SoftReset => ("machine.soft_reset", n_!("Reset"), App, &["Cmd+Shift+K"]),
             Command::Home => ("machine.home", n_!("Home"), App, &["Cmd+Home"]),
             Command::Unlock => ("machine.unlock", n_!("Unlock"), App, &["Cmd+U"]),
             // No default keys: GTK jogs from the numeric keypad (8/2/4/6/9/3), which

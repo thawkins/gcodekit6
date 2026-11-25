@@ -25,9 +25,14 @@ mod stream;
 
 use std::sync::{Arc, Mutex};
 
+use gcodekit5_app::device_status::{jog_direction, set_jog_inverted};
 use gcodekit5_app::i18n::Translator;
-use gcodekit5_app::machine::{Axis, MachineController, MachineEvent, RealtimeCommand};
+use gcodekit5_app::machine::{
+    Axis, MachineController, MachineError, MachineEvent, RealtimeCommand,
+};
+use gcodekit5_core::units::{FeedRateUnits, MeasurementSystem};
 use gcodekit5_settings::ConnectionSettings;
+use gcodekit5_settings::config::Config;
 
 use crate::commands::Command;
 use crate::machine::{MachineStatus, lock};
@@ -57,7 +62,7 @@ pub fn msgids() -> Vec<&'static str> {
 
 const MSGIDS: &[&str] = &[
     n_!("E-STOP"),
-    n_!("Emergency stop (soft reset Ctrl-X)"),
+    n_!("Emergency stop (soft reset, {shortcut})"),
     n_!("Home"),
     n_!("Home machine ($H)"),
     n_!("Unlock"),
@@ -70,9 +75,20 @@ pub struct MachineControlPane {
     connection: connection::ConnectionForm,
     jog: jog::JogPanel,
     direct: direct_sender::DirectSender,
+    /// The measurement system lengths are shown in.
+    units: MeasurementSystem,
+    /// The units feeds are shown in.
+    feed_units: FeedRateUnits,
     /// A refusal of the pane's own (not the controller's), shown until the next action.
     notice: Option<String>,
 }
+
+/// The soft reset chord as the user's platform names it (see [`crate::commands`]).
+const SOFT_RESET_CHORD: &str = if cfg!(target_os = "macos") {
+    "Cmd+Shift+K"
+} else {
+    "Ctrl+Shift+K"
+};
 
 impl std::fmt::Debug for MachineControlPane {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -95,7 +111,51 @@ impl MachineControlPane {
             connection: connection::ConnectionForm::new(ConnectionSettings::default()),
             jog: jog::JogPanel::default(),
             direct: direct_sender::DirectSender::default(),
+            units: MeasurementSystem::Metric,
+            feed_units: FeedRateUnits::MmPerMin,
             notice: None,
+        }
+    }
+
+    /// Takes the settings that change how the pane jogs and shows values: the measurement
+    /// system and feed units, the X/Y/Z travel and the per-axis jog inversion (shared with
+    /// the GTK front end through `device_status::set_jog_inverted`).
+    ///
+    /// # Arguments
+    /// * `config` - The current settings.
+    pub fn configure(&mut self, config: &Config) {
+        let machine = &config.machine;
+        for axis in ['X', 'Y', 'Z', 'A', 'B', 'C'] {
+            let inverted = machine
+                .axis_direction_invert
+                .get(&axis.to_string())
+                .copied()
+                .unwrap_or(false);
+            // Written only on a change, so panes with the default settings never touch the
+            // process-wide table.
+            if (jog_direction(axis) < 0.0) != inverted {
+                set_jog_inverted(axis, inverted);
+            }
+        }
+        self.units = config.ui.measurement_system;
+        self.feed_units = config.ui.feed_rate_units;
+        let travel = [machine.x_limit, machine.y_limit, machine.z_limit].map(|v| v as f32);
+        self.jog.configure(self.units, self.feed_units, travel);
+    }
+
+    /// Ends a hold-to-jog in progress with jog cancel (0x85).
+    fn cancel_jog_hold(&mut self) {
+        if self.jog.take_hold() {
+            self.with_controller(|c| c.realtime(RealtimeCommand::JogCancel));
+        }
+    }
+
+    /// Sends a command line; a refusal is shown in the pane.
+    fn send_line(&mut self, line: &str) {
+        let result: Result<(), MachineError> = self.with_controller(|c| c.send_line(line));
+        match result {
+            Ok(()) => self.notice = None,
+            Err(error) => self.notice = Some(error.to_string()),
         }
     }
 
@@ -140,8 +200,9 @@ impl MachineControlPane {
         }
     }
 
-    /// Starts streaming the loaded program.
+    /// Starts streaming the loaded program, ending a hold-to-jog first.
     fn start_stream(&mut self, ctx: &PaneContext, tr: &Translator) {
+        self.cancel_jog_hold();
         let Some(program) = ctx.machine().and_then(|m| m.program()).cloned() else {
             self.notice = Some(tr.tr("No program loaded").into_owned());
             return;
@@ -158,7 +219,8 @@ impl MachineControlPane {
     /// Jogs `axis` one step in the direction of `sign`.
     fn jog_step(&mut self, axis: Axis, sign: f32) {
         let (step, feed) = (self.jog.step_mm(), self.jog.feed_mm_min());
-        self.with_controller(|c| c.jog(axis, sign * step, feed));
+        let distance = jog::directed(axis, sign * step);
+        self.with_controller(|c| c.jog(axis, distance, feed));
     }
 
     /// Runs a machine command; returns false for the commands that are not the pane's.
@@ -173,6 +235,8 @@ impl MachineControlPane {
             Command::JogZNeg => self.jog_step(Axis::Z, -1.0),
             Command::Connect => self.connect(tr),
             Command::Disconnect => {
+                // Disconnect writes jog cancel itself when a jog is outstanding.
+                self.jog.forget_hold();
                 self.with_controller(MachineController::disconnect);
                 self.connection.set_connecting(false);
             }
@@ -187,8 +251,8 @@ impl MachineControlPane {
                 self.jog.forget_hold();
                 self.with_controller(MachineController::stop);
             }
-            Command::Home => self.with_controller(|c| c.send_line("$H")),
-            Command::Unlock => self.with_controller(|c| c.send_line("$X")),
+            Command::Home => self.send_line("$H"),
+            Command::Unlock => self.send_line("$X"),
             Command::FileNew
             | Command::FileNew3d
             | Command::FileOpen
@@ -231,6 +295,9 @@ impl MachineControlPane {
         {
             self.connection.set_connecting(false);
         }
+        if events.contains(&MachineEvent::Disconnected) {
+            self.jog.forget_hold();
+        }
     }
 
     /// Draws the emergency stop and the homing buttons.
@@ -242,9 +309,10 @@ impl MachineControlPane {
         )
         .fill(egui::Color32::from_rgb(0xc0, 0x1c, 0x28))
         .min_size(egui::vec2(ui.available_width(), 36.0));
-        let response = ui
-            .add_enabled(status.connected, estop)
-            .on_hover_text(tr.tr("Emergency stop (soft reset Ctrl-X)"));
+        let response = ui.add_enabled(status.connected, estop).on_hover_text(
+            tr.tr("Emergency stop (soft reset, {shortcut})")
+                .replace("{shortcut}", SOFT_RESET_CHORD),
+        );
         if response.clicked() {
             self.jog.forget_hold();
             self.with_controller(MachineController::stop);
@@ -256,14 +324,14 @@ impl MachineControlPane {
                 .on_hover_text(tr.tr("Home machine ($H)"))
                 .clicked()
             {
-                self.with_controller(|c| c.send_line("$H"));
+                self.send_line("$H");
             }
             if ui
                 .add_enabled(idle, egui::Button::new(tr.tr("Unlock")))
                 .on_hover_text(tr.tr("Unlock from ALARM ($X)"))
                 .clicked()
             {
-                self.with_controller(|c| c.send_line("$X"));
+                self.send_line("$X");
             }
         });
     }
@@ -289,6 +357,15 @@ impl Pane for MachineControlPane {
         let has_program = machine.and_then(|m| m.program()).is_some();
         egui::ScrollArea::vertical()
             .auto_shrink([false, false])
+            // A drag off a held jog button must not scroll the pane under the pointer.
+            .scroll_source(if self.jog.is_holding() {
+                egui::scroll_area::ScrollSource {
+                    drag: egui::scroll_area::DragScroll::Never,
+                    ..egui::scroll_area::ScrollSource::default()
+                }
+            } else {
+                egui::scroll_area::ScrollSource::default()
+            })
             .show(ui, |ui| {
                 let controller = Arc::clone(&self.controller);
                 match self.connection.show(ui, tr, status) {
@@ -308,7 +385,7 @@ impl Pane for MachineControlPane {
                 ui.separator();
                 self.show_safety(ui, tr, status);
                 ui.separator();
-                dro::show(ui, tr, status);
+                dro::show(ui, tr, status, self.units, self.feed_units);
                 ui.separator();
                 match stream::show(ui, tr, status, has_program) {
                     Some(stream::Action::Start) => ctx.request(Command::StreamStart),
@@ -320,6 +397,9 @@ impl Pane for MachineControlPane {
                 ui.separator();
                 for action in self.jog.show(ui, tr, status) {
                     let mut controller = lock(&controller);
+                    if !matches!(action, jog::Action::Refused(_)) {
+                        self.notice = None;
+                    }
                     match action {
                         jog::Action::Move {
                             axis,
@@ -329,6 +409,9 @@ impl Pane for MachineControlPane {
                             controller.jog(axis, distance_mm, feed_mm_min);
                         }
                         jog::Action::Cancel => controller.realtime(RealtimeCommand::JogCancel),
+                        jog::Action::Refused(msgid) => {
+                            self.notice = Some(tr.tr(msgid).into_owned());
+                        }
                     }
                 }
                 ui.separator();
@@ -337,12 +420,20 @@ impl Pane for MachineControlPane {
                 }
                 ui.separator();
                 if let Some(line) = self.direct.show(ui, tr, status) {
-                    lock(&controller).send_line(&line);
+                    self.send_line(&line);
                 }
             });
     }
 
     fn command(&mut self, command: Command, ctx: &mut PaneContext) -> bool {
         self.run(command, ctx)
+    }
+
+    fn cancel_hold(&mut self) {
+        self.cancel_jog_hold();
+    }
+
+    fn configure(&mut self, config: &Config) {
+        MachineControlPane::configure(self, config);
     }
 }
