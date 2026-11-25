@@ -309,3 +309,33 @@ fn test_designer_properties_field_edit_applies_at_every_scale() -> TestResult {
     }
     Ok(())
 }
+
+#[test]
+fn test_cam_generate_click_makes_the_program_at_every_scale() -> TestResult {
+    use gcodekit5_ui_egui::panes::cam_tools::{CamTool, CamToolsPane, SharedCamTools};
+    use std::cell::RefCell;
+    use std::rc::Rc;
+    let _guard = crate::global_env_lock();
+    let expected = crate::test_cam_drill_press::fixture("drill_press_default.gcode");
+    for ppp in SCALES {
+        let tr = Translator::new("en");
+        let cam = Rc::new(RefCell::new(CamToolsPane::new()));
+        cam.borrow_mut().set_open_tool(Some(CamTool::DrillPress));
+        let mut harness = Harness::builder()
+            .with_size(egui::vec2(640.0, 900.0))
+            .with_pixels_per_point(ppp)
+            .build_ui_state(
+                move |ui, pane: &mut SharedCamTools| {
+                    let mut requested = Vec::new();
+                    let mut ctx = PaneContext::new(&tr, &mut requested);
+                    pane.ui(ui, &mut ctx);
+                },
+                SharedCamTools(Rc::clone(&cam)),
+            );
+        harness.run();
+        let pos = harness.get_by_label("Generate").rect().center();
+        click_at(&mut harness, pos);
+        assert_eq!(cam.borrow().output(), Some(expected.as_str()), "ppp {ppp}");
+    }
+    Ok(())
+}

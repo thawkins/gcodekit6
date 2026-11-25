@@ -3384,3 +3384,48 @@ msgstr "Aperçu"
 
 msgid "Generation failed"
 msgstr "Échec de la génération"
+
+msgid "Hole Diameter:"
+msgstr "Diamètre du trou :"
+
+msgid "Tool Diameter:"
+msgstr "Diamètre de l'outil :"
+
+msgid "Center X:"
+msgstr "Centre X :"
+
+msgid "Center Y:"
+msgstr "Centre Y :"
+
+msgid "Top Z (Surface):"
+msgstr "Z haut (surface) :"
+
+msgid "Bottom Z (Depth):"
+msgstr "Z bas (profondeur) :"
+
+msgid "Peck Depth (0 for none):"
+msgstr "Profondeur de débourrage (0 pour aucun) :"
+
+msgid "Plunge Rate (mm/min):"
+msgstr "Vitesse de plongée (mm/min) :"
+
+msgid "Safe Z:"
+msgstr "Z de sécurité :"
+
+msgid "Must be below Top Z"
+msgstr "Doit être sous le Z haut"
+
+msgid "Must be above Top Z"
+msgstr "Doit être au-dessus du Z haut"
+
+msgid "Emulate a drill press on your CNC. Supports standard drilling, peck drilling for chip clearing, and helical interpolation for holes larger than the tool."
+msgstr "Émule une perceuse à colonne sur votre CNC. Prend en charge le perçage standard, le perçage avec débourrage pour évacuer les copeaux et l'interpolation hélicoïdale pour les trous plus grands que l'outil."
+
+msgid "Hole Geometry"
+msgstr "Géométrie du trou"
+
+msgid "Depth and Pecking"
+msgstr "Profondeur et débourrage"
+
+msgid "Machine Settings"
+msgstr "Paramètres de la machine"

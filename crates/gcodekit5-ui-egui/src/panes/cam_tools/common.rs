@@ -252,14 +252,15 @@ pub fn field_row(
     unit: &str,
     errors: &[FieldError],
 ) {
-    ui.label(tr.tr(label));
+    let name = ui.label(tr.tr(label));
     ui.vertical(|ui| {
         ui.horizontal(|ui| {
             ui.add(
                 egui::TextEdit::singleline(text)
                     .id_salt(label)
                     .desired_width(110.0),
-            );
+            )
+            .labelled_by(name.id);
             if !unit.is_empty() {
                 ui.weak(unit);
             }
@@ -279,8 +280,8 @@ pub fn field_row(
 /// * `label` - The msgid of the label.
 /// * `value` - The checkbox's state.
 pub fn check_row(ui: &mut egui::Ui, tr: &Translator, label: &'static str, value: &mut bool) {
-    ui.label(tr.tr(label));
-    ui.checkbox(value, "");
+    let name = ui.label(tr.tr(label));
+    ui.checkbox(value, "").labelled_by(name.id);
     ui.end_row();
 }
 

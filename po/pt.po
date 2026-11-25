@@ -3372,3 +3372,48 @@ msgstr "Pré-visualizar"
 
 msgid "Generation failed"
 msgstr "Falha na geração"
+
+msgid "Hole Diameter:"
+msgstr "Diâmetro do furo:"
+
+msgid "Tool Diameter:"
+msgstr "Diâmetro da ferramenta:"
+
+msgid "Center X:"
+msgstr "Centro X:"
+
+msgid "Center Y:"
+msgstr "Centro Y:"
+
+msgid "Top Z (Surface):"
+msgstr "Z superior (superfície):"
+
+msgid "Bottom Z (Depth):"
+msgstr "Z inferior (profundidade):"
+
+msgid "Peck Depth (0 for none):"
+msgstr "Profundidade de bicada (0 para nenhuma):"
+
+msgid "Plunge Rate (mm/min):"
+msgstr "Velocidade de mergulho (mm/min):"
+
+msgid "Safe Z:"
+msgstr "Z seguro:"
+
+msgid "Must be below Top Z"
+msgstr "Deve estar abaixo do Z superior"
+
+msgid "Must be above Top Z"
+msgstr "Deve estar acima do Z superior"
+
+msgid "Emulate a drill press on your CNC. Supports standard drilling, peck drilling for chip clearing, and helical interpolation for holes larger than the tool."
+msgstr "Emula uma furadeira de bancada na sua CNC. Suporta furação padrão, furação com bicadas para remover cavacos e interpolação helicoidal para furos maiores que a ferramenta."
+
+msgid "Hole Geometry"
+msgstr "Geometria do furo"
+
+msgid "Depth and Pecking"
+msgstr "Profundidade e bicadas"
+
+msgid "Machine Settings"
+msgstr "Configurações da máquina"

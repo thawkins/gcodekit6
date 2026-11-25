@@ -27,6 +27,7 @@ craft-dialogs = { workspace = true }
 craft-quit = { workspace = true, features = ["egui"] }
 raw-window-handle = { workspace = true }
 gcodekit5-app = { path = "../gcodekit5-app" }
+gcodekit5-camtools = { path = "../gcodekit5-camtools" }
 gcodekit5-communication = { path = "../gcodekit5-communication" }
 gcodekit5-core = { path = "../gcodekit5-core" }
 gcodekit5-designer = { path = "../gcodekit5-designer" }

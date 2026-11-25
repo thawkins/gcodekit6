@@ -3301,3 +3301,48 @@ msgstr ""
 
 msgid "Generation failed"
 msgstr ""
+
+msgid "Hole Diameter:"
+msgstr ""
+
+msgid "Tool Diameter:"
+msgstr ""
+
+msgid "Center X:"
+msgstr ""
+
+msgid "Center Y:"
+msgstr ""
+
+msgid "Top Z (Surface):"
+msgstr ""
+
+msgid "Bottom Z (Depth):"
+msgstr ""
+
+msgid "Peck Depth (0 for none):"
+msgstr ""
+
+msgid "Plunge Rate (mm/min):"
+msgstr ""
+
+msgid "Safe Z:"
+msgstr ""
+
+msgid "Must be below Top Z"
+msgstr ""
+
+msgid "Must be above Top Z"
+msgstr ""
+
+msgid "Emulate a drill press on your CNC. Supports standard drilling, peck drilling for chip clearing, and helical interpolation for holes larger than the tool."
+msgstr ""
+
+msgid "Hole Geometry"
+msgstr ""
+
+msgid "Depth and Pecking"
+msgstr ""
+
+msgid "Machine Settings"
+msgstr ""

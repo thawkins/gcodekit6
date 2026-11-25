@@ -2362,6 +2362,7 @@ dependencies = [
  "egui-wgpu",
  "egui_kittest",
  "gcodekit5-app",
+ "gcodekit5-camtools",
  "gcodekit5-communication",
  "gcodekit5-core",
  "gcodekit5-designer",

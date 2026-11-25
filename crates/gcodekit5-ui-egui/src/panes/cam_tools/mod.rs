@@ -14,6 +14,7 @@
 //! `gcodekit5-settings` (units).
 
 pub mod common;
+pub mod drill_press;
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -23,30 +24,42 @@ use gcodekit5_core::units::MeasurementSystem;
 use gcodekit5_settings::config::Config;
 
 pub use common::{CamAction, CamError, FieldError};
+use drill_press::DrillPressParams;
 
 use crate::workspace::{Pane, PaneContext, PaneId};
 
 /// One CAM tool of the picker.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum CamTool {}
+pub enum CamTool {
+    /// Drill Press.
+    DrillPress,
+}
 
 impl CamTool {
     /// Every tool, in GTK's list order.
-    pub const ALL: [CamTool; 0] = [];
+    pub const ALL: [CamTool; 1] = [CamTool::DrillPress];
 
     /// The msgid of the tool's title.
     pub fn title_msgid(self) -> &'static str {
-        match self {}
+        match self {
+            CamTool::DrillPress => n_!("Drill Press"),
+        }
     }
 
     /// The msgid of the tool's description.
     pub fn description_msgid(self) -> &'static str {
-        match self {}
+        match self {
+            CamTool::DrillPress => {
+                n_!("Emulate a drill press with peck drilling and helical cycles")
+            }
+        }
     }
 
     /// The picker category the tool is listed under.
     pub fn category(self) -> Category {
-        match self {}
+        match self {
+            CamTool::DrillPress => Category::Generators,
+        }
     }
 }
 
@@ -114,6 +127,7 @@ pub fn msgids() -> Vec<&'static str> {
         ids.push(tool.description_msgid());
     }
     ids.extend(common::msgids());
+    ids.extend(drill_press::msgids());
     ids
 }
 
@@ -134,6 +148,8 @@ pub struct CamToolsPane {
     output: Option<(CamTool, String)>,
     /// A message shown above the page (a generator's refusal, a refused handoff).
     notice: Option<String>,
+    /// The Drill Press page.
+    drill_press: DrillPressParams,
     /// Send to Editor / Preview, waiting for the app.
     editor_request: Option<CamDelivery>,
     /// The program the request hands to the editor.
@@ -156,6 +172,7 @@ impl CamToolsPane {
             selected: None,
             search: String::new(),
             category: Category::All,
+            drill_press: DrillPressParams::new(units),
             output: None,
             notice: None,
             editor_request: None,
@@ -263,6 +280,12 @@ impl CamToolsPane {
     /// Shows the pages' lengths in `units`, converting what is typed.
     fn set_units(&mut self, units: MeasurementSystem) {
         self.units = units;
+        self.drill_press.set_units(units);
+    }
+
+    /// The Drill Press page's input.
+    pub fn drill_press_mut(&mut self) -> &mut DrillPressParams {
+        &mut self.drill_press
     }
 
     /// Runs a page's action.
@@ -287,13 +310,16 @@ impl CamToolsPane {
 
     /// Generates `tool`'s program from its page.
     fn generate(&mut self, tool: CamTool) -> Result<String, CamError> {
-        match tool {}
+        match tool {
+            CamTool::DrillPress => self.drill_press.generate(),
+        }
     }
 
     /// Draws `tool`'s page.
     fn show_page(&mut self, ui: &mut egui::Ui, tool: CamTool, tr: &Translator) -> CamAction {
-        let _ = (ui, tr);
-        match tool {}
+        match tool {
+            CamTool::DrillPress => drill_press::show(ui, &mut self.drill_press, tr),
+        }
     }
 
     /// Draws the pane.
@@ -331,14 +357,15 @@ impl CamToolsPane {
                 if let Some(gcode) = self.output() {
                     let mut text = gcode;
                     ui.add_space(8.0);
-                    ui.strong(tr.tr("Generated G-Code"));
+                    let name = ui.strong(tr.tr("Generated G-Code"));
                     ui.add(
                         egui::TextEdit::multiline(&mut text)
                             .id_salt("cam-generated")
                             .code_editor()
                             .desired_rows(12)
                             .desired_width(f32::INFINITY),
-                    );
+                    )
+                    .labelled_by(name.id);
                 }
             });
     }
@@ -347,18 +374,23 @@ impl CamToolsPane {
     fn show_picker(&mut self, ui: &mut egui::Ui, tr: &Translator) {
         ui.heading(tr.tr(PaneId::CamTools.title_msgid()));
         ui.horizontal(|ui| {
+            let hint = tr.tr("Search tools...");
             ui.add(
                 egui::TextEdit::singleline(&mut self.search)
                     .id_salt("cam-search")
-                    .hint_text(tr.tr("Search tools...")),
-            );
+                    .hint_text(hint.as_ref()),
+            )
+            .widget_info(|| egui::WidgetInfo::labeled(egui::Role::TextInput, true, &hint));
+            let category = ui.label(tr.tr("Category"));
             egui::ComboBox::from_id_salt("cam-category")
                 .selected_text(tr.tr(self.category.msgid()))
                 .show_ui(ui, |ui| {
                     for category in Category::ALL {
                         ui.selectable_value(&mut self.category, category, tr.tr(category.msgid()));
                     }
-                });
+                })
+                .response
+                .labelled_by(category.id);
         });
         ui.separator();
         let listed = self.listed_tools(tr);
