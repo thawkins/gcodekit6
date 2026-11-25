@@ -4149,3 +4149,270 @@ msgstr "Paramètres enregistrés dans le profil d'appareil :"
 
 msgid "Settings not stored in a device profile: no profile matches the connected port."
 msgstr "Paramètres non enregistrés dans un profil d'appareil : aucun profil ne correspond au port connecté."
+
+msgid "Basic Info"
+msgstr "Informations de base"
+
+msgid "Geometry"
+msgstr "Géométrie"
+
+msgid "Manufacturer"
+msgstr "Fabricant"
+
+msgid "Notes"
+msgstr "Remarques"
+
+msgid "No settings folder: custom tools cannot be loaded or saved."
+msgstr "Aucun dossier de paramètres : les outils personnalisés ne peuvent être ni chargés ni enregistrés."
+
+msgid "The custom tools file could not be read:"
+msgstr "Le fichier des outils personnalisés n'a pas pu être lu :"
+
+msgid "A copy of the unreadable custom tools file was kept in"
+msgstr "Une copie du fichier d'outils illisible a été conservée dans"
+
+msgid "Tool ID already exists. Please choose a unique ID."
+msgstr "L'identifiant d'outil existe déjà. Choisissez un identifiant unique."
+
+msgid "Tool saved:"
+msgstr "Outil enregistré :"
+
+msgid "Tool deleted:"
+msgstr "Outil supprimé :"
+
+msgid "Custom tools removed."
+msgstr "Outils personnalisés supprimés."
+
+msgid "Reset failed:"
+msgstr "Échec de la réinitialisation :"
+
+msgid "Import complete."
+msgstr "Importation terminée."
+
+msgid "Skipped:"
+msgstr "Ignorés :"
+
+msgid "Errors:"
+msgstr "Erreurs :"
+
+msgid "Custom tools exported."
+msgstr "Outils personnalisés exportés."
+
+msgid "Search (name, id, type, diameter)..."
+msgstr "Rechercher (nom, id, type, diamètre)..."
+
+msgid "All Types"
+msgstr "Tous les types"
+
+msgid "All Materials"
+msgstr "Tous les matériaux"
+
+msgid "Filters"
+msgstr "Filtres"
+
+msgid "Min diameter (mm)"
+msgstr "Diamètre min. (mm)"
+
+msgid "Max diameter (mm)"
+msgstr "Diamètre max. (mm)"
+
+msgid "New Tool"
+msgstr "Nouvel outil"
+
+msgid "Create a new custom tool"
+msgstr "Créer un nouvel outil personnalisé"
+
+msgid "Library"
+msgstr "Bibliothèque"
+
+msgid "Import GTC (.zip)..."
+msgstr "Importer GTC (.zip)..."
+
+msgid "Import tool catalog from a GTC zip package"
+msgstr "Importer un catalogue d'outils depuis un paquet GTC zip"
+
+msgid "Import GTC (.json)..."
+msgstr "Importer GTC (.json)..."
+
+msgid "Import tool catalog from a GTC JSON file"
+msgstr "Importer un catalogue d'outils depuis un fichier GTC JSON"
+
+msgid "Export Custom Tools..."
+msgstr "Exporter les outils personnalisés..."
+
+msgid "Export custom tools to a JSON file"
+msgstr "Exporter les outils personnalisés vers un fichier JSON"
+
+msgid "Reset Custom Tools..."
+msgstr "Réinitialiser les outils personnalisés..."
+
+msgid "Remove all custom/imported tools and delete local storage"
+msgstr "Supprimer tous les outils personnalisés/importés et effacer le stockage local"
+
+msgid "Please select or create a tool to edit"
+msgstr "Sélectionnez ou créez un outil à modifier"
+
+msgid "Save changes"
+msgstr "Enregistrer les modifications"
+
+msgid "Discard changes"
+msgstr "Abandonner les modifications"
+
+msgid "Delete this tool"
+msgstr "Supprimer cet outil"
+
+msgid "Only custom tools can be deleted."
+msgstr "Seuls les outils personnalisés peuvent être supprimés."
+
+msgid "Delete tool?"
+msgstr "Supprimer l'outil ?"
+
+msgid "Reset custom tools?"
+msgstr "Réinitialiser les outils personnalisés ?"
+
+msgid "This will delete all custom/imported tools and remove local custom tools storage."
+msgstr "Cela supprimera tous les outils personnalisés/importés et le stockage local des outils."
+
+msgid "ID:"
+msgstr "Identifiant :"
+
+msgid "Tool Number:"
+msgstr "Numéro d'outil :"
+
+msgid "Tool Type:"
+msgstr "Type d'outil :"
+
+msgid "Tool Material:"
+msgstr "Matériau de l'outil :"
+
+msgid "Coating:"
+msgstr "Revêtement :"
+
+msgid "Shank:"
+msgstr "Queue :"
+
+msgid "Diameter (mm):"
+msgstr "Diamètre (mm) :"
+
+msgid "Length (mm):"
+msgstr "Longueur (mm) :"
+
+msgid "Flute Length (mm):"
+msgstr "Longueur de coupe (mm) :"
+
+msgid "Shaft Diameter (mm):"
+msgstr "Diamètre de queue (mm) :"
+
+msgid "Number of Flutes:"
+msgstr "Nombre de dents :"
+
+msgid "Corner Radius (mm):"
+msgstr "Rayon de coin (mm) :"
+
+msgid "Only for corner radius end mills"
+msgstr "Uniquement pour les fraises à rayon de coin"
+
+msgid "Tip Angle (deg):"
+msgstr "Angle de pointe (degrés) :"
+
+msgid "Used for drills / V-bits"
+msgstr "Pour forets / fraises en V"
+
+msgid "Manufacturer:"
+msgstr "Fabricant :"
+
+msgid "Part Number:"
+msgstr "Référence :"
+
+msgid "Additional Notes:"
+msgstr "Remarques supplémentaires :"
+
+msgid "Flat End Mill"
+msgstr "Fraise plate"
+
+msgid "Ball End Mill"
+msgstr "Fraise boule"
+
+msgid "Corner Radius End Mill"
+msgstr "Fraise à rayon de coin"
+
+msgid "V-Bit"
+msgstr "Fraise en V"
+
+msgid "Drill Bit"
+msgstr "Foret"
+
+msgid "Spot Drill"
+msgstr "Foret à pointer"
+
+msgid "Engraving Bit"
+msgstr "Outil de gravure"
+
+msgid "Chamfer Tool"
+msgstr "Fraise à chanfreiner"
+
+msgid "Specialty"
+msgstr "Spécial"
+
+msgid "Carbide"
+msgstr "Carbure"
+
+msgid "Coated Carbide"
+msgstr "Carbure revêtu"
+
+msgid "Diamond"
+msgstr "Diamant"
+
+msgid "Derived (Straight from shaft diameter)"
+msgstr "Dérivée (droite, selon le diamètre de queue)"
+
+msgid "Collet"
+msgstr "Pince"
+
+msgid "Tapered"
+msgstr "Conique"
+
+msgid "Tool ID is required"
+msgstr "L'identifiant d'outil est obligatoire"
+
+msgid "Tool name is required"
+msgstr "Le nom de l'outil est obligatoire"
+
+msgid "Invalid diameter"
+msgstr "Diamètre invalide"
+
+msgid "Invalid length"
+msgstr "Longueur invalide"
+
+msgid "Invalid flute length"
+msgstr "Longueur de coupe invalide"
+
+msgid "Invalid shaft diameter"
+msgstr "Diamètre de queue invalide"
+
+msgid "Invalid corner radius"
+msgstr "Rayon de coin invalide"
+
+msgid "Invalid tip angle"
+msgstr "Angle de pointe invalide"
+
+msgid "Import GTC Package"
+msgstr "Importer un paquet GTC"
+
+msgid "Import GTC JSON"
+msgstr "Importer GTC JSON"
+
+msgid "Export Custom Tools"
+msgstr "Exporter les outils personnalisés"
+
+msgid "GTC Packages"
+msgstr "Paquets GTC"
+
+msgid "Cannot Save Material"
+msgstr "Impossible d'enregistrer le matériau"
+
+msgid "Could not save the material:"
+msgstr "Impossible d'enregistrer le matériau :"
+
+msgid "Could not delete the material:"
+msgstr "Impossible de supprimer le matériau :"

@@ -38,6 +38,7 @@
 
 mod cam_presets;
 pub mod designer_files;
+mod library_windows;
 mod machine_windows;
 
 use std::cell::RefCell;
@@ -75,13 +76,13 @@ use crate::panes::visualizer::VisualizerPane;
 use crate::theme;
 use crate::windows::{
     AboutWindow, DeviceInfoWindow, DeviceManagerWindow, FirmwareSettingsWindow, SettingsOutcome,
-    SettingsWindow,
+    SettingsWindow, ToolsManagerWindow,
 };
 use crate::workspace::{PaneContext, PaneId, Workspace};
 use designer_files::{DesignFlow, DesignNext, EditorNext, OPEN_BEHIND_HANDOFF};
 use gcodekit5_app::materials_manager_backend::MaterialsManagerBackend;
-use gcodekit5_app::tools_manager_backend::ToolsManagerBackend;
-use gcodekit5_devicedb::DeviceProfile;
+use gcodekit5_app::tools_manager_backend::TOOLS_FILE;
+use gcodekit5_core::data::materials::Material;
 
 /// The GTK build's device profiles file, in the legacy settings folder.
 const DEVICES_FILE: &str = "devices.json";
@@ -150,6 +151,11 @@ pub struct AppState {
     /// folder); `None` without a settings folder. Replace it (with
     /// [`AppState::with_device_file`]) before the app is built from the state.
     pub device_file: Option<PathBuf>,
+    /// The custom tools file (the GTK build's `custom_tools.json` in the legacy settings
+    /// folder, where `ToolsManagerBackend::default_storage_path` puts it); `None` without a
+    /// settings folder. Replace it (with [`AppState::with_tools_file`]) before the app is
+    /// built from the state.
+    pub tools_file: Option<PathBuf>,
 }
 
 impl AppState {
@@ -161,6 +167,7 @@ impl AppState {
     pub fn new(settings: SettingsManager, decision: Decision) -> Self {
         let translator = Translator::new(&settings.config().ui.language);
         let device_file = settings.dirs().map(|dirs| dirs.legacy.join(DEVICES_FILE));
+        let tools_file = settings.dirs().map(|dirs| dirs.legacy.join(TOOLS_FILE));
         Self {
             settings,
             translator,
@@ -169,7 +176,17 @@ impl AppState {
             dirty: DirtyState::default(),
             machine: Machine::new(MachineController::new()),
             device_file,
+            tools_file,
         }
+    }
+
+    /// The same state keeping its custom tools in `file` (a test folder, for example).
+    ///
+    /// # Arguments
+    /// * `file` - The custom tools file.
+    pub fn with_tools_file(mut self, file: PathBuf) -> Self {
+        self.tools_file = Some(file);
+        self
     }
 
     /// The same state keeping its device profiles in `file` (a test folder, for example).
@@ -232,17 +249,23 @@ struct QuitFlow {
     confirmed: bool,
 }
 
-/// Gives the CAM tools the user's tool and material libraries, from the files the GTK build
-/// keeps in `legacy` (`custom_tools.json`, `custom_materials.json`), and the active device.
-fn load_cam_libraries(cam: &mut CamToolsPane, legacy: &Path, device: Option<DeviceProfile>) {
-    let tools = ToolsManagerBackend::with_storage_path(legacy.join("custom_tools.json"));
-    let materials =
-        MaterialsManagerBackend::with_storage_path(legacy.join("custom_materials.json"));
-    cam.set_libraries(
-        tools.get_all_tools().into_iter().cloned().collect(),
-        materials.get_all_materials().into_iter().cloned().collect(),
-        device,
-    );
+/// The user's material library, from the file the GTK build keeps in `legacy`
+/// (`custom_materials.json`), or the standard materials without a settings folder.
+fn load_materials(legacy: Option<&Path>) -> Vec<Material> {
+    match legacy {
+        Some(legacy) => {
+            MaterialsManagerBackend::with_storage_path(legacy.join("custom_materials.json"))
+                .get_all_materials()
+                .into_iter()
+                .cloned()
+                .collect()
+        }
+        None => gcodekit5_core::data::materials::init_standard_library()
+            .get_all_materials()
+            .into_iter()
+            .cloned()
+            .collect(),
+    }
 }
 
 /// What to do once the editor's G-code is saved.
@@ -288,6 +311,8 @@ pub struct GcodeKitApp {
     device_info: DeviceInfoWindow,
     /// The Device Manager window, which also holds the device profiles.
     device_manager: DeviceManagerWindow,
+    /// The CNC Tools window, which also holds the tool library.
+    tools_manager: ToolsManagerWindow,
     /// The last command dispatched.
     last_dispatched: Option<Command>,
     /// The quit being decided, if any.
@@ -393,14 +418,13 @@ impl GcodeKitApp {
         workspace.set_pane(Box::new(LayersPane::new(Rc::clone(&designer))));
         workspace.set_pane(Box::new(PropertiesPane::new(Rc::clone(&designer))));
         let device_manager = DeviceManagerWindow::new(state.device_file.clone());
+        let tools_manager = ToolsManagerWindow::new(state.tools_file.clone(), state.config());
         let cam_tools = Rc::new(RefCell::new(CamToolsPane::new()));
-        if let Some(dirs) = state.settings.dirs() {
-            load_cam_libraries(
-                &mut cam_tools.borrow_mut(),
-                &dirs.legacy,
-                device_manager.active_profile(),
-            );
-        }
+        cam_tools.borrow_mut().set_libraries(
+            tools_manager.tools(),
+            load_materials(state.settings.dirs().map(|dirs| dirs.legacy.as_path())),
+            device_manager.active_profile(),
+        );
         workspace.set_pane(Box::new(SharedCamTools::new(Rc::clone(&cam_tools))));
         workspace.configure(state.config());
         {
@@ -429,6 +453,7 @@ impl GcodeKitApp {
             firmware_settings: FirmwareSettingsWindow::default(),
             device_info: DeviceInfoWindow::default(),
             device_manager,
+            tools_manager,
             last_dispatched: None,
             quit: QuitFlow::default(),
             editor,
@@ -888,7 +913,8 @@ impl GcodeKitApp {
                     self.route_pane_command(cmd);
                 }
             }
-            Command::OpenToolsManager | Command::OpenMaterialsManager | Command::OpenHelp => {
+            Command::OpenToolsManager => self.tools_manager.open(&self.state.translator),
+            Command::OpenMaterialsManager | Command::OpenHelp => {
                 tracing::debug!(?cmd, "window command not available yet")
             }
         }
@@ -914,6 +940,7 @@ impl GcodeKitApp {
         }
         self.about_window.show(ctx, &self.state.translator);
         self.show_machine_windows(ctx);
+        self.show_library_windows(ctx);
     }
 
     /// Acts on a dialog's answer; every answer is also kept in
@@ -922,6 +949,7 @@ impl GcodeKitApp {
         if self.handle_design_answer(&answer)
             || self.handle_cam_preset_answer(&answer)
             || self.handle_firmware_settings_answer(&answer)
+            || self.handle_library_answer(&answer)
         {
             self.last_dialog_answer = Some(answer);
             return;

@@ -7,7 +7,9 @@ use gcodekit5_ui_egui::frame::caption_msgid;
 use gcodekit5_ui_egui::menu;
 use gcodekit5_ui_egui::panes::{cam_tools, console, designer, editor, machine_control, visualizer};
 use gcodekit5_ui_egui::status_bar;
-use gcodekit5_ui_egui::windows::{about, device_info, device_manager, firmware_settings, settings};
+use gcodekit5_ui_egui::windows::{
+    about, device_info, device_manager, firmware_settings, settings, tools_manager,
+};
 use gcodekit5_ui_egui::workspace::PaneId;
 
 const LANGUAGES: [&str; 5] = ["de", "es", "fr", "it", "pt"];
@@ -262,6 +264,7 @@ fn msgids() -> Vec<&'static str> {
         .chain(firmware_settings::msgids())
         .chain(device_info::msgids())
         .chain(device_manager::msgids())
+        .chain(tools_manager::msgids())
         .chain(dialogs::msgids())
         .chain(machine_control::msgids())
         .chain(console::msgids())

@@ -282,7 +282,10 @@ impl GcodeKitApp {
                     | FilePurpose::OpenGerberFolder
                     | FilePurpose::OpenEngravingImage
                     | FilePurpose::ExportFirmwareSettings
-                    | FilePurpose::ImportFirmwareSettings => return false,
+                    | FilePurpose::ImportFirmwareSettings
+                    | FilePurpose::ImportGtcPackage
+                    | FilePurpose::ImportGtcJson
+                    | FilePurpose::ExportCustomTools => return false,
                 }
             }
             DialogAnswer::Cancelled {

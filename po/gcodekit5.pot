@@ -4066,3 +4066,270 @@ msgstr ""
 
 msgid "Settings not stored in a device profile: no profile matches the connected port."
 msgstr ""
+
+msgid "Basic Info"
+msgstr ""
+
+msgid "Geometry"
+msgstr ""
+
+msgid "Manufacturer"
+msgstr ""
+
+msgid "Notes"
+msgstr ""
+
+msgid "No settings folder: custom tools cannot be loaded or saved."
+msgstr ""
+
+msgid "The custom tools file could not be read:"
+msgstr ""
+
+msgid "A copy of the unreadable custom tools file was kept in"
+msgstr ""
+
+msgid "Tool ID already exists. Please choose a unique ID."
+msgstr ""
+
+msgid "Tool saved:"
+msgstr ""
+
+msgid "Tool deleted:"
+msgstr ""
+
+msgid "Custom tools removed."
+msgstr ""
+
+msgid "Reset failed:"
+msgstr ""
+
+msgid "Import complete."
+msgstr ""
+
+msgid "Skipped:"
+msgstr ""
+
+msgid "Errors:"
+msgstr ""
+
+msgid "Custom tools exported."
+msgstr ""
+
+msgid "Search (name, id, type, diameter)..."
+msgstr ""
+
+msgid "All Types"
+msgstr ""
+
+msgid "All Materials"
+msgstr ""
+
+msgid "Filters"
+msgstr ""
+
+msgid "Min diameter (mm)"
+msgstr ""
+
+msgid "Max diameter (mm)"
+msgstr ""
+
+msgid "New Tool"
+msgstr ""
+
+msgid "Create a new custom tool"
+msgstr ""
+
+msgid "Library"
+msgstr ""
+
+msgid "Import GTC (.zip)..."
+msgstr ""
+
+msgid "Import tool catalog from a GTC zip package"
+msgstr ""
+
+msgid "Import GTC (.json)..."
+msgstr ""
+
+msgid "Import tool catalog from a GTC JSON file"
+msgstr ""
+
+msgid "Export Custom Tools..."
+msgstr ""
+
+msgid "Export custom tools to a JSON file"
+msgstr ""
+
+msgid "Reset Custom Tools..."
+msgstr ""
+
+msgid "Remove all custom/imported tools and delete local storage"
+msgstr ""
+
+msgid "Please select or create a tool to edit"
+msgstr ""
+
+msgid "Save changes"
+msgstr ""
+
+msgid "Discard changes"
+msgstr ""
+
+msgid "Delete this tool"
+msgstr ""
+
+msgid "Only custom tools can be deleted."
+msgstr ""
+
+msgid "Delete tool?"
+msgstr ""
+
+msgid "Reset custom tools?"
+msgstr ""
+
+msgid "This will delete all custom/imported tools and remove local custom tools storage."
+msgstr ""
+
+msgid "ID:"
+msgstr ""
+
+msgid "Tool Number:"
+msgstr ""
+
+msgid "Tool Type:"
+msgstr ""
+
+msgid "Tool Material:"
+msgstr ""
+
+msgid "Coating:"
+msgstr ""
+
+msgid "Shank:"
+msgstr ""
+
+msgid "Diameter (mm):"
+msgstr ""
+
+msgid "Length (mm):"
+msgstr ""
+
+msgid "Flute Length (mm):"
+msgstr ""
+
+msgid "Shaft Diameter (mm):"
+msgstr ""
+
+msgid "Number of Flutes:"
+msgstr ""
+
+msgid "Corner Radius (mm):"
+msgstr ""
+
+msgid "Only for corner radius end mills"
+msgstr ""
+
+msgid "Tip Angle (deg):"
+msgstr ""
+
+msgid "Used for drills / V-bits"
+msgstr ""
+
+msgid "Manufacturer:"
+msgstr ""
+
+msgid "Part Number:"
+msgstr ""
+
+msgid "Additional Notes:"
+msgstr ""
+
+msgid "Flat End Mill"
+msgstr ""
+
+msgid "Ball End Mill"
+msgstr ""
+
+msgid "Corner Radius End Mill"
+msgstr ""
+
+msgid "V-Bit"
+msgstr ""
+
+msgid "Drill Bit"
+msgstr ""
+
+msgid "Spot Drill"
+msgstr ""
+
+msgid "Engraving Bit"
+msgstr ""
+
+msgid "Chamfer Tool"
+msgstr ""
+
+msgid "Specialty"
+msgstr ""
+
+msgid "Carbide"
+msgstr ""
+
+msgid "Coated Carbide"
+msgstr ""
+
+msgid "Diamond"
+msgstr ""
+
+msgid "Derived (Straight from shaft diameter)"
+msgstr ""
+
+msgid "Collet"
+msgstr ""
+
+msgid "Tapered"
+msgstr ""
+
+msgid "Tool ID is required"
+msgstr ""
+
+msgid "Tool name is required"
+msgstr ""
+
+msgid "Invalid diameter"
+msgstr ""
+
+msgid "Invalid length"
+msgstr ""
+
+msgid "Invalid flute length"
+msgstr ""
+
+msgid "Invalid shaft diameter"
+msgstr ""
+
+msgid "Invalid corner radius"
+msgstr ""
+
+msgid "Invalid tip angle"
+msgstr ""
+
+msgid "Import GTC Package"
+msgstr ""
+
+msgid "Import GTC JSON"
+msgstr ""
+
+msgid "Export Custom Tools"
+msgstr ""
+
+msgid "GTC Packages"
+msgstr ""
+
+msgid "Cannot Save Material"
+msgstr ""
+
+msgid "Could not save the material:"
+msgstr ""
+
+msgid "Could not delete the material:"
+msgstr ""

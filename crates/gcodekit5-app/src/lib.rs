@@ -2,7 +2,7 @@
 //!
 //! Toolkit-free application state shared by the GCodeKit5 front ends (GTK and
 //! egui): device status, console model, command history, the firmware settings and device
-//! info models, the device profile form, tool and material manager back ends, shared parameter types, and the
+//! info models, the device profile form, the tool and material manager forms and back ends, shared parameter types, and the
 //! answer to an unsaved-changes prompt.
 //!
 //! Depends on `gcodekit5-core`, `gcodekit5-communication` and
@@ -27,10 +27,12 @@ pub mod device_status;
 pub mod firmware_settings;
 pub mod i18n;
 pub mod machine;
+pub mod material_form;
 pub mod materials_manager_backend;
 #[cfg(feature = "test-support")]
 #[doc(hidden)]
 pub mod test_support;
+pub mod tool_form;
 pub mod tools_manager_backend;
 pub mod types;
 pub mod unsaved_changes;

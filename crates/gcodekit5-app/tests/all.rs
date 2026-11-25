@@ -43,6 +43,8 @@ mod test_machine_sent_events;
 mod test_materials_manager_backend;
 #[path = "test_report_units.rs"]
 mod test_report_units;
+#[path = "test_tool_material_library.rs"]
+mod test_tool_material_library;
 #[path = "test_tools_manager_backend.rs"]
 mod test_tools_manager_backend;
 #[path = "test_unsaved_changes_choice.rs"]

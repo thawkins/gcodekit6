@@ -54,6 +54,12 @@ pub enum FilePurpose {
     ExportFirmwareSettings,
     /// Choose a saved firmware settings list to load.
     ImportFirmwareSettings,
+    /// Choose a GTC tool catalog package (.zip) to import into the tool library.
+    ImportGtcPackage,
+    /// Choose a GTC tool catalog (.json) to import into the tool library.
+    ImportGtcJson,
+    /// Choose where to export the custom tools.
+    ExportCustomTools,
 }
 
 impl FilePurpose {
@@ -74,6 +80,9 @@ impl FilePurpose {
             Self::OpenEngravingImage => n_!("Select Image"),
             Self::ExportFirmwareSettings => n_!("Export Settings"),
             Self::ImportFirmwareSettings => n_!("Import Settings"),
+            Self::ImportGtcPackage => n_!("Import GTC Package"),
+            Self::ImportGtcJson => n_!("Import GTC JSON"),
+            Self::ExportCustomTools => n_!("Export Custom Tools"),
         }
     }
 
@@ -107,6 +116,10 @@ impl FilePurpose {
             Self::OpenEngravingImage => vec![FileFilter::ENGRAVING_IMAGE],
             // GTK's firmware settings dialogs offered no file types.
             Self::ExportFirmwareSettings | Self::ImportFirmwareSettings => Vec::new(),
+            Self::ImportGtcPackage => open(FileFilter::GTC_PACKAGE),
+            Self::ImportGtcJson => open(FileFilter::JSON),
+            // GTK's export offered JSON only.
+            Self::ExportCustomTools => vec![FileFilter::JSON],
         }
     }
 }
@@ -156,6 +169,16 @@ impl FileFilter {
     pub const ENGRAVING_IMAGE: Self = Self {
         name_msgid: n_!("Image files"),
         extensions: &["png", "jpg", "jpeg", "bmp", "gif", "tif", "tiff"],
+    };
+    /// GTC tool catalog packages.
+    pub const GTC_PACKAGE: Self = Self {
+        name_msgid: n_!("GTC Packages"),
+        extensions: &["zip"],
+    };
+    /// JSON files (GTC catalogs, exported custom tools).
+    pub const JSON: Self = Self {
+        name_msgid: "JSON",
+        extensions: &["json"],
     };
     /// The G-code types the designer's export offers (GTK's).
     pub const GCODE_EXPORT: Self = Self {
@@ -552,6 +575,9 @@ pub fn msgids() -> Vec<&'static str> {
         FilePurpose::OpenEngravingImage,
         FilePurpose::ExportFirmwareSettings,
         FilePurpose::ImportFirmwareSettings,
+        FilePurpose::ImportGtcPackage,
+        FilePurpose::ImportGtcJson,
+        FilePurpose::ExportCustomTools,
     ]
     .map(FilePurpose::title_msgid);
     let filters = [
@@ -561,6 +587,7 @@ pub fn msgids() -> Vec<&'static str> {
         FileFilter::SVG,
         FileFilter::DXF,
         FileFilter::IMAGE,
+        FileFilter::GTC_PACKAGE,
     ]
     .map(|f| f.name_msgid)
     .into_iter()
