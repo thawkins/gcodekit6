@@ -219,8 +219,27 @@ pub enum MachineEvent {
         /// Program length.
         total: usize,
     },
+    /// A manual command line (`$H`, `$X`, an MDI line, a `$J` jog) or a real-time command
+    /// (shown as its label, e.g. `0x18 (Reset)`) was written to the controller. Program
+    /// lines of a stream are not reported (as in the GTK console, which did not echo them).
+    Sent(String),
     /// An error from the controller or the transport.
     Error(String),
+}
+
+/// How the console names a real-time byte that is worth echoing, or `None` for the ones
+/// that are not (`?` polls, overrides).
+///
+/// # Arguments
+/// * `byte` - The real-time byte written.
+pub fn realtime_label(byte: u8) -> Option<&'static str> {
+    match byte {
+        b'!' => Some("! (Feed hold)"),
+        b'~' => Some("~ (Cycle start)"),
+        0x18 => Some("0x18 (Reset)"),
+        0x85 => Some("0x85 (Jog cancel)"),
+        _ => None,
+    }
 }
 
 /// Builds a fresh, unconnected transport for each [`MachineController::connect`].
@@ -795,6 +814,7 @@ impl WorkerState {
             }
             Command::Realtime(byte) => {
                 self.write(&[byte])?;
+                self.echo_realtime(byte);
                 if byte == RealtimeCommand::JogCancel.byte()
                     || byte == RealtimeCommand::SoftReset.byte()
                 {
@@ -806,14 +826,17 @@ impl WorkerState {
             }
             Command::Pause => {
                 self.write(&[RealtimeCommand::FeedHold.byte()])?;
+                self.echo_realtime(RealtimeCommand::FeedHold.byte());
                 self.paused = true;
             }
             Command::Resume => {
                 self.write(&[RealtimeCommand::CycleStart.byte()])?;
+                self.echo_realtime(RealtimeCommand::CycleStart.byte());
                 self.paused = false;
             }
             Command::Stop => {
                 self.write(&[RealtimeCommand::SoftReset.byte()])?;
+                self.echo_realtime(RealtimeCommand::SoftReset.byte());
                 self.jog_outstanding = false;
                 self.reset_buffers();
                 self.end_stream(false);
@@ -833,6 +856,13 @@ impl WorkerState {
             Command::Shutdown => {}
         }
         Ok(())
+    }
+
+    /// Reports a written real-time byte as [`MachineEvent::Sent`] when it has a label.
+    fn echo_realtime(&self, byte: u8) {
+        if let Some(label) = realtime_label(byte) {
+            self.sink.emit(MachineEvent::Sent(label.to_string()));
+        }
     }
 
     /// Writes a `?` and tags it with the state lines written so far.
@@ -887,6 +917,8 @@ impl WorkerState {
                 self.jog_seen = false;
             }
             self.window.on_sent(line.trim_end_matches('\n'));
+            self.sink
+                .emit(MachineEvent::Sent(line.trim_end_matches('\n').to_string()));
             self.in_flight_is_program.push_back(false);
             self.written_seq = self.written_seq.max(seq);
             self.manual.pop_front();

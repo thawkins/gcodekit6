@@ -19,7 +19,12 @@ use crate::machine::{MachineStatus, Xyz};
 use crate::panes::machine_control::format_length;
 
 /// The msgids the bar shows, for the translation check.
-pub const MSGIDS: &[&str] = &[n_!("Connected"), n_!("Disconnected")];
+pub const MSGIDS: &[&str] = &[
+    n_!("Connected"),
+    n_!("Disconnected"),
+    n_!("E-STOP"),
+    n_!("Emergency stop (soft reset, {shortcut})"),
+];
 
 /// What the status bar shows, as text.
 #[derive(Debug, Clone, PartialEq)]
@@ -94,9 +99,33 @@ pub fn summary(status: &MachineStatus, units: MeasurementSystem, tr: &Translator
 /// * `tr` - Translator for the current UI language.
 /// * `status` - The app's machine status.
 /// * `units` - The measurement system lengths are shown in.
-pub fn show(ui: &mut egui::Ui, tr: &Translator, status: &MachineStatus, units: MeasurementSystem) {
+///
+/// # Returns
+/// Whether the user clicked E-STOP; the caller queues [`crate::commands::Command::SoftReset`],
+/// which the Machine Control pane runs as its own E-STOP button does.
+pub fn show(
+    ui: &mut egui::Ui,
+    tr: &Translator,
+    status: &MachineStatus,
+    units: MeasurementSystem,
+) -> bool {
     let summary = summary(status, units, tr);
+    let mut estop_clicked = false;
     ui.horizontal(|ui| {
+        let estop = egui::Button::new(
+            egui::RichText::new(tr.tr("E-STOP"))
+                .strong()
+                .color(egui::Color32::WHITE),
+        )
+        .fill(egui::Color32::from_rgb(0xc0, 0x1c, 0x28));
+        estop_clicked = ui
+            .add_enabled(summary.connected, estop)
+            .on_hover_text(tr.tr("Emergency stop (soft reset, {shortcut})").replace(
+                "{shortcut}",
+                crate::panes::machine_control::SOFT_RESET_CHORD,
+            ))
+            .clicked();
+
         // Painted: the bundled fonts have no bullet glyph.
         let colour = if summary.connected {
             egui::Color32::from_rgb(0x2e, 0xa0, 0x43)
@@ -130,4 +159,5 @@ pub fn show(ui: &mut egui::Ui, tr: &Translator, status: &MachineStatus, units: M
             }
         });
     });
+    estop_clicked
 }

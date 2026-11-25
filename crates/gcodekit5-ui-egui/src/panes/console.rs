@@ -115,6 +115,7 @@ impl ConsolePane {
                     MessageLevel::Error,
                     format!("{}: {message}", tr.tr("Error")),
                 ),
+                MachineEvent::Sent(line) => self.log.add_command(line),
                 MachineEvent::Received(line) => {
                     let line = line.trim();
                     if !line.is_empty() && !is_status_report(line) {
@@ -143,7 +144,7 @@ impl ConsolePane {
         let result = lock(&self.controller).send_line(&line);
         match result {
             Ok(()) => {
-                self.log.add_command(&line);
+                // The echo (`> line`) arrives as `MachineEvent::Sent` once it is written.
                 self.log.add_to_history(&line);
                 self.input.clear();
                 self.history_cursor = None;

@@ -2,14 +2,22 @@
 
 use std::time::Duration;
 
-use egui_kittest::kittest::Queryable;
+use craft_ui::docking::{Action, Placement};
+
+use egui_kittest::kittest::{NodeT, Queryable};
 use gcodekit5_app::i18n::Translator;
 use gcodekit5_communication::firmware::grbl::status_parser::FullStatus;
 use gcodekit5_core::units::MeasurementSystem;
 use gcodekit5_ui_egui::machine::{MachineStatus, Progress};
 use gcodekit5_ui_egui::status_bar::{position_text, summary};
 
-use crate::machine_support::step_until;
+use gcodekit5_app::test_support::Wrote;
+use gcodekit5_ui_egui::GcodeKitApp;
+use gcodekit5_ui_egui::workspace::PaneId;
+
+use crate::machine_support::{
+    app_harness, loopback_state, start_held_stream, step_until, wait_until,
+};
 use crate::test_machine_pane::pane_app;
 
 fn report(line: &str) -> FullStatus {
@@ -82,5 +90,59 @@ fn test_status_bar_shows_position_in_app() {
         harness
             .query_by_label("X: 1.23  Y: 2.00  Z: -3.10 (mm)")
             .is_some()
+    );
+}
+
+/// Hides the Machine Control pane behind the visualizer's tab.
+fn hide_machine_control(harness: &mut egui_kittest::Harness<'_, GcodeKitApp>) {
+    let workspace = harness.state_mut().workspace_mut();
+    workspace
+        .apply(Action::Move {
+            panel: PaneId::MachineControl,
+            anchor: PaneId::Visualizer,
+            placement: Placement::Tab { before: None },
+        })
+        .expect("move the pane into the visualizer's tabs");
+    workspace
+        .apply(Action::Activate {
+            panel: PaneId::Visualizer,
+        })
+        .expect("show the visualizer");
+    harness.step();
+    harness.step();
+}
+
+#[test]
+fn test_status_bar_estop_disabled_while_disconnected() {
+    let (mut harness, _shared) = pane_app(Duration::from_millis(1), false);
+    hide_machine_control(&mut harness);
+    assert!(
+        harness
+            .get_by_label("E-STOP")
+            .accesskit_node()
+            .is_disabled()
+    );
+}
+
+#[test]
+fn test_status_bar_estop_stops_stream_without_machine_control() {
+    let (mut state, shared) = loopback_state(Duration::from_millis(20));
+    start_held_stream(&mut state, &shared, 50);
+    let mut harness = app_harness(GcodeKitApp::from_state(state));
+    harness.step();
+    hide_machine_control(&mut harness);
+    let estop = harness.get_by_label("E-STOP");
+    assert!(!estop.accesskit_node().is_disabled());
+    estop.click();
+    harness.step();
+    harness.step();
+    assert!(
+        wait_until(|| shared.log().contains(&Wrote::Realtime(0x18))),
+        "no 0x18: {:?}",
+        shared.log()
+    );
+    assert!(
+        step_until(&mut harness, |app| !app.state().machine.status().streaming),
+        "stream still running"
     );
 }

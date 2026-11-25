@@ -11,7 +11,7 @@ use gcodekit5_communication::firmware::grbl::status_parser::StatusParser;
 use gcodekit5_ui_egui::machine::Machine;
 use gcodekit5_ui_egui::panes::console::{ConsolePane, MAX_CONSOLE_LINES};
 
-use crate::machine_support::wait_until;
+use crate::machine_support::{step_until, wait_until};
 use crate::test_machine_pane::pane_app;
 
 /// A console over an unconnected controller, and an English translator.
@@ -103,14 +103,17 @@ fn test_machine_pending_events_are_taken_once() {
 fn test_console_shows_received_lines_in_app() {
     let (mut harness, shared) = pane_app(Duration::from_millis(1), true);
     shared.inject("[MSG:Hello console]\n");
-    for _ in 0..200 {
-        harness.step();
-        if harness.query_by_label("[MSG:Hello console]").is_some() {
-            return;
-        }
-        std::thread::sleep(Duration::from_millis(5));
-    }
-    panic!("the console never showed the line");
+    let hello = received("[MSG:Hello console]");
+    assert!(
+        step_until(&mut harness, |app| app
+            .state()
+            .machine
+            .events()
+            .contains(&hello)),
+        "the line never arrived"
+    );
+    harness.step();
+    assert!(harness.query_by_label("[MSG:Hello console]").is_some());
 }
 
 #[test]
@@ -141,4 +144,40 @@ fn test_console_entry_sends_line_and_echoes_it() {
     );
     harness.step();
     assert!(harness.query_by_label("> G0 X5").is_some());
+}
+
+#[test]
+fn test_console_echoes_home_from_machine_control() {
+    let (mut harness, _shared) = pane_app(Duration::from_millis(1), true);
+    harness.get_by_label("Home").click();
+    let sent = MachineEvent::Sent("$H".to_string());
+    assert!(
+        step_until(&mut harness, |app| app
+            .state()
+            .machine
+            .events()
+            .contains(&sent)),
+        "no Sent event"
+    );
+    harness.step();
+    assert!(harness.query_by_label("> $H").is_some());
+}
+
+#[test]
+fn test_console_echoes_soft_reset_label() {
+    let (mut harness, _shared) = pane_app(Duration::from_millis(1), true);
+    harness
+        .state_mut()
+        .dispatch(gcodekit5_ui_egui::commands::Command::SoftReset);
+    let sent = MachineEvent::Sent("0x18 (Reset)".to_string());
+    assert!(
+        step_until(&mut harness, |app| app
+            .state()
+            .machine
+            .events()
+            .contains(&sent)),
+        "no Sent event"
+    );
+    harness.step();
+    assert!(harness.query_by_label("> 0x18 (Reset)").is_some());
 }

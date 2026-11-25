@@ -195,6 +195,7 @@ impl MachineStatus {
                         total: *total,
                     });
                 }
+                MachineEvent::Sent(_) => {}
                 MachineEvent::Error(message) => self.last_error = Some(message.clone()),
             }
         }

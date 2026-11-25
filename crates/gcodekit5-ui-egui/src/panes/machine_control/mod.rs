@@ -86,7 +86,7 @@ pub struct MachineControlPane {
 }
 
 /// The soft reset chord as the user's platform names it (see [`crate::commands`]).
-const SOFT_RESET_CHORD: &str = if cfg!(target_os = "macos") {
+pub(crate) const SOFT_RESET_CHORD: &str = if cfg!(target_os = "macos") {
     "Cmd+Shift+K"
 } else {
     "Ctrl+Shift+K"
@@ -150,6 +150,14 @@ impl MachineControlPane {
         if self.jog.take_hold() {
             self.with_controller(|c| c.realtime(RealtimeCommand::JogCancel));
         }
+    }
+
+    /// The emergency stop, shared by the pane's button, the soft reset command and the status
+    /// bar's button (which queues [`Command::SoftReset`]): forgets a jog hold, then `stop`
+    /// (0x18, queued lines dropped, stream ended).
+    fn emergency_stop(&mut self) {
+        self.jog.forget_hold();
+        self.with_controller(MachineController::stop);
     }
 
     /// Sends a command line; a refusal is shown in the pane.
@@ -258,10 +266,7 @@ impl MachineControlPane {
             }
             Command::CycleStart => self.with_controller(MachineController::resume),
             // Soft reset through `stop`: 0x18, and the queued lines are dropped with it.
-            Command::StreamStop | Command::SoftReset => {
-                self.jog.forget_hold();
-                self.with_controller(MachineController::stop);
-            }
+            Command::StreamStop | Command::SoftReset => self.emergency_stop(),
             Command::Home => self.send_line("$H"),
             Command::Unlock => self.send_line("$X"),
             Command::FileNew
@@ -325,8 +330,7 @@ impl MachineControlPane {
                 .replace("{shortcut}", SOFT_RESET_CHORD),
         );
         if response.clicked() {
-            self.jog.forget_hold();
-            self.with_controller(MachineController::stop);
+            self.emergency_stop();
         }
         ui.horizontal(|ui| {
             let idle = status.connected && !status.streaming;

@@ -508,12 +508,14 @@ impl GcodeKitApp {
         queue.extend(self.menus.take_native(&ctx, gate));
         self.show_frame_and_menu(ui, gate, &mut queue);
         egui::Panel::bottom("gcodekit5-status-bar").show(ui, |ui| {
-            crate::status_bar::show(
+            if crate::status_bar::show(
                 ui,
                 &self.state.translator,
                 self.state.machine.status(),
                 self.state.config().ui.measurement_system,
-            );
+            ) {
+                queue.push(Command::SoftReset);
+            }
         });
         let mut panes =
             PaneContext::new(&self.state.translator, &mut queue).with_machine(&self.state.machine);
