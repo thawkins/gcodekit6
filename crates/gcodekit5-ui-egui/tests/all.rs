@@ -28,6 +28,8 @@ mod test_designer_app;
 mod test_designer_canvas;
 #[path = "test_designer_editing.rs"]
 mod test_designer_editing;
+#[path = "test_designer_layers.rs"]
+mod test_designer_layers;
 #[path = "test_designer_snapshots.rs"]
 mod test_designer_snapshots;
 #[path = "test_designer_toolbox.rs"]

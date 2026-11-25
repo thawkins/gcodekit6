@@ -26,6 +26,7 @@ use gcodekit5_designer::commands::{DesignerCommand, MoveShapes};
 use gcodekit5_designer::model::Point;
 
 use super::editing::{self, ResizeDrag};
+use super::flags::ShapeFlags;
 use super::{CanvasView, DesignerTool};
 
 /// A primary-button drag in progress.
@@ -120,14 +121,17 @@ impl CanvasInput {
     /// * `response` - The canvas's response (click and drag sense).
     /// * `view` - The view the frame started with.
     /// * `state` - The design.
+    /// * `flags` - The hidden and locked shapes, which clicks and the marquee skip.
     /// * `tool` - The current tool.
     /// * `tr` - Translator for the context menu.
+    #[allow(clippy::too_many_arguments)] // the frame's whole input context, called once
     pub fn handle(
         &mut self,
         ui: &egui::Ui,
         response: &Response,
         view: &CanvasView,
         state: &mut DesignerState,
+        flags: &ShapeFlags,
         tool: DesignerTool,
         tr: &Translator,
     ) {
@@ -160,9 +164,9 @@ impl CanvasInput {
             && let Some(origin) = press_origin
             && tool == DesignerTool::Select
         {
-            press_select(state, view, world(view, origin), modifiers);
+            press_select(state, flags, view, world(view, origin), modifiers);
         }
-        self.primary_drag(ui, response, view, state, tool, modifiers);
+        self.primary_drag(ui, response, view, state, flags, tool, modifiers);
         if response.dragged_by(PointerButton::Middle) {
             let d = response.drag_delta();
             state.canvas.pan_by(f64::from(d.x), -f64::from(d.y));
@@ -171,7 +175,7 @@ impl CanvasInput {
             && let Some(p) = response.interact_pointer_pos()
         {
             let double = response.double_clicked();
-            self.click(state, tool, world(view, p), double, modifiers);
+            self.click(state, flags, tool, world(view, p), double, modifiers);
         }
         self.wheel(ui, response, view, state);
         let finished = response.secondary_clicked()
@@ -209,6 +213,7 @@ impl CanvasInput {
     fn click(
         &mut self,
         state: &mut DesignerState,
+        flags: &ShapeFlags,
         tool: DesignerTool,
         at: (f64, f64),
         double: bool,
@@ -229,7 +234,7 @@ impl CanvasInput {
                 // A plain click on a selected shape keeps only that shape selected.
                 let tolerance = editing::hit_tolerance_mm(state.canvas.zoom());
                 let point = Point::new(at.0, at.1);
-                if let Some(id) = editing::topmost_shape_at(state, &point, tolerance)
+                if let Some(id) = editing::topmost_shape_at(state, flags, &point, tolerance)
                     && state.canvas.get_shape(id).is_some_and(|o| o.selected)
                 {
                     state.canvas.deselect_all();
@@ -241,12 +246,14 @@ impl CanvasInput {
     }
 
     /// Starts, continues and ends a primary-button drag.
+    #[allow(clippy::too_many_arguments)] // the frame's whole input context, called once
     fn primary_drag(
         &mut self,
         ui: &egui::Ui,
         response: &Response,
         view: &CanvasView,
         state: &mut DesignerState,
+        flags: &ShapeFlags,
         tool: DesignerTool,
         modifiers: Modifiers,
     ) {
@@ -300,7 +307,7 @@ impl CanvasInput {
                 }
                 Some(Drag::Marquee { start, current }) => {
                     if state.canvas.selection_manager.selected_id().is_none() {
-                        editing::marquee_select(state, start, current);
+                        editing::marquee_select(state, flags, start, current);
                     }
                 }
                 Some(Drag::Pan) | None => {}
@@ -336,6 +343,7 @@ impl CanvasInput {
 /// the pointer is selected (Shift adds, Ctrl/Cmd toggles) and empty space deselects.
 fn press_select(
     state: &mut DesignerState,
+    flags: &ShapeFlags,
     view: &CanvasView,
     at: (f64, f64),
     modifiers: Modifiers,
@@ -349,22 +357,14 @@ fn press_select(
     let (shift, ctrl) = (modifiers.shift, modifiers.command);
     let tolerance = editing::hit_tolerance_mm(zoom);
     let point = Point::new(at.0, at.1);
-    if let Some(id) = editing::topmost_shape_at(state, &point, tolerance)
+    if let Some(id) = editing::topmost_shape_at(state, flags, &point, tolerance)
         && state.canvas.get_shape(id).is_some_and(|o| o.selected)
         && !shift
         && !ctrl
     {
         return;
     }
-    if state
-        .canvas
-        .select_at(&point, tolerance, shift, ctrl)
-        .is_none()
-        && !shift
-        && !ctrl
-    {
-        state.canvas.deselect_all();
-    }
+    editing::select_at(state, flags, &point, tolerance, shift, ctrl);
 }
 
 /// The drag a primary press at `at` starts with `tool`.

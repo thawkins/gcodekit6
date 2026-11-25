@@ -3199,3 +3199,9 @@ msgstr ""
 
 msgid "180°"
 msgstr ""
+
+msgid "Show"
+msgstr ""
+
+msgid "Lock"
+msgstr ""

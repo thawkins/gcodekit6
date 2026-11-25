@@ -16,6 +16,7 @@
 //! `gcodekit5-settings` (grid line widths, display units), `gcodekit5-core` (units).
 
 pub mod canvas;
+pub mod layers;
 pub mod toolbox;
 
 use std::cell::RefCell;
@@ -28,7 +29,7 @@ use gcodekit5_designer::model::Point;
 use gcodekit5_settings::config::Config;
 
 use canvas::rendering::{self, LineWidths};
-use canvas::{CanvasInput, CanvasView, DesignerTool, editing};
+use canvas::{CanvasInput, CanvasView, DesignerTool, ShapeFlags, editing};
 
 use crate::commands::Command;
 use crate::workspace::{Pane, PaneContext, PaneId};
@@ -37,6 +38,7 @@ use crate::workspace::{Pane, PaneContext, PaneId};
 pub fn msgids() -> Vec<&'static str> {
     let mut ids = toolbox::msgids();
     ids.extend(canvas::input::msgids());
+    ids.extend(layers::msgids());
     ids
 }
 
@@ -50,6 +52,8 @@ pub struct DesignerPane {
     /// Whether the view was fitted to the work area (on the first frame with a size).
     fitted: bool,
     widths: LineWidths,
+    /// The shapes the layers panel has hidden or locked.
+    flags: ShapeFlags,
     /// The display units of the toolbox's settings.
     units: MeasurementSystem,
 }
@@ -80,6 +84,7 @@ impl DesignerPane {
             view: CanvasView::default(),
             fitted: false,
             widths: LineWidths::default(),
+            flags: ShapeFlags::default(),
             units: MeasurementSystem::default(),
         }
     }
@@ -107,6 +112,47 @@ impl DesignerPane {
         if tool != self.tool {
             self.input.reset();
             self.tool = tool;
+        }
+    }
+
+    /// The hidden and locked shapes.
+    pub fn flags(&self) -> &ShapeFlags {
+        &self.flags
+    }
+
+    /// Hides or shows shape `id`. A hidden shape is not painted or picked, and is deselected.
+    ///
+    /// # Arguments
+    /// * `id` - The shape.
+    /// * `hidden` - Whether it is hidden from now on.
+    pub fn set_hidden(&mut self, id: u64, hidden: bool) {
+        self.flags.set_hidden(id, hidden);
+        if hidden {
+            self.deselect(id);
+        }
+    }
+
+    /// Locks or unlocks shape `id`. A locked shape cannot be picked, and is deselected.
+    ///
+    /// # Arguments
+    /// * `id` - The shape.
+    /// * `locked` - Whether it is locked from now on.
+    pub fn set_locked(&mut self, id: u64, locked: bool) {
+        self.flags.set_locked(id, locked);
+        if locked {
+            self.deselect(id);
+        }
+    }
+
+    /// Drops shape `id` from the selection.
+    fn deselect(&mut self, id: u64) {
+        let canvas = &mut self.state.canvas;
+        if let Some(obj) = canvas.get_shape_mut(id) {
+            obj.selected = false;
+        }
+        if canvas.selection_manager.selected_id() == Some(id) {
+            let next = canvas.shapes().find(|o| o.selected).map(|o| o.id);
+            canvas.selection_manager.set_selected_id(next);
         }
     }
 
@@ -169,14 +215,22 @@ impl DesignerPane {
             self.fitted = true;
         }
         let view = CanvasView::new(rect, self.state.canvas.viewport());
-        self.input
-            .handle(ui, &response, &view, &mut self.state, self.tool, tr);
+        self.input.handle(
+            ui,
+            &response,
+            &view,
+            &mut self.state,
+            &self.flags,
+            self.tool,
+            tr,
+        );
         self.view = CanvasView::new(rect, self.state.canvas.viewport());
         let palette = crate::theme::palette(ui.ctx().theme());
         rendering::paint(
             &ui.painter_at(rect),
             &self.view,
             &self.state,
+            &self.flags,
             &self.input,
             palette,
             self.widths,

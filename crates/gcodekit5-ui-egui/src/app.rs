@@ -57,6 +57,7 @@ use crate::dialogs::{
 use crate::machine::{Machine, lock};
 use crate::menu::Menus;
 use crate::panes::console::ConsolePane;
+use crate::panes::designer::layers::LayersPane;
 use crate::panes::designer::{DesignerPane, SharedDesigner};
 use crate::panes::editor::{EditorPane, SharedEditor};
 use crate::panes::machine_control::MachineControlPane;
@@ -327,6 +328,7 @@ impl GcodeKitApp {
         workspace.set_pane(Box::new(VisualizerPane::new()));
         let designer = Rc::new(RefCell::new(DesignerPane::new()));
         workspace.set_pane(Box::new(SharedDesigner(Rc::clone(&designer))));
+        workspace.set_pane(Box::new(LayersPane::new(Rc::clone(&designer))));
         workspace.configure(state.config());
         {
             // Wake the event loop whenever the machine reports something.

@@ -3278,3 +3278,9 @@ msgstr "45° en sentido antihorario"
 
 msgid "180°"
 msgstr "180°"
+
+msgid "Show"
+msgstr "Mostrar"
+
+msgid "Lock"
+msgstr "Bloquear"

@@ -15,7 +15,7 @@ use gcodekit5_designer::model::{DesignerShape, Shape};
 use lyon::path::iterator::PathIterator;
 
 use super::editing::{self, HANDLE_SIZE_PT};
-use super::{CanvasInput, CanvasView};
+use super::{CanvasInput, CanvasView, ShapeFlags};
 use crate::theme::{self, Palette};
 
 /// Grid and line widths, in points.
@@ -49,6 +49,7 @@ const FLATTEN_PT: f32 = 0.25;
 /// * `painter` - Painter clipped to the canvas.
 /// * `view` - The view to paint with.
 /// * `state` - The design.
+/// * `flags` - The hidden shapes, which are not painted.
 /// * `input` - The drag and polyline in progress.
 /// * `palette` - Theme colours.
 /// * `widths` - Grid line widths.
@@ -56,6 +57,7 @@ pub fn paint(
     painter: &Painter,
     view: &CanvasView,
     state: &DesignerState,
+    flags: &ShapeFlags,
     input: &CanvasInput,
     palette: &Palette,
     widths: LineWidths,
@@ -88,7 +90,7 @@ pub fn paint(
         Stroke::new(1.0, theme::AXIS_Y),
     );
     paint_polyline(painter, view, input, palette.accent);
-    for obj in state.canvas.shapes() {
+    for obj in state.canvas.shapes().filter(|o| !flags.is_hidden(o.id)) {
         let modified =
             obj.offset.abs() > 1e-6 || obj.fillet.abs() > 1e-6 || obj.chamfer.abs() > 1e-6;
         let stroke = if obj.selected {

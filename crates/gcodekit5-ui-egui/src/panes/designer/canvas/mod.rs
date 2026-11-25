@@ -10,9 +10,12 @@
 //! ([`input`]); [`editing`] has the edits (shape creation, resize, rotate, snap) and
 //! [`rendering`] the painting.
 //!
+//! [`ShapeFlags`] are the layers panel's hidden and locked shapes ([`flags`]).
+//!
 //! Dependencies: `egui`, `glam`, `gcodekit5-designer` (model, viewport, undo commands).
 
 pub mod editing;
+pub mod flags;
 pub mod input;
 pub mod rendering;
 
@@ -20,6 +23,7 @@ use egui::{Pos2, Rect, pos2};
 use gcodekit5_designer::viewport::Viewport;
 use glam::Vec2;
 
+pub use flags::ShapeFlags;
 pub use input::CanvasInput;
 
 /// The tool the canvas's primary button uses.

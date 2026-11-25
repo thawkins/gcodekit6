@@ -3275,3 +3275,9 @@ msgstr "45° gegen den Uhrzeigersinn"
 
 msgid "180°"
 msgstr "180°"
+
+msgid "Show"
+msgstr "Anzeigen"
+
+msgid "Lock"
+msgstr "Sperren"

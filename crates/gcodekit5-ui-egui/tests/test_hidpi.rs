@@ -249,6 +249,21 @@ fn test_designer_click_selects_same_shape_at_every_scale() -> TestResult {
 }
 
 #[test]
+fn test_designer_layers_row_click_selects_same_shape_at_every_scale() -> TestResult {
+    use crate::test_designer_layers::{both_at, click_row, order, sel, three};
+    let _guard = crate::global_env_lock();
+    for ppp in SCALES {
+        let mut harness = both_at(three(), ppp);
+        let ids = order(&harness);
+        for id in [ids[2], ids[0], ids[1]] {
+            click_row(&mut harness, id, egui::Modifiers::NONE);
+            assert_eq!(sel(&harness), vec![id], "row {id} at ppp {ppp}");
+        }
+    }
+    Ok(())
+}
+
+#[test]
 fn test_designer_toolbox_button_click_picks_same_tool_at_every_scale() -> TestResult {
     use crate::test_designer_canvas::{click, harness_at};
     use gcodekit5_ui_egui::panes::designer::DesignerPane;
