@@ -3225,3 +3225,30 @@ msgstr "Impossible d'envoyer ce programme"
 
 msgid "Read-only while a job is running."
 msgstr "Lecture seule pendant l'exécution d'une tâche."
+
+msgid "Front View"
+msgstr "Vue de face"
+
+msgid "Left View"
+msgstr "Vue de gauche"
+
+msgid "Right View"
+msgstr "Vue de droite"
+
+msgid "Bottom View"
+msgstr "Vue de dessous"
+
+msgid "Isometric (NW)"
+msgstr "Isométrique (NO)"
+
+msgid "Isometric (NE)"
+msgstr "Isométrique (NE)"
+
+msgid "Isometric (SW)"
+msgstr "Isométrique (SO)"
+
+msgid "Isometric (SE)"
+msgstr "Isométrique (SE)"
+
+msgid "Fit"
+msgstr "Ajuster"

@@ -42,5 +42,7 @@ mod test_smoke;
 mod test_status_bar;
 #[path = "test_translations.rs"]
 mod test_translations;
+#[path = "test_visualizer.rs"]
+mod test_visualizer;
 #[path = "test_workspace.rs"]
 mod test_workspace;

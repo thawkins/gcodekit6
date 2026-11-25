@@ -3218,3 +3218,30 @@ msgstr "Dieses Programm kann nicht gesendet werden"
 
 msgid "Read-only while a job is running."
 msgstr "Schreibgeschützt, solange ein Auftrag läuft."
+
+msgid "Front View"
+msgstr "Vorderansicht"
+
+msgid "Left View"
+msgstr "Linke Ansicht"
+
+msgid "Right View"
+msgstr "Rechte Ansicht"
+
+msgid "Bottom View"
+msgstr "Untersicht"
+
+msgid "Isometric (NW)"
+msgstr "Isometrisch (NW)"
+
+msgid "Isometric (NE)"
+msgstr "Isometrisch (NO)"
+
+msgid "Isometric (SW)"
+msgstr "Isometrisch (SW)"
+
+msgid "Isometric (SE)"
+msgstr "Isometrisch (SO)"
+
+msgid "Fit"
+msgstr "Einpassen"

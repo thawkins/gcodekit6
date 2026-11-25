@@ -3213,3 +3213,30 @@ msgstr "Não é possível enviar este programa"
 
 msgid "Read-only while a job is running."
 msgstr "Só de leitura enquanto um trabalho está em execução."
+
+msgid "Front View"
+msgstr "Vista frontal"
+
+msgid "Left View"
+msgstr "Vista esquerda"
+
+msgid "Right View"
+msgstr "Vista direita"
+
+msgid "Bottom View"
+msgstr "Vista inferior"
+
+msgid "Isometric (NW)"
+msgstr "Isométrica (NO)"
+
+msgid "Isometric (NE)"
+msgstr "Isométrica (NE)"
+
+msgid "Isometric (SW)"
+msgstr "Isométrica (SO)"
+
+msgid "Isometric (SE)"
+msgstr "Isométrica (SE)"
+
+msgid "Fit"
+msgstr "Ajustar"

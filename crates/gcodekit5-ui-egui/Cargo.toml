@@ -13,6 +13,9 @@ autotests = false
 anyhow = { workspace = true }
 egui = { workspace = true }
 eframe = { workspace = true }
+egui-wgpu = { workspace = true }
+bytemuck = { version = "1.25", features = ["derive"] }
+glam = "0.34"
 craft-ui = { workspace = true, features = ["serde"] }
 craft-window = { workspace = true, features = ["egui"] }
 craft-platform = { workspace = true, features = ["egui", "appearance"] }
@@ -25,12 +28,13 @@ gcodekit5-app = { path = "../gcodekit5-app" }
 gcodekit5-communication = { path = "../gcodekit5-communication" }
 gcodekit5-core = { path = "../gcodekit5-core" }
 gcodekit5-settings = { path = "../gcodekit5-settings" }
+gcodekit5-visualizer = { path = "../gcodekit5-visualizer" }
 serde = { workspace = true }
 tracing = { workspace = true }
 
 [dev-dependencies]
 gcodekit5-app = { path = "../gcodekit5-app", features = ["test-support"] }
-egui_kittest = { workspace = true }
+egui_kittest = { workspace = true, features = ["wgpu", "snapshot"] }
 serde_json = { workspace = true }
 
 [[test]]

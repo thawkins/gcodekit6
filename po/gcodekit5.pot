@@ -3142,3 +3142,30 @@ msgstr ""
 
 msgid "Read-only while a job is running."
 msgstr ""
+
+msgid "Front View"
+msgstr ""
+
+msgid "Left View"
+msgstr ""
+
+msgid "Right View"
+msgstr ""
+
+msgid "Bottom View"
+msgstr ""
+
+msgid "Isometric (NW)"
+msgstr ""
+
+msgid "Isometric (NE)"
+msgstr ""
+
+msgid "Isometric (SW)"
+msgstr ""
+
+msgid "Isometric (SE)"
+msgstr ""
+
+msgid "Fit"
+msgstr ""

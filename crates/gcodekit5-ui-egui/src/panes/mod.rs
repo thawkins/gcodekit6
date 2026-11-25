@@ -5,3 +5,4 @@
 pub mod console;
 pub mod editor;
 pub mod machine_control;
+pub mod visualizer;

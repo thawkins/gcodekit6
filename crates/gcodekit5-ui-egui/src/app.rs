@@ -59,6 +59,7 @@ use crate::menu::Menus;
 use crate::panes::console::ConsolePane;
 use crate::panes::editor::{EditorPane, SharedEditor};
 use crate::panes::machine_control::MachineControlPane;
+use crate::panes::visualizer::VisualizerPane;
 use crate::theme;
 use crate::windows::{AboutWindow, SettingsOutcome, SettingsWindow};
 use crate::workspace::{PaneContext, PaneId, Workspace};
@@ -272,6 +273,10 @@ impl GcodeKitApp {
     /// * `state` - The front end's state.
     pub fn new(cc: &eframe::CreationContext, state: AppState) -> Self {
         theme::install(&cc.egui_ctx);
+        match &cc.wgpu_render_state {
+            Some(render_state) => crate::panes::visualizer::install(render_state),
+            None => tracing::warn!("no wgpu renderer; the visualizer shows no toolpath"),
+        }
         #[cfg_attr(not(target_os = "macos"), allow(unused_mut))]
         let mut app = Self {
             system_theme: craft_platform::appearance::egui_service(),
@@ -314,6 +319,7 @@ impl GcodeKitApp {
         ))));
         let editor = Rc::new(RefCell::new(EditorPane::new()));
         workspace.set_pane(Box::new(SharedEditor(Rc::clone(&editor))));
+        workspace.set_pane(Box::new(VisualizerPane::new()));
         workspace.configure(state.config());
         {
             // Wake the event loop whenever the machine reports something.
@@ -634,13 +640,14 @@ impl GcodeKitApp {
         }
     }
 
-    /// Hands a machine command to the pane that runs it (Machine Control).
-    fn route_machine_command(&mut self, cmd: Command) {
+    /// Hands a command to the pane that runs it: Machine Control the machine commands, the
+    /// Visualizer the view commands.
+    fn route_pane_command(&mut self, cmd: Command) {
         let mut requested = Vec::new();
         let mut ctx = PaneContext::new(&self.state.translator, &mut requested)
             .with_machine(&self.state.machine);
         if !self.workspace.route(cmd, &mut ctx) {
-            tracing::warn!(?cmd, "no pane runs this machine command");
+            tracing::warn!(?cmd, "no pane runs this command");
         }
         self.queue.extend(requested);
     }
@@ -712,7 +719,7 @@ impl GcodeKitApp {
             Command::StreamStart => {
                 // Stream exactly what the editor shows, also within the typing pause.
                 self.sync_editor(true);
-                self.route_machine_command(cmd);
+                self.route_pane_command(cmd);
             }
             Command::Connect
             | Command::Disconnect
@@ -728,14 +735,14 @@ impl GcodeKitApp {
             | Command::JogYPos
             | Command::JogYNeg
             | Command::JogZPos
-            | Command::JogZNeg => self.route_machine_command(cmd),
-            Command::ZoomFit
+            | Command::JogZNeg
+            | Command::ZoomFit
             | Command::ZoomIn
             | Command::ZoomOut
             | Command::ResetView
             | Command::ViewTop
             | Command::ViewFront
-            | Command::ViewIso => tracing::debug!(?cmd, "view command not available yet"),
+            | Command::ViewIso => self.route_pane_command(cmd),
             Command::OpenDeviceManager
             | Command::OpenToolsManager
             | Command::OpenMaterialsManager
