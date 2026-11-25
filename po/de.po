@@ -3602,3 +3602,9 @@ msgstr "Negatives Z für die Ausrichtungslöcher (durch die Platine)"
 
 msgid "Open Gerber Directory"
 msgstr "Gerber-Verzeichnis öffnen"
+
+msgid "Too many dividers: they would not fit the side"
+msgstr "Zu viele Trennwände: sie passen nicht auf die Seite"
+
+msgid "Must be at most 100"
+msgstr "Darf höchstens 100 sein"

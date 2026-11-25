@@ -236,23 +236,50 @@ pub fn check(
     }
 }
 
-/// Rule: greater than zero.
+/// `v` as the generators get it (`f32`), or [`OUT_OF_RANGE`] when it does not fit one (a
+/// value too large becomes infinity).
+fn as_f32(v: f64) -> Result<f32, &'static str> {
+    let v = v as f32;
+    if v.is_finite() {
+        Ok(v)
+    } else {
+        Err(OUT_OF_RANGE)
+    }
+}
+
+/// Rule: greater than zero (compared as the generators do, in `f32`, so a value that rounds
+/// to zero is refused, and one too large for `f32` is [`OUT_OF_RANGE`]).
 pub fn positive(v: f64) -> Option<&'static str> {
-    (v <= 0.0).then_some(MUST_BE_POSITIVE)
+    if v <= 0.0 {
+        return Some(MUST_BE_POSITIVE);
+    }
+    match as_f32(v) {
+        Ok(v) => (v <= 0.0).then_some(MUST_BE_POSITIVE),
+        Err(message) => Some(message),
+    }
 }
 
-/// Rule: zero or more.
+/// Rule: zero or more (compared as the generators do, in `f32`).
 pub fn not_negative(v: f64) -> Option<&'static str> {
-    (v < 0.0).then_some(MUST_NOT_BE_NEGATIVE)
+    match as_f32(v) {
+        Ok(v) => (v < 0.0).then_some(MUST_NOT_BE_NEGATIVE),
+        Err(_) if v < 0.0 => Some(MUST_NOT_BE_NEGATIVE),
+        Err(message) => Some(message),
+    }
 }
 
-/// Rule: at least `min` (compared as the generators do, in `f32`).
+/// Rule: at least `min` (compared as the generators do, in `f32`; a value too large for
+/// `f32` is [`OUT_OF_RANGE`]).
 ///
 /// # Arguments
 /// * `min` - The smallest allowed value.
 /// * `message` - The msgid of the message for a smaller value.
 pub fn at_least(min: f64, message: &'static str) -> impl Fn(f64) -> Option<&'static str> {
-    move |v| ((v as f32) < (min as f32)).then_some(message)
+    move |v| match as_f32(v) {
+        Ok(v) => (v < min as f32).then_some(message),
+        Err(_) if v < min => Some(message),
+        Err(range) => Some(range),
+    }
 }
 
 /// Rule: from `min` to `max`, both allowed (compared as the generators do, in `f32`).

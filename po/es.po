@@ -3605,3 +3605,9 @@ msgstr "Z negativo para los agujeros de alineación (a través de la placa)"
 
 msgid "Open Gerber Directory"
 msgstr "Abrir directorio de Gerber"
+
+msgid "Too many dividers: they would not fit the side"
+msgstr "Demasiados divisores: no caben en el lado"
+
+msgid "Must be at most 100"
+msgstr "Debe ser como máximo 100"

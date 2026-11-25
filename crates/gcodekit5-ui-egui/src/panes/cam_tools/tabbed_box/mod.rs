@@ -71,6 +71,11 @@ const THICKNESS_RANGE: &str = n_!("Must be between 1 and 20 mm");
 const NO_ROOM_FOR_WALLS: &str = n_!("Must be more than twice the thickness");
 const JOINT_TOO_SMALL: &str = n_!("Finger plus space must be at least 0.1");
 const AT_LEAST_ONE: &str = n_!("Must be at least 1");
+const TOO_MANY_DIVIDERS: &str = n_!("Too many dividers: they would not fit the side");
+const TOO_MANY_PASSES: &str = n_!("Must be at most 100");
+
+/// The most laser passes the page accepts (each pass repeats every path).
+const MAX_PASSES: f64 = 100.0;
 
 /// The smallest box side the generator makes (mm).
 const MIN_SIDE_MM: f64 = 20.0;
@@ -124,6 +129,8 @@ pub fn msgids() -> Vec<&'static str> {
         NO_ROOM_FOR_WALLS,
         JOINT_TOO_SMALL,
         AT_LEAST_ONE,
+        TOO_MANY_DIVIDERS,
+        TOO_MANY_PASSES,
         n_!("Box Dimensions"),
         n_!("Box Configuration"),
         n_!("Material Settings"),
@@ -296,10 +303,14 @@ impl TabbedBoxParams {
         };
         let dividers_x = whole(DIVIDERS_X, &self.dividers_x, &not_negative);
         let dividers_y = whole(DIVIDERS_Y, &self.dividers_y, &not_negative);
-        let passes = whole(PASSES, &self.passes, &at_least(1.0, AT_LEAST_ONE));
+        let at_least_one = at_least(1.0, AT_LEAST_ONE);
+        let passes_rule =
+            |v: f64| at_least_one(v).or_else(|| (v > MAX_PASSES).then_some(TOO_MANY_PASSES));
+        let passes = whole(PASSES, &self.passes, &passes_rule);
         let power = whole(POWER, &self.power, &not_negative);
         if strict && errors.is_empty() {
             self.check_joint_and_walls(&mut errors, [x, y, h], thickness, finger, space);
+            self.check_dividers(&mut errors, [x, y], thickness, [dividers_x, dividers_y]);
         }
         if !errors.is_empty() {
             return Err(errors);
@@ -353,6 +364,35 @@ impl TabbedBoxParams {
                 if (side as f32) - 2.0 * (thickness as f32) <= 0.0 {
                     errors.push(FieldError::field(label, NO_ROOM_FOR_WALLS));
                 }
+            }
+        }
+    }
+
+    /// The dividers that do not fit their side: the generator spaces `n` dividers evenly
+    /// over the inside length, so each gap must be wider than one thickness, or the slots
+    /// (one thickness wide, less the burn) and the divider panels overlap. Inside lengths
+    /// are the sizes less the two walls when sizes are outside ones, as the generator takes
+    /// them.
+    fn check_dividers(
+        &self,
+        errors: &mut Vec<FieldError>,
+        sides: [f64; 2],
+        thickness: f64,
+        dividers: [f64; 2],
+    ) {
+        let t = thickness as f32;
+        for ((label, side), count) in [DIVIDERS_X, DIVIDERS_Y]
+            .into_iter()
+            .zip(sides)
+            .zip(dividers)
+        {
+            let inside = if self.outside {
+                side as f32 - 2.0 * t
+            } else {
+                side as f32
+            };
+            if count > 0.0 && inside / (count as f32 + 1.0) <= t {
+                errors.push(FieldError::field(label, TOO_MANY_DIVIDERS));
             }
         }
     }

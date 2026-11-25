@@ -3609,3 +3609,9 @@ msgstr "Z négatif pour les trous d'alignement (à travers la carte)"
 
 msgid "Open Gerber Directory"
 msgstr "Ouvrir le répertoire Gerber"
+
+msgid "Too many dividers: they would not fit the side"
+msgstr "Trop de séparateurs : ils ne tiennent pas sur le côté"
+
+msgid "Must be at most 100"
+msgstr "Doit être au plus 100"

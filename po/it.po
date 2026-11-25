@@ -3605,3 +3605,9 @@ msgstr "Z negativo per i fori di allineamento (attraverso la scheda)"
 
 msgid "Open Gerber Directory"
 msgstr "Apri directory Gerber"
+
+msgid "Too many dividers: they would not fit the side"
+msgstr "Troppi divisori: non entrano nel lato"
+
+msgid "Must be at most 100"
+msgstr "Deve essere al massimo 100"
