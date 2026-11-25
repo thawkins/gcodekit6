@@ -1,3 +1,16 @@
+## [Unreleased] - 2026-11-25 (egui + craft-libs migration, milestone M2: machine control)
+
+### Added
+- **Machine Control panel (egui)**: connect/disconnect, Home, Unlock, position display in mm (2 decimals) or inches (3 decimals), step and press-and-hold jog, feed/rapid/spindle overrides, stream start/pause/stop and a command line
+- **Console panel (egui)**: machine replies and sent lines (`> $H`, `> 0x18 (Reset)`), optional hiding of status reports, 5,000-line limit
+- **Status bar (egui)**: connection, machine state, position, progress, last error and an E-STOP that works with the Machine Control panel hidden
+- **Window**: the egui main window opens maximized
+
+### Fixed
+- **Jog safety**: releasing a jog button, losing focus, hiding the panel, disconnecting or quitting sends a jog cancel; axis inversion is honoured; press-and-hold jogs are clamped to remaining travel (inch `$13` reports converted); jogging only while Idle with a fresh status report
+- **Machine controller**: a jog cancel and a soft reset drop queued jogs; status replies are matched to the queries they answer; command lines reject GRBL control bytes and lines longer than the RX buffer
+- **Keys**: soft reset is Ctrl/Cmd+Shift+K and feed hold Ctrl/Cmd+Shift+H, with no bare-key bindings
+
 ## [Unreleased] - 2026-11-25 (egui + craft-libs migration, milestone M1: app shell)
 
 ### Added
