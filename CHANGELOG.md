@@ -1,3 +1,17 @@
+## [Unreleased] - 2026-11-25 (egui + craft-libs migration, milestone M3: editor and visualizer)
+
+### Added
+- **G-code editor (egui)**: open, edit and save (atomic, refuses read-only files); syntax colours for light and dark; Find; follows the streamed line; clicking a line number selects that line; files over 50,000 lines open in a fast read-only view with "Edit anyway"; read-only while a job runs; Start streams what the editor shows; Save works from the quit prompt; the first G-code file on the command line opens at startup
+- **3D visualizer (egui, wgpu)**: rapid and cut moves in their own colours, streamed lines recoloured as the job runs, grid and origin axes, orbit/pan/zoom/fit and standard views, nav cube, extents and position readout; edits keep the view and a new file refits it; toolpaths build off the UI thread; a toolpath too large for the GPU shows a notice instead of crashing
+- **Tests**: 1M-line editor frame-time and near-limit typing tests run in CI; visualizer snapshot tests on lavapipe; HiDPI hit tests at 1x, 1.5x and 2x
+
+### Changed
+- **File > Open** is refused while a job runs
+
+### Known gaps
+- Typing near the 50,000-line editing limit takes about 0.5-1 s per keystroke
+- Not yet ported from GTK: editor replace and match count; visualizer 2D mode, machine bounds, stock removal and run preview
+
 ## [Unreleased] - 2026-11-25 (egui + craft-libs migration, milestone M2: machine control)
 
 ### Added
