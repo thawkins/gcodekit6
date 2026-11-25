@@ -47,7 +47,7 @@ All six defaults below were confirmed by the user on 2026-11-25.
 - No `.unwrap()`/`.expect()` on user-facing paths; `code-quality.yml` `clippy-unwrap-check` fails on any.
 - `cargo clippy --workspace --all-targets -- -D warnings` and `cargo fmt --all -- --check` clean after every task.
 - Tests live in `crates/<crate>/tests/test_*.rs`, included from the crate's single `tests/all.rs`; `autotests = false`. Run with `cargo nextest run`.
-- Tests never write into the repository; snapshot output goes to `target/temp/` unless it is a checked-in reference image under `crates/gcodekit5-ui-egui/tests/snapshots/`.
+- Tests never write into the repository; snapshot output goes to `target/temp/` unless it is a checked-in reference image under `crates/gcodekit5-ui-egui/tests/snapshots/`. Exception: on a snapshot mismatch egui_kittest writes `*.new.png`, `*.diff.png` and `*.old.png` beside the reference (its output path is the reference path); these appear only on failure and are git-ignored.
 - Internal units: millimetres as `f32`, UTC datetimes, UTF-8 text; UI shows 2 decimal places.
 - No `println!` in application code; `tracing` only.
 - Every public fn has a `///` doc comment; every module a `//!` header.
