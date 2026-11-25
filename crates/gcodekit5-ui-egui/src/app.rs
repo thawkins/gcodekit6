@@ -623,6 +623,7 @@ impl GcodeKitApp {
         self.sync_editor(false);
         self.sync_designer();
         self.deliver_editor_gcode();
+        self.deliver_designer_shapes();
         self.ask_cam_preset();
         self.deliver_machine_events();
         self.queue = queue;

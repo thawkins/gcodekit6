@@ -11,7 +11,8 @@
 //! [`layers`] is the Layers pane and [`properties`] the Properties pane. The Text tool opens
 //! the Add Text dialog ([`canvas::text_tool`]). The toolbox's "Shape Gallery…" opens
 //! [`shape_gallery`]; the shape it arms is placed by the next canvas click. New, Open, Save
-//! and Import are [`file_ops`]; G-code and SVG output (Export, the toolbox's Generate G-Code
+//! and Import are [`file_ops`]; the shapes a CAM page generates are added by
+//! [`DesignerPane::add_generated_paths`]; G-code and SVG output (Export, the toolbox's Generate G-Code
 //! and Frame) are [`export`], the outcome shown as the pane's notice. Not ported here:
 //! scrollbars, the device's work area (the default 250 x 250 mm is shown), and the context
 //! menu's other entries.
@@ -22,6 +23,7 @@
 pub mod canvas;
 pub mod export;
 pub mod file_ops;
+mod generated;
 pub mod layers;
 pub mod properties;
 pub mod shape_gallery;

@@ -37,6 +37,15 @@ pub fn open_tool(tool: CamTool) -> Harness<'static, GcodeKitApp> {
     h
 }
 
+/// Clicks the button `label`, scrolling the page to it first (a tall page leaves its buttons
+/// below the fold), then lets the app handle the request.
+pub fn click(h: &mut Harness<'static, GcodeKitApp>, label: &str) {
+    h.get_by_label(label).scroll_to_me();
+    frames(h, 2);
+    h.get_by_label(label).click();
+    frames(h, 3);
+}
+
 pub fn pane<'a>(h: &'a Harness<'static, GcodeKitApp>) -> std::cell::RefMut<'a, CamToolsPane> {
     h.state().cam_tools().borrow_mut()
 }

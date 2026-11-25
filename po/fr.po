@@ -3474,3 +3474,33 @@ msgstr "L'appareil est en mode laser ($32=1). Passez-le en mode CNC pour utilise
 
 msgid "Another program is waiting to go to the editor; this one was not sent."
 msgstr "Un autre programme attend d'être envoyé à l'éditeur ; celui-ci n'a pas été envoyé."
+
+msgid "Must be at least 50 mm"
+msgstr "Doit être d'au moins 50 mm"
+
+msgid "Must be a whole number from 2 to 20"
+msgstr "Doit être un nombre entier de 2 à 20"
+
+msgid "Pieces would be narrower than 15 mm"
+msgstr "Les pièces seraient plus étroites que 15 mm"
+
+msgid "Pieces would be shorter than 15 mm"
+msgstr "Les pièces seraient moins hautes que 15 mm"
+
+msgid "Must be between 10 and 30"
+msgstr "Doit être compris entre 10 et 30"
+
+msgid "Must be between 0 and 13"
+msgstr "Doit être compris entre 0 et 13"
+
+msgid "Must be between 0 and 10 mm"
+msgstr "Doit être compris entre 0 et 10 mm"
+
+msgid "Must be a whole number from 0 to 4294967295"
+msgstr "Doit être un nombre entier de 0 à 4294967295"
+
+msgid "Randomize"
+msgstr "Aléatoire"
+
+msgid "Not a whole number"
+msgstr "Pas un nombre entier"

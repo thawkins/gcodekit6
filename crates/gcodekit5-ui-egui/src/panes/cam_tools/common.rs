@@ -28,6 +28,11 @@ pub enum CamAction {
     LoadPreset,
     /// Save the page's input to a preset file (GTK's Save).
     SavePreset,
+    /// Generate the page's shapes and add them to the design in the designer (GTK's jigsaw
+    /// Generate and the tabbed box's Generate Shapes).
+    SendToDesigner,
+    /// Choose the Gerber project folder (GTK's Browse).
+    ChooseFolder,
 }
 
 /// Why a page produced no program.
@@ -102,6 +107,8 @@ pub const NOT_A_NUMBER: &str = n_!("Not a number");
 pub const MUST_BE_POSITIVE: &str = n_!("Must be greater than 0");
 /// Message: the value must not be below zero.
 pub const MUST_NOT_BE_NEGATIVE: &str = n_!("Must not be negative");
+/// Message: the text is not a whole number.
+pub const NOT_A_WHOLE_NUMBER: &str = n_!("Not a whole number");
 /// Message: the value is outside the field's range.
 pub const OUT_OF_RANGE: &str = n_!("Out of range");
 /// Message: the tool needs a Z axis.
@@ -113,6 +120,7 @@ pub fn msgids() -> Vec<&'static str> {
     vec![
         NOT_A_LENGTH,
         NOT_A_NUMBER,
+        NOT_A_WHOLE_NUMBER,
         MUST_BE_POSITIVE,
         MUST_NOT_BE_NEGATIVE,
         OUT_OF_RANGE,
@@ -157,6 +165,20 @@ pub fn parse_number(text: &str) -> Result<f64, &'static str> {
         .ok()
         .filter(|v| v.is_finite())
         .ok_or(NOT_A_NUMBER)
+}
+
+/// Reads a whole number (a piece count, laser passes).
+///
+/// # Arguments
+/// * `text` - The field's text.
+///
+/// # Errors
+/// [`NOT_A_WHOLE_NUMBER`] when the text is not an integer.
+pub fn parse_whole(text: &str) -> Result<f64, &'static str> {
+    text.trim()
+        .parse::<i64>()
+        .map(|v| v as f64)
+        .map_err(|_| NOT_A_WHOLE_NUMBER)
 }
 
 /// The text of `mm` in `units`, as a length field shows it.
@@ -222,6 +244,51 @@ pub fn positive(v: f64) -> Option<&'static str> {
 /// Rule: zero or more.
 pub fn not_negative(v: f64) -> Option<&'static str> {
     (v < 0.0).then_some(MUST_NOT_BE_NEGATIVE)
+}
+
+/// Rule: at least `min` (compared as the generators do, in `f32`).
+///
+/// # Arguments
+/// * `min` - The smallest allowed value.
+/// * `message` - The msgid of the message for a smaller value.
+pub fn at_least(min: f64, message: &'static str) -> impl Fn(f64) -> Option<&'static str> {
+    move |v| ((v as f32) < (min as f32)).then_some(message)
+}
+
+/// Rule: from `min` to `max`, both allowed (compared as the generators do, in `f32`).
+///
+/// # Arguments
+/// * `min` - The smallest allowed value.
+/// * `max` - The largest allowed value.
+/// * `message` - The msgid of the message for a value outside.
+pub fn between(min: f64, max: f64, message: &'static str) -> impl Fn(f64) -> Option<&'static str> {
+    move |v| {
+        let v = v as f32;
+        (v < min as f32 || v > max as f32).then_some(message)
+    }
+}
+
+/// `rule` while `strict`, no rule otherwise: a preset only needs its fields to parse.
+///
+/// # Arguments
+/// * `strict` - Whether the rule applies.
+/// * `rule` - The rule.
+pub fn gated(
+    strict: bool,
+    rule: impl Fn(f64) -> Option<&'static str>,
+) -> impl Fn(f64) -> Option<&'static str> {
+    move |v| if strict { rule(v) } else { None }
+}
+
+/// The first of `errors`, as a preset's refusal.
+///
+/// # Arguments
+/// * `errors` - The problems found.
+pub fn first_error(errors: Vec<FieldError>) -> FieldError {
+    errors
+        .into_iter()
+        .next()
+        .unwrap_or_else(|| FieldError::page(n_!("Invalid Parameters")))
 }
 
 /// Rule: any value.
@@ -422,20 +489,46 @@ pub fn apply_text(text: &mut String, map: &serde_json::Map<String, serde_json::V
 /// # Returns
 /// The button pressed, if any.
 pub fn gcode_actions(ui: &mut egui::Ui, tr: &Translator, valid: bool) -> CamAction {
+    action_row(
+        ui,
+        tr,
+        valid,
+        &[
+            (n_!("Generate"), CamAction::Generate),
+            (n_!("Send to Editor"), CamAction::SendToEditor),
+            (n_!("Preview"), CamAction::Preview),
+        ],
+    )
+}
+
+/// The page's action buttons, disabled while the input has problems, then Load and Save of
+/// the page's preset (always enabled).
+///
+/// # Arguments
+/// * `ui` - The page's `Ui`.
+/// * `tr` - Translator for the current UI language.
+/// * `valid` - Whether the input has no problems.
+/// * `buttons` - The action buttons: label msgid and what the button asks for.
+///
+/// # Returns
+/// The button pressed, if any.
+pub fn action_row(
+    ui: &mut egui::Ui,
+    tr: &Translator,
+    valid: bool,
+    buttons: &[(&'static str, CamAction)],
+) -> CamAction {
     let mut action = CamAction::None;
     ui.add_space(8.0);
-    ui.horizontal(|ui| {
-        ui.add_enabled_ui(valid, |ui| {
-            for (msgid, what) in [
-                (n_!("Generate"), CamAction::Generate),
-                (n_!("Send to Editor"), CamAction::SendToEditor),
-                (n_!("Preview"), CamAction::Preview),
-            ] {
-                if ui.button(tr.tr(msgid)).clicked() {
-                    action = what;
-                }
+    ui.horizontal_wrapped(|ui| {
+        for (msgid, what) in buttons {
+            if ui
+                .add_enabled(valid, egui::Button::new(tr.tr(msgid)))
+                .clicked()
+            {
+                action = *what;
             }
-        });
+        }
         ui.separator();
         for (msgid, what) in [
             (n_!("Load"), CamAction::LoadPreset),

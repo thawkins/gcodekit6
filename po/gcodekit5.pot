@@ -3391,3 +3391,33 @@ msgstr ""
 
 msgid "Another program is waiting to go to the editor; this one was not sent."
 msgstr ""
+
+msgid "Must be at least 50 mm"
+msgstr ""
+
+msgid "Must be a whole number from 2 to 20"
+msgstr ""
+
+msgid "Pieces would be narrower than 15 mm"
+msgstr ""
+
+msgid "Pieces would be shorter than 15 mm"
+msgstr ""
+
+msgid "Must be between 10 and 30"
+msgstr ""
+
+msgid "Must be between 0 and 13"
+msgstr ""
+
+msgid "Must be between 0 and 10 mm"
+msgstr ""
+
+msgid "Must be a whole number from 0 to 4294967295"
+msgstr ""
+
+msgid "Randomize"
+msgstr ""
+
+msgid "Not a whole number"
+msgstr ""

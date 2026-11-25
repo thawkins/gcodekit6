@@ -349,6 +349,21 @@ impl GcodeKitApp {
         }
     }
 
+    /// Adds the shapes a CAM page generated to the design and brings the designer to the
+    /// front (GTK switched to the designer tab).
+    pub(super) fn deliver_designer_shapes(&mut self) {
+        let Some(generated) = self.cam_tools.borrow_mut().take_designer_request() else {
+            return;
+        };
+        self.designer.borrow_mut().add_generated_paths(&generated);
+        let shown = self.workspace.apply(craft_ui::docking::Action::Activate {
+            panel: PaneId::Designer,
+        });
+        if let Err(error) = shown {
+            tracing::warn!(?error, "designer not brought to the front");
+        }
+    }
+
     /// Delivers one handoff, or asks first about the editor's unsaved edits.
     fn deliver_handoff(&mut self, handoff: Handoff) {
         if self.refuse_editor_gcode_during_job(handoff) {
