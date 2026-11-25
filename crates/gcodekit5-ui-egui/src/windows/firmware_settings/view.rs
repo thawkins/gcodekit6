@@ -13,6 +13,7 @@ use gcodekit5_app::i18n::Translator;
 
 use super::{Edit, FileRequest, FirmwareSettingsWindow};
 use crate::machine::Machine;
+use crate::windows::help::{self, HelpTopic};
 
 impl FirmwareSettingsWindow {
     /// Draws the window (and the open editor) while it is open.
@@ -87,6 +88,7 @@ impl FirmwareSettingsWindow {
             if load.clicked() {
                 self.file_request = Some(FileRequest::Load);
             }
+            help::help_button(ui, HelpTopic::DeviceConfig, tr);
         });
         ui.horizontal(|ui| {
             let label = ui.label(tr.tr(n_!("Filter:")));

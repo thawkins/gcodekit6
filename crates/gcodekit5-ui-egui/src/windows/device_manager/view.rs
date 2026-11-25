@@ -15,6 +15,7 @@ use gcodekit5_settings::config::Config;
 
 use super::{DeviceManagerWindow, Edit, Tab};
 use crate::machine::Machine;
+use crate::windows::help::{HelpTopic, help_row};
 
 /// What the action bar asked for this frame.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -59,6 +60,7 @@ impl DeviceManagerWindow {
 
     fn contents(&mut self, ui: &mut egui::Ui, machine: &Machine, config: &Config, tr: &Translator) {
         let (units, feed_units) = (config.ui.measurement_system, config.ui.feed_rate_units);
+        help_row(ui, HelpTopic::DeviceManager, tr);
         ui.horizontal_top(|ui| {
             let size = egui::vec2(250.0, ui.available_height());
             ui.allocate_ui_with_layout(size, egui::Layout::top_down(egui::Align::Min), |ui| {

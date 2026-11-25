@@ -26,6 +26,7 @@ use gcodekit5_app::i18n::Translator;
 use gcodekit5_app::machine::{MachineController, MachineEvent};
 
 use crate::machine::{MachineStatus, lock, worker_message};
+use crate::windows::help::{self, HelpTopic};
 use crate::workspace::{Pane, PaneContext, PaneId};
 
 /// Messages the log keeps; older ones are dropped (the GTK console keeps 5000 lines too).
@@ -259,6 +260,8 @@ impl Pane for ConsolePane {
                     if ui.button(tr.tr("Clear")).clicked() {
                         self.log.clear();
                     }
+                    // GTK's console header had the Machine Control help button.
+                    help::help_button(ui, HelpTopic::MachineControl, tr);
                 });
                 self.show_entry(ui, tr, &status);
             });

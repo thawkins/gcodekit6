@@ -6,6 +6,7 @@
 use gcodekit5_app::i18n::Translator;
 
 use super::CamToolsPane;
+use crate::windows::help::HelpTopic;
 use crate::workspace::PaneId;
 
 /// One CAM tool of the picker.
@@ -44,6 +45,21 @@ impl CamTool {
         CamTool::DrillPress,
         CamTool::ProbeRoutines,
     ];
+
+    /// The help topic of the tool's page (GTK's page help button); Probe Tools has none.
+    pub fn help_topic(self) -> Option<HelpTopic> {
+        match self {
+            CamTool::Jigsaw => Some(HelpTopic::JigsawPuzzle),
+            CamTool::TabbedBox => Some(HelpTopic::TabbedBoxMaker),
+            CamTool::BitmapEngraving => Some(HelpTopic::LaserImageEngraver),
+            CamTool::SpeedsFeeds => Some(HelpTopic::SpeedsFeedsCalculator),
+            CamTool::Gerber => Some(HelpTopic::Gerber),
+            CamTool::SpoilboardGrid => Some(HelpTopic::SpoilboardGrid),
+            CamTool::SpoilboardSurfacing => Some(HelpTopic::SpoilboardSurfacing),
+            CamTool::DrillPress => Some(HelpTopic::DrillPress),
+            CamTool::ProbeRoutines => None,
+        }
+    }
 
     /// The msgid of the tool's title.
     pub fn title_msgid(self) -> &'static str {

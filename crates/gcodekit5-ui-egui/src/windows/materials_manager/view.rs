@@ -11,6 +11,8 @@ use gcodekit5_app::material_form::{
     chip_type_label, hazard_level_label, heat_sensitivity_label, surface_finish_label,
 };
 
+use crate::windows::help::{HelpTopic, help_row};
+
 use super::{MaterialsManagerWindow, Next, Question, Tab};
 
 /// What the action bar asked for this frame.
@@ -43,6 +45,7 @@ impl MaterialsManagerWindow {
     }
 
     fn contents(&mut self, ui: &mut egui::Ui, tr: &Translator) {
+        help_row(ui, HelpTopic::MaterialsManager, tr);
         ui.horizontal_top(|ui| {
             let size = egui::vec2(260.0, ui.available_height());
             ui.allocate_ui_with_layout(size, egui::Layout::top_down(egui::Align::Min), |ui| {

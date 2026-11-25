@@ -59,6 +59,7 @@ use tabbed_box::TabbedBoxParams;
 pub use tools::{CamTool, Category};
 
 use crate::machine::Machine;
+use crate::windows::help;
 
 /// How a page's program reaches the editor.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -545,6 +546,9 @@ impl CamToolsPane {
                 self.open = None;
             }
             ui.heading(tr.tr(tool.title_msgid()));
+            if let Some(topic) = tool.help_topic() {
+                help::help_button(ui, topic, tr);
+            }
         });
         ui.separator();
         egui::ScrollArea::vertical()

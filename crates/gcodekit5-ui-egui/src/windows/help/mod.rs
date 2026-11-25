@@ -195,6 +195,20 @@ pub fn help_button(ui: &mut egui::Ui, topic: HelpTopic, tr: &Translator) {
     }
 }
 
+/// A row with a [`help_button`] at its right end, for the top of a window.
+///
+/// # Arguments
+/// * `ui` - Where the row goes.
+/// * `topic` - The topic the button opens.
+/// * `tr` - Translates the tooltip.
+pub fn help_row(ui: &mut egui::Ui, topic: HelpTopic, tr: &Translator) {
+    ui.horizontal(|ui| {
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            help_button(ui, topic, tr);
+        });
+    });
+}
+
 /// Takes the topic a [`help_button`] asked for this frame, if any.
 ///
 /// # Arguments

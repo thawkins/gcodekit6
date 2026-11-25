@@ -10,6 +10,8 @@ use gcodekit5_app::tool_form::{
     has_corner_radius, has_tip_angle, tool_material_label, tool_summary, tool_type_label,
 };
 
+use crate::windows::help::{HelpTopic, help_row};
+
 use super::{GtcFile, Next, Question, Tab, ToolsFileRequest, ToolsManagerWindow};
 
 /// What the action bar asked for this frame.
@@ -42,6 +44,7 @@ impl ToolsManagerWindow {
     }
 
     fn contents(&mut self, ui: &mut egui::Ui, tr: &Translator) {
+        help_row(ui, HelpTopic::ToolsManager, tr);
         ui.horizontal_top(|ui| {
             let size = egui::vec2(300.0, ui.available_height());
             ui.allocate_ui_with_layout(size, egui::Layout::top_down(egui::Align::Min), |ui| {

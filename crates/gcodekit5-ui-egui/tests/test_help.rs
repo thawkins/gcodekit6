@@ -15,7 +15,10 @@ use gcodekit5_ui_egui::resources;
 use gcodekit5_ui_egui::windows::help::markdown::{Block, LinkTarget, Span, parse};
 use gcodekit5_ui_egui::windows::help::{HelpTopic, HelpWindow, load_topic};
 
+use gcodekit5_ui_egui::panes::cam_tools::CamTool;
+
 use crate::machine_support::{app_harness, loopback_state};
+use crate::test_cam_drill_press::open_tool;
 
 /// A harness drawing only the help window, in English.
 fn help_harness(topic: HelpTopic) -> Harness<'static, HelpWindow> {
@@ -358,4 +361,91 @@ fn test_help_f1_command_opens_index() {
         h.query_by_label("GCodeKit5 Help").is_some(),
         "index not shown"
     );
+}
+/// The labels of every "Help (F1)" button on screen.
+fn help_buttons(h: &Harness<'static, GcodeKitApp>) -> usize {
+    h.query_all_by_label("Help (F1)").count()
+}
+
+/// Clicks the help button inside the window titled `title` and returns the topic opened.
+fn click_window_help(h: &mut Harness<'static, GcodeKitApp>, title: &str) -> HelpTopic {
+    h.get_by_role_and_label(Role::Window, title)
+        .get_by_label("Help (F1)")
+        .click();
+    h.run_steps(3);
+    assert!(h.state().help().is_open(), "{title}: help not open");
+    h.state().help().current()
+}
+
+#[test]
+fn test_help_buttons_open_the_window_topic() {
+    for (command, title, topic) in [
+        (
+            Command::OpenFirmwareSettings,
+            "Firmware Settings",
+            HelpTopic::DeviceConfig,
+        ),
+        (
+            Command::OpenDeviceManager,
+            "Device Manager",
+            HelpTopic::DeviceManager,
+        ),
+        (
+            Command::OpenToolsManager,
+            "CNC Tools",
+            HelpTopic::ToolsManager,
+        ),
+        (
+            Command::OpenMaterialsManager,
+            "Materials Manager",
+            HelpTopic::MaterialsManager,
+        ),
+    ] {
+        let (state, _shared) = loopback_state(std::time::Duration::from_millis(1));
+        let mut h = app_harness(GcodeKitApp::from_state(state));
+        let before = help_buttons(&h);
+        h.state_mut().dispatch(command);
+        h.run_steps(3);
+        assert_eq!(help_buttons(&h), before + 1, "{title}: no help button");
+        assert_eq!(click_window_help(&mut h, title), topic, "{title}");
+    }
+}
+
+#[test]
+fn test_help_console_and_cam_pages_open_their_topic() {
+    let (state, _shared) = loopback_state(std::time::Duration::from_millis(1));
+    let mut h = app_harness(GcodeKitApp::from_state(state));
+    h.run_steps(2);
+    // The console's help button (GTK's console header) opens Machine Control.
+    h.get_by_label("Help (F1)").click();
+    h.run_steps(3);
+    assert_eq!(h.state().help().current(), HelpTopic::MachineControl);
+
+    for tool in CamTool::ALL {
+        let expected = match tool {
+            CamTool::Jigsaw => Some("jigsaw_puzzle"),
+            CamTool::TabbedBox => Some("tabbed_box_maker"),
+            CamTool::BitmapEngraving => Some("laser_image_engraver"),
+            CamTool::SpeedsFeeds => Some("speeds_feeds_calculator"),
+            CamTool::Gerber => Some("gerber"),
+            CamTool::SpoilboardGrid => Some("spoilboard_grid"),
+            CamTool::SpoilboardSurfacing => Some("spoilboard_surfacing"),
+            CamTool::DrillPress => Some("drill_press"),
+            CamTool::ProbeRoutines => None,
+        };
+        assert_eq!(tool.help_topic().map(HelpTopic::id), expected, "{tool:?}");
+    }
+    let mut h = open_tool(CamTool::Gerber);
+    let before = h.state().help().is_open();
+    assert!(!before);
+    let buttons: Vec<_> = h.query_all_by_label("Help (F1)").collect();
+    assert_eq!(buttons.len(), 2, "console and Gerber page help buttons");
+    // The page's button is the one drawn first (the CAM pane is above the console).
+    let page = buttons
+        .iter()
+        .min_by(|a, b| a.rect().top().total_cmp(&b.rect().top()))
+        .expect("page button");
+    page.click();
+    h.run_steps(3);
+    assert_eq!(h.state().help().current(), HelpTopic::Gerber);
 }
