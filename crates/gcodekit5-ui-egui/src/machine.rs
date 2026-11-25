@@ -292,7 +292,9 @@ impl Machine {
     }
 
     /// Whether a program is streaming, also between a successful start and its first
-    /// progress report.
+    /// progress report. This is the app's one "machine busy" predicate: it covers any
+    /// stream the controller runs, a probe routine's included, and the controller's halt of
+    /// a stop-on-error stream (the controller streams until the halt's reset ends it).
     pub fn job_running(&self) -> bool {
         self.status.streaming || lock(&self.controller).is_streaming()
     }
