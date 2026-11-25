@@ -186,6 +186,8 @@ impl VisualizerPane {
         match program {
             Some(lines) => {
                 self.building = true;
+                // A new build replaces the failed one, so its notice no longer applies.
+                self.build_failed = false;
                 self.worker
                     .request(self.generation, lines, self.applied.clone(), repaint);
             }

@@ -602,6 +602,15 @@ fn test_panicking_build_leaves_worker_usable() -> TestResult {
         .iter()
         .map(|s| s.to_string())
         .collect();
+    // Loading C starts its build; the notice for B is gone before any poll sees the result.
+    let ctx = harness.ctx.clone();
+    harness
+        .state_mut()
+        .load_program(Some(c.clone().into()), &ctx);
+    assert!(
+        !harness.state().build_failed(),
+        "notice cleared as soon as the new build starts"
+    );
     load(&mut harness, c.into())?;
     assert!(harness.state().toolpath_generation().is_some());
     assert!(

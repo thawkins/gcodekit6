@@ -197,6 +197,15 @@ impl EditorBuffer {
 /// or a full disk never leaves a half-written program. An existing file's permissions are
 /// kept; the temporary file is removed when anything fails.
 fn write_atomic(path: &Path, text: &str) -> std::io::Result<()> {
+    // The rename below would replace a read-only target, which a plain write refuses.
+    if let Ok(existing) = std::fs::metadata(path)
+        && existing.permissions().readonly()
+    {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::PermissionDenied,
+            "target file is read-only",
+        ));
+    }
     let name = path.file_name().map_or_else(
         || "program".to_string(),
         |name| name.to_string_lossy().into_owned(),

@@ -280,6 +280,24 @@ fn app_with_running_job(text: &str) -> GcodeKitApp {
 }
 
 #[test]
+fn test_save_refuses_read_only_file_and_keeps_content() -> TestResult {
+    let dir = scratch("read_only_save")?;
+    let path = write(&dir, "locked.gcode", "G0 X0\n")?;
+    let mut buffer = EditorBuffer::load(&path)?;
+    buffer.set_text("G1 X9\n".to_string());
+    let original = std::fs::metadata(&path)?.permissions();
+    let mut locked = original.clone();
+    locked.set_readonly(true);
+    std::fs::set_permissions(&path, locked)?;
+    let result = buffer.save();
+    // Restore the original mode before asserting, so the scratch dir can be cleaned up.
+    std::fs::set_permissions(&path, original)?;
+    assert!(result.is_err(), "save over a read-only file must fail");
+    assert_eq!(std::fs::read_to_string(&path)?, "G0 X0\n");
+    Ok(())
+}
+
+#[test]
 fn test_open_is_refused_while_a_job_runs() -> TestResult {
     let dir = scratch("open_job")?;
     let path = write(&dir, "other.gcode", "G1 X99 F100\n")?;
