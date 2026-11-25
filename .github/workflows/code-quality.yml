@@ -118,10 +118,10 @@ jobs:
         env:
           WGPU_BACKEND: vulkan
 
-      # Review Focus 2: the egui editor draws a 1,000,000-line file within its frame budget.
+      # Review Focus 2: the egui editor draws a 1,000,000-line file, and a keystroke in a 49,999-line file, within frame budgets.
       # Ignored in the default run (generating the file is slow), so it runs here on its own.
       - name: Run large-file frame-time test
-        run: cargo nextest run -p gcodekit5-ui-egui --profile ci --run-ignored only -E 'test(test_large_file_frame_time)'
+        run: cargo nextest run -p gcodekit5-ui-egui --profile ci --run-ignored only -E 'test(test_large_file_frame_time) + test(test_near_threshold_edit_frame_time)'
         env:
           WGPU_BACKEND: vulkan
 

@@ -2365,6 +2365,7 @@ dependencies = [
  "gcodekit5-communication",
  "gcodekit5-core",
  "gcodekit5-settings",
+ "gcodekit5-ui-egui",
  "gcodekit5-visualizer",
  "glam 0.34.3",
  "raw-window-handle",

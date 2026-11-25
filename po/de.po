@@ -3248,3 +3248,12 @@ msgstr "Einpassen"
 
 msgid "Toolpath too large to display on this GPU."
 msgstr "Werkzeugbahn zu groß für die Anzeige auf dieser GPU."
+
+msgid "Bounds {axis}: {min} to {max} {unit}"
+msgstr "Grenzen {axis}: {min} bis {max} {unit}"
+
+msgid "Could not draw this toolpath."
+msgstr "Diese Werkzeugbahn konnte nicht gezeichnet werden."
+
+msgid "Stop the running job before opening a file."
+msgstr "Beenden Sie den laufenden Auftrag, bevor Sie eine Datei öffnen."

@@ -88,7 +88,7 @@ impl EditorBuffer {
     /// # Errors
     /// The file cannot be written.
     pub fn save_as(&mut self, path: &Path) -> anyhow::Result<()> {
-        std::fs::write(path, &self.text)
+        write_atomic(path, &self.text)
             .with_context(|| format!("cannot write {}", path.display()))?;
         self.path = Some(path.to_path_buf());
         self.dirty = false;
@@ -176,10 +176,45 @@ impl EditorBuffer {
         self.line_starts.partition_point(|&start| start <= byte) - 1
     }
 
+    /// The byte offset where `line` (0-based, clamped to the text) starts.
+    ///
+    /// # Arguments
+    /// * `line` - The line.
+    pub fn line_start(&self, line: usize) -> usize {
+        self.line_starts
+            .get(line)
+            .copied()
+            .unwrap_or_else(|| self.line_starts.last().copied().unwrap_or(0))
+    }
+
     /// Bumped on every edit; tells whether the text changed since a value was taken.
     pub fn generation(&self) -> u64 {
         self.generation
     }
+}
+
+/// Writes `text` to a temporary file beside `path`, then renames it over `path`, so a crash
+/// or a full disk never leaves a half-written program. An existing file's permissions are
+/// kept; the temporary file is removed when anything fails.
+fn write_atomic(path: &Path, text: &str) -> std::io::Result<()> {
+    let name = path.file_name().map_or_else(
+        || "program".to_string(),
+        |name| name.to_string_lossy().into_owned(),
+    );
+    let temp = path.with_file_name(format!(".{name}.{}.tmp", std::process::id()));
+    let result = std::fs::write(&temp, text)
+        .and_then(|()| match std::fs::metadata(path) {
+            Ok(existing) => std::fs::set_permissions(&temp, existing.permissions()),
+            Err(_) => Ok(()),
+        })
+        .and_then(|()| std::fs::rename(&temp, path));
+    if result.is_err() {
+        // The write error is the one to report; a leftover temp file is only logged.
+        if let Err(error) = std::fs::remove_file(&temp) {
+            tracing::debug!(%error, "temporary save file not removed");
+        }
+    }
+    result
 }
 
 /// For each line the machine streams from `text` (in order), the editor line (0-based) it

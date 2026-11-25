@@ -3172,3 +3172,12 @@ msgstr ""
 
 msgid "Toolpath too large to display on this GPU."
 msgstr ""
+
+msgid "Bounds {axis}: {min} to {max} {unit}"
+msgstr ""
+
+msgid "Could not draw this toolpath."
+msgstr ""
+
+msgid "Stop the running job before opening a file."
+msgstr ""

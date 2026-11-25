@@ -79,6 +79,8 @@ pub struct VisualizerPane {
     worker: BuildWorker,
     /// A build for `generation` was requested and has not arrived.
     building: bool,
+    /// The last build failed, so nothing is drawn for the current program.
+    build_failed: bool,
     /// Counts programs loaded, to tag each mesh.
     generation: u64,
     /// Program lines the machine acknowledged in the current or last stream.
@@ -106,6 +108,7 @@ impl VisualizerPane {
             cut_bounds: None,
             worker: BuildWorker::new(),
             building: false,
+            build_failed: false,
             generation: 0,
             progress: 0,
             units: MeasurementSystem::Metric,
@@ -142,6 +145,12 @@ impl VisualizerPane {
     /// Whether a toolpath is still being built.
     pub fn is_building(&self) -> bool {
         self.building
+    }
+
+    /// Whether the build of the current program failed (the OSD says so, and no toolpath of
+    /// an earlier program is left on screen).
+    pub fn build_failed(&self) -> bool {
+        self.build_failed
     }
 
     /// Program lines acknowledged in the current or last stream.
@@ -183,12 +192,18 @@ impl VisualizerPane {
             None => {
                 self.worker.cancel(self.generation);
                 self.building = false;
-                self.applied = None;
-                self.mesh = None;
-                self.bounds = None;
-                self.cut_bounds = None;
+                self.build_failed = false;
+                self.clear_toolpath();
             }
         }
+    }
+
+    /// Drops the toolpath shown, so nothing of an earlier program stays on screen.
+    fn clear_toolpath(&mut self) {
+        self.applied = None;
+        self.mesh = None;
+        self.bounds = None;
+        self.cut_bounds = None;
     }
 
     /// Takes the finished build, if any.
@@ -196,12 +211,16 @@ impl VisualizerPane {
         match self.worker.take() {
             Some(Outcome::Done(built)) if built.generation == self.generation => {
                 self.building = false;
+                self.build_failed = false;
                 self.applied = self.program.clone();
                 self.set_mesh(built.mesh, built.replaced);
             }
             Some(Outcome::Failed { generation }) if generation == self.generation => {
-                // Already logged by the worker; stay usable for the next program.
+                // Already logged by the worker. The machine already holds this program, so
+                // the previous program's toolpath must not stay up as if it were this one.
                 self.building = false;
+                self.build_failed = true;
+                self.clear_toolpath();
             }
             Some(Outcome::Done(_) | Outcome::Failed { .. }) | None => {}
         }
@@ -325,6 +344,7 @@ impl Pane for VisualizerPane {
             osd::Overlay {
                 loaded,
                 too_large,
+                failed: self.build_failed,
                 bounds: bounds.as_ref(),
                 tool,
             },

@@ -19,8 +19,7 @@ use crate::panes::machine_control::format_length;
 /// The msgids the OSD shows, for the translation check.
 pub fn msgids() -> Vec<&'static str> {
     vec![
-        n_!("Bounds"),
-        n_!("to"),
+        n_!("Bounds {axis}: {min} to {max} {unit}"),
         n_!("Position"),
         n_!("No G-code loaded"),
         n_!("Open a file to preview toolpaths."),
@@ -29,6 +28,7 @@ pub fn msgids() -> Vec<&'static str> {
         n_!("Shift+Left button+Drag: Pan"),
         n_!("Mouse wheel: Zoom+/-"),
         n_!("Toolpath too large to display on this GPU."),
+        n_!("Could not draw this toolpath."),
     ]
 }
 
@@ -39,18 +39,17 @@ pub fn msgids() -> Vec<&'static str> {
 /// * `units` - The measurement system to show.
 /// * `tr` - Translator for the current UI language.
 pub fn bounds_lines(bounds: &Aabb, units: MeasurementSystem, tr: &Translator) -> Vec<String> {
-    let label = tr.tr("Bounds");
-    let to = tr.tr("to");
+    let template = tr.tr("Bounds {axis}: {min} to {max} {unit}");
     let unit = get_unit_label(units);
     ["X", "Y", "Z"]
         .into_iter()
         .zip(bounds.min.to_array().into_iter().zip(bounds.max.to_array()))
         .map(|(axis, (min, max))| {
-            format!(
-                "{label} {axis}: {} {to} {} {unit}",
-                format_length(min, units),
-                format_length(max, units)
-            )
+            template
+                .replace("{axis}", axis)
+                .replace("{min}", &format_length(min, units))
+                .replace("{max}", &format_length(max, units))
+                .replace("{unit}", unit)
         })
         .collect()
 }
@@ -103,6 +102,8 @@ pub struct Overlay<'a> {
     pub loaded: bool,
     /// Whether the toolpath is too large for the GPU and is not drawn.
     pub too_large: bool,
+    /// Whether the build of the program's toolpath failed; nothing is drawn for it.
+    pub failed: bool,
     /// The program's bounds, once built, if it moves at all.
     pub bounds: Option<&'a Aabb>,
     /// The tool's work position, when the machine reports one.
@@ -127,6 +128,7 @@ pub fn show(
     let Overlay {
         loaded,
         too_large,
+        failed,
         bounds,
         tool,
     } = overlay;
@@ -158,6 +160,10 @@ pub fn show(
         let note = [tr
             .tr("Toolpath too large to display on this GPU.")
             .into_owned()];
+        panel(ui, rect.center(), egui::Align2::CENTER_CENTER, &note);
+    }
+    if failed {
+        let note = [tr.tr("Could not draw this toolpath.").into_owned()];
         panel(ui, rect.center(), egui::Align2::CENTER_CENTER, &note);
     }
     if !loaded {

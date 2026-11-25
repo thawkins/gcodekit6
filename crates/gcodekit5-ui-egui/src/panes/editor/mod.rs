@@ -70,6 +70,7 @@ pub fn msgids() -> Vec<&'static str> {
         n_!("Edit anyway"),
         n_!("Large file: shown read-only to stay fast."),
         n_!("Could not open file"),
+        n_!("Stop the running job before opening a file."),
         n_!("Could not save file"),
         n_!("Cannot stream this program"),
         n_!("Read-only while a job is running."),

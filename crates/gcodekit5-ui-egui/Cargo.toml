@@ -32,7 +32,12 @@ gcodekit5-visualizer = { path = "../gcodekit5-visualizer" }
 serde = { workspace = true }
 tracing = { workspace = true }
 
+[features]
+# Test hooks (e.g. the visualizer build panic hook) that must not ship in production.
+test-support = []
+
 [dev-dependencies]
+gcodekit5-ui-egui = { path = ".", features = ["test-support"] }
 gcodekit5-app = { path = "../gcodekit5-app", features = ["test-support"] }
 egui_kittest = { workspace = true, features = ["wgpu", "snapshot"] }
 serde_json = { workspace = true }

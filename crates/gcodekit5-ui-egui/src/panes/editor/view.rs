@@ -48,10 +48,17 @@ impl EditorPane {
                 row_height,
                 lines,
             );
-            ui.allocate_rect(
+            let response = ui.allocate_rect(
                 egui::Rect::from_min_size(content.min, size),
-                egui::Sense::hover(),
+                egui::Sense::click(),
             );
+            // A click in the gutter makes its line current, as GTK's source view does.
+            let clicked = response
+                .clicked()
+                .then(|| response.interact_pointer_pos())
+                .flatten()
+                .filter(|pos| pos.x < content.left() + gutter_width)
+                .map(|pos| line_at(pos.y, content.top(), row_height, lines));
             let rows = gutter::Rows {
                 column: egui::Rect::from_min_size(
                     content.min,
@@ -80,9 +87,13 @@ impl EditorPane {
                 );
                 painter.galley(pos, galley, style.syntax.plain);
             }
-            range
+            (range, clicked)
         });
-        self.visible = visible.inner;
+        let (range, clicked) = visible.inner;
+        self.visible = range;
+        if let Some(line) = clicked {
+            self.buffer.set_current_line(line);
+        }
     }
 
     /// The longest line, in characters (bytes, for ASCII G-code); counted once per edit.
@@ -138,10 +149,15 @@ impl EditorPane {
             ui.spacing_mut().item_spacing = egui::Vec2::ZERO;
             ui.horizontal_top(|ui| {
                 let content = ui.max_rect();
-                let (column, _) = ui.allocate_exact_size(
+                let (column, gutter_response) = ui.allocate_exact_size(
                     gutter::size(gutter_width, row_height, lines),
-                    egui::Sense::hover(),
+                    egui::Sense::click(),
                 );
+                let gutter_click = gutter_response
+                    .clicked()
+                    .then(|| gutter_response.interact_pointer_pos())
+                    .flatten()
+                    .map(|pos| line_at(pos.y, column.top(), row_height, lines));
                 let rows = gutter::Rows {
                     column,
                     row_height,
@@ -179,11 +195,11 @@ impl EditorPane {
                     info.label = Some(label.to_string());
                     info
                 });
-                (response.changed(), edit.cursor_range, range)
+                (response.changed(), edit.cursor_range, range, gutter_click)
             })
             .inner
         });
-        let (changed, cursor, range) = output.inner;
+        let (changed, cursor, range, gutter_click) = output.inner;
         self.visible = range;
         if changed {
             self.buffer.mark_edited();
@@ -199,6 +215,25 @@ impl EditorPane {
                 self.buffer.set_current_line(line);
             }
         }
+        if let Some(line) = gutter_click {
+            self.select_line(ui.ctx(), text_id, line);
+        }
+    }
+
+    /// Makes `line` current and puts the text cursor at its start (a gutter click).
+    fn select_line(&mut self, ctx: &egui::Context, id: egui::Id, line: usize) {
+        self.buffer.set_current_line(line);
+        let line = self.buffer.current_line();
+        let start = self.buffer.line_start(line);
+        let index = self.buffer.text()[..start].chars().count();
+        let mut state = egui::TextEdit::load_state(ctx, id).unwrap_or_default();
+        state
+            .cursor
+            .set_char_range(Some(CCursorRange::one(CCursor::new(index))));
+        state.store(ctx, id);
+        self.last_cursor = Some(index);
+        ctx.memory_mut(|m| m.request_focus(id));
+        ctx.request_repaint();
     }
 
     /// Selects the find match in the text field, once, when one was just found.
@@ -219,6 +254,12 @@ impl EditorPane {
         state.store(ctx, id);
         self.last_cursor = Some(end);
     }
+}
+
+/// The line whose row holds screen height `y`, for rows of `row_height` from `top`.
+fn line_at(y: f32, top: f32, row_height: f32, lines: usize) -> usize {
+    let row = ((y - top) / row_height).max(0.0) as usize;
+    row.min(lines.saturating_sub(1))
 }
 
 /// The char index `index` of `text` as a byte offset.

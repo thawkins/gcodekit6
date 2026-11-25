@@ -581,14 +581,38 @@ fn test_panicking_build_leaves_worker_usable() -> TestResult {
     let _guard = crate::global_env_lock();
     let mut harness = pane_harness(VisualizerPane::new());
     harness.run();
-    visualizer::build::PANIC_NEXT_BUILD.store(true, std::sync::atomic::Ordering::Release);
+    // A good program A is shown first.
     load(&mut harness, sample())?;
-    assert!(!harness.state().is_building(), "building cleared");
-    assert_eq!(harness.state().toolpath_generation(), None, "nothing shown");
-    // The next program still builds.
-    let mut next: Vec<String> = SAMPLE.iter().map(|s| s.to_string()).collect();
-    next.push("G0 X1".to_string());
-    load(&mut harness, next.into())?;
+    let a_bounds = harness.state().bounds().ok_or("program A has bounds")?;
     assert!(harness.state().toolpath_generation().is_some());
+    assert!(!harness.state().build_failed());
+    // Program B panics its build: nothing of A may stay on screen, and the OSD says so.
+    visualizer::build::PANIC_NEXT_BUILD.store(true, std::sync::atomic::Ordering::Release);
+    let mut b: Vec<String> = SAMPLE.iter().map(|s| s.to_string()).collect();
+    b.push("G0 X1".to_string());
+    let loaded = load(&mut harness, b.into());
+    visualizer::build::PANIC_NEXT_BUILD.store(false, std::sync::atomic::Ordering::Release);
+    loaded?;
+    assert!(!harness.state().is_building(), "building cleared");
+    assert_eq!(harness.state().toolpath_generation(), None, "no stale mesh");
+    assert_eq!(harness.state().bounds(), None, "no stale bounds");
+    assert!(harness.state().build_failed(), "failure notice shown");
+    // The next program still builds, and it is the new program that is drawn.
+    let c: Vec<String> = ["G21", "G90", "G0 X0 Y0", "G1 X100 Y0 F300"]
+        .iter()
+        .map(|s| s.to_string())
+        .collect();
+    load(&mut harness, c.into())?;
+    assert!(harness.state().toolpath_generation().is_some());
+    assert!(
+        !harness.state().build_failed(),
+        "notice cleared by a good build"
+    );
+    let c_bounds = harness.state().bounds().ok_or("program C has bounds")?;
+    assert!(close(c_bounds.max.x, 100.0), "C's bounds: {c_bounds:?}");
+    assert!(
+        !close(c_bounds.max.x, a_bounds.max.x),
+        "not A's bounds: {c_bounds:?}"
+    );
     Ok(())
 }

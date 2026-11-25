@@ -3255,3 +3255,12 @@ msgstr "Ajuster"
 
 msgid "Toolpath too large to display on this GPU."
 msgstr "Parcours d'outil trop grand pour être affiché sur ce GPU."
+
+msgid "Bounds {axis}: {min} to {max} {unit}"
+msgstr "Limites {axis} : {min} à {max} {unit}"
+
+msgid "Could not draw this toolpath."
+msgstr "Impossible de dessiner ce parcours d'outil."
+
+msgid "Stop the running job before opening a file."
+msgstr "Arrêtez le travail en cours avant d'ouvrir un fichier."

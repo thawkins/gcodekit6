@@ -3251,3 +3251,12 @@ msgstr "Adatta"
 
 msgid "Toolpath too large to display on this GPU."
 msgstr "Percorso utensile troppo grande per essere visualizzato su questa GPU."
+
+msgid "Bounds {axis}: {min} to {max} {unit}"
+msgstr "Limiti {axis}: da {min} a {max} {unit}"
+
+msgid "Could not draw this toolpath."
+msgstr "Impossibile disegnare questo percorso utensile."
+
+msgid "Stop the running job before opening a file."
+msgstr "Interrompere il lavoro in corso prima di aprire un file."

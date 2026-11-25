@@ -46,6 +46,7 @@ pub enum Outcome {
 
 /// Test hook: when set, the next build panics (once), to exercise the worker's recovery.
 #[doc(hidden)]
+#[cfg(any(test, feature = "test-support"))]
 pub static PANIC_NEXT_BUILD: std::sync::atomic::AtomicBool =
     std::sync::atomic::AtomicBool::new(false);
 
@@ -99,6 +100,7 @@ fn run(shared: &Shared, request: Request) -> Option<Built> {
         None => true,
     };
     shared.is_current(generation).then_some(())?;
+    #[cfg(any(test, feature = "test-support"))]
     if PANIC_NEXT_BUILD.swap(false, Ordering::AcqRel) {
         panic!("toolpath build panic requested by test hook");
     }

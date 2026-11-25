@@ -683,6 +683,9 @@ impl GcodeKitApp {
         self.last_dispatched = Some(cmd);
         match cmd {
             Command::FileOpen => {
+                if self.refuse_open_during_job() {
+                    return;
+                }
                 if self.editor.borrow().buffer().is_dirty() {
                     self.open_after_confirm = true;
                     self.dialogs.confirm(ConfirmRequest::UnsavedGcode);
@@ -718,8 +721,11 @@ impl GcodeKitApp {
             | Command::Redo => tracing::debug!(?cmd, "document command not available yet"),
             Command::StreamStart => {
                 // Stream exactly what the editor shows, also within the typing pause.
-                self.sync_editor(true);
-                self.route_pane_command(cmd);
+                if self.sync_editor(true) {
+                    self.route_pane_command(cmd);
+                } else {
+                    tracing::warn!("Start not sent: the editor could not be synced");
+                }
             }
             Command::Connect
             | Command::Disconnect
@@ -852,6 +858,9 @@ impl GcodeKitApp {
     /// # Arguments
     /// * `path` - The G-code file.
     pub fn open_gcode(&mut self, path: &Path) {
+        if self.refuse_open_during_job() {
+            return;
+        }
         {
             let mut editor = self.editor.borrow_mut();
             if let Err(error) = editor.load(path) {
@@ -861,6 +870,22 @@ impl GcodeKitApp {
             }
         }
         self.sync_editor(true);
+    }
+
+    /// While a job streams, opening a file would swap the editor (and the program armed for
+    /// the next Start) under the toolpath the job is drawing: says so in the editor and
+    /// returns `true`.
+    fn refuse_open_during_job(&mut self) -> bool {
+        if !self.state.job_running() {
+            return false;
+        }
+        let message = self
+            .state
+            .translator
+            .tr("Stop the running job before opening a file.")
+            .into_owned();
+        self.editor.borrow_mut().set_notice(message);
+        true
     }
 
     /// Opens the first G-code file named on the command line in the editor: the first path
@@ -889,10 +914,12 @@ impl GcodeKitApp {
 
     /// Copies the editor's dirty flag to [`AppState::dirty`] when it changed, and hands the
     /// editor's text to the machine when it changed and typing paused (or `force`), unless a
-    /// job is streaming.
-    fn sync_editor(&mut self, force: bool) {
+    /// job is streaming. Returns `false` when the editor could not be reached (it is
+    /// borrowed), so the caller must not act on a program that may be out of date.
+    fn sync_editor(&mut self, force: bool) -> bool {
         let Ok(mut editor) = self.editor.try_borrow_mut() else {
-            return;
+            tracing::warn!("editor busy; program not synced");
+            return false;
         };
         let dirty = editor.buffer().is_dirty();
         if dirty != self.editor_dirty {
@@ -903,7 +930,7 @@ impl GcodeKitApp {
             || !(force || editor.edit_settled(Instant::now()))
             || self.state.job_running()
         {
-            return;
+            return true;
         }
         match self.state.machine.set_program(editor.buffer().text()) {
             Ok(0) => {
@@ -918,6 +945,7 @@ impl GcodeKitApp {
                     .program_rejected(format!("{}: {reason}", tr.tr("Cannot stream this program")));
             }
         }
+        true
     }
 
     /// Asks for a G-code file to open.

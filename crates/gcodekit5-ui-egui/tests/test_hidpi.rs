@@ -150,7 +150,16 @@ fn test_editor_click_selects_same_line_at_every_scale() -> TestResult {
             assert_eq!(
                 harness.state().buffer().current_line(),
                 target,
-                "row {target}, ppp {ppp}"
+                "text row {target}, ppp {ppp}"
+            );
+            // The gutter row of the same line: well inside the gutter (a click within the hit
+            // radius of the text field would reach the field instead).
+            harness.state_mut().buffer_mut().set_current_line(other);
+            click_at(&mut harness, egui::pos2(rect.left() - 20.0, y));
+            assert_eq!(
+                harness.state().buffer().current_line(),
+                target,
+                "gutter row {target}, ppp {ppp}"
             );
         }
     }

@@ -149,6 +149,179 @@ fn test_dirty_flag() -> TestResult {
     Ok(())
 }
 
+/// Build time of the editable view's frame after a keystroke, for a file one line under
+/// [`LARGE_FILE_LINES`]: the worst of the frames that re-layout the whole text.
+fn near_threshold_keystroke_frame() -> Result<Duration, Box<dyn std::error::Error>> {
+    let text: String = (0..LARGE_FILE_LINES - 1)
+        .map(|i| {
+            format!(
+                "N{i} G1 X{}.{} Y{} F1200 ; pass\n",
+                i % 300,
+                i % 10,
+                i % 200
+            )
+        })
+        .collect();
+    let mut pane = EditorPane::new();
+    pane.buffer_mut().set_text(text);
+    assert!(!pane.is_large(), "{} lines", pane.buffer().line_count());
+    let mut harness = pane_harness(pane, egui::vec2(1280.0, 800.0));
+    // Warm-up: fonts and the first layout.
+    harness.step();
+    harness.get_by_label("G-Code Editor").focus();
+    harness.step();
+    let mut worst = Duration::ZERO;
+    for _ in 0..3 {
+        // The keystroke changes the text, so the next frame re-lays out all of it.
+        harness.get_by_label("G-Code Editor").type_text("M");
+        let start = Instant::now();
+        harness.step();
+        worst = worst.max(start.elapsed());
+    }
+    assert!(harness.state().buffer().text().contains('M'));
+    Ok(worst)
+}
+
+/// A frame after a keystroke in a 49,999-line file (the editable path's worst case) stays
+/// within [`EDIT_FRAME_BUDGET`].
+#[test]
+#[ignore = "50k-line file; CI runs it with --run-ignored only"]
+fn test_near_threshold_edit_frame_time() -> TestResult {
+    let worst = near_threshold_keystroke_frame()?;
+    assert!(
+        worst < EDIT_FRAME_BUDGET,
+        "slowest edit frame {worst:?}, budget {EDIT_FRAME_BUDGET:?}"
+    );
+    Ok(())
+}
+
+/// A click in the large-file view's gutter makes that line current.
+#[test]
+fn test_large_file_gutter_click_sets_current_line() -> TestResult {
+    let text: String = (0..LARGE_FILE_LINES + 10)
+        .map(|i| format!("G1 X{}\n", i % 300))
+        .collect();
+    let mut pane = EditorPane::new();
+    pane.buffer_mut().set_text(text);
+    assert!(pane.is_large());
+    let mut harness = pane_harness(pane, egui::vec2(800.0, 600.0));
+    harness.run();
+    let visible = harness.state().visible_lines();
+    // Clicks in the gutter column at two heights select the lines under them, in order.
+    let mut selected = Vec::new();
+    for y in [200.0_f32, 320.0] {
+        let pos = egui::pos2(15.0, y);
+        harness.event(egui::Event::PointerMoved(pos));
+        harness.step();
+        for pressed in [true, false] {
+            harness.event(egui::Event::PointerButton {
+                pos,
+                button: egui::PointerButton::Primary,
+                pressed,
+                modifiers: egui::Modifiers::NONE,
+            });
+            harness.step();
+        }
+        harness.step();
+        selected.push(harness.state().buffer().current_line());
+    }
+    assert!(
+        selected[0] > 0 && selected[0] < selected[1] && visible.contains(&selected[1]),
+        "{selected:?} in {visible:?}"
+    );
+    Ok(())
+}
+
+#[test]
+fn test_save_as_writes_atomically_and_leaves_no_temp_file() -> TestResult {
+    let dir = scratch("atomic_save")?;
+    let path = write(&dir, "part.gcode", "G0 X0\n")?;
+    let mode_before = std::fs::metadata(&path)?.permissions();
+    let mut buffer = EditorBuffer::load(&path)?;
+    buffer.set_text("G1 X5 F100\nM2\n".to_string());
+    buffer.save()?;
+    assert_eq!(std::fs::read_to_string(&path)?, "G1 X5 F100\nM2\n");
+    assert_eq!(std::fs::metadata(&path)?.permissions(), mode_before);
+    assert!(!buffer.is_dirty());
+    // Save as a new name: that file holds the text, the old one is untouched.
+    let other = dir.join("other.gcode");
+    buffer.save_as(&other)?;
+    assert_eq!(std::fs::read_to_string(&other)?, "G1 X5 F100\nM2\n");
+    assert_eq!(buffer.path(), Some(other.as_path()));
+    let names: Vec<String> = std::fs::read_dir(&dir)?
+        .map(|e| e.map(|e| e.file_name().to_string_lossy().into_owned()))
+        .collect::<Result<_, _>>()?;
+    let mut sorted = names.clone();
+    sorted.sort();
+    assert_eq!(
+        sorted,
+        ["other.gcode", "part.gcode"],
+        "stray files: {names:?}"
+    );
+    // A directory that does not exist is an error, not a panic, and leaves nothing behind.
+    assert!(
+        buffer
+            .save_as(&dir.join("missing").join("x.gcode"))
+            .is_err()
+    );
+    Ok(())
+}
+
+/// An app whose machine is streaming a held job, with `text` in the editor.
+fn app_with_running_job(text: &str) -> GcodeKitApp {
+    let (mut state, shared) = crate::machine_support::loopback_state(Duration::from_millis(1));
+    crate::machine_support::start_held_stream(&mut state, &shared, 5);
+    let app = GcodeKitApp::from_state(state);
+    app.editor()
+        .borrow_mut()
+        .buffer_mut()
+        .set_text(text.to_string());
+    app
+}
+
+#[test]
+fn test_open_is_refused_while_a_job_runs() -> TestResult {
+    let dir = scratch("open_job")?;
+    let path = write(&dir, "other.gcode", "G1 X99 F100\n")?;
+    let mut app = app_with_running_job("G1 X1 F100\n");
+    assert!(app.state().job_running());
+    let asked = answer_files(&mut app, Some(path.clone()));
+    app.dispatch(Command::FileOpen);
+    app.open_gcode(&path);
+    assert!(
+        asked.lock().map(|a| a.is_empty()).unwrap_or(false),
+        "no dialog"
+    );
+    let editor = app.editor().borrow();
+    assert_eq!(editor.buffer().text(), "G1 X1 F100\n", "editor untouched");
+    assert_eq!(
+        editor.notice(),
+        Some("Stop the running job before opening a file.")
+    );
+    Ok(())
+}
+
+#[test]
+fn test_stream_start_not_routed_when_editor_sync_cannot_run() {
+    let (mut state, _shared) = crate::machine_support::loopback_state(Duration::from_millis(1));
+    crate::machine_support::connect(&mut state);
+    // The machine holds program A; the editor shows a newer program B.
+    state.machine.set_program("G1 X1 F100\n").expect("program");
+    let mut app = GcodeKitApp::from_state(state);
+    app.editor()
+        .borrow_mut()
+        .buffer_mut()
+        .set_text("G1 X2 F100\n".to_string());
+    let editor = std::rc::Rc::clone(app.editor());
+    let held = editor.borrow_mut();
+    app.dispatch(Command::StreamStart);
+    drop(held);
+    assert!(
+        !app.state().job_running(),
+        "Start must not stream the previously fed program"
+    );
+}
+
 #[test]
 fn test_dirty_flag_reaches_app_state() -> TestResult {
     let dir = scratch("dirty_app")?;
@@ -333,6 +506,12 @@ fn test_large_file_is_read_only_until_edit_anyway() -> TestResult {
 /// about 3 ms per frame there, so 50 ms leaves room for a slow CI runner while a whole-text
 /// layout (seconds at this size) still fails.
 const FRAME_BUDGET: Duration = Duration::from_millis(50);
+
+/// Budget for a frame after a keystroke in the editable view of a 49,999-line file. Measured
+/// locally (dev profile, this machine): the slowest of three such frames took 1.99-2.06 s over
+/// four runs, so the budget is 3x that. It guards against a regression, not against the
+/// cost itself: re-laying out the whole text per keystroke is slow near the threshold.
+const EDIT_FRAME_BUDGET: Duration = Duration::from_millis(6000);
 
 /// Review Focus 2: a 1,000,000-line file draws a frame within [`FRAME_BUDGET`]. Ignored in
 /// the default run because generating the file is slow; CI runs it with
