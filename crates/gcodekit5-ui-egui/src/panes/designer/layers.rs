@@ -13,7 +13,7 @@
 //!
 //! Rows run bottom to top in drawing order (position 1 is drawn first). A position field
 //! takes a number and Enter, as in GTK; a move that would split a group is refused with a
-//! notice (GTK's dialog). Keys: Delete removes the selection while the pointer is over the
+//! notice (GTK's dialog). Keys: Delete removes the selection (not during a canvas drag) while the pointer is over the
 //! pane and no text field has focus.
 //!
 //! Dependencies: `egui`, `gcodekit5-designer` (model and commands), `gcodekit5-app`
@@ -94,6 +94,8 @@ pub fn msgids() -> Vec<&'static str> {
         n_!("Lock"),
         n_!("Unlock"),
         n_!("Position"),
+        n_!("Pocket"),
+        n_!("Profile"),
         n_!("Name"),
     ]
 }
@@ -267,25 +269,27 @@ impl LayersPane {
         let locked = d.flags().is_locked(row.id);
         ui.horizontal(|ui| {
             if ui
-                .selectable_label(hidden, "V")
-                .on_hover_text(tr.tr(if hidden { "Show" } else { "Hide" }))
+                .selectable_label(hidden, tr.tr(if hidden { "Show" } else { "Hide" }))
                 .clicked()
             {
                 d.set_hidden(row.id, !hidden);
             }
             if ui
-                .selectable_label(locked, "L")
-                .on_hover_text(tr.tr(if locked { "Unlock" } else { "Lock" }))
+                .selectable_label(locked, tr.tr(if locked { "Unlock" } else { "Lock" }))
                 .clicked()
             {
                 d.set_locked(row.id, !locked);
             }
             let operation = match row.operation {
-                OperationType::Pocket => (n_!("Pocket operation"), "Pk"),
-                OperationType::Profile => (n_!("Profile operation"), "Pf"),
+                OperationType::Pocket => (n_!("Pocket operation"), n_!("Pocket")),
+                OperationType::Profile => (n_!("Profile operation"), n_!("Profile")),
             };
-            ui.weak(operation.1).on_hover_text(tr.tr(operation.0));
-            self.position_field(ui, d, row, rows.len(), tr);
+            ui.weak(tr.tr(operation.1))
+                .on_hover_text(tr.tr(operation.0));
+            // A locked shape is read-only here: no rename, no move in the order.
+            ui.add_enabled_ui(!locked, |ui| {
+                self.position_field(ui, d, row, rows.len(), tr)
+            });
             let label = format!("{} #{}", tr.tr(row.shape_msgid), row.id);
             let pickable = d.flags().is_pickable(row.id);
             if ui
@@ -295,7 +299,7 @@ impl LayersPane {
                 let modifiers = ui.input(|i| i.modifiers);
                 self.click_row(d, rows, row, modifiers);
             }
-            self.name_field(ui, d, row, tr);
+            ui.add_enabled_ui(!locked, |ui| self.name_field(ui, d, row, tr));
             self.group_badge(ui, d, rows, row, tr);
         });
     }
@@ -526,6 +530,7 @@ impl Pane for LayersPane {
         // Delete with the pointer over the pane, unless a text field (a rename) has the keys.
         let over = ui.rect_contains_pointer(ui.max_rect());
         if over
+            && !d.dragging()
             && !ui.ctx().egui_wants_keyboard_input()
             && ui.input(|i| i.key_pressed(egui::Key::Delete) || i.key_pressed(egui::Key::Backspace))
         {

@@ -17,6 +17,7 @@
 pub mod editing;
 pub mod flags;
 pub mod input;
+pub mod picking;
 pub mod rendering;
 
 use egui::{Pos2, Rect, pos2};

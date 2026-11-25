@@ -27,6 +27,7 @@ use gcodekit5_designer::model::Point;
 
 use super::editing::{self, ResizeDrag};
 use super::flags::ShapeFlags;
+use super::picking;
 use super::{CanvasView, DesignerTool};
 
 /// A primary-button drag in progress.
@@ -234,7 +235,7 @@ impl CanvasInput {
                 // A plain click on a selected shape keeps only that shape selected.
                 let tolerance = editing::hit_tolerance_mm(state.canvas.zoom());
                 let point = Point::new(at.0, at.1);
-                if let Some(id) = editing::topmost_shape_at(state, flags, &point, tolerance)
+                if let Some(id) = picking::topmost_shape_at(state, flags, &point, tolerance)
                     && state.canvas.get_shape(id).is_some_and(|o| o.selected)
                 {
                     state.canvas.deselect_all();
@@ -307,7 +308,7 @@ impl CanvasInput {
                 }
                 Some(Drag::Marquee { start, current }) => {
                     if state.canvas.selection_manager.selected_id().is_none() {
-                        editing::marquee_select(state, flags, start, current);
+                        picking::marquee_select(state, flags, start, current);
                     }
                 }
                 Some(Drag::Pan) | None => {}
@@ -357,14 +358,14 @@ fn press_select(
     let (shift, ctrl) = (modifiers.shift, modifiers.command);
     let tolerance = editing::hit_tolerance_mm(zoom);
     let point = Point::new(at.0, at.1);
-    if let Some(id) = editing::topmost_shape_at(state, flags, &point, tolerance)
+    if let Some(id) = picking::topmost_shape_at(state, flags, &point, tolerance)
         && state.canvas.get_shape(id).is_some_and(|o| o.selected)
         && !shift
         && !ctrl
     {
         return;
     }
-    editing::select_at(state, flags, &point, tolerance, shift, ctrl);
+    picking::select_at(state, flags, &point, tolerance, shift, ctrl);
 }
 
 /// The drag a primary press at `at` starts with `tool`.

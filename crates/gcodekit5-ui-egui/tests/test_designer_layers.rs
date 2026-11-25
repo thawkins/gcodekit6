@@ -12,7 +12,7 @@ use egui_kittest::{Harness, SnapshotOptions};
 use gcodekit5_app::i18n::Translator;
 use gcodekit5_designer::model::Point;
 use gcodekit5_ui_egui::panes::designer::DesignerPane;
-use gcodekit5_ui_egui::panes::designer::canvas::editing::topmost_shape_at;
+use gcodekit5_ui_egui::panes::designer::canvas::picking::topmost_shape_at;
 use gcodekit5_ui_egui::panes::designer::canvas::rendering::{self, LineWidths};
 use gcodekit5_ui_egui::panes::designer::canvas::{CanvasInput, CanvasView};
 use gcodekit5_ui_egui::panes::designer::layers::LayersPane;
@@ -94,6 +94,22 @@ fn canvas_pos(h: &Harness<'_, Both>, index: usize) -> Pos2 {
         .borrow()
         .view()
         .world_to_screen(glam::Vec2::new(x, 20.0))
+}
+
+/// The centre of row `row`'s (0-based) toggle, whichever of `labels` it shows now.
+pub fn toggle_pos(h: &Harness<'_, Both>, labels: [&str; 2], row: usize) -> Pos2 {
+    let mut found: Vec<Pos2> = labels
+        .iter()
+        .flat_map(|l| h.query_all_by_label(l).map(|n| n.rect().center()))
+        .collect();
+    found.sort_by(|a, b| a.y.total_cmp(&b.y));
+    found[row]
+}
+
+/// Clicks row `row`'s toggle (see [`toggle_pos`]).
+fn click_toggle(h: &mut Harness<'_, Both>, labels: [&str; 2], row: usize) {
+    let pos = toggle_pos(h, labels, row);
+    click(h, pos);
 }
 
 /// Presses and releases `key`.
@@ -226,8 +242,7 @@ fn test_layer_visibility_hides_shape() {
     let s = order(&h);
     assert_eq!(painted_outlines(&h.state().designer.borrow()), 3);
     // The "V" toggles of the rows, in row order: hide the middle shape.
-    let toggles: Vec<_> = h.get_all_by_label("V").map(|n| n.rect().center()).collect();
-    click(&mut h, toggles[1]);
+    click_toggle(&mut h, ["Hide", "Show"], 1);
     let d = h.state().designer.borrow();
     assert!(d.flags().is_hidden(s[1]));
     // Not drawn.
@@ -250,8 +265,7 @@ fn test_layer_visibility_hides_shape() {
     crate::test_designer_canvas::drag(&mut h, from, to);
     assert!(sel(&h).is_empty(), "the marquee skips the hidden shape");
     // Showing it again restores both.
-    let toggles: Vec<_> = h.get_all_by_label("V").map(|n| n.rect().center()).collect();
-    click(&mut h, toggles[1]);
+    click_toggle(&mut h, ["Hide", "Show"], 1);
     assert_eq!(painted_outlines(&h.state().designer.borrow()), 3);
     let pos = canvas_pos(&h, 1);
     click(&mut h, pos);
@@ -264,8 +278,7 @@ fn test_hiding_deselects_and_a_hidden_row_cannot_be_selected() {
     let s = order(&h);
     h.state().designer.borrow_mut().state_mut().is_modified = false;
     click_row(&mut h, s[0], Modifiers::NONE);
-    let toggles: Vec<_> = h.get_all_by_label("V").map(|n| n.rect().center()).collect();
-    click(&mut h, toggles[0]);
+    click_toggle(&mut h, ["Hide", "Show"], 0);
     assert!(sel(&h).is_empty());
     click_row(&mut h, s[0], Modifiers::NONE);
     assert!(sel(&h).is_empty());
@@ -279,8 +292,7 @@ fn test_locked_shape_is_drawn_but_not_pickable() {
     designer.borrow_mut().state_mut().show_grid = false;
     let mut h = both(designer);
     let s = order(&h);
-    let locks: Vec<_> = h.get_all_by_label("L").map(|n| n.rect().center()).collect();
-    click(&mut h, locks[2]);
+    click_toggle(&mut h, ["Lock", "Unlock"], 2);
     {
         let d = h.state().designer.borrow();
         assert!(d.flags().is_locked(s[2]));
@@ -294,8 +306,7 @@ fn test_locked_shape_is_drawn_but_not_pickable() {
     // An unlocked neighbour still selects, and unlocking restores the lock's shape.
     click_row(&mut h, s[1], Modifiers::NONE);
     assert_eq!(sel(&h), vec![s[1]]);
-    let locks: Vec<_> = h.get_all_by_label("L").map(|n| n.rect().center()).collect();
-    click(&mut h, locks[2]);
+    click_toggle(&mut h, ["Lock", "Unlock"], 2);
     click_row(&mut h, s[2], Modifiers::NONE);
     assert_eq!(sel(&h), vec![s[2]]);
 }
@@ -549,4 +560,129 @@ fn test_layer_row_snapshot() {
     if let Err(error) = h.try_snapshot_options("designer_layers", &options) {
         panic!("designer_layers: {error}");
     }
+}
+
+/// Clicks the `which`th text field of the panel (per row: position, then name), types
+/// `text` over it and presses Enter.
+fn type_into(h: &mut Harness<'_, Both>, which: usize, text: &str) {
+    let fields: Vec<_> = h
+        .get_all_by_role(egui::accesskit::Role::TextInput)
+        .map(|n| n.rect().center())
+        .collect();
+    click(h, fields[which]);
+    h.key_combination_modifiers(Modifiers::COMMAND, &[egui::Key::A]);
+    h.event(egui::Event::Text(text.to_string()));
+    h.run();
+    press(h, egui::Key::Enter);
+}
+
+#[test]
+fn test_undo_does_not_reselect_a_hidden_or_locked_shape() {
+    for lock in [false, true] {
+        let mut h = both(three());
+        let s = order(&h);
+        click_row(&mut h, s[1], Modifiers::NONE);
+        type_into(&mut h, 3, "Lid");
+        click_row(&mut h, s[1], Modifiers::NONE);
+        if lock {
+            click_toggle(&mut h, ["Lock", "Unlock"], 1);
+        } else {
+            click_toggle(&mut h, ["Hide", "Show"], 1);
+        }
+        assert!(sel(&h).is_empty());
+        undo(&h);
+        assert!(sel(&h).is_empty(), "lock {lock}: undo reselected it");
+        h.state().designer.borrow_mut().redo();
+        assert!(sel(&h).is_empty(), "lock {lock}: redo reselected it");
+        // Delete removes nothing.
+        h.event(egui::Event::PointerMoved(row_pos(&h, s[0])));
+        h.run();
+        press(&mut h, egui::Key::Delete);
+        assert_eq!(order(&h), s, "lock {lock}");
+    }
+}
+
+#[test]
+fn test_gcode_export_skips_hidden_shapes() {
+    let designer = three();
+    let mut h = both(Rc::clone(&designer));
+    let s = order(&h);
+    let all = designer.borrow().generate_gcode(None);
+    // The squares span x 10..30, 50..70 and 90..110; the middle one has x 70 only.
+    assert!(all.contains("X70"), "{all}");
+    click_toggle(&mut h, ["Hide", "Show"], 1);
+    assert!(designer.borrow().flags().is_hidden(s[1]));
+    let code = designer.borrow().generate_gcode(None);
+    assert!(!code.contains("X70"), "hidden shape was cut:\n{code}");
+    assert!(code.contains("X30") && code.contains("X110"), "{code}");
+    // The design itself is untouched.
+    assert_eq!(order(&h), s);
+}
+
+#[test]
+fn test_panel_delete_waits_for_a_canvas_drag() {
+    let mut h = both(three());
+    let s = order(&h);
+    let start = canvas_pos(&h, 1);
+    click(&mut h, start);
+    // Press on the selected shape and start moving it, without releasing.
+    crate::test_designer_canvas::button(&h, start, PointerButton::Primary, true, Modifiers::NONE);
+    h.step();
+    let into_panel = row_pos(&h, s[0]);
+    for t in [0.25, 0.5, 0.75, 1.0] {
+        h.event(egui::Event::PointerMoved(start.lerp(into_panel, t)));
+        h.step();
+    }
+    assert!(h.state().designer.borrow().dragging());
+    // The canvas holds the keyboard during a drag; take it away so only the panel could act.
+    h.ctx.memory_mut(|m| {
+        if let Some(id) = m.focused() {
+            m.surrender_focus(id);
+        }
+    });
+    press(&mut h, egui::Key::Delete);
+    assert_eq!(order(&h), s, "no delete mid-drag");
+}
+
+#[test]
+fn test_locked_shape_cannot_be_renamed_or_repositioned_from_the_panel() {
+    let mut h = both(three());
+    let s = order(&h);
+    click_toggle(&mut h, ["Lock", "Unlock"], 0);
+    let name = |h: &Harness<'_, Both>| {
+        h.state()
+            .designer
+            .borrow()
+            .state()
+            .canvas
+            .get_shape(s[0])
+            .map(|o| o.name.clone())
+    };
+    let before = name(&h);
+    type_into(&mut h, 1, "Nope");
+    assert_eq!(name(&h), before);
+    type_into(&mut h, 0, "3");
+    assert_eq!(order(&h), s);
+}
+
+#[test]
+fn test_group_with_a_locked_member_cannot_be_picked_from_the_canvas() {
+    let mut h = both(three());
+    let s = order(&h);
+    click_row(&mut h, s[0], Modifiers::NONE);
+    click_row(&mut h, s[1], Modifiers::COMMAND);
+    button(&mut h, "Group");
+    click_toggle(&mut h, ["Lock", "Unlock"], 0);
+    for index in [0, 1] {
+        let pos = canvas_pos(&h, index);
+        click(&mut h, pos);
+        assert!(sel(&h).is_empty(), "member {index} picked part of a group");
+    }
+    // The marquee skips the whole group too.
+    let (a, b) = (
+        canvas_pos(&h, 0) - egui::vec2(15.0, 15.0),
+        canvas_pos(&h, 1) + egui::vec2(15.0, 15.0),
+    );
+    crate::test_designer_canvas::drag(&mut h, a, b);
+    assert!(sel(&h).is_empty());
 }

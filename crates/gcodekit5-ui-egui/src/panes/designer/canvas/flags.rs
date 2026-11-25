@@ -3,7 +3,13 @@
 //! The design model has no visibility or lock state, so the flags live beside it, in the
 //! Designer pane. A hidden shape is neither painted nor hit-testable; a locked shape is
 //! painted but cannot be picked (by a click or the marquee), so the canvas cannot move,
-//! resize or delete it. The flags are view state: not saved with the design and not undoable.
+//! resize or delete it. A group is picked whole or not at all, so one hidden or locked member
+//! makes the group unpickable (`picking`).
+//!
+//! The flags are view state: not saved with the design, not undoable, and they do not mark
+//! it modified. The model knows nothing of them, so every G-code export must go through
+//! `DesignerPane::generate_gcode`, which leaves hidden shapes out; calling the model's
+//! `generate_gcode` directly would cut them.
 //!
 //! Dependencies: none beyond `std`.
 

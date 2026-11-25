@@ -25,6 +25,7 @@ use std::rc::Rc;
 use gcodekit5_app::i18n::Translator;
 use gcodekit5_core::units::MeasurementSystem;
 use gcodekit5_designer::DesignerState;
+use gcodekit5_designer::gcode_gen::MachineLimits;
 use gcodekit5_designer::model::Point;
 use gcodekit5_settings::config::Config;
 
@@ -144,6 +145,21 @@ impl DesignerPane {
         }
     }
 
+    /// Drops every hidden or locked shape from the selection. Undo and redo restore a shape's
+    /// whole state, `selected` included, so this keeps the selection free of them.
+    fn deselect_unpickable(&mut self) {
+        let ids: Vec<u64> = self
+            .state
+            .canvas
+            .shapes()
+            .filter(|o| o.selected && !self.flags.is_pickable(o.id))
+            .map(|o| o.id)
+            .collect();
+        for id in ids {
+            self.deselect(id);
+        }
+    }
+
     /// Drops shape `id` from the selection.
     fn deselect(&mut self, id: u64) {
         let canvas = &mut self.state.canvas;
@@ -177,6 +193,7 @@ impl DesignerPane {
             tracing::debug!("undo ignored during a canvas drag");
         } else {
             self.state.undo();
+            self.deselect_unpickable();
         }
     }
 
@@ -186,6 +203,7 @@ impl DesignerPane {
             tracing::debug!("redo ignored during a canvas drag");
         } else {
             self.state.redo();
+            self.deselect_unpickable();
         }
     }
 
@@ -193,6 +211,24 @@ impl DesignerPane {
     /// it ends, from the shapes it started with, so undo, redo and delete wait for it.
     pub fn dragging(&self) -> bool {
         self.input.dragging()
+    }
+
+    /// Generates G-code for the design, leaving out hidden shapes.
+    ///
+    /// Hidden shapes ([`ShapeFlags`]) are view state the model does not know, so this builds
+    /// the code from a copy of the design without them (the design is untouched). Every
+    /// export must go through here, so a hidden shape is never cut. Locked shapes are cut.
+    ///
+    /// # Arguments
+    /// * `machine_limits` - The machine's limits, if known (as the model's `generate_gcode`).
+    pub fn generate_gcode(&self, machine_limits: Option<MachineLimits>) -> String {
+        let mut copy = self.state.clone();
+        for id in self.state.canvas.shape_store.draw_order_iter() {
+            if self.flags.is_hidden(id) {
+                copy.canvas.remove_shape(id);
+            }
+        }
+        copy.generate_gcode(machine_limits)
     }
 
     /// Rotates the selection by `degrees` (counter-clockwise positive), as one undo step.
