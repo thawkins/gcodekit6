@@ -209,3 +209,41 @@ fn test_jog_buttons_send_same_line_at_every_scale() -> TestResult {
     }
     Ok(())
 }
+
+#[test]
+fn test_designer_click_selects_same_shape_at_every_scale() -> TestResult {
+    use crate::test_designer_canvas::{click, harness_at, pane_with_rects, screen};
+    let _guard = crate::global_env_lock();
+    let rects = [
+        (20.0, 20.0, 30.0, 30.0),
+        (70.0, 20.0, 30.0, 30.0),
+        (20.0, 70.0, 30.0, 30.0),
+    ];
+    for ppp in SCALES {
+        let mut harness = harness_at(pane_with_rects(&rects), ppp);
+        let ids: Vec<u64> = harness
+            .state()
+            .state()
+            .canvas
+            .shape_store
+            .draw_order_iter()
+            .collect();
+        for (i, &(x, y, w, h)) in rects.iter().enumerate() {
+            // The centre and a point just inside the far corner of each shape.
+            for (wx, wy) in [(x + w / 2.0, y + h / 2.0), (x + w - 0.5, y + h - 0.5)] {
+                let pos = screen(&harness, wx as f32, wy as f32);
+                click(&mut harness, pos);
+                let picked: Vec<u64> = harness
+                    .state()
+                    .state()
+                    .canvas
+                    .shapes()
+                    .filter(|o| o.selected)
+                    .map(|o| o.id)
+                    .collect();
+                assert_eq!(picked, vec![ids[i]], "shape {i} at ({wx}, {wy}), ppp {ppp}");
+            }
+        }
+    }
+    Ok(())
+}

@@ -3260,3 +3260,21 @@ msgstr "Impossibile disegnare questo percorso utensile."
 
 msgid "Stop the running job before opening a file."
 msgstr "Interrompere il lavoro in corso prima di aprire un file."
+
+msgid "Rotate"
+msgstr "Ruota"
+
+msgid "90° CW"
+msgstr "90° in senso orario"
+
+msgid "90° CCW"
+msgstr "90° in senso antiorario"
+
+msgid "45° CW"
+msgstr "45° in senso orario"
+
+msgid "45° CCW"
+msgstr "45° in senso antiorario"
+
+msgid "180°"
+msgstr "180°"

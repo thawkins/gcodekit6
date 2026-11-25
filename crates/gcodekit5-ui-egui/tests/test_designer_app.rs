@@ -1,0 +1,119 @@
+//! The designer in the app: Undo/Redo reach it when it is the pane the user works in, its
+//! modified flag reaches the quit prompt, and its keys stay with a focused text field.
+
+use egui::{Modifiers, PointerButton, Pos2};
+use egui_kittest::Harness;
+use egui_kittest::kittest::Queryable;
+use gcodekit5_designer::model::{DesignRectangle, Shape};
+use gcodekit5_ui_egui::commands::Command;
+use gcodekit5_ui_egui::workspace::PaneId;
+use glam::Vec2;
+
+use crate::test_designer_canvas::selected;
+
+/// The app's designer, with the Designer tab shown.
+fn app_with_designer() -> Harness<'static, gcodekit5_ui_egui::GcodeKitApp> {
+    use gcodekit5_settings::SettingsManager;
+    use gcodekit5_settings::config::Config;
+    use gcodekit5_ui_egui::{AppState, GcodeKitApp};
+    let app = GcodeKitApp::from_state(AppState::new(
+        SettingsManager::detached(Config::default()),
+        crate::test_smoke::native_decision(),
+    ));
+    let mut h = crate::machine_support::app_harness(app);
+    let shown = h
+        .state_mut()
+        .workspace_mut()
+        .apply(craft_ui::docking::Action::Activate {
+            panel: PaneId::Designer,
+        });
+    assert!(shown.is_ok(), "{shown:?}");
+    h.run();
+    h
+}
+
+/// Clicks `pos` in the app with the real pointer events.
+fn app_click(h: &mut Harness<'_, gcodekit5_ui_egui::GcodeKitApp>, pos: Pos2) {
+    h.event(egui::Event::PointerMoved(pos));
+    h.step();
+    h.event(egui::Event::PointerButton {
+        pos,
+        button: PointerButton::Primary,
+        pressed: true,
+        modifiers: Modifiers::NONE,
+    });
+    h.step();
+    h.event(egui::Event::PointerButton {
+        pos,
+        button: PointerButton::Primary,
+        pressed: false,
+        modifiers: Modifiers::NONE,
+    });
+    h.step();
+    h.run();
+}
+
+#[test]
+fn test_app_routes_undo_to_active_designer_and_tracks_dirty() {
+    let mut h = app_with_designer();
+    let designer = std::rc::Rc::clone(h.state().designer());
+    designer
+        .borrow_mut()
+        .state_mut()
+        .add_shape_with_undo(Shape::Rectangle(DesignRectangle::new(
+            20.0, 20.0, 40.0, 40.0,
+        )));
+    h.run();
+    assert!(
+        h.state().state().dirty.designer,
+        "the design's changes reach the quit prompt"
+    );
+    // Undo goes to the designer only once the user worked in it.
+    h.state_mut().dispatch(Command::Undo);
+    h.run();
+    assert_eq!(designer.borrow().state().canvas.shape_count(), 1);
+    let p = designer
+        .borrow()
+        .view()
+        .world_to_screen(Vec2::new(40.0, 40.0));
+    app_click(&mut h, p);
+    assert_eq!(selected(&designer.borrow()).len(), 1);
+    h.key_press_modifiers(Modifiers::COMMAND, egui::Key::Z);
+    h.run();
+    assert_eq!(designer.borrow().state().canvas.shape_count(), 0);
+    h.state_mut().dispatch(Command::Redo);
+    h.run();
+    assert_eq!(designer.borrow().state().canvas.shape_count(), 1);
+}
+
+#[test]
+fn test_canvas_keys_do_not_fire_while_typing() {
+    let mut h = app_with_designer();
+    let designer = std::rc::Rc::clone(h.state().designer());
+    designer
+        .borrow_mut()
+        .state_mut()
+        .add_shape_with_undo(Shape::Rectangle(DesignRectangle::new(
+            20.0, 20.0, 40.0, 40.0,
+        )));
+    h.run();
+    let p = designer
+        .borrow()
+        .view()
+        .world_to_screen(Vec2::new(40.0, 40.0));
+    app_click(&mut h, p);
+    assert_eq!(selected(&designer.borrow()).len(), 1);
+    // Give a text field the keyboard: Delete, Escape and Cmd+Z belong to it now.
+    let field = h
+        .get_all_by_role(egui::accesskit::Role::TextInput)
+        .next()
+        .expect("a text field");
+    field.focus();
+    h.run();
+    h.key_press(egui::Key::Delete);
+    h.key_press(egui::Key::Escape);
+    h.key_press_modifiers(Modifiers::COMMAND, egui::Key::Z);
+    h.run();
+    assert_eq!(designer.borrow().state().canvas.shape_count(), 1);
+    assert_eq!(selected(&designer.borrow()).len(), 1);
+}

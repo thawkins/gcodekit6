@@ -5,7 +5,7 @@ use gcodekit5_app::i18n::Translator;
 use gcodekit5_ui_egui::dialogs;
 use gcodekit5_ui_egui::frame::caption_msgid;
 use gcodekit5_ui_egui::menu;
-use gcodekit5_ui_egui::panes::{console, editor, machine_control, visualizer};
+use gcodekit5_ui_egui::panes::{console, designer, editor, machine_control, visualizer};
 use gcodekit5_ui_egui::status_bar;
 use gcodekit5_ui_egui::windows::{about, settings};
 use gcodekit5_ui_egui::workspace::PaneId;
@@ -14,7 +14,7 @@ const LANGUAGES: [&str; 5] = ["de", "es", "fr", "it", "pt"];
 
 /// Translations that are spelled like the English msgid; the Translator cannot tell them
 /// from a missing entry, so the po file is checked for them instead.
-const IDENTICAL: [(&str, &str); 63] = [
+const IDENTICAL: [(&str, &str); 73] = [
     ("de", "G-Code Editor"),
     ("de", "Designer"),
     ("it", "Designer"),
@@ -80,6 +80,17 @@ const IDENTICAL: [(&str, &str); 63] = [
     // Visualizer OSD.
     ("de", "Position"),
     ("fr", "Position"),
+    // Designer tools and the rotate menu.
+    ("de", "Ellipse"),
+    ("de", "Polygon"),
+    ("fr", "Rectangle"),
+    ("fr", "Ellipse"),
+    ("fr", "Triangle"),
+    ("de", "180°"),
+    ("es", "180°"),
+    ("fr", "180°"),
+    ("it", "180°"),
+    ("pt", "180°"),
 ];
 
 fn msgids() -> Vec<&'static str> {
@@ -95,6 +106,7 @@ fn msgids() -> Vec<&'static str> {
         .chain(console::msgids())
         .chain(editor::msgids())
         .chain(visualizer::msgids())
+        .chain(designer::msgids())
         .chain(status_bar::MSGIDS.iter().copied())
         .collect()
 }

@@ -22,6 +22,12 @@ mod machine_support;
 mod test_commands;
 #[path = "test_console_pane.rs"]
 mod test_console_pane;
+#[path = "test_designer_app.rs"]
+mod test_designer_app;
+#[path = "test_designer_canvas.rs"]
+mod test_designer_canvas;
+#[path = "test_designer_snapshots.rs"]
+mod test_designer_snapshots;
 #[path = "test_dialogs.rs"]
 mod test_dialogs;
 #[path = "test_editor.rs"]

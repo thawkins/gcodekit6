@@ -3257,3 +3257,21 @@ msgstr "Diese Werkzeugbahn konnte nicht gezeichnet werden."
 
 msgid "Stop the running job before opening a file."
 msgstr "Beenden Sie den laufenden Auftrag, bevor Sie eine Datei öffnen."
+
+msgid "Rotate"
+msgstr "Drehen"
+
+msgid "90° CW"
+msgstr "90° im Uhrzeigersinn"
+
+msgid "90° CCW"
+msgstr "90° gegen den Uhrzeigersinn"
+
+msgid "45° CW"
+msgstr "45° im Uhrzeigersinn"
+
+msgid "45° CCW"
+msgstr "45° gegen den Uhrzeigersinn"
+
+msgid "180°"
+msgstr "180°"

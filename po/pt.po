@@ -3252,3 +3252,21 @@ msgstr "Não foi possível desenhar esta trajetória."
 
 msgid "Stop the running job before opening a file."
 msgstr "Pare o trabalho em andamento antes de abrir um arquivo."
+
+msgid "Rotate"
+msgstr "Rodar"
+
+msgid "90° CW"
+msgstr "90° no sentido horário"
+
+msgid "90° CCW"
+msgstr "90° no sentido anti-horário"
+
+msgid "45° CW"
+msgstr "45° no sentido horário"
+
+msgid "45° CCW"
+msgstr "45° no sentido anti-horário"
+
+msgid "180°"
+msgstr "180°"

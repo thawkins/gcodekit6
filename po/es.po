@@ -3260,3 +3260,21 @@ msgstr "No se pudo dibujar esta trayectoria."
 
 msgid "Stop the running job before opening a file."
 msgstr "Detenga el trabajo en curso antes de abrir un archivo."
+
+msgid "Rotate"
+msgstr "Rotar"
+
+msgid "90° CW"
+msgstr "90° en sentido horario"
+
+msgid "90° CCW"
+msgstr "90° en sentido antihorario"
+
+msgid "45° CW"
+msgstr "45° en sentido horario"
+
+msgid "45° CCW"
+msgstr "45° en sentido antihorario"
+
+msgid "180°"
+msgstr "180°"

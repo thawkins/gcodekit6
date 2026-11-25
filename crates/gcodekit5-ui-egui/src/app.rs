@@ -57,6 +57,7 @@ use crate::dialogs::{
 use crate::machine::{Machine, lock};
 use crate::menu::Menus;
 use crate::panes::console::ConsolePane;
+use crate::panes::designer::{DesignerPane, SharedDesigner};
 use crate::panes::editor::{EditorPane, SharedEditor};
 use crate::panes::machine_control::MachineControlPane;
 use crate::panes::visualizer::VisualizerPane;
@@ -118,7 +119,7 @@ pub struct AppState {
     /// (`eframe::App::on_exit`). Cleared when the quit is cancelled.
     pub restart: Arc<AtomicBool>,
     /// Which documents have unsaved changes; asked about on quit. The app copies the editor's
-    /// flag here whenever it changes; the designer sets its own once it exists (Task 12).
+    /// and the designer's flags here whenever they change.
     pub dirty: DirtyState,
     /// The machine connection: the shared controller, this frame's events and the state
     /// derived from them. Replace it (with [`AppState::with_machine`]) before the app is built
@@ -237,6 +238,10 @@ pub struct GcodeKitApp {
     editor: Rc<RefCell<EditorPane>>,
     /// The editor's dirty flag as last copied to [`AppState::dirty`].
     editor_dirty: bool,
+    /// The designer, also drawn by the workspace.
+    designer: Rc<RefCell<DesignerPane>>,
+    /// The design's modified flag as last copied to [`AppState::dirty`].
+    designer_dirty: bool,
     /// What waits for the editor's save dialog to be answered.
     after_save: Option<AfterSave>,
     /// An Open asked first about the editor's unsaved changes.
@@ -320,6 +325,8 @@ impl GcodeKitApp {
         let editor = Rc::new(RefCell::new(EditorPane::new()));
         workspace.set_pane(Box::new(SharedEditor(Rc::clone(&editor))));
         workspace.set_pane(Box::new(VisualizerPane::new()));
+        let designer = Rc::new(RefCell::new(DesignerPane::new()));
+        workspace.set_pane(Box::new(SharedDesigner(Rc::clone(&designer))));
         workspace.configure(state.config());
         {
             // Wake the event loop whenever the machine reports something.
@@ -348,6 +355,8 @@ impl GcodeKitApp {
             quit: QuitFlow::default(),
             editor,
             editor_dirty: false,
+            designer,
+            designer_dirty: false,
             after_save: None,
             open_after_confirm: false,
             machine_polled: None,
@@ -564,6 +573,7 @@ impl GcodeKitApp {
             self.dispatch(command);
         }
         self.sync_editor(false);
+        self.sync_designer();
         self.deliver_machine_events();
         self.queue = queue;
         self.show_windows(&ctx);
@@ -652,6 +662,23 @@ impl GcodeKitApp {
         self.queue.extend(requested);
     }
 
+    /// Hands `cmd` to the designer when it is the pane the user works in
+    /// ([`Workspace::active_pane`]).
+    ///
+    /// # Returns
+    /// Whether the designer ran it.
+    fn route_to_active_designer(&mut self, cmd: Command) -> bool {
+        if self.workspace.active_pane() != Some(PaneId::Designer) {
+            return false;
+        }
+        let mut requested = Vec::new();
+        let mut ctx = PaneContext::new(&self.state.translator, &mut requested)
+            .with_machine(&self.state.machine);
+        let ran = self.workspace.route_to(PaneId::Designer, cmd, &mut ctx);
+        self.queue.extend(requested);
+        ran
+    }
+
     /// Draws the window frame and the in-window menu bar (unless the native menu is up): in
     /// the title-bar strip when the app draws one, else in a top panel of its own.
     fn show_frame_and_menu(&self, ui: &mut egui::Ui, gate: Gate, queue: &mut Vec<Command>) {
@@ -716,9 +743,12 @@ impl GcodeKitApp {
             | Command::FileImportImage
             | Command::FileExportGcode
             | Command::FileExportSvg
-            | Command::FileRun
-            | Command::Undo
-            | Command::Redo => tracing::debug!(?cmd, "document command not available yet"),
+            | Command::FileRun => tracing::debug!(?cmd, "document command not available yet"),
+            Command::Undo | Command::Redo => {
+                if !self.route_to_active_designer(cmd) {
+                    tracing::debug!(?cmd, "no document to undo in");
+                }
+            }
             Command::StreamStart => {
                 // Stream exactly what the editor shows, also within the typing pause.
                 if self.sync_editor(true) {
@@ -742,13 +772,14 @@ impl GcodeKitApp {
             | Command::JogYNeg
             | Command::JogZPos
             | Command::JogZNeg
-            | Command::ZoomFit
-            | Command::ZoomIn
-            | Command::ZoomOut
-            | Command::ResetView
             | Command::ViewTop
             | Command::ViewFront
             | Command::ViewIso => self.route_pane_command(cmd),
+            Command::ZoomFit | Command::ZoomIn | Command::ZoomOut | Command::ResetView => {
+                if !self.route_to_active_designer(cmd) {
+                    self.route_pane_command(cmd);
+                }
+            }
             Command::OpenDeviceManager
             | Command::OpenToolsManager
             | Command::OpenMaterialsManager
@@ -910,6 +941,26 @@ impl GcodeKitApp {
     /// The G-code editor.
     pub fn editor(&self) -> &Rc<RefCell<EditorPane>> {
         &self.editor
+    }
+
+    /// The designer pane.
+    pub fn designer(&self) -> &Rc<RefCell<DesignerPane>> {
+        &self.designer
+    }
+
+    /// Copies the design's modified flag to [`AppState::dirty`] when it changed.
+    fn sync_designer(&mut self) {
+        let modified = match self.designer.try_borrow() {
+            Ok(designer) => designer.is_modified(),
+            Err(error) => {
+                tracing::warn!(%error, "designer busy; dirty flag not synced");
+                return;
+            }
+        };
+        if modified != self.designer_dirty {
+            self.designer_dirty = modified;
+            self.state.dirty.designer = modified;
+        }
     }
 
     /// Copies the editor's dirty flag to [`AppState::dirty`] when it changed, and hands the

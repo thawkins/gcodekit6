@@ -1,0 +1,96 @@
+//! Designer canvas snapshots through wgpu: one per drawing tool, and a selection with its
+//! handles.
+
+use egui_kittest::{Harness, SnapshotOptions};
+use gcodekit5_app::i18n::Translator;
+use gcodekit5_ui_egui::panes::designer::DesignerPane;
+use gcodekit5_ui_egui::panes::designer::canvas::DesignerTool;
+use gcodekit5_ui_egui::theme;
+use gcodekit5_ui_egui::workspace::{Pane, PaneContext};
+
+use crate::test_designer_canvas::{STEP_DT, click, drag, ids, press, screen};
+
+/// Snapshot options shared with the visualizer snapshots (see `test_visualizer.rs`).
+fn snapshot_options() -> SnapshotOptions {
+    SnapshotOptions::new()
+        .threshold(1.0)
+        .max_failed_pixels(40)
+        .output_path(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/snapshots"))
+}
+
+/// The pane in a harness that renders through wgpu, dark theme.
+fn gpu_harness() -> Harness<'static, DesignerPane> {
+    let tr = Translator::new("en");
+    let mut harness = Harness::builder()
+        .with_size(egui::vec2(480.0, 360.0))
+        .with_step_dt(STEP_DT)
+        .with_theme(egui::Theme::Dark)
+        .wgpu()
+        .build_ui_state(
+            move |ui, pane: &mut DesignerPane| {
+                theme::install(ui.ctx());
+                let mut requested = Vec::new();
+                let mut ctx = PaneContext::new(&tr, &mut requested);
+                pane.ui(ui, &mut ctx);
+            },
+            DesignerPane::new(),
+        );
+    harness.run();
+    harness
+}
+
+/// One snapshot per drawing tool: the shape drawn by a drag from (40, 40) to (160, 140) mm,
+/// then left unselected, on the grid and device bounds.
+#[test]
+fn test_snapshot_each_drawing_tool() {
+    let tools = [
+        (DesignerTool::Rectangle, "designer_rectangle"),
+        (DesignerTool::Circle, "designer_circle"),
+        (DesignerTool::Line, "designer_line"),
+        (DesignerTool::Ellipse, "designer_ellipse"),
+        (DesignerTool::Triangle, "designer_triangle"),
+        (DesignerTool::Polygon, "designer_polygon"),
+        (DesignerTool::Gear, "designer_gear"),
+        (DesignerTool::Sprocket, "designer_sprocket"),
+    ];
+    let mut failures = Vec::new();
+    for (tool, name) in tools {
+        let mut h = gpu_harness();
+        h.state_mut().set_tool(tool);
+        let (from, to) = (screen(&h, 40.0, 40.0), screen(&h, 160.0, 140.0));
+        drag(&mut h, from, to);
+        assert_eq!(ids(h.state()).len(), 1, "{tool:?}");
+        h.event(egui::Event::PointerGone);
+        h.run();
+        if let Err(error) = h.try_snapshot_options(name, &snapshot_options()) {
+            failures.push(format!("{name}: {error}"));
+        }
+    }
+    // A polyline, and a selection with its handles.
+    let mut h = gpu_harness();
+    h.state_mut().set_tool(DesignerTool::Polyline);
+    for (x, y) in [(40.0, 40.0), (160.0, 60.0), (100.0, 140.0)] {
+        let p = screen(&h, x, y);
+        click(&mut h, p);
+        h.run_steps(30);
+    }
+    press(&mut h, egui::Key::Enter);
+    h.event(egui::Event::PointerGone);
+    h.run();
+    if let Err(error) = h.try_snapshot_options("designer_polyline", &snapshot_options()) {
+        failures.push(format!("designer_polyline: {error}"));
+    }
+    let mut h = gpu_harness();
+    h.state_mut().set_tool(DesignerTool::Rectangle);
+    let (from, to) = (screen(&h, 40.0, 40.0), screen(&h, 160.0, 140.0));
+    drag(&mut h, from, to);
+    h.state_mut().set_tool(DesignerTool::Select);
+    let p = screen(&h, 100.0, 90.0);
+    click(&mut h, p);
+    h.event(egui::Event::PointerGone);
+    h.run();
+    if let Err(error) = h.try_snapshot_options("designer_selection", &snapshot_options()) {
+        failures.push(format!("designer_selection: {error}"));
+    }
+    assert!(failures.is_empty(), "{failures:#?}");
+}

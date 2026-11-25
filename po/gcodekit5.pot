@@ -3181,3 +3181,21 @@ msgstr ""
 
 msgid "Stop the running job before opening a file."
 msgstr ""
+
+msgid "Rotate"
+msgstr ""
+
+msgid "90° CW"
+msgstr ""
+
+msgid "90° CCW"
+msgstr ""
+
+msgid "45° CW"
+msgstr ""
+
+msgid "45° CCW"
+msgstr ""
+
+msgid "180°"
+msgstr ""

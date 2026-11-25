@@ -3264,3 +3264,21 @@ msgstr "Impossible de dessiner ce parcours d'outil."
 
 msgid "Stop the running job before opening a file."
 msgstr "Arrêtez le travail en cours avant d'ouvrir un fichier."
+
+msgid "Rotate"
+msgstr "Pivoter"
+
+msgid "90° CW"
+msgstr "90° sens horaire"
+
+msgid "90° CCW"
+msgstr "90° sens antihoraire"
+
+msgid "45° CW"
+msgstr "45° sens horaire"
+
+msgid "45° CCW"
+msgstr "45° sens antihoraire"
+
+msgid "180°"
+msgstr "180°"
