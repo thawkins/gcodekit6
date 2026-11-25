@@ -92,6 +92,8 @@ mod test_designer_toolbox;
 mod test_designer_toolpath;
 #[path = "test_device_info.rs"]
 mod test_device_info;
+#[path = "test_device_manager.rs"]
+mod test_device_manager;
 #[path = "test_dialogs.rs"]
 mod test_dialogs;
 #[path = "test_editor.rs"]

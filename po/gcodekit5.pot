@@ -3802,3 +3802,258 @@ msgstr ""
 
 msgid "The value is out of range"
 msgstr ""
+
+msgid "Dimensions"
+msgstr ""
+
+msgid "Device profiles could not be read:"
+msgstr ""
+
+msgid "No settings folder: device profiles cannot be loaded or saved."
+msgstr ""
+
+msgid "Failed to save device"
+msgstr ""
+
+msgid "Device not changed"
+msgstr ""
+
+msgid "Device saved:"
+msgstr ""
+
+msgid "Device deleted:"
+msgstr ""
+
+msgid "Active device:"
+msgstr ""
+
+msgid "Please connect to a device first."
+msgstr ""
+
+msgid "No settings reported yet: Retrieve them in Firmware Settings first."
+msgstr ""
+
+msgid "Device dimensions, spindle speed, and capabilities have been updated from the connected device. Click Save to apply changes."
+msgstr ""
+
+msgid "Devices"
+msgstr ""
+
+msgid "Search devices..."
+msgstr ""
+
+msgid "Add Device"
+msgstr ""
+
+msgid "Active"
+msgstr ""
+
+msgid "Sync from Device"
+msgstr ""
+
+msgid "Update device information from connected device"
+msgstr ""
+
+msgid "Set Active"
+msgstr ""
+
+msgid "Please select or create a device entry to edit"
+msgstr ""
+
+msgid "Delete device?"
+msgstr ""
+
+msgid "Delete '{}'? This cannot be undone."
+msgstr ""
+
+msgid "Device Type:"
+msgstr ""
+
+msgid "Controller:"
+msgstr ""
+
+msgid "Connection Type:"
+msgstr ""
+
+msgid "Baud Rate:"
+msgstr ""
+
+msgid "TCP Host:"
+msgstr ""
+
+msgid "TCP Port:"
+msgstr ""
+
+msgid "Timeout (ms):"
+msgstr ""
+
+msgid "Auto Reconnect"
+msgstr ""
+
+msgid "X Axis:"
+msgstr ""
+
+msgid "Y Axis:"
+msgstr ""
+
+msgid "Z Axis:"
+msgstr ""
+
+msgid "Min:"
+msgstr ""
+
+msgid "Max:"
+msgstr ""
+
+msgid "Limits"
+msgstr ""
+
+msgid "Max S-Value:"
+msgstr ""
+
+msgid "No of Axes:"
+msgstr ""
+
+msgid "Has Spindle"
+msgstr ""
+
+msgid "Spindle Power (W):"
+msgstr ""
+
+msgid "Max Spindle Speed (RPM):"
+msgstr ""
+
+msgid "Has Laser"
+msgstr ""
+
+msgid "Laser Power (W):"
+msgstr ""
+
+msgid "Has Coolant"
+msgstr ""
+
+msgid "Pen Mode (Repetier: M3/M5 become pen down/up Z moves)"
+msgstr ""
+
+msgid "FluidNC (supported via GRBL)"
+msgstr ""
+
+msgid "grblHAL (supported via GRBL)"
+msgstr ""
+
+msgid "TinyG (not supported)"
+msgstr ""
+
+msgid "g2core (not supported)"
+msgstr ""
+
+msgid "Smoothieware (not supported)"
+msgstr ""
+
+msgid "Marlin (not supported)"
+msgstr ""
+
+msgid "Serial"
+msgstr ""
+
+msgid "CNC Mill"
+msgstr ""
+
+msgid "CNC Lathe"
+msgstr ""
+
+msgid "Laser Cutter"
+msgstr ""
+
+msgid "3D Printer"
+msgstr ""
+
+msgid "Plotter"
+msgstr ""
+
+msgid "Invalid TCP Port"
+msgstr ""
+
+msgid "TCP Port must be a number"
+msgstr ""
+
+msgid "Invalid Timeout"
+msgstr ""
+
+msgid "Timeout must be a number (ms)"
+msgstr ""
+
+msgid "Invalid TCP Host"
+msgstr ""
+
+msgid "TCP Host must not contain spaces"
+msgstr ""
+
+msgid "TCP Host must not be empty for network connections"
+msgstr ""
+
+msgid "Invalid X Min"
+msgstr ""
+
+msgid "Invalid X Max"
+msgstr ""
+
+msgid "Invalid Y Min"
+msgstr ""
+
+msgid "Invalid Y Max"
+msgstr ""
+
+msgid "Invalid Z Min"
+msgstr ""
+
+msgid "Invalid Z Max"
+msgstr ""
+
+msgid "Invalid No of Axes"
+msgstr ""
+
+msgid "Number of axes must be an integer between 1 and 6"
+msgstr ""
+
+msgid "Invalid Max Feed Rate"
+msgstr ""
+
+msgid "Invalid Max S-Value"
+msgstr ""
+
+msgid "Max S-Value must be a number"
+msgstr ""
+
+msgid "Invalid Spindle Power"
+msgstr ""
+
+msgid "Spindle power must be a number (W)"
+msgstr ""
+
+msgid "Invalid Max Spindle Speed"
+msgstr ""
+
+msgid "Max spindle speed must be an integer (RPM)"
+msgstr ""
+
+msgid "Invalid Laser Power"
+msgstr ""
+
+msgid "Laser power must be a number (W)"
+msgstr ""
+
+msgid "Unsupported controller"
+msgstr ""
+
+msgid "The selected controller '{}' is not supported yet. Please choose a supported one and try again."
+msgstr ""
+
+msgid "The active device cannot be deleted. Set another device active first."
+msgstr ""
+
+msgid "The only device cannot be deleted."
+msgstr ""
+
+msgid "Check that the active device's controller in the Device Manager matches the machine."
+msgstr ""

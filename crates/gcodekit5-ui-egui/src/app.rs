@@ -74,12 +74,17 @@ use crate::panes::machine_control::MachineControlPane;
 use crate::panes::visualizer::VisualizerPane;
 use crate::theme;
 use crate::windows::{
-    AboutWindow, DeviceInfoWindow, FirmwareSettingsWindow, SettingsOutcome, SettingsWindow,
+    AboutWindow, DeviceInfoWindow, DeviceManagerWindow, FirmwareSettingsWindow, SettingsOutcome,
+    SettingsWindow,
 };
 use crate::workspace::{PaneContext, PaneId, Workspace};
 use designer_files::{DesignFlow, DesignNext, EditorNext, OPEN_BEHIND_HANDOFF};
 use gcodekit5_app::materials_manager_backend::MaterialsManagerBackend;
 use gcodekit5_app::tools_manager_backend::ToolsManagerBackend;
+use gcodekit5_devicedb::DeviceProfile;
+
+/// The GTK build's device profiles file, in the legacy settings folder.
+const DEVICES_FILE: &str = "devices.json";
 
 /// How long quitting waits for a stopped job to be confirmed by the controller.
 const STOP_JOB_TIMEOUT: Duration = Duration::from_secs(2);
@@ -141,6 +146,10 @@ pub struct AppState {
     /// derived from them. Replace it (with [`AppState::with_machine`]) before the app is built
     /// from the state, since the Machine Control pane shares its controller.
     pub machine: Machine,
+    /// The device profiles file (the GTK build's `devices.json` in the legacy settings
+    /// folder); `None` without a settings folder. Replace it (with
+    /// [`AppState::with_device_file`]) before the app is built from the state.
+    pub device_file: Option<PathBuf>,
 }
 
 impl AppState {
@@ -151,6 +160,7 @@ impl AppState {
     /// * `decision` - craft-window's frame decision for the window.
     pub fn new(settings: SettingsManager, decision: Decision) -> Self {
         let translator = Translator::new(&settings.config().ui.language);
+        let device_file = settings.dirs().map(|dirs| dirs.legacy.join(DEVICES_FILE));
         Self {
             settings,
             translator,
@@ -158,7 +168,17 @@ impl AppState {
             restart: Arc::new(AtomicBool::new(false)),
             dirty: DirtyState::default(),
             machine: Machine::new(MachineController::new()),
+            device_file,
         }
+    }
+
+    /// The same state keeping its device profiles in `file` (a test folder, for example).
+    ///
+    /// # Arguments
+    /// * `file` - The device profiles file.
+    pub fn with_device_file(mut self, file: PathBuf) -> Self {
+        self.device_file = Some(file);
+        self
     }
 
     /// The same state driving `controller` (a test transport, for example).
@@ -212,23 +232,12 @@ struct QuitFlow {
     confirmed: bool,
 }
 
-/// Gives the CAM tools the user's tool and material libraries and the active device, from
-/// the files the GTK build keeps in `legacy` (`custom_tools.json`, `custom_materials.json`,
-/// `devices.json`). Nothing is written: without `devices.json` there is no device.
-fn load_cam_libraries(cam: &mut CamToolsPane, legacy: &Path) {
+/// Gives the CAM tools the user's tool and material libraries, from the files the GTK build
+/// keeps in `legacy` (`custom_tools.json`, `custom_materials.json`), and the active device.
+fn load_cam_libraries(cam: &mut CamToolsPane, legacy: &Path, device: Option<DeviceProfile>) {
     let tools = ToolsManagerBackend::with_storage_path(legacy.join("custom_tools.json"));
     let materials =
         MaterialsManagerBackend::with_storage_path(legacy.join("custom_materials.json"));
-    let devices = legacy.join("devices.json");
-    let device = if devices.exists() {
-        let manager = gcodekit5_devicedb::DeviceManager::new(devices);
-        if let Err(error) = manager.load() {
-            tracing::warn!(%error, "device profiles not loaded; no active device");
-        }
-        manager.get_active_profile()
-    } else {
-        None
-    };
     cam.set_libraries(
         tools.get_all_tools().into_iter().cloned().collect(),
         materials.get_all_materials().into_iter().cloned().collect(),
@@ -277,6 +286,8 @@ pub struct GcodeKitApp {
     firmware_settings: FirmwareSettingsWindow,
     /// The Device Info window.
     device_info: DeviceInfoWindow,
+    /// The Device Manager window, which also holds the device profiles.
+    device_manager: DeviceManagerWindow,
     /// The last command dispatched.
     last_dispatched: Option<Command>,
     /// The quit being decided, if any.
@@ -381,9 +392,14 @@ impl GcodeKitApp {
         workspace.set_pane(Box::new(SharedDesigner(Rc::clone(&designer))));
         workspace.set_pane(Box::new(LayersPane::new(Rc::clone(&designer))));
         workspace.set_pane(Box::new(PropertiesPane::new(Rc::clone(&designer))));
+        let device_manager = DeviceManagerWindow::new(state.device_file.clone());
         let cam_tools = Rc::new(RefCell::new(CamToolsPane::new()));
         if let Some(dirs) = state.settings.dirs() {
-            load_cam_libraries(&mut cam_tools.borrow_mut(), &dirs.legacy);
+            load_cam_libraries(
+                &mut cam_tools.borrow_mut(),
+                &dirs.legacy,
+                device_manager.active_profile(),
+            );
         }
         workspace.set_pane(Box::new(SharedCamTools::new(Rc::clone(&cam_tools))));
         workspace.configure(state.config());
@@ -412,6 +428,7 @@ impl GcodeKitApp {
             about_window,
             firmware_settings: FirmwareSettingsWindow::default(),
             device_info: DeviceInfoWindow::default(),
+            device_manager,
             last_dispatched: None,
             quit: QuitFlow::default(),
             editor,
@@ -816,6 +833,7 @@ impl GcodeKitApp {
             Command::About => self.about_window.open(),
             Command::OpenFirmwareSettings => self.firmware_settings.open(),
             Command::OpenDeviceInfo => self.device_info.open(),
+            Command::OpenDeviceManager => self.device_manager.open(&self.state.translator),
             Command::Quit => self.request_quit(QuitSource::MenuQuit),
             Command::Cut => self
                 .viewport_commands
@@ -870,10 +888,9 @@ impl GcodeKitApp {
                     self.route_pane_command(cmd);
                 }
             }
-            Command::OpenDeviceManager
-            | Command::OpenToolsManager
-            | Command::OpenMaterialsManager
-            | Command::OpenHelp => tracing::debug!(?cmd, "window command not available yet"),
+            Command::OpenToolsManager | Command::OpenMaterialsManager | Command::OpenHelp => {
+                tracing::debug!(?cmd, "window command not available yet")
+            }
         }
     }
 

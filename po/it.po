@@ -3881,3 +3881,258 @@ msgstr "Inserire un numero intero"
 
 msgid "The value is out of range"
 msgstr "Il valore è fuori intervallo"
+
+msgid "Dimensions"
+msgstr "Dimensioni"
+
+msgid "Device profiles could not be read:"
+msgstr "Impossibile leggere i profili dispositivo:"
+
+msgid "No settings folder: device profiles cannot be loaded or saved."
+msgstr "Nessuna cartella impostazioni: i profili dispositivo non possono essere caricati o salvati."
+
+msgid "Failed to save device"
+msgstr "Impossibile salvare il dispositivo"
+
+msgid "Device not changed"
+msgstr "Dispositivo non modificato"
+
+msgid "Device saved:"
+msgstr "Dispositivo salvato:"
+
+msgid "Device deleted:"
+msgstr "Dispositivo eliminato:"
+
+msgid "Active device:"
+msgstr "Dispositivo attivo:"
+
+msgid "Please connect to a device first."
+msgstr "Connettersi prima a un dispositivo."
+
+msgid "No settings reported yet: Retrieve them in Firmware Settings first."
+msgstr "Nessuna impostazione ricevuta: recuperarle prima in Impostazioni firmware."
+
+msgid "Device dimensions, spindle speed, and capabilities have been updated from the connected device. Click Save to apply changes."
+msgstr "Dimensioni, velocità del mandrino e capacità sono state aggiornate dal dispositivo connesso. Fare clic su Salva per applicare."
+
+msgid "Devices"
+msgstr "Dispositivi"
+
+msgid "Search devices..."
+msgstr "Cerca dispositivi..."
+
+msgid "Add Device"
+msgstr "Aggiungi dispositivo"
+
+msgid "Active"
+msgstr "Attivo"
+
+msgid "Sync from Device"
+msgstr "Sincronizza dal dispositivo"
+
+msgid "Update device information from connected device"
+msgstr "Aggiorna le informazioni dal dispositivo connesso"
+
+msgid "Set Active"
+msgstr "Imposta come attivo"
+
+msgid "Please select or create a device entry to edit"
+msgstr "Selezionare o creare un dispositivo da modificare"
+
+msgid "Delete device?"
+msgstr "Eliminare il dispositivo?"
+
+msgid "Delete '{}'? This cannot be undone."
+msgstr "Eliminare '{}'? L'operazione non può essere annullata."
+
+msgid "Device Type:"
+msgstr "Tipo di dispositivo:"
+
+msgid "Controller:"
+msgstr "Controller del dispositivo:"
+
+msgid "Connection Type:"
+msgstr "Tipo di connessione:"
+
+msgid "Baud Rate:"
+msgstr "Velocità in baud:"
+
+msgid "TCP Host:"
+msgstr "Host TCP:"
+
+msgid "TCP Port:"
+msgstr "Porta TCP:"
+
+msgid "Timeout (ms):"
+msgstr "Timeout (ms) della connessione:"
+
+msgid "Auto Reconnect"
+msgstr "Riconnessione automatica"
+
+msgid "X Axis:"
+msgstr "Asse X:"
+
+msgid "Y Axis:"
+msgstr "Asse Y:"
+
+msgid "Z Axis:"
+msgstr "Asse Z:"
+
+msgid "Min:"
+msgstr "Min.:"
+
+msgid "Max:"
+msgstr "Mass.:"
+
+msgid "Limits"
+msgstr "Limiti"
+
+msgid "Max S-Value:"
+msgstr "Valore S mass.:"
+
+msgid "No of Axes:"
+msgstr "N. di assi:"
+
+msgid "Has Spindle"
+msgstr "Ha mandrino"
+
+msgid "Spindle Power (W):"
+msgstr "Potenza mandrino (W):"
+
+msgid "Max Spindle Speed (RPM):"
+msgstr "Velocità mass. mandrino (giri/min):"
+
+msgid "Has Laser"
+msgstr "Ha laser"
+
+msgid "Laser Power (W):"
+msgstr "Potenza laser (W):"
+
+msgid "Has Coolant"
+msgstr "Ha refrigerante"
+
+msgid "Pen Mode (Repetier: M3/M5 become pen down/up Z moves)"
+msgstr "Modalità penna (Repetier: M3/M5 diventano movimenti Z penna giù/su)"
+
+msgid "FluidNC (supported via GRBL)"
+msgstr "FluidNC (supportato tramite GRBL)"
+
+msgid "grblHAL (supported via GRBL)"
+msgstr "grblHAL (supportato tramite GRBL)"
+
+msgid "TinyG (not supported)"
+msgstr "TinyG (non supportato)"
+
+msgid "g2core (not supported)"
+msgstr "g2core (non supportato)"
+
+msgid "Smoothieware (not supported)"
+msgstr "Smoothieware (non supportato)"
+
+msgid "Marlin (not supported)"
+msgstr "Marlin (non supportato)"
+
+msgid "Serial"
+msgstr "Seriale"
+
+msgid "CNC Mill"
+msgstr "Fresatrice CNC"
+
+msgid "CNC Lathe"
+msgstr "Tornio CNC"
+
+msgid "Laser Cutter"
+msgstr "Taglierina laser"
+
+msgid "3D Printer"
+msgstr "Stampante 3D"
+
+msgid "Plotter"
+msgstr "Plotter a penna"
+
+msgid "Invalid TCP Port"
+msgstr "Porta TCP non valida"
+
+msgid "TCP Port must be a number"
+msgstr "La porta TCP deve essere un numero"
+
+msgid "Invalid Timeout"
+msgstr "Timeout non valido"
+
+msgid "Timeout must be a number (ms)"
+msgstr "Il timeout deve essere un numero (ms)"
+
+msgid "Invalid TCP Host"
+msgstr "Host TCP non valido"
+
+msgid "TCP Host must not contain spaces"
+msgstr "L'host TCP non deve contenere spazi"
+
+msgid "TCP Host must not be empty for network connections"
+msgstr "L'host TCP non può essere vuoto per le connessioni di rete"
+
+msgid "Invalid X Min"
+msgstr "X min. non valido"
+
+msgid "Invalid X Max"
+msgstr "X mass. non valido"
+
+msgid "Invalid Y Min"
+msgstr "Y min. non valido"
+
+msgid "Invalid Y Max"
+msgstr "Y mass. non valido"
+
+msgid "Invalid Z Min"
+msgstr "Z min. non valido"
+
+msgid "Invalid Z Max"
+msgstr "Z mass. non valido"
+
+msgid "Invalid No of Axes"
+msgstr "Numero di assi non valido"
+
+msgid "Number of axes must be an integer between 1 and 6"
+msgstr "Il numero di assi deve essere un intero tra 1 e 6"
+
+msgid "Invalid Max Feed Rate"
+msgstr "Avanzamento mass. non valido"
+
+msgid "Invalid Max S-Value"
+msgstr "Valore S mass. non valido"
+
+msgid "Max S-Value must be a number"
+msgstr "Il valore S mass. deve essere un numero"
+
+msgid "Invalid Spindle Power"
+msgstr "Potenza mandrino non valida"
+
+msgid "Spindle power must be a number (W)"
+msgstr "La potenza del mandrino deve essere un numero (W)"
+
+msgid "Invalid Max Spindle Speed"
+msgstr "Velocità mass. mandrino non valida"
+
+msgid "Max spindle speed must be an integer (RPM)"
+msgstr "La velocità mass. del mandrino deve essere un intero (giri/min)"
+
+msgid "Invalid Laser Power"
+msgstr "Potenza laser non valida"
+
+msgid "Laser power must be a number (W)"
+msgstr "La potenza laser deve essere un numero (W)"
+
+msgid "Unsupported controller"
+msgstr "Controller non supportato"
+
+msgid "The selected controller '{}' is not supported yet. Please choose a supported one and try again."
+msgstr "Il controller '{}' selezionato non è ancora supportato. Sceglierne uno supportato e riprovare."
+
+msgid "The active device cannot be deleted. Set another device active first."
+msgstr "Il dispositivo attivo non può essere eliminato. Impostare prima un altro dispositivo come attivo."
+
+msgid "The only device cannot be deleted."
+msgstr "L'unico dispositivo non può essere eliminato."
+
+msgid "Check that the active device's controller in the Device Manager matches the machine."
+msgstr "Verificare che il controller del dispositivo attivo nel Gestore dispositivi corrisponda alla macchina."

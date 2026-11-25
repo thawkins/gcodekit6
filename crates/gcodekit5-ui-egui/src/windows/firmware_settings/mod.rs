@@ -2,10 +2,14 @@
 //! settings, filtered by search text and category, read from the controller (Retrieve),
 //! edited one at a time, and saved to or loaded from a JSON file.
 //!
-//! - **Retrieve** loads the GRBL (or, when the controller said it runs Repetier, the
-//!   Repetier) definitions and sends `$$` then `$I` (`M205` then `M115`). The identity
-//!   reply follows the dump, so it marks the dump complete; after 5 s the retrieval ends
-//!   as incomplete.
+//! - **Retrieve** loads the GRBL (or, when the active device profile's controller is
+//!   Repetier or the controller said it runs Repetier, the Repetier) definitions and sends
+//!   `$$` then `$I` (`M205` then `M115`), as GTK chose. The identity reply follows the dump,
+//!   so it marks the dump complete; after 5 s the retrieval ends as incomplete. A dump with
+//!   no settings hints at the active profile's controller in the Device Manager.
+//! - The first complete GRBL dump of a connection with at least 10 settings is handed to
+//!   the app ([`FirmwareSettingsWindow::take_dump_for_profile`]) to keep in the active
+//!   device profile, as GTK's Device Config page did.
 //! - `$n=v` lines update the list whenever they arrive (a `$$` typed in the console too);
 //!   the GRBL definitions are loaded first when the list is empty.
 //! - Clicking a writable row the controller has reported (on this connection, since the
@@ -22,7 +26,7 @@
 //! Dependencies: `egui`, `gcodekit5-app` (settings model, controller, translations),
 //! `gcodekit5-communication` (`SettingsManager`).
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeSet, HashMap};
 use std::path::Path;
 use std::time::{Duration, Instant};
 
@@ -43,6 +47,9 @@ use crate::machine::Machine;
 
 /// How long a retrieval waits for the identity reply that ends the dump.
 pub const RETRIEVE_TIMEOUT: Duration = Duration::from_secs(5);
+
+/// How many settings a dump needs before it is kept in the device profile (GTK's rule).
+const PROFILE_DUMP_MIN: usize = 10;
 
 /// The file name the Save dialog suggests.
 pub const EXPORT_FILE_NAME: &str = "grbl_settings.json";
@@ -98,6 +105,10 @@ pub struct FirmwareSettingsWindow {
     edit: Option<Edit>,
     write: Option<Write>,
     file_request: Option<FileRequest>,
+    /// A complete dump for the app to keep in the active device profile.
+    dump_for_profile: Option<HashMap<u16, String>>,
+    /// A dump was handed over on this connection.
+    dump_stored: bool,
 }
 
 impl Default for FirmwareSettingsWindow {
@@ -113,6 +124,8 @@ impl Default for FirmwareSettingsWindow {
             edit: None,
             write: None,
             file_request: None,
+            dump_for_profile: None,
+            dump_stored: false,
         }
     }
 }
@@ -123,9 +136,30 @@ impl FirmwareSettingsWindow {
         self.open = true;
     }
 
+    /// Closes the window.
+    pub fn close(&mut self) {
+        self.open = false;
+        self.edit = None;
+    }
+
     /// Whether the window is open.
     pub fn is_open(&self) -> bool {
         self.open
+    }
+
+    /// The GRBL settings the controller reported on this connection (number to value), for
+    /// the Device Manager's Sync from Device.
+    pub fn reported_values(&self) -> HashMap<u16, String> {
+        self.reported
+            .iter()
+            .filter(|n| **n < REPETIER_OFFSET)
+            .filter_map(|n| Some((*n, self.table.get_setting(*n)?.value.clone())))
+            .collect()
+    }
+
+    /// Takes the dump to keep in the active device profile, once per connection.
+    pub fn take_dump_for_profile(&mut self) -> Option<HashMap<u16, String>> {
+        self.dump_for_profile.take()
     }
 
     /// The rows the list shows for the current search text and category.
@@ -158,6 +192,8 @@ impl FirmwareSettingsWindow {
                 MachineEvent::Received(line) => self.received(line.trim()),
                 MachineEvent::Disconnected => {
                     self.reported.clear();
+                    self.dump_stored = false;
+                    self.dump_for_profile = None;
                     // Ends a retrieval in progress; an earlier result stays until read (the
                     // window shows the connection state beside it).
                     if self.retrieval.take().is_some() {
@@ -218,9 +254,9 @@ impl FirmwareSettingsWindow {
         if let Some(retrieval) = &self.retrieval {
             let complete = retrieval.identity_seen;
             if complete || retrieval.started.elapsed() > RETRIEVE_TIMEOUT {
-                let count = retrieval.count;
+                let (count, repetier) = (retrieval.count, retrieval.repetier);
                 self.retrieval = None;
-                self.finish_retrieval(complete, count, tr);
+                self.finish_retrieval(complete, count, repetier, tr);
             }
         }
         if self.write.as_ref().is_some_and(|w| w.pending.timed_out()) {
@@ -228,12 +264,19 @@ impl FirmwareSettingsWindow {
         }
     }
 
-    fn finish_retrieval(&mut self, complete: bool, count: usize, tr: &Translator) {
+    fn finish_retrieval(&mut self, complete: bool, count: usize, repetier: bool, tr: &Translator) {
         if count == 0 {
             self.table.clear();
             let text = n_!("Protocol mismatch: No valid parameters received from device");
-            self.say(tr.tr(text).into_owned(), true);
+            let hint = n_!(
+                "Check that the active device's controller in the Device Manager matches the machine."
+            );
+            self.say(format!("{} {}", tr.tr(text), tr.tr(hint)), true);
             return;
+        }
+        if complete && !repetier && count >= PROFILE_DUMP_MIN && !self.dump_stored {
+            self.dump_stored = true;
+            self.dump_for_profile = Some(self.reported_values());
         }
         let text = if complete {
             n_!("Settings retrieved from device:")
@@ -271,8 +314,15 @@ impl FirmwareSettingsWindow {
         self.say(format!("{title}: {line}: {reason}"), true);
     }
 
-    /// Reads every setting from the controller.
-    fn retrieve(&mut self, machine: &Machine, identity: &DeviceIdentity, tr: &Translator) {
+    /// Reads every setting from the controller; Repetier's when the active device profile or
+    /// the controller says Repetier (GTK's rule).
+    fn retrieve(
+        &mut self,
+        machine: &Machine,
+        identity: &DeviceIdentity,
+        profile_repetier: bool,
+        tr: &Translator,
+    ) {
         match setting_write::blocked(machine) {
             Some(SettingsBlocked::NotConnected) => {
                 let text = n_!("Please connect the machine before retrieving parameters.");
@@ -287,7 +337,7 @@ impl FirmwareSettingsWindow {
             }
             None => {}
         }
-        let repetier = identity.is_repetier();
+        let repetier = profile_repetier || identity.is_repetier();
         let (definitions, lines, failure) = if repetier {
             (
                 repetier_definitions(),
@@ -414,6 +464,7 @@ pub fn msgids() -> Vec<&'static str> {
         n_!("Category"),
         n_!("Description"),
         n_!("Protocol mismatch: No valid parameters received from device"),
+        n_!("Check that the active device's controller in the Device Manager matches the machine."),
         n_!("Settings retrieved from device:"),
         n_!("Settings retrieval incomplete (timed out), settings received:"),
         n_!("Setting written:"),

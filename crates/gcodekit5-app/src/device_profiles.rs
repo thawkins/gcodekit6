@@ -386,7 +386,7 @@ impl ProfileForm {
             return Err(FormError {
                 title: n_!("Unsupported controller"),
                 detail: n_!(
-                    "The selected controller \"{}\" is not supported yet. Please choose a supported one and try again."
+                    "The selected controller '{}' is not supported yet. Please choose a supported one and try again."
                 ),
                 arg: Some(protocol.display_name.to_string()),
             });
@@ -569,7 +569,7 @@ pub fn msgids() -> Vec<&'static str> {
         n_!("Laser power must be a number (W)"),
         n_!("Unsupported controller"),
         n_!(
-            "The selected controller \"{}\" is not supported yet. Please choose a supported one and try again."
+            "The selected controller '{}' is not supported yet. Please choose a supported one and try again."
         ),
         DeleteRefusal::Active.msgid(),
         DeleteRefusal::Last.msgid(),

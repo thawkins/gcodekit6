@@ -21,12 +21,14 @@ impl FirmwareSettingsWindow {
     /// * `ctx` - The egui context.
     /// * `machine` - The app's machine connection, for reading and writing settings.
     /// * `identity` - What the controller reported about itself (Repetier or GRBL).
+    /// * `profile_repetier` - The active device profile's controller is Repetier.
     /// * `tr` - Translates the labels.
     pub fn show(
         &mut self,
         ctx: &egui::Context,
         machine: &Machine,
         identity: &DeviceIdentity,
+        profile_repetier: bool,
         tr: &Translator,
     ) {
         self.tick(tr);
@@ -44,7 +46,9 @@ impl FirmwareSettingsWindow {
             .id(egui::Id::unique("gcodekit5-firmware-settings"))
             .open(&mut open)
             .default_size([900.0, 560.0])
-            .show(ctx, |ui| self.contents(ui, machine, identity, tr));
+            .show(ctx, |ui| {
+                self.contents(ui, machine, identity, profile_repetier, tr)
+            });
         self.open = open;
         if !self.open {
             self.edit = None;
@@ -57,6 +61,7 @@ impl FirmwareSettingsWindow {
         ui: &mut egui::Ui,
         machine: &Machine,
         identity: &DeviceIdentity,
+        profile_repetier: bool,
         tr: &Translator,
     ) {
         let busy = self.retrieval.is_some() || self.write.is_some();
@@ -65,7 +70,7 @@ impl FirmwareSettingsWindow {
                 .add_enabled(!busy, egui::Button::new(tr.tr(n_!("Retrieve"))))
                 .on_hover_text(tr.tr(n_!("Retrieve Settings from Device ($$)")));
             if retrieve.clicked() {
-                self.retrieve(machine, identity, tr);
+                self.retrieve(machine, identity, profile_repetier, tr);
             }
             let save = ui
                 .add_enabled(
