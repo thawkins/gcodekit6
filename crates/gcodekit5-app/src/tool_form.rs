@@ -244,18 +244,23 @@ impl Default for ToolForm {
     }
 }
 
-/// Parses a required length.
+/// Parses a required length or angle, which must be a finite number above 0 (`NaN`, `inf`,
+/// `0` and negatives would reach the speeds and feeds calculator).
 fn required(text: &str, error: &'static str) -> Result<f32, &'static str> {
-    text.trim().parse::<f32>().map_err(|_| error)
+    text.trim()
+        .parse::<f32>()
+        .ok()
+        .filter(|v| v.is_finite() && *v > 0.0)
+        .ok_or(error)
 }
 
-/// Parses an optional length; empty is `None`.
+/// Parses an optional length or angle; empty is `None`, anything else as [`required`].
 fn optional(text: &str, error: &'static str) -> Result<Option<f32>, &'static str> {
     let text = text.trim();
     if text.is_empty() {
         Ok(None)
     } else {
-        text.parse::<f32>().map(Some).map_err(|_| error)
+        required(text, error).map(Some)
     }
 }
 

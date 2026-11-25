@@ -60,6 +60,41 @@ fn test_tool_form_validation_messages() {
 }
 
 #[test]
+fn test_tool_form_refuses_lengths_that_are_not_positive() {
+    let valid = ToolForm {
+        id: "my_tool".into(),
+        name: "My tool".into(),
+        ..ToolForm::default()
+    };
+    assert!(valid.build(None).is_ok());
+    for bad in ["NaN", "inf", "0", "-3", "0.0"] {
+        let cases: [(fn(&mut ToolForm) -> &mut String, &str); 4] = [
+            (|f| &mut f.diameter, "Invalid diameter"),
+            (|f| &mut f.length, "Invalid length"),
+            (|f| &mut f.flute_length, "Invalid flute length"),
+            (|f| &mut f.shaft_diameter, "Invalid shaft diameter"),
+        ];
+        for (field, message) in cases {
+            let mut form = valid.clone();
+            *field(&mut form) = bad.into();
+            assert_eq!(form.build(None).err(), Some(message), "{message}: {bad}");
+        }
+        let mut form = valid.clone();
+        form.set_tool_type(ToolType::EndMillCornerRadius);
+        form.corner_radius = bad.into();
+        assert_eq!(
+            form.build(None).err(),
+            Some("Invalid corner radius"),
+            "{bad}"
+        );
+        let mut form = valid.clone();
+        form.set_tool_type(ToolType::VBit);
+        form.tip_angle = bad.into();
+        assert_eq!(form.build(None).err(), Some("Invalid tip angle"), "{bad}");
+    }
+}
+
+#[test]
 fn test_tool_form_round_trip_keeps_unedited_fields() {
     let backend = ToolsManagerBackend::with_storage_path(scratch("form_rt").join(TOOLS_FILE));
     let standard = backend.get_all_tools()[0].clone();
