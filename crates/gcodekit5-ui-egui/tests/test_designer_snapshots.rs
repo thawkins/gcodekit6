@@ -1,5 +1,5 @@
 //! Designer canvas snapshots through wgpu: one per drawing tool, and a selection with its
-//! handles, the toolbox, the Text tool and the shape gallery.
+//! handles, the toolbox, the Text tool, the shape gallery and the toolpath preview.
 
 use egui_kittest::{Harness, SnapshotOptions};
 use gcodekit5_app::i18n::Translator;
@@ -177,4 +177,31 @@ fn test_snapshot_shape_gallery() {
         failures.push(format!("designer_gallery_ghost: {error}"));
     }
     assert!(failures.is_empty(), "{failures:#?}");
+}
+
+/// The toolpath preview of a rectangle and a circle in CNC mode: cuts in the success
+/// colour, rapids dashed.
+#[test]
+fn test_snapshot_toolpath_preview() {
+    use gcodekit5_designer::model::{DesignCircle, DesignRectangle, Point, Shape};
+    let mut h = gpu_harness();
+    {
+        let state = h.state_mut().state_mut();
+        state.set_machine_mode(gcodekit5_designer::designer_state::MachineMode::Cnc3D);
+        state.add_shape_with_undo(Shape::Rectangle(DesignRectangle::new(
+            40.0, 40.0, 80.0, 60.0,
+        )));
+        state.add_shape_with_undo(Shape::Circle(DesignCircle::new(
+            Point::new(170.0, 120.0),
+            30.0,
+        )));
+        state.canvas.deselect_all();
+        state.show_toolpaths = true;
+    }
+    crate::test_designer_toolpath::wait_for_preview(&mut h);
+    h.event(egui::Event::PointerGone);
+    h.run();
+    if let Err(error) = h.try_snapshot_options("designer_toolpaths", &snapshot_options()) {
+        panic!("designer_toolpaths: {error}");
+    }
 }

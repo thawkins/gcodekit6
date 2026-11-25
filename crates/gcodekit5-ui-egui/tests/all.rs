@@ -48,6 +48,8 @@ mod test_designer_snapshots;
 mod test_designer_text_tool;
 #[path = "test_designer_toolbox.rs"]
 mod test_designer_toolbox;
+#[path = "test_designer_toolpath.rs"]
+mod test_designer_toolpath;
 #[path = "test_dialogs.rs"]
 mod test_dialogs;
 #[path = "test_editor.rs"]

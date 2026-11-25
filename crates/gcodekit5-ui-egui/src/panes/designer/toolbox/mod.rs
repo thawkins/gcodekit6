@@ -39,6 +39,7 @@ pub fn msgids() -> Vec<&'static str> {
         n_!("Active tool:"),
         n_!("Show Grid"),
         n_!("Snap to grid"),
+        n_!("Show Toolpaths"),
         n_!("Machine Mode"),
         n_!("Laser 2D"),
         n_!("CNC 3D"),
@@ -93,6 +94,7 @@ pub fn show(
             ui.separator();
             ui.checkbox(&mut state.show_grid, tr.tr("Show Grid"));
             ui.checkbox(&mut state.snap_enabled, tr.tr("Snap to grid"));
+            ui.checkbox(&mut state.show_toolpaths, tr.tr("Show Toolpaths"));
             ui.separator();
             machine_mode(ui, state, tr);
             settings::show(ui, state, units, tr);

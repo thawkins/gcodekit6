@@ -3244,3 +3244,6 @@ msgstr ""
 
 msgid "The array would create more than 10000 objects"
 msgstr ""
+
+msgid "Show Toolpaths"
+msgstr ""

@@ -3323,3 +3323,6 @@ msgstr "Introduzca un ángulo distinto de cero"
 
 msgid "The array would create more than 10000 objects"
 msgstr "La matriz crearía más de 10000 objetos"
+
+msgid "Show Toolpaths"
+msgstr "Mostrar trayectorias"

@@ -3327,3 +3327,6 @@ msgstr "Saisissez un angle non nul"
 
 msgid "The array would create more than 10000 objects"
 msgstr "Le réseau créerait plus de 10000 objets"
+
+msgid "Show Toolpaths"
+msgstr "Afficher les parcours d'outil"

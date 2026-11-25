@@ -3320,3 +3320,6 @@ msgstr "Geben Sie einen Winkel ungleich 0 ein"
 
 msgid "The array would create more than 10000 objects"
 msgstr "Die Anordnung würde mehr als 10000 Objekte erzeugen"
+
+msgid "Show Toolpaths"
+msgstr "Werkzeugbahnen anzeigen"

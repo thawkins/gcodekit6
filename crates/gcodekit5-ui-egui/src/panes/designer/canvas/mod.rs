@@ -12,7 +12,8 @@
 //!
 //! [`ShapeFlags`] are the layers panel's hidden and locked shapes ([`flags`]). The Text tool's
 //! Add Text dialog is [`text_tool`]; text shapes are painted as their glyph outlines
-//! ([`text_outline`]). The context menu's "Array..." opens [`array_dialog`].
+//! ([`text_outline`]). The context menu's "Array..." opens [`array_dialog`]; the toolbox's
+//! "Show Toolpaths" draws [`toolpath_preview`].
 //!
 //! Dependencies: `egui`, `glam`, `gcodekit5-designer` (model, viewport, undo commands).
 
@@ -24,6 +25,7 @@ pub mod picking;
 pub mod rendering;
 pub mod text_outline;
 pub mod text_tool;
+pub mod toolpath_preview;
 
 use egui::{Pos2, Rect, pos2};
 use gcodekit5_designer::viewport::Viewport;

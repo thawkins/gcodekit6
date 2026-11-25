@@ -36,6 +36,7 @@ use gcodekit5_settings::config::Config;
 use canvas::array_dialog::{self, ArrayDialog};
 use canvas::rendering::{self, LineWidths};
 use canvas::text_tool::{self, TextTool};
+use canvas::toolpath_preview::ToolpathPreview;
 use canvas::{CanvasInput, CanvasView, DesignerTool, ShapeFlags, editing};
 use shape_gallery::ShapeGallery;
 
@@ -76,6 +77,8 @@ pub struct DesignerPane {
     gallery: ShapeGallery,
     /// The context menu's Array dialog.
     array: ArrayDialog,
+    /// The toolpath preview ("Show Toolpaths").
+    toolpaths: ToolpathPreview,
 }
 
 impl std::fmt::Debug for DesignerPane {
@@ -110,7 +113,18 @@ impl DesignerPane {
             preview: Vec::new(),
             gallery: ShapeGallery::default(),
             array: ArrayDialog::default(),
+            toolpaths: ToolpathPreview::default(),
         }
+    }
+
+    /// The toolpaths the preview shows (the last finished build).
+    pub fn preview_toolpaths(&self) -> &[gcodekit5_designer::Toolpath] {
+        self.toolpaths.toolpaths()
+    }
+
+    /// Whether the preview matches the design as it is now (true while it is off).
+    pub fn toolpath_preview_ready(&self) -> bool {
+        self.toolpaths.is_current(&self.state, &self.flags)
     }
 
     /// Whether the Array dialog is open.
@@ -343,6 +357,7 @@ impl DesignerPane {
         }
         self.array.show(ui.ctx(), &mut self.state, self.units, tr);
         self.view = CanvasView::new(rect, self.state.canvas.viewport());
+        self.toolpaths.update(ui.ctx(), &self.state, &self.flags);
         let palette = crate::theme::palette(ui.ctx().theme());
         let painter = ui.painter_at(rect);
         rendering::paint(
@@ -355,6 +370,8 @@ impl DesignerPane {
             self.widths,
             &self.preview,
         );
+        self.toolpaths
+            .paint(&painter, &self.view, &self.state, palette);
         if self.gallery.pending().is_some() {
             let ghost = self.input.hover.and_then(|at| self.gallery.ghost(at));
             rendering::paint_ghost(&painter, &self.view, ghost.as_ref(), palette.accent);

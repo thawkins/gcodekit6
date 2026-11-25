@@ -3323,3 +3323,6 @@ msgstr "Inserisci un angolo diverso da zero"
 
 msgid "The array would create more than 10000 objects"
 msgstr "La serie creerebbe più di 10000 oggetti"
+
+msgid "Show Toolpaths"
+msgstr "Mostra percorsi utensile"
