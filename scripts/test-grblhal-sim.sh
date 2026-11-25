@@ -2,7 +2,7 @@
 # Test the grblHAL simulator virtual TTY
 # This demonstrates how to communicate with the simulator
 
-TTY_DEVICE="${HOME}/Projects/gcodekit5/target/temp/ttyGRBL"
+TTY_DEVICE="/dev/ttyGRBL"
 
 # Check if simulator is running
 if [ ! -e "${TTY_DEVICE}" ]; then
@@ -32,4 +32,4 @@ send_command "\$G"         # View parser state
 
 echo "Test complete!"
 echo ""
-echo "Your gcodekit5 application can connect to: ${TTY_DEVICE}"
+echo "GCodeKit can connect to: ${TTY_DEVICE}"
