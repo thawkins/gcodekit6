@@ -7,8 +7,8 @@
 
 use super::GcodeKitApp;
 use crate::dialogs::{Asked, DialogAnswer, FilePurpose};
-use crate::windows::ToolsManagerWindow;
 use crate::windows::tools_manager::{GtcFile, ToolsFileRequest};
+use crate::windows::{MaterialsManagerWindow, ToolsManagerWindow};
 
 impl GcodeKitApp {
     /// The CNC Tools window.
@@ -21,12 +21,23 @@ impl GcodeKitApp {
         &mut self.tools_manager
     }
 
+    /// The Materials Manager window.
+    pub fn materials_manager(&self) -> &MaterialsManagerWindow {
+        &self.materials_manager
+    }
+
+    /// The Materials Manager window, to drive it directly (tests).
+    pub fn materials_manager_mut(&mut self) -> &mut MaterialsManagerWindow {
+        &mut self.materials_manager
+    }
+
     /// Draws the library windows, shows the file dialog CNC Tools asked for, and hands a
     /// changed library to the speeds and feeds calculator.
     pub(super) fn show_library_windows(&mut self, ctx: &egui::Context) {
         let tr = &self.state.translator;
         let tools_open = self.tools_manager.is_open();
         self.tools_manager.show(ctx, tr);
+        self.materials_manager.show(ctx, tr);
         if tools_open && !self.tools_manager.is_open() {
             self.store_tools_ui_state();
         }
@@ -51,17 +62,16 @@ impl GcodeKitApp {
 
     /// Gives the speeds and feeds calculator the libraries again once one changed.
     fn sync_libraries(&mut self) {
-        if self.tools_manager.take_changed() {
-            let materials = self
-                .cam_tools
-                .borrow_mut()
-                .speeds_feeds_mut()
-                .materials
-                .clone();
+        let tools = self.tools_manager.take_changed();
+        let materials = self.materials_manager.take_changed();
+        if tools || materials {
             self.cam_tools
                 .borrow_mut()
                 .speeds_feeds_mut()
-                .replace_libraries(self.tools_manager.tools(), materials);
+                .replace_libraries(
+                    self.tools_manager.tools(),
+                    self.materials_manager.materials(),
+                );
         }
     }
 

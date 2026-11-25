@@ -112,6 +112,8 @@ mod test_machine_pane;
 mod test_machine_probe_report;
 #[path = "test_machine_worker_messages.rs"]
 mod test_machine_worker_messages;
+#[path = "test_materials_manager.rs"]
+mod test_materials_manager;
 #[path = "test_quit.rs"]
 mod test_quit;
 #[path = "test_settings_window.rs"]

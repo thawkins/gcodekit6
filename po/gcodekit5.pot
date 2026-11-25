@@ -4333,3 +4333,162 @@ msgstr ""
 
 msgid "Could not delete the material:"
 msgstr ""
+
+msgid "Machining"
+msgstr ""
+
+msgid "Safety"
+msgstr ""
+
+msgid "No settings folder: custom materials cannot be loaded or saved."
+msgstr ""
+
+msgid "The custom materials file could not be read:"
+msgstr ""
+
+msgid "A copy of the unreadable custom materials file was kept in"
+msgstr ""
+
+msgid "A material with this ID already exists."
+msgstr ""
+
+msgid "Material saved:"
+msgstr ""
+
+msgid "Material deleted:"
+msgstr ""
+
+msgid "No materials found"
+msgstr ""
+
+msgid "New Material"
+msgstr ""
+
+msgid "Please select or create a material to edit"
+msgstr ""
+
+msgid "Machinability:"
+msgstr ""
+
+msgid "Only custom materials can be deleted."
+msgstr ""
+
+msgid "Delete material?"
+msgstr ""
+
+msgid "The material has unsaved changes. Save them before continuing?"
+msgstr ""
+
+msgid "Subcategory:"
+msgstr ""
+
+msgid "e.g., Hardwood, Alloy"
+msgstr ""
+
+msgid "Density (kg/m3):"
+msgstr ""
+
+msgid "Machinability (1-10):"
+msgstr ""
+
+msgid "Tensile Strength (MPa):"
+msgstr ""
+
+msgid "Melting Point (deg C):"
+msgstr ""
+
+msgid "Optional"
+msgstr ""
+
+msgid "Chip Type:"
+msgstr ""
+
+msgid "Heat Sensitivity:"
+msgstr ""
+
+msgid "Abrasiveness:"
+msgstr ""
+
+msgid "Surface Finish:"
+msgstr ""
+
+msgid "Dust Hazard:"
+msgstr ""
+
+msgid "Fume Hazard:"
+msgstr ""
+
+msgid "Coolant Required"
+msgstr ""
+
+msgid "Additional Notes and Tips:"
+msgstr ""
+
+msgid "Engineered Wood"
+msgstr ""
+
+msgid "Plastic"
+msgstr ""
+
+msgid "Non-Ferrous Metal"
+msgstr ""
+
+msgid "Ferrous Metal"
+msgstr ""
+
+msgid "Composite"
+msgstr ""
+
+msgid "Stone and Ceramic"
+msgstr ""
+
+msgid "Segmented"
+msgstr ""
+
+msgid "Granular"
+msgstr ""
+
+msgid "Small"
+msgstr ""
+
+msgid "Low"
+msgstr ""
+
+msgid "Moderate"
+msgstr ""
+
+msgid "High"
+msgstr ""
+
+msgid "Excellent"
+msgstr ""
+
+msgid "Good"
+msgstr ""
+
+msgid "Fair"
+msgstr ""
+
+msgid "Rough"
+msgstr ""
+
+msgid "Minimal"
+msgstr ""
+
+msgid "Name is required"
+msgstr ""
+
+msgid "Subcategory is required"
+msgstr ""
+
+msgid "Tensile strength must be a number"
+msgstr ""
+
+msgid "Melting point must be a number"
+msgstr ""
+
+msgid "ID is required"
+msgstr ""
+
+msgid "ID must not contain spaces"
+msgstr ""

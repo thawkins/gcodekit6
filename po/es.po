@@ -4412,3 +4412,162 @@ msgstr "No se pudo guardar el material:"
 
 msgid "Could not delete the material:"
 msgstr "No se pudo eliminar el material:"
+
+msgid "Machining"
+msgstr "Mecanizado"
+
+msgid "Safety"
+msgstr "Seguridad"
+
+msgid "No settings folder: custom materials cannot be loaded or saved."
+msgstr "Sin carpeta de configuración: no se pueden cargar ni guardar los materiales personalizados."
+
+msgid "The custom materials file could not be read:"
+msgstr "No se pudo leer el archivo de materiales personalizados:"
+
+msgid "A copy of the unreadable custom materials file was kept in"
+msgstr "Se guardó una copia del archivo de materiales ilegible en"
+
+msgid "A material with this ID already exists."
+msgstr "Ya existe un material con este ID."
+
+msgid "Material saved:"
+msgstr "Material guardado:"
+
+msgid "Material deleted:"
+msgstr "Material eliminado:"
+
+msgid "No materials found"
+msgstr "No se encontraron materiales"
+
+msgid "New Material"
+msgstr "Nuevo material"
+
+msgid "Please select or create a material to edit"
+msgstr "Seleccione o cree un material para editar"
+
+msgid "Machinability:"
+msgstr "Maquinabilidad:"
+
+msgid "Only custom materials can be deleted."
+msgstr "Solo se pueden eliminar materiales personalizados."
+
+msgid "Delete material?"
+msgstr "¿Eliminar material?"
+
+msgid "The material has unsaved changes. Save them before continuing?"
+msgstr "El material tiene cambios sin guardar. ¿Guardarlos antes de continuar?"
+
+msgid "Subcategory:"
+msgstr "Subcategoría:"
+
+msgid "e.g., Hardwood, Alloy"
+msgstr "p. ej., madera dura, aleación"
+
+msgid "Density (kg/m3):"
+msgstr "Densidad (kg/m3):"
+
+msgid "Machinability (1-10):"
+msgstr "Maquinabilidad (1-10):"
+
+msgid "Tensile Strength (MPa):"
+msgstr "Resistencia a la tracción (MPa):"
+
+msgid "Melting Point (deg C):"
+msgstr "Punto de fusión (grados C):"
+
+msgid "Optional"
+msgstr "Opcional"
+
+msgid "Chip Type:"
+msgstr "Tipo de viruta:"
+
+msgid "Heat Sensitivity:"
+msgstr "Sensibilidad al calor:"
+
+msgid "Abrasiveness:"
+msgstr "Abrasividad:"
+
+msgid "Surface Finish:"
+msgstr "Acabado superficial:"
+
+msgid "Dust Hazard:"
+msgstr "Peligro de polvo:"
+
+msgid "Fume Hazard:"
+msgstr "Peligro de humos:"
+
+msgid "Coolant Required"
+msgstr "Requiere refrigerante"
+
+msgid "Additional Notes and Tips:"
+msgstr "Notas y consejos adicionales:"
+
+msgid "Engineered Wood"
+msgstr "Madera técnica"
+
+msgid "Plastic"
+msgstr "Plástico"
+
+msgid "Non-Ferrous Metal"
+msgstr "Metal no ferroso"
+
+msgid "Ferrous Metal"
+msgstr "Metal ferroso"
+
+msgid "Composite"
+msgstr "Compuesto"
+
+msgid "Stone and Ceramic"
+msgstr "Piedra y cerámica"
+
+msgid "Segmented"
+msgstr "Segmentada"
+
+msgid "Granular"
+msgstr "Granulada"
+
+msgid "Small"
+msgstr "Pequeña"
+
+msgid "Low"
+msgstr "Baja"
+
+msgid "Moderate"
+msgstr "Moderada"
+
+msgid "High"
+msgstr "Alta"
+
+msgid "Excellent"
+msgstr "Excelente"
+
+msgid "Good"
+msgstr "Bueno"
+
+msgid "Fair"
+msgstr "Regular"
+
+msgid "Rough"
+msgstr "Rugoso"
+
+msgid "Minimal"
+msgstr "Mínimo"
+
+msgid "Name is required"
+msgstr "El nombre es obligatorio"
+
+msgid "Subcategory is required"
+msgstr "La subcategoría es obligatoria"
+
+msgid "Tensile strength must be a number"
+msgstr "La resistencia a la tracción debe ser un número"
+
+msgid "Melting point must be a number"
+msgstr "El punto de fusión debe ser un número"
+
+msgid "ID is required"
+msgstr "El ID es obligatorio"
+
+msgid "ID must not contain spaces"
+msgstr "El ID no debe contener espacios"

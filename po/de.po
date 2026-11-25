@@ -4409,3 +4409,162 @@ msgstr "Das Material konnte nicht gespeichert werden:"
 
 msgid "Could not delete the material:"
 msgstr "Das Material konnte nicht gelöscht werden:"
+
+msgid "Machining"
+msgstr "Bearbeitung"
+
+msgid "Safety"
+msgstr "Sicherheit"
+
+msgid "No settings folder: custom materials cannot be loaded or saved."
+msgstr "Kein Einstellungsordner: Eigene Materialien können nicht geladen oder gespeichert werden."
+
+msgid "The custom materials file could not be read:"
+msgstr "Die Datei der eigenen Materialien konnte nicht gelesen werden:"
+
+msgid "A copy of the unreadable custom materials file was kept in"
+msgstr "Eine Kopie der unlesbaren Materialdatei wurde gespeichert unter"
+
+msgid "A material with this ID already exists."
+msgstr "Ein Material mit dieser ID existiert bereits."
+
+msgid "Material saved:"
+msgstr "Material gespeichert:"
+
+msgid "Material deleted:"
+msgstr "Material gelöscht:"
+
+msgid "No materials found"
+msgstr "Keine Materialien gefunden"
+
+msgid "New Material"
+msgstr "Neues Material"
+
+msgid "Please select or create a material to edit"
+msgstr "Bitte ein Material zum Bearbeiten auswählen oder anlegen"
+
+msgid "Machinability:"
+msgstr "Bearbeitbarkeit:"
+
+msgid "Only custom materials can be deleted."
+msgstr "Nur eigene Materialien können gelöscht werden."
+
+msgid "Delete material?"
+msgstr "Material löschen?"
+
+msgid "The material has unsaved changes. Save them before continuing?"
+msgstr "Das Material hat ungespeicherte Änderungen. Vor dem Fortfahren speichern?"
+
+msgid "Subcategory:"
+msgstr "Unterkategorie:"
+
+msgid "e.g., Hardwood, Alloy"
+msgstr "z. B. Hartholz, Legierung"
+
+msgid "Density (kg/m3):"
+msgstr "Dichte (kg/m3):"
+
+msgid "Machinability (1-10):"
+msgstr "Bearbeitbarkeit (1-10):"
+
+msgid "Tensile Strength (MPa):"
+msgstr "Zugfestigkeit (MPa):"
+
+msgid "Melting Point (deg C):"
+msgstr "Schmelzpunkt (Grad C):"
+
+msgid "Optional"
+msgstr "Optional"
+
+msgid "Chip Type:"
+msgstr "Spanart:"
+
+msgid "Heat Sensitivity:"
+msgstr "Wärmeempfindlichkeit:"
+
+msgid "Abrasiveness:"
+msgstr "Abrasivität:"
+
+msgid "Surface Finish:"
+msgstr "Oberflächengüte:"
+
+msgid "Dust Hazard:"
+msgstr "Staubgefahr:"
+
+msgid "Fume Hazard:"
+msgstr "Rauchgefahr:"
+
+msgid "Coolant Required"
+msgstr "Kühlmittel erforderlich"
+
+msgid "Additional Notes and Tips:"
+msgstr "Zusätzliche Notizen und Tipps:"
+
+msgid "Engineered Wood"
+msgstr "Holzwerkstoff"
+
+msgid "Plastic"
+msgstr "Kunststoff"
+
+msgid "Non-Ferrous Metal"
+msgstr "Nichteisenmetall"
+
+msgid "Ferrous Metal"
+msgstr "Eisenmetall"
+
+msgid "Composite"
+msgstr "Verbundwerkstoff"
+
+msgid "Stone and Ceramic"
+msgstr "Stein und Keramik"
+
+msgid "Segmented"
+msgstr "Segmentiert"
+
+msgid "Granular"
+msgstr "Körnig"
+
+msgid "Small"
+msgstr "Klein"
+
+msgid "Low"
+msgstr "Niedrig"
+
+msgid "Moderate"
+msgstr "Mittel"
+
+msgid "High"
+msgstr "Hoch"
+
+msgid "Excellent"
+msgstr "Ausgezeichnet"
+
+msgid "Good"
+msgstr "Gut"
+
+msgid "Fair"
+msgstr "Mäßig"
+
+msgid "Rough"
+msgstr "Rau"
+
+msgid "Minimal"
+msgstr "Minimal"
+
+msgid "Name is required"
+msgstr "Name ist erforderlich"
+
+msgid "Subcategory is required"
+msgstr "Unterkategorie ist erforderlich"
+
+msgid "Tensile strength must be a number"
+msgstr "Zugfestigkeit muss eine Zahl sein"
+
+msgid "Melting point must be a number"
+msgstr "Schmelzpunkt muss eine Zahl sein"
+
+msgid "ID is required"
+msgstr "ID ist erforderlich"
+
+msgid "ID must not contain spaces"
+msgstr "ID darf keine Leerzeichen enthalten"
