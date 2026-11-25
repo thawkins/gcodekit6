@@ -39,7 +39,7 @@ use gcodekit5_core::units::MeasurementSystem;
 use gcodekit5_settings::config::Config;
 use glam::Vec3;
 
-use build::BuildWorker;
+use build::{BuildWorker, Outcome};
 pub use camera::{Aabb, Camera, StdView};
 pub use nav_cube::NavAction;
 pub use pipeline::install;
@@ -193,12 +193,17 @@ impl VisualizerPane {
 
     /// Takes the finished build, if any.
     fn poll_build(&mut self) {
-        if let Some(built) = self.worker.take()
-            && built.generation == self.generation
-        {
-            self.building = false;
-            self.applied = self.program.clone();
-            self.set_mesh(built.mesh, built.replaced);
+        match self.worker.take() {
+            Some(Outcome::Done(built)) if built.generation == self.generation => {
+                self.building = false;
+                self.applied = self.program.clone();
+                self.set_mesh(built.mesh, built.replaced);
+            }
+            Some(Outcome::Failed { generation }) if generation == self.generation => {
+                // Already logged by the worker; stay usable for the next program.
+                self.building = false;
+            }
+            Some(Outcome::Done(_) | Outcome::Failed { .. }) | None => {}
         }
     }
 

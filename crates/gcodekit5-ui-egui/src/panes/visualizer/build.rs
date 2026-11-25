@@ -32,6 +32,23 @@ pub struct Built {
     pub replaced: bool,
 }
 
+/// What the worker reports for a request.
+#[derive(Debug)]
+pub enum Outcome {
+    /// The build finished.
+    Done(Built),
+    /// The build panicked; the worker is still alive.
+    Failed {
+        /// The generation that was being built.
+        generation: u64,
+    },
+}
+
+/// Test hook: when set, the next build panics (once), to exercise the worker's recovery.
+#[doc(hidden)]
+pub static PANIC_NEXT_BUILD: std::sync::atomic::AtomicBool =
+    std::sync::atomic::AtomicBool::new(false);
+
 /// A build to run.
 struct Request {
     generation: u64,
@@ -82,6 +99,9 @@ fn run(shared: &Shared, request: Request) -> Option<Built> {
         None => true,
     };
     shared.is_current(generation).then_some(())?;
+    if PANIC_NEXT_BUILD.swap(false, Ordering::AcqRel) {
+        panic!("toolpath build panic requested by test hook");
+    }
     let mesh = toolpath::build(&lines);
     shared.is_current(generation).then_some(())?;
     Some(Built {
@@ -91,8 +111,24 @@ fn run(shared: &Shared, request: Request) -> Option<Built> {
     })
 }
 
+/// Runs `request` like [`run`], turning a panic into [`Outcome::Failed`] and logging it, so a
+/// bad program cannot kill the worker.
+fn run_guarded(shared: &Shared, request: Request) -> Option<Outcome> {
+    let generation = request.generation;
+    match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| run(shared, request))) {
+        Ok(built) => built.map(Outcome::Done),
+        Err(_) => {
+            tracing::error!(
+                generation,
+                "toolpath build panicked; the worker keeps running"
+            );
+            Some(Outcome::Failed { generation })
+        }
+    }
+}
+
 /// The worker's loop: wait for a request, build it, send it, until closed.
-fn work(shared: &Shared, results: &Sender<Built>) {
+fn work(shared: &Shared, results: &Sender<Outcome>) {
     loop {
         let request = {
             let mut slot = shared.lock();
@@ -110,7 +146,7 @@ fn work(shared: &Shared, results: &Sender<Built>) {
             }
         };
         let repaint = request.repaint.clone();
-        if let Some(built) = run(shared, request) {
+        if let Some(built) = run_guarded(shared, request) {
             if results.send(built).is_err() {
                 return;
             }
@@ -122,9 +158,9 @@ fn work(shared: &Shared, results: &Sender<Built>) {
 /// Builds toolpaths on a background thread, latest request first.
 pub struct BuildWorker {
     shared: Arc<Shared>,
-    results: Receiver<Built>,
+    results: Receiver<Outcome>,
     /// Set when the thread could not start: builds then run on the caller's thread.
-    inline: Option<Sender<Built>>,
+    inline: Option<Sender<Outcome>>,
 }
 
 impl std::fmt::Debug for BuildWorker {
@@ -189,7 +225,7 @@ impl BuildWorker {
             repaint: repaint.clone(),
         };
         if let Some(sender) = &self.inline {
-            if let Some(built) = run(&self.shared, request)
+            if let Some(built) = run_guarded(&self.shared, request)
                 && sender.send(built).is_err()
             {
                 tracing::debug!("toolpath result dropped");
@@ -210,11 +246,14 @@ impl BuildWorker {
     }
 
     /// The finished build of the latest request, if it is done; stale results are dropped.
-    pub fn take(&self) -> Option<Built> {
+    pub fn take(&self) -> Option<Outcome> {
         let latest = self.shared.latest.load(Ordering::Acquire);
         self.results
             .try_iter()
-            .filter(|built| built.generation == latest)
+            .filter(|outcome| match outcome {
+                Outcome::Done(built) => built.generation == latest,
+                Outcome::Failed { generation } => *generation == latest,
+            })
             .last()
     }
 }

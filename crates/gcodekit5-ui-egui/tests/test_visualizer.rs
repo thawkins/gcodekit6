@@ -341,7 +341,7 @@ fn test_stale_builds_are_dropped() -> TestResult {
     worker.request(2, sample(), None, &ctx);
     let deadline = Instant::now() + Duration::from_secs(20);
     let built = loop {
-        if let Some(built) = worker.take() {
+        if let Some(visualizer::build::Outcome::Done(built)) = worker.take() {
             break built;
         }
         if Instant::now() > deadline {
@@ -355,7 +355,7 @@ fn test_stale_builds_are_dropped() -> TestResult {
     worker.request(4, sample(), Some(sample()), &ctx);
     let deadline = Instant::now() + Duration::from_secs(20);
     loop {
-        if let Some(built) = worker.take() {
+        if let Some(visualizer::build::Outcome::Done(built)) = worker.take() {
             assert_eq!(built.generation, 4);
             assert!(
                 !built.replaced,
@@ -574,4 +574,21 @@ fn test_app_routes_view_commands_to_the_visualizer() {
         app.dispatch(command);
     }
     assert_eq!(*seen.borrow(), view.to_vec());
+}
+
+#[test]
+fn test_panicking_build_leaves_worker_usable() -> TestResult {
+    let _guard = crate::global_env_lock();
+    let mut harness = pane_harness(VisualizerPane::new());
+    harness.run();
+    visualizer::build::PANIC_NEXT_BUILD.store(true, std::sync::atomic::Ordering::Release);
+    load(&mut harness, sample())?;
+    assert!(!harness.state().is_building(), "building cleared");
+    assert_eq!(harness.state().toolpath_generation(), None, "nothing shown");
+    // The next program still builds.
+    let mut next: Vec<String> = SAMPLE.iter().map(|s| s.to_string()).collect();
+    next.push("G0 X1".to_string());
+    load(&mut harness, next.into())?;
+    assert!(harness.state().toolpath_generation().is_some());
+    Ok(())
 }
