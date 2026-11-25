@@ -6,8 +6,9 @@
 //! controller's worker thread, which owns the transport), so the UI never waits on I/O. The
 //! controller reports no event for a manual line's `ok`, so a GRBL write is confirmed by
 //! reading the settings back: `$n=v` is followed by `$$`. The controller answers lines in
-//! order, so after `$n=v` is written the first reply seen decides it: an `error:N` refuses
-//! it, and the first `$n=` line of the `$$` dump means its `ok` came first.
+//! order, and a write starts only once every earlier line is answered ([`blocked`]), so
+//! after `$n=v` is written the first reply seen is its own: an `error:N` refuses it, and
+//! the first `$n=` line of the `$$` dump means its `ok` came first.
 //!
 //! Dependencies: `gcodekit5-app` (controller, settings guard, translations).
 
@@ -23,7 +24,9 @@ use crate::machine::{Machine, lock, worker_message};
 pub const WRITE_TIMEOUT: Duration = Duration::from_secs(5);
 
 /// Why a settings command must not be sent now, or `None` when it may be: connected, no
-/// job streaming ([`Machine::job_running`]) and the machine Idle or in Alarm.
+/// job streaming ([`Machine::job_running`]), every earlier command line answered
+/// (`MachineController::lines_answered`, so a write's reply is its own) and the machine
+/// Idle or in Alarm.
 ///
 /// # Arguments
 /// * `machine` - The app's machine connection.
@@ -33,7 +36,8 @@ pub fn blocked(machine: &Machine) -> Option<SettingsBlocked> {
         .report
         .as_ref()
         .and_then(|report| report.machine_state.as_deref());
-    settings_blocked(status.connected, machine.job_running(), state)
+    let answered = lock(machine.controller()).lines_answered();
+    settings_blocked(status.connected, machine.job_running(), answered, state)
 }
 
 /// The translated reason a settings command was refused.
@@ -45,6 +49,9 @@ pub fn blocked_text(blocked: &SettingsBlocked, tr: &Translator) -> String {
     match blocked {
         SettingsBlocked::NotConnected => tr.tr(n_!("not connected")).into_owned(),
         SettingsBlocked::JobRunning => tr.tr(n_!("a job is running")).into_owned(),
+        SettingsBlocked::Unanswered => tr
+            .tr(n_!("waiting for the controller to answer earlier commands"))
+            .into_owned(),
         SettingsBlocked::NotIdle(state) => {
             format!("{} ({state})", tr.tr(n_!("the machine must be idle")))
         }
@@ -167,6 +174,7 @@ pub fn msgids() -> Vec<&'static str> {
     vec![
         n_!("not connected"),
         n_!("a job is running"),
+        n_!("waiting for the controller to answer earlier commands"),
         n_!("the machine must be idle"),
     ]
 }

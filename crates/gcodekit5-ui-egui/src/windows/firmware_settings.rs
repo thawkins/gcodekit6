@@ -503,8 +503,8 @@ impl FirmwareSettingsWindow {
 
     /// Draws the editor of the clicked row while it is open.
     fn show_editor(&mut self, ctx: &egui::Context, machine: &Machine, tr: &Translator) {
-        // One write at a time: its answer is matched to the line written.
-        let can_apply = self.write.is_none();
+        // One command at a time: a write's answer is told by the order of the replies.
+        let can_apply = self.write.is_none() && self.retrieval.is_none();
         let Some(edit) = self.edit.as_mut() else {
             return;
         };
@@ -524,6 +524,8 @@ impl FirmwareSettingsWindow {
         let (mut apply, mut cancel) = (false, false);
         egui::Window::new(title)
             .id(egui::Id::unique("gcodekit5-firmware-settings-edit"))
+            // Above the list it edits, which a click would otherwise raise over it.
+            .order(egui::Order::Foreground)
             .collapsible(false)
             .resizable(false)
             .show(ctx, |ui| {

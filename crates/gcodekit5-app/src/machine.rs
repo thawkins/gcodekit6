@@ -381,6 +381,9 @@ pub struct MachineController {
     requested: u64,
     /// The highest such sequence number written before the latest status report.
     fresh: Arc<AtomicU64>,
+    /// The highest such sequence number whose reply (`ok` or `error:N`) was read, or which
+    /// a reset dropped; see [`lines_answered`](Self::lines_answered).
+    answered: Arc<AtomicU64>,
     worker: Option<Worker>,
     /// Workers told to shut down while still connecting; reaped once finished.
     closing: Vec<JoinHandle<()>>,
@@ -422,6 +425,7 @@ impl MachineController {
             streaming: Arc::new(AtomicBool::new(false)),
             requested: 0,
             fresh: Arc::new(AtomicU64::new(0)),
+            answered: Arc::new(AtomicU64::new(0)),
             worker: None,
             closing: Vec::new(),
             pending: Vec::new(),
@@ -464,6 +468,7 @@ impl MachineController {
         self.streaming = Arc::new(AtomicBool::new(false));
         self.requested = 0;
         self.fresh = Arc::new(AtomicU64::new(0));
+        self.answered = Arc::new(AtomicU64::new(0));
         let state = WorkerState::new(
             (self.factory)(),
             cmd_rx,
@@ -474,6 +479,7 @@ impl MachineController {
             self.streaming.clone(),
             ready.clone(),
             self.fresh.clone(),
+            self.answered.clone(),
         );
         let handle = std::thread::Builder::new()
             .name("machine-controller".to_string())
@@ -643,6 +649,15 @@ impl MachineController {
         self.fresh.load(Ordering::SeqCst) >= self.requested
     }
 
+    /// Whether every line sent with [`send_line`](Self::send_line) has had its reply (`ok` or
+    /// `error:N`) or was dropped by a reset. The controller reports no event for a manual
+    /// line's `ok`, so a front end that tells a line's answer by the order of the replies
+    /// (a setting write) must start only when nothing earlier is unanswered. True before any
+    /// line is sent.
+    pub fn lines_answered(&self) -> bool {
+        self.answered.load(Ordering::SeqCst) >= self.requested
+    }
+
     /// Whether a program is streaming: from a successful
     /// [`start_stream`](Self::start_stream) until it finishes or stops.
     pub fn is_streaming(&self) -> bool {
@@ -799,6 +814,12 @@ struct WorkerState {
     window: CharCountWindow,
     /// One entry per line in `window`: true for a program line, false for a manual one.
     in_flight_is_program: VecDeque<bool>,
+    /// The state-line sequence number of each manual line in `window`, oldest first (0 for
+    /// a jog).
+    in_flight_seq: VecDeque<u64>,
+    /// Shared with the controller: the highest state-line sequence number answered or
+    /// dropped, see [`MachineController::lines_answered`].
+    answered: Arc<AtomicU64>,
     splitter: ResponseLineSplitter,
     /// Manual lines waiting for room, each with its state-line sequence number (0 for a jog).
     manual: VecDeque<(String, u64)>,
@@ -856,6 +877,7 @@ impl WorkerState {
         streaming: Arc<AtomicBool>,
         ready: Arc<AtomicBool>,
         fresh: Arc<AtomicU64>,
+        answered: Arc<AtomicU64>,
     ) -> Self {
         Self {
             comm,
@@ -865,6 +887,8 @@ impl WorkerState {
             ready,
             window: CharCountWindow::default(),
             in_flight_is_program: VecDeque::new(),
+            in_flight_seq: VecDeque::new(),
+            answered,
             splitter: ResponseLineSplitter::new(),
             manual: VecDeque::new(),
             stream: None,
@@ -1130,7 +1154,16 @@ impl WorkerState {
             // written first: hand the sequence number to the last queued state line.
             match self.manual.iter_mut().rev().find(|(_, s)| *s > 0) {
                 Some((_, queued)) => *queued = (*queued).max(seq),
-                None => self.written_seq = self.written_seq.max(seq),
+                None => {
+                    self.written_seq = self.written_seq.max(seq);
+                    // Answered with the last line in flight, or at once when none is.
+                    match self.in_flight_seq.back_mut() {
+                        Some(in_flight) => *in_flight = (*in_flight).max(seq),
+                        None => {
+                            self.answered.fetch_max(seq, Ordering::SeqCst);
+                        }
+                    }
+                }
             }
             return;
         }
@@ -1164,6 +1197,7 @@ impl WorkerState {
             self.sink
                 .emit(MachineEvent::Sent(line.trim_end_matches('\n').to_string()));
             self.in_flight_is_program.push_back(false);
+            self.in_flight_seq.push_back(seq);
             self.written_seq = self.written_seq.max(seq);
             self.manual.pop_front();
         }
@@ -1285,6 +1319,9 @@ impl WorkerState {
             return;
         }
         let is_program = self.in_flight_is_program.pop_front().unwrap_or(false);
+        if !is_program && let Some(seq) = self.in_flight_seq.pop_front() {
+            self.answered.fetch_max(seq, Ordering::SeqCst);
+        }
         let stream = match self.stream.as_mut() {
             Some(stream) if is_program => stream,
             _ => {
@@ -1416,6 +1453,9 @@ impl WorkerState {
         // Dropped state lines never run: a report after the reset describes the machine.
         let dropped = self.manual.drain(..).map(|(_, seq)| seq).max().unwrap_or(0);
         self.written_seq = self.written_seq.max(dropped);
+        // Every line in flight or queued is answered or dropped.
+        self.in_flight_seq.clear();
+        self.answered.fetch_max(self.written_seq, Ordering::SeqCst);
         self.splitter.clear();
     }
 }

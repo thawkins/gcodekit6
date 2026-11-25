@@ -3787,3 +3787,6 @@ msgstr ""
 
 msgid "Build"
 msgstr ""
+
+msgid "waiting for the controller to answer earlier commands"
+msgstr ""

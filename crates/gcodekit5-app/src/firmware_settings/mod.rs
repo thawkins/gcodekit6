@@ -282,6 +282,9 @@ pub enum SettingsBlocked {
     NotConnected,
     /// A job (or a probe routine, or its halt) is streaming.
     JobRunning,
+    /// An earlier command line has not been answered yet, so the reply to this one could
+    /// not be told from its reply.
+    Unanswered,
     /// GRBL takes `$` commands only while Idle or in Alarm; holds the reported state.
     NotIdle(String),
 }
@@ -291,11 +294,13 @@ pub enum SettingsBlocked {
 /// # Arguments
 /// * `connected` - Whether a controller is connected.
 /// * `job_running` - Whether a program streams (the app's machine-busy predicate).
+/// * `lines_answered` - Whether every command line sent so far has had its reply.
 /// * `state` - The latest reported machine state (`Idle`, `Run`, ...), if any; an unknown
 ///   state does not block, as in the GTK front end.
 pub fn settings_blocked(
     connected: bool,
     job_running: bool,
+    lines_answered: bool,
     state: Option<&str>,
 ) -> Option<SettingsBlocked> {
     if !connected {
@@ -303,6 +308,9 @@ pub fn settings_blocked(
     }
     if job_running {
         return Some(SettingsBlocked::JobRunning);
+    }
+    if !lines_answered {
+        return Some(SettingsBlocked::Unanswered);
     }
     let state = state.unwrap_or("").trim();
     let low = state.to_ascii_lowercase();

@@ -273,3 +273,95 @@ fn test_firmware_settings_retrieve_sends_dump_and_identity_queries() {
         h.state().firmware_settings().notice()
     );
 }
+
+/// Whether `line` was written to the loopback.
+fn wrote(shared: &LoopbackShared, line: &str) -> bool {
+    shared.log().contains(&Wrote::Line(line.to_string()))
+}
+
+#[test]
+fn test_firmware_settings_write_waits_for_an_earlier_retrieve() {
+    let (mut h, shared) = open_window(|_| {});
+    edit_110(&mut h, "5000");
+    shared.hold_acks.store(true, Ordering::SeqCst);
+    h.get_by_label("Retrieve").click();
+    h.run_steps(2);
+    assert!(wait_until(|| wrote(&shared, "$I")));
+
+    // The dump is still coming: the write would take its lines as its own answer.
+    h.get_by_label("Apply").click();
+    h.run_steps(2);
+    std::thread::sleep(Duration::from_millis(30));
+    h.run_steps(2);
+    assert!(!wrote(&shared, "$110=5000"), "written during the retrieve");
+
+    // The dump ended, but `$$` and `$I` are still unanswered.
+    shared.inject("$110=500.000\n[VER:1.1h.20190825:]\n");
+    assert!(step_until(&mut h, |app| app
+        .firmware_settings()
+        .notice()
+        .is_some_and(|n| n.contains("Settings retrieved"))));
+    h.get_by_label("Apply").click();
+    h.run_steps(2);
+    std::thread::sleep(Duration::from_millis(30));
+    h.run_steps(2);
+    assert!(
+        !wrote(&shared, "$110=5000"),
+        "written before the retrieve was answered"
+    );
+    let notice = h.state().firmware_settings().notice().unwrap_or_default();
+    assert!(
+        notice.contains("waiting for the controller") && !notice.contains("Setting written"),
+        "notice: {notice:?}"
+    );
+
+    // Once answered, the write goes out.
+    shared.hold_acks.store(false, Ordering::SeqCst);
+    edit_110(&mut h, "5000");
+    assert!(step_until(&mut h, |app| {
+        let machine = app.state().machine.controller();
+        gcodekit5_ui_egui::machine::lock(machine).lines_answered()
+    }));
+    h.get_by_label("Apply").click();
+    h.run_steps(2);
+    assert!(wait_until(|| wrote(&shared, "$110=5000")));
+}
+
+#[test]
+fn test_firmware_settings_earlier_error_is_not_the_writes_answer() {
+    let (mut h, shared) = open_window(|_| {});
+    shared.hold_acks.store(true, Ordering::SeqCst);
+    gcodekit5_ui_egui::machine::lock(h.state().state().machine.controller())
+        .send_line("G4 P0")
+        .expect("send");
+    assert!(wait_until(|| wrote(&shared, "G4 P0")));
+    edit_110(&mut h, "5000");
+    h.get_by_label("Apply").click();
+    h.run_steps(2);
+    assert!(
+        !wrote(&shared, "$110=5000"),
+        "written behind an unanswered line"
+    );
+
+    // G4's own error answers it; it is not the write's.
+    shared.inject("error:20\n");
+    assert!(step_until(&mut h, |app| gcodekit5_ui_egui::machine::lock(
+        app.state().machine.controller()
+    )
+    .lines_answered()));
+    edit_110(&mut h, "5000");
+    h.get_by_label("Apply").click();
+    h.run_steps(2);
+    assert!(wait_until(|| wrote(&shared, "$110=5000")));
+    shared.hold_acks.store(false, Ordering::SeqCst);
+    assert!(wait_until(|| wrote(&shared, "$$")));
+    shared.inject("$110=5000.000\n");
+    assert!(
+        step_until(&mut h, |app| app
+            .firmware_settings()
+            .notice()
+            .is_some_and(|n| n.contains("Setting written"))),
+        "notice: {:?}",
+        h.state().firmware_settings().notice()
+    );
+}

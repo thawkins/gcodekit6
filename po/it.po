@@ -3866,3 +3866,6 @@ msgstr "un lavoro è in esecuzione"
 
 msgid "Build"
 msgstr "Compilazione"
+
+msgid "waiting for the controller to answer earlier commands"
+msgstr "in attesa che il controller risponda ai comandi precedenti"

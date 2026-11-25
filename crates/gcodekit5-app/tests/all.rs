@@ -31,6 +31,8 @@ mod test_job_preferences;
 mod test_machine_busy_guard;
 #[path = "test_machine_controller.rs"]
 mod test_machine_controller;
+#[path = "test_machine_lines_answered.rs"]
+mod test_machine_lines_answered;
 #[path = "test_machine_probe_stream.rs"]
 mod test_machine_probe_stream;
 #[path = "test_machine_sent_events.rs"]
