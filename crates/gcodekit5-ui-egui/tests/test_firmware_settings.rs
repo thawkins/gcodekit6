@@ -621,3 +621,31 @@ fn test_firmware_settings_value_grbl_would_truncate_is_not_sent() {
         shared.log()
     );
 }
+
+/// A write waits for an earlier jog's reply, so the jog's `error:15` is never taken for the
+/// write's answer.
+#[test]
+fn test_firmware_settings_write_waits_for_an_earlier_jog() {
+    let (mut h, shared) = open_window(|_| {});
+    shared.hold_acks.store(true, Ordering::SeqCst);
+    gcodekit5_ui_egui::machine::lock(h.state().state().machine.controller()).jog(
+        gcodekit5_app::machine::Axis::X,
+        500.0,
+        1000.0,
+    );
+    assert!(wait_until(|| shared
+        .log()
+        .iter()
+        .any(|w| matches!(w, Wrote::Line(l) if l.starts_with("$J=")))));
+    edit_110(&mut h, "5000");
+    h.get_by_label("Apply").click();
+    h.run_steps(2);
+    assert!(!wrote(&shared, "$110=5000"), "written behind the jog");
+    let notice = h.state().firmware_settings().notice().unwrap_or_default();
+    assert!(notice.contains("waiting for the controller"), "{notice:?}");
+    shared.inject("error:15\n");
+    assert!(step_until(&mut h, |app| gcodekit5_ui_egui::machine::lock(
+        app.state().machine.controller()
+    )
+    .lines_answered()));
+}

@@ -350,6 +350,8 @@ enum Command {
     Pause,
     Resume,
     Stop,
+    /// A `$J=` jog line, answered through [`MachineController::lines_answered`]'s own jog
+    /// count rather than a state-line sequence number.
     Line(String),
     /// A command line that may change the machine state, with its sequence number.
     StateLine(String, u64),
@@ -386,6 +388,10 @@ pub struct MachineController {
     /// The highest such sequence number whose reply (`ok` or `error:N`) was read, or which
     /// a reset dropped; see [`lines_answered`](Self::lines_answered).
     answered: Arc<AtomicU64>,
+    /// How many jogs were handed to the worker on this connection.
+    jogs_requested: u64,
+    /// How many of those jogs were answered or dropped (never to run).
+    jogs_answered: Arc<AtomicU64>,
     worker: Option<Worker>,
     /// Workers told to shut down while still connecting; reaped once finished.
     closing: Vec<JoinHandle<()>>,
@@ -429,6 +435,8 @@ impl MachineController {
             requested: 0,
             fresh: Arc::new(AtomicU64::new(0)),
             answered: Arc::new(AtomicU64::new(0)),
+            jogs_requested: 0,
+            jogs_answered: Arc::new(AtomicU64::new(0)),
             worker: None,
             closing: Vec::new(),
             pending: Vec::new(),
@@ -472,6 +480,8 @@ impl MachineController {
         self.requested = 0;
         self.fresh = Arc::new(AtomicU64::new(0));
         self.answered = Arc::new(AtomicU64::new(0));
+        self.jogs_requested = 0;
+        self.jogs_answered = Arc::new(AtomicU64::new(0));
         let state = WorkerState::new(
             (self.factory)(),
             cmd_rx,
@@ -482,7 +492,7 @@ impl MachineController {
             self.streaming.clone(),
             ready.clone(),
             self.fresh.clone(),
-            self.answered.clone(),
+            [self.answered.clone(), self.jogs_answered.clone()],
         );
         let handle = std::thread::Builder::new()
             .name("machine-controller".to_string())
@@ -593,7 +603,10 @@ impl MachineController {
             return;
         }
         let line = linear_jog_command(axis.letter(), distance_mm, feed_mm_min);
-        self.send_or_report(Command::Line(line));
+        match self.send(Command::Line(line)) {
+            Ok(()) => self.jogs_requested += 1,
+            Err(e) => self.pending.push(MachineEvent::Error(e.to_string())),
+        }
     }
 
     /// Queues one command line (`$H`, `$X`, an MDI line), trimmed of spaces, behind any
@@ -659,13 +672,15 @@ impl MachineController {
         self.last_connection.as_ref()
     }
 
-    /// Whether every line sent with [`send_line`](Self::send_line) has had its reply (`ok` or
-    /// `error:N`) or was dropped by a reset. The controller reports no event for a manual
-    /// line's `ok`, so a front end that tells a line's answer by the order of the replies
-    /// (a setting write) must start only when nothing earlier is unanswered. True before any
-    /// line is sent.
+    /// Whether every line sent with [`send_line`](Self::send_line) or [`jog`](Self::jog) has
+    /// had its reply (`ok` or `error:N`) or was dropped (by a reset, or a jog cancel for a
+    /// queued jog). The controller reports no event for a manual line's `ok`, so a front end
+    /// that tells a line's answer by the order of the replies (a setting write) must start
+    /// only when nothing earlier is unanswered: a jog's `error:15` must not be taken for the
+    /// write's. True before any line is sent.
     pub fn lines_answered(&self) -> bool {
         self.answered.load(Ordering::SeqCst) >= self.requested
+            && self.jogs_answered.load(Ordering::SeqCst) >= self.jogs_requested
     }
 
     /// Whether a program is streaming: from a successful
@@ -830,6 +845,9 @@ struct WorkerState {
     /// Shared with the controller: the highest state-line sequence number answered or
     /// dropped, see [`MachineController::lines_answered`].
     answered: Arc<AtomicU64>,
+    /// Shared with the controller: how many jogs (sequence number 0) were answered or
+    /// dropped, see [`MachineController::lines_answered`].
+    jogs_answered: Arc<AtomicU64>,
     splitter: ResponseLineSplitter,
     /// Manual lines waiting for room, each with its state-line sequence number (0 for a jog).
     manual: VecDeque<(String, u64)>,
@@ -887,7 +905,7 @@ impl WorkerState {
         streaming: Arc<AtomicBool>,
         ready: Arc<AtomicBool>,
         fresh: Arc<AtomicU64>,
-        answered: Arc<AtomicU64>,
+        [answered, jogs_answered]: [Arc<AtomicU64>; 2],
     ) -> Self {
         Self {
             comm,
@@ -899,6 +917,7 @@ impl WorkerState {
             in_flight_is_program: VecDeque::new(),
             in_flight_seq: VecDeque::new(),
             answered,
+            jogs_answered,
             splitter: ResponseLineSplitter::new(),
             manual: VecDeque::new(),
             stream: None,
@@ -1030,8 +1049,15 @@ impl WorkerState {
                     || byte == RealtimeCommand::SoftReset.byte()
                 {
                     // A jog still waiting in the queue must not start after the cancel or
-                    // the reset.
-                    self.manual.retain(|(line, _)| !line.starts_with("$J="));
+                    // the reset; it is answered by never running.
+                    let (jogs, kept): (Vec<_>, Vec<_>) = self
+                        .manual
+                        .drain(..)
+                        .partition(|(line, _)| line.starts_with("$J="));
+                    self.manual = kept.into();
+                    for (_, seq) in jogs {
+                        self.drop_line(seq);
+                    }
                     self.jog_outstanding = false;
                 }
                 if byte == RealtimeCommand::SoftReset.byte() {
@@ -1160,21 +1186,7 @@ impl WorkerState {
                 "{}: {line}",
                 worker_text::LINE_TOO_LONG
             )));
-            // The refused line never runs, but a lower state line still queued must be
-            // written first: hand the sequence number to the last queued state line.
-            match self.manual.iter_mut().rev().find(|(_, s)| *s > 0) {
-                Some((_, queued)) => *queued = (*queued).max(seq),
-                None => {
-                    self.written_seq = self.written_seq.max(seq);
-                    // Answered with the last line in flight, or at once when none is.
-                    match self.in_flight_seq.back_mut() {
-                        Some(in_flight) => *in_flight = (*in_flight).max(seq),
-                        None => {
-                            self.answered.fetch_max(seq, Ordering::SeqCst);
-                        }
-                    }
-                }
-            }
+            self.drop_line(seq);
             return;
         }
         if line.starts_with("$J=") {
@@ -1182,6 +1194,29 @@ impl WorkerState {
             self.jog_seen = false;
         }
         self.manual.push_back((line, seq));
+    }
+
+    /// Counts a manual line that never runs (refused, or dropped from the queue) as
+    /// answered: a jog (`seq` 0) at once; a state line once every lower state line still
+    /// queued or in flight is, by handing its sequence number to the last of them.
+    fn drop_line(&mut self, seq: u64) {
+        if seq == 0 {
+            self.jogs_answered.fetch_add(1, Ordering::SeqCst);
+            return;
+        }
+        match self.manual.iter_mut().rev().find(|(_, s)| *s > 0) {
+            Some((_, queued)) => *queued = (*queued).max(seq),
+            None => {
+                self.written_seq = self.written_seq.max(seq);
+                // Answered with the last state line in flight, or at once when none is.
+                match self.in_flight_seq.iter_mut().rev().find(|s| **s > 0) {
+                    Some(in_flight) => *in_flight = (*in_flight).max(seq),
+                    None => {
+                        self.answered.fetch_max(seq, Ordering::SeqCst);
+                    }
+                }
+            }
+        }
     }
 
     /// Writes manual lines, then program lines, while they fit in the RX buffer. Nothing is
@@ -1330,7 +1365,11 @@ impl WorkerState {
         }
         let is_program = self.in_flight_is_program.pop_front().unwrap_or(false);
         if !is_program && let Some(seq) = self.in_flight_seq.pop_front() {
-            self.answered.fetch_max(seq, Ordering::SeqCst);
+            if seq == 0 {
+                self.jogs_answered.fetch_add(1, Ordering::SeqCst);
+            } else {
+                self.answered.fetch_max(seq, Ordering::SeqCst);
+            }
         }
         let stream = match self.stream.as_mut() {
             Some(stream) if is_program => stream,
@@ -1460,6 +1499,16 @@ impl WorkerState {
         self.unanswered_queries.clear();
         self.window = CharCountWindow::default();
         self.in_flight_is_program.clear();
+        // Every jog in flight or queued is answered or dropped.
+        let jogs = self
+            .manual
+            .iter()
+            .map(|(_, seq)| *seq)
+            .chain(self.in_flight_seq.iter().copied())
+            .filter(|seq| *seq == 0)
+            .count();
+        self.jogs_answered
+            .fetch_add(u64::try_from(jogs).unwrap_or(u64::MAX), Ordering::SeqCst);
         // Dropped state lines never run: a report after the reset describes the machine.
         let dropped = self.manual.drain(..).map(|(_, seq)| seq).max().unwrap_or(0);
         self.written_seq = self.written_seq.max(dropped);

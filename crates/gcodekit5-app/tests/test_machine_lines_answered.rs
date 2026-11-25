@@ -83,3 +83,63 @@ fn test_lines_answered_after_a_reset_drops_them() {
     shared.inject("Grbl 1.1h ['$' for help]\n");
     assert!(wait(&mut controller, MachineController::lines_answered));
 }
+
+fn jogs_written(shared: &LoopbackShared) -> usize {
+    shared
+        .log()
+        .iter()
+        .filter(|w| matches!(w, Wrote::Line(l) if l.starts_with("$J=")))
+        .count()
+}
+
+#[test]
+fn test_lines_answered_waits_for_a_jogs_reply() {
+    use gcodekit5_app::machine::Axis;
+    let (mut controller, shared) = connected();
+    shared.hold_acks.store(true, Ordering::SeqCst);
+    controller.jog(Axis::X, 5.0, 1000.0);
+    assert!(!controller.lines_answered(), "a queued jog is unanswered");
+    assert!(wait(&mut controller, |_| jogs_written(&shared) == 1));
+    std::thread::sleep(Duration::from_millis(20));
+    controller.poll();
+    assert!(!controller.lines_answered(), "a written jog is unanswered");
+    // A soft-limit refusal answers it: a setting write sent next can own the next reply.
+    shared.inject("error:15\n");
+    assert!(wait(&mut controller, MachineController::lines_answered));
+}
+
+#[test]
+fn test_lines_answered_after_a_jog_cancel_drops_queued_jogs() {
+    use gcodekit5_app::machine::{Axis, RealtimeCommand};
+    let (mut controller, shared) = connected();
+    shared.hold_acks.store(true, Ordering::SeqCst);
+    // More jogs than fit the controller's buffer: some wait in the worker's queue.
+    for _ in 0..12 {
+        controller.jog(Axis::X, 1.0, 1000.0);
+    }
+    assert!(wait(&mut controller, |_| jogs_written(&shared) > 0));
+    std::thread::sleep(Duration::from_millis(20));
+    controller.poll();
+    assert!(jogs_written(&shared) < 12, "every jog was written");
+    controller.realtime(RealtimeCommand::JogCancel);
+    // The jogs in flight are acknowledged; the queued ones never run.
+    shared.hold_acks.store(false, Ordering::SeqCst);
+    assert!(wait(&mut controller, MachineController::lines_answered));
+    assert!(
+        jogs_written(&shared) < 12,
+        "a queued jog ran after the cancel"
+    );
+}
+
+#[test]
+fn test_lines_answered_after_a_reset_drops_jogs() {
+    use gcodekit5_app::machine::Axis;
+    let (mut controller, shared) = connected();
+    shared.hold_acks.store(true, Ordering::SeqCst);
+    for _ in 0..12 {
+        controller.jog(Axis::Y, 1.0, 1000.0);
+    }
+    assert!(wait(&mut controller, |_| jogs_written(&shared) > 0));
+    shared.inject("Grbl 1.1h ['$' for help]\n");
+    assert!(wait(&mut controller, MachineController::lines_answered));
+}
