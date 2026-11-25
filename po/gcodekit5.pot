@@ -3382,3 +3382,12 @@ msgstr ""
 
 msgid "Set the spindle's maximum RPM and power in the Device Manager."
 msgstr ""
+
+msgid "Must not be larger than the hole"
+msgstr ""
+
+msgid "The device is in laser mode ($32=1). Switch it to CNC mode to use the Drill Press."
+msgstr ""
+
+msgid "Another program is waiting to go to the editor; this one was not sent."
+msgstr ""

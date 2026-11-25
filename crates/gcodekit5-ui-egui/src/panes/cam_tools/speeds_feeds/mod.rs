@@ -123,8 +123,8 @@ pub struct SpeedsFeedsParams {
     pub coolant: bool,
     /// Conservative calculation (20 % lower values).
     pub conservative: bool,
-    /// The last results.
-    pub results: Option<SpeedsFeedsResults>,
+    /// The last results, with the input they were calculated for ([`Self::input_key`]).
+    results: Option<(String, SpeedsFeedsResults)>,
     /// The open selection dialog.
     pub(super) picker: Option<Picker>,
 }
@@ -203,6 +203,47 @@ impl SpeedsFeedsParams {
     pub fn select_material(&mut self, id: &MaterialId) -> bool {
         self.material = self.materials.iter().find(|m| &m.id == id).cloned();
         self.material.is_some()
+    }
+
+    /// The last results, while the input is still the one they were calculated for.
+    pub fn results(&self) -> Option<&SpeedsFeedsResults> {
+        self.results
+            .as_ref()
+            .filter(|(key, _)| *key == self.input_key())
+            .map(|(_, results)| results)
+    }
+
+    /// Keeps `results` as the results of the current input.
+    ///
+    /// # Arguments
+    /// * `results` - The results of [`SpeedsFeedsParams::calculate`].
+    pub fn store_results(&mut self, results: SpeedsFeedsResults) {
+        self.results = Some((self.input_key(), results));
+    }
+
+    /// Everything the calculation reads, to tell when results are out of date.
+    fn input_key(&self) -> String {
+        let device = self.device.as_ref().map(|d| {
+            (
+                d.has_spindle,
+                d.max_spindle_speed_rpm,
+                d.cnc_spindle_watts.to_bits(),
+            )
+        });
+        format!(
+            "{:?}",
+            (
+                self.tool.as_ref().map(|t| (&t.id, t.diameter.to_bits())),
+                self.material.as_ref().map(|m| &m.id),
+                self.operation,
+                &self.depth_of_cut,
+                &self.stepover,
+                &self.stick_out,
+                self.coolant,
+                self.conservative,
+                device,
+            )
+        )
     }
 
     /// Sets the open selection dialog's search text.

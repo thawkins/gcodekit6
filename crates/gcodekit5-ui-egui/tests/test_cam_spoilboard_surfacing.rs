@@ -64,7 +64,9 @@ fn test_cam_surfacing_generate_matches_gtk_custom_imperial() {
 
 #[test]
 fn test_cam_surfacing_invalid_input_shows_error_and_disables_generate() {
-    let cases: [(Breaker, &str); 6] = [
+    let cases: [(Breaker, &str); 8] = [
+        (|p| p.spindle_speed = "0".into(), "Must be greater than 0"),
+        (|p| p.height = "0".into(), "Must be greater than 0"),
         (|p| p.cut_depth = "-0.5".into(), "Must be greater than 0"),
         (|p| p.tool_diameter = "0".into(), "Must be greater than 0"),
         (|p| p.stepover_percent = "150".into(), "Out of range"),

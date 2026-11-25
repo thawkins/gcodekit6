@@ -83,7 +83,7 @@ fn value_row(ui: &mut egui::Ui, tr: &Translator, label: &str, value: &str) {
 /// The results and the active device.
 fn results(ui: &mut egui::Ui, params: &SpeedsFeedsParams, tr: &Translator) {
     heading(ui, tr, n_!("Calculated Results"));
-    let r = params.results.as_ref();
+    let r = params.results();
     let value = |f: fn(&super::SpeedsFeedsResults) -> &String| r.map_or("--", |r| f(r).as_str());
     grid(ui, "cam-sf-results", |ui| {
         value_row(ui, tr, "Spindle Speed (RPM):", value(|r| &r.spindle_speed));

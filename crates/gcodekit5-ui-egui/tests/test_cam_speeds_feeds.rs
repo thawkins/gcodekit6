@@ -114,8 +114,7 @@ fn test_cam_speeds_feeds_calculate_shows_results() {
     frames(&mut h, 2);
     let spindle = pane(&h)
         .speeds_feeds_mut()
-        .results
-        .as_ref()
+        .results()
         .map(|r| r.spindle_speed.clone());
     assert_eq!(spindle.as_deref(), Some("22497"));
     h.get_by_label("Calculated Results").scroll_to_me();
@@ -155,7 +154,7 @@ fn test_cam_speeds_feeds_invalid_input_shows_error_and_disables_calculate() {
         press(&mut h, "Calculate");
         frames(&mut h, 2);
         assert_eq!(
-            pane(&h).speeds_feeds_mut().results,
+            pane(&h).speeds_feeds_mut().results().cloned(),
             None,
             "{message}: calculated"
         );
@@ -173,13 +172,55 @@ fn test_cam_speeds_feeds_needs_a_configured_spindle() {
         cnc_spindle_watts: 0.0,
         ..spindle_device(24000)
     };
-    for device in [no_spindle, unset] {
-        let page = page(device, "tool_1_4_flat", "metal_al_6061");
-        assert!(page.calculate().is_err());
-    }
     let mut none = page(spindle_device(24000), "tool_1_4_flat", "metal_al_6061");
     none.device = None;
-    assert!(none.calculate().is_err(), "no device has no spindle");
+    for (ready, message) in [
+        (
+            page(no_spindle, "tool_1_4_flat", "metal_al_6061"),
+            NO_SPINDLE,
+        ),
+        (page(unset, "tool_1_4_flat", "metal_al_6061"), SPINDLE_UNSET),
+        (none, NO_SPINDLE),
+    ] {
+        assert!(ready.calculate().is_err());
+        let mut h = open_tool(CamTool::SpeedsFeeds);
+        *pane(&h).speeds_feeds_mut() = ready;
+        frames(&mut h, 2);
+        assert!(h.query_by_label(message).is_some(), "{message} not shown");
+    }
+}
+
+/// The page's refusal when the device has no spindle.
+const NO_SPINDLE: &str = "The active device does not have a spindle configured. Please configure a spindle in the Device Manager.";
+/// The page's refusal when the spindle's RPM or power is unset.
+const SPINDLE_UNSET: &str = "Set the spindle's maximum RPM and power in the Device Manager.";
+
+/// GTK's clamp: a spindle slower than the calculator's 1000 RPM floor gets the clamped RPM
+/// and a scaled feed, formatted as GTK did.
+#[test]
+fn test_cam_speeds_feeds_matches_gtk_clamped() {
+    let page = page(spindle_device(500), "tool_1_4_flat", "metal_al_6061");
+    let results = page.calculate().expect("calculates");
+    assert!(
+        results.spindle_speed.contains("clamped from"),
+        "{results:?}"
+    );
+    assert_eq!(lines(&results), fixture("speeds_feeds_clamped.txt"));
+}
+
+/// The results are withdrawn as soon as the input changes.
+#[test]
+fn test_cam_speeds_feeds_results_clear_when_the_input_changes() {
+    let mut h = open_tool(CamTool::SpeedsFeeds);
+    *pane(&h).speeds_feeds_mut() = page(spindle_device(24000), "tool_1_4_flat", "metal_al_6061");
+    frames(&mut h, 2);
+    press(&mut h, "Calculate");
+    frames(&mut h, 2);
+    assert!(pane(&h).speeds_feeds_mut().results().is_some());
+    pane(&h).speeds_feeds_mut().depth_of_cut = "2.0".into();
+    frames(&mut h, 2);
+    assert_eq!(pane(&h).speeds_feeds_mut().results(), None);
+    assert!(h.query_by_label("22497").is_none());
 }
 
 /// Calculate waits for a tool and a material.
@@ -188,7 +229,7 @@ fn test_cam_speeds_feeds_waits_for_a_selection() {
     let mut h = open_tool(CamTool::SpeedsFeeds);
     press(&mut h, "Calculate");
     frames(&mut h, 2);
-    assert_eq!(pane(&h).speeds_feeds_mut().results, None);
+    assert_eq!(pane(&h).speeds_feeds_mut().results().cloned(), None);
 }
 
 /// The tool picker: search, choose a row, Select.

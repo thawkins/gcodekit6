@@ -137,9 +137,12 @@ fn spindle_device(max_rpm: u32) -> DeviceProfile {
 }
 
 /// Speeds and feeds: the panel's defaults (1/4" flat end mill in 6061 aluminium on a
-/// 24000 RPM spindle without coolant), and a clamped case (1/8" flat end mill in red oak,
-/// adaptive, operation-default stepover, not conservative, 6000 RPM spindle). Each result
-/// is one `name=value` line.
+/// 24000 RPM spindle without coolant); a custom case (1/8" flat end mill in red oak,
+/// adaptive, operation-default stepover, not conservative, 6000 RPM spindle), whose RPM the
+/// calculator itself keeps under the spindle's maximum; and a clamped case (the defaults on a
+/// 500 RPM spindle: the calculator raises the RPM to its 1000 RPM floor, so the page clamps
+/// it and scales the feed, "(clamped from ...)" / "(adjusted)"). Each result is one
+/// `name=value` line.
 fn speeds_feeds_cases() -> Vec<(&'static str, String)> {
     let tool = |id: &str| {
         tools()
@@ -179,24 +182,29 @@ fn speeds_feeds_cases() -> Vec<(&'static str, String)> {
         },
         spindle_device(6000),
     );
-    [("default", default), ("custom", custom)]
-        .into_iter()
-        .map(|(name, (selection, device))| {
-            let t = speeds_feeds_texts(&selection, Some(&device)).expect("spindle configured");
-            let text = format!(
-                "spindle_speed={}\nfeed_rate={}\nsurface_speed={}\nchip_load={}\nmrr={}\n\
+    let clamped = (default.0.clone(), spindle_device(500));
+    [
+        ("default", default),
+        ("custom", custom),
+        ("clamped", clamped),
+    ]
+    .into_iter()
+    .map(|(name, (selection, device))| {
+        let t = speeds_feeds_texts(&selection, Some(&device)).expect("spindle configured");
+        let text = format!(
+            "spindle_speed={}\nfeed_rate={}\nsurface_speed={}\nchip_load={}\nmrr={}\n\
                  power={}\ndeflection={}\n",
-                t.spindle_speed,
-                t.feed_rate,
-                t.surface_speed,
-                t.chip_load,
-                t.mrr,
-                t.power,
-                t.deflection
-            );
-            (name, text)
-        })
-        .collect()
+            t.spindle_speed,
+            t.feed_rate,
+            t.surface_speed,
+            t.chip_load,
+            t.mrr,
+            t.power,
+            t.deflection
+        );
+        (name, text)
+    })
+    .collect()
 }
 
 /// Every fixture: file name and content.

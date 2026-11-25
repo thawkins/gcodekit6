@@ -3453,3 +3453,12 @@ msgstr "Cria um padrão de grade na mesa de sacrifício para alinhar e fixar pe�
 
 msgid "Set the spindle's maximum RPM and power in the Device Manager."
 msgstr "Defina as RPM máximas e a potência do fuso no Gerenciador de dispositivos."
+
+msgid "Must not be larger than the hole"
+msgstr "Não pode ser maior que o furo"
+
+msgid "The device is in laser mode ($32=1). Switch it to CNC mode to use the Drill Press."
+msgstr "O dispositivo está no modo laser ($32=1). Mude-o para o modo CNC para usar a furadeira."
+
+msgid "Another program is waiting to go to the editor; this one was not sent."
+msgstr "Outro programa está aguardando para ir ao editor; este não foi enviado."

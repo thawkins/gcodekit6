@@ -32,6 +32,9 @@ const SPINDLE_SPEED: &str = n_!("Spindle Speed (RPM):");
 const SAFE_Z: &str = n_!("Safe Z:");
 const BELOW_TOP: &str = n_!("Must be below Top Z");
 const ABOVE_TOP: &str = n_!("Must be above Top Z");
+const LARGER_THAN_HOLE: &str = n_!("Must not be larger than the hole");
+const LASER_MODE: &str =
+    n_!("The device is in laser mode ($32=1). Switch it to CNC mode to use the Drill Press.");
 const DESCRIPTION: &str = n_!(
     "Emulate a drill press on your CNC. Supports standard drilling, peck drilling for chip clearing, and helical interpolation for holes larger than the tool."
 );
@@ -52,6 +55,8 @@ pub fn msgids() -> Vec<&'static str> {
         SAFE_Z,
         BELOW_TOP,
         ABOVE_TOP,
+        LARGER_THAN_HOLE,
+        LASER_MODE,
         DESCRIPTION,
         n_!("Hole Geometry"),
         n_!("Depth and Pecking"),
@@ -91,6 +96,15 @@ pub struct DrillPressParams {
     pub home_before: bool,
     /// The active device's axis count (the pane refreshes it from the device status).
     pub num_axes: u8,
+    /// The device is in laser mode, GRBL `$32=1` (the pane refreshes it from the device
+    /// status). The program starts the spindle with `M3` and plunges: a laser would fire in
+    /// place, so GTK refused to drill.
+    pub laser_mode: bool,
+}
+
+/// Whether the device status says the machine is in laser mode (GRBL `$32=1`).
+pub fn device_in_laser_mode() -> bool {
+    device_status::get_grbl_setting_numeric(32).unwrap_or(0.0) > 0.5
 }
 
 impl DrillPressParams {
@@ -127,6 +141,7 @@ impl DrillPressParams {
             safe_z: len(5.0),
             home_before: false,
             num_axes: device_status::get_active_num_axes(),
+            laser_mode: device_in_laser_mode(),
         }
     }
 
@@ -176,14 +191,21 @@ impl DrillPressParams {
         };
         let plunge_rate = num(PLUNGE_RATE, &self.plunge_rate, positive);
         let feed_rate = num(FEED_RATE, &self.feed_rate, positive);
-        let spindle_speed = num(SPINDLE_SPEED, &self.spindle_speed, not_negative);
+        let spindle_speed = num(SPINDLE_SPEED, &self.spindle_speed, positive);
         let parsed = |label| !errors.iter().any(|e: &FieldError| e.field == Some(label));
         let (top_ok, bottom_ok, safe_ok) = (parsed(TOP_Z), parsed(BOTTOM_Z), parsed(SAFE_Z));
+        let (hole_ok, tool_ok) = (parsed(HOLE_DIAMETER), parsed(TOOL_DIAMETER));
+        if hole_ok && tool_ok && tool_diameter > hole_diameter {
+            errors.push(FieldError::field(TOOL_DIAMETER, LARGER_THAN_HOLE));
+        }
         if top_ok && bottom_ok && bottom_z >= top_z {
             errors.push(FieldError::field(BOTTOM_Z, BELOW_TOP));
         }
         if top_ok && safe_ok && safe_z <= top_z {
             errors.push(FieldError::field(SAFE_Z, ABOVE_TOP));
+        }
+        if self.laser_mode {
+            errors.push(FieldError::page(LASER_MODE));
         }
         if self.num_axes < 3 {
             errors.push(FieldError::page(common::NEEDS_THREE_AXES));

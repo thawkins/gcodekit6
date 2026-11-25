@@ -3461,3 +3461,12 @@ msgstr "Crea una griglia sul piano sacrificale per allineare e fissare facilment
 
 msgid "Set the spindle's maximum RPM and power in the Device Manager."
 msgstr "Imposta i giri massimi e la potenza del mandrino nel Gestore dispositivi."
+
+msgid "Must not be larger than the hole"
+msgstr "Non deve essere più grande del foro"
+
+msgid "The device is in laser mode ($32=1). Switch it to CNC mode to use the Drill Press."
+msgstr "Il dispositivo è in modalità laser ($32=1). Passa alla modalità CNC per usare il trapano."
+
+msgid "Another program is waiting to go to the editor; this one was not sent."
+msgstr "Un altro programma è in attesa di andare all'editor; questo non è stato inviato."

@@ -109,8 +109,13 @@ type Breaker = fn(&mut DrillPressParams);
 /// Each unsafe value is reported at its field, and Generate makes nothing.
 #[test]
 fn test_cam_drill_press_invalid_input_shows_error_and_disables_generate() {
-    let cases: [(Breaker, &str); 6] = [
+    let cases: [(Breaker, &str); 8] = [
         (|p| p.peck_depth = "-1".into(), "Must not be negative"),
+        (
+            |p| p.tool_diameter = "12".into(),
+            "Must not be larger than the hole",
+        ),
+        (|p| p.spindle_speed = "0".into(), "Must be greater than 0"),
         (|p| p.tool_diameter = "0".into(), "Must be greater than 0"),
         (|p| p.hole_diameter = "-3".into(), "Must be greater than 0"),
         (|p| p.bottom_z = "1".into(), "Must be below Top Z"),
@@ -163,4 +168,49 @@ fn test_cam_field_typing_runs_no_shortcut() {
     frames(&mut h, 2);
     assert_eq!(pane(&h).drill_press_mut().hole_diameter, "12.345+");
     assert_eq!(h.state().last_dispatched(), None);
+}
+
+/// GTK refused to drill while the device is in laser mode (`$32=1`): the program starts the
+/// spindle with `M3` and plunges, which would fire a laser in place.
+#[test]
+fn test_cam_drill_press_refuses_laser_mode() {
+    let mut page = DrillPressParams::with_center(MeasurementSystem::Metric, (100.0, 100.0));
+    page.laser_mode = true;
+    let errors = page.parameters().expect_err("laser mode is refused");
+    assert!(errors.iter().any(|e| e.field.is_none()));
+    assert_eq!(page.generate().ok(), None);
+}
+
+/// The pane reads `$32` from the device status every frame and shows the refusal.
+#[test]
+fn test_cam_drill_press_pane_follows_the_laser_mode_setting() {
+    let _guard = crate::global_env_lock();
+    gcodekit5_app::device_status::update_grbl_setting(32, "1".to_string());
+    let mut h = open_tool(CamTool::DrillPress);
+    let shown = h.query_by_label(LASER_MODE_REFUSAL).is_some();
+    h.get_by_label("Generate").click();
+    frames(&mut h, 2);
+    let output = pane(&h).output().map(str::to_string);
+    gcodekit5_app::device_status::update_grbl_setting(32, "0".to_string());
+    assert!(shown, "laser-mode refusal not shown");
+    assert_eq!(output, None, "Generate made a program in laser mode");
+    frames(&mut h, 2);
+    assert!(h.query_by_label(LASER_MODE_REFUSAL).is_none());
+}
+
+/// The refusal shown while the device is in laser mode.
+const LASER_MODE_REFUSAL: &str =
+    "The device is in laser mode ($32=1). Switch it to CNC mode to use the Drill Press.";
+
+/// The generated program is withdrawn as soon as the input changes.
+#[test]
+fn test_cam_generated_output_clears_when_the_input_changes() {
+    let mut h = open_tool(CamTool::DrillPress);
+    h.get_by_label("Generate").click();
+    frames(&mut h, 2);
+    assert!(pane(&h).output().is_some());
+    pane(&h).drill_press_mut().hole_diameter = "11".into();
+    frames(&mut h, 2);
+    assert_eq!(pane(&h).output(), None);
+    assert!(h.query_by_label("Generated G-Code").is_none());
 }

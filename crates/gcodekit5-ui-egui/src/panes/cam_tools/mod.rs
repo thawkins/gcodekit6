@@ -166,6 +166,17 @@ pub fn msgids() -> Vec<&'static str> {
     ids
 }
 
+/// The program Generate made, and the page input it was made from.
+#[derive(Debug)]
+struct Output {
+    /// The page.
+    tool: CamTool,
+    /// The page's input ([`CamToolsPane::input_key`]).
+    input: String,
+    /// The program.
+    gcode: String,
+}
+
 /// The CAM Tools pane.
 #[derive(Debug)]
 pub struct CamToolsPane {
@@ -180,7 +191,7 @@ pub struct CamToolsPane {
     /// The picker's category filter.
     category: Category,
     /// The last program Generate made, and its tool.
-    output: Option<(CamTool, String)>,
+    output: Option<Output>,
     /// A message shown above the page (a generator's refusal, a refused handoff).
     notice: Option<String>,
     /// The Drill Press page.
@@ -298,12 +309,23 @@ impl CamToolsPane {
         self.notice = Some(message);
     }
 
-    /// The program the last Generate made on the open page.
+    /// The program the last Generate made on the open page, while the page's input is still
+    /// the one it was made from.
     pub fn output(&self) -> Option<&str> {
         self.output
             .as_ref()
-            .filter(|(tool, _)| Some(*tool) == self.open)
-            .map(|(_, gcode)| gcode.as_str())
+            .filter(|o| Some(o.tool) == self.open && o.input == self.input_key(o.tool))
+            .map(|o| o.gcode.as_str())
+    }
+
+    /// Everything `tool`'s page holds, to tell when its output is out of date.
+    fn input_key(&self, tool: CamTool) -> String {
+        match tool {
+            CamTool::SpeedsFeeds => String::new(),
+            CamTool::SpoilboardSurfacing => format!("{:?}", self.spoilboard_surfacing),
+            CamTool::SpoilboardGrid => format!("{:?}", self.spoilboard_grid),
+            CamTool::DrillPress => format!("{:?}", self.drill_press),
+        }
     }
 
     /// Takes the Send to Editor / Preview request; the program waits in
@@ -383,7 +405,7 @@ impl CamToolsPane {
             // Calculate: the results show on the page; there is no program.
             if action == CamAction::Generate {
                 match self.speeds_feeds.calculate() {
-                    Ok(results) => self.speeds_feeds.results = Some(results),
+                    Ok(results) => self.speeds_feeds.store_results(results),
                     Err(_) => self.notice = Some(CamError::Invalid.message(tr)),
                 }
             }
@@ -399,7 +421,10 @@ impl CamToolsPane {
             Ok(gcode) => {
                 self.notice = None;
                 match delivery {
-                    None => self.output = Some((tool, gcode)),
+                    None => {
+                        let input = self.input_key(tool);
+                        self.output = Some(Output { tool, input, gcode });
+                    }
                     Some(delivery) => self.request_to_editor(gcode, delivery),
                 }
             }
@@ -436,6 +461,7 @@ impl CamToolsPane {
         let axes = device_status::get_active_num_axes();
         self.drill_press.num_axes = axes;
         self.spoilboard_surfacing.num_axes = axes;
+        self.drill_press.laser_mode = drill_press::device_in_laser_mode();
         if let Some(notice) = self.notice.clone() {
             ui.horizontal(|ui| {
                 ui.colored_label(ui.visuals().error_fg_color, notice);

@@ -68,10 +68,15 @@ pub(super) struct DesignFlow {
 
 /// The msgids the app shows for the designer, for the translation check.
 pub fn msgids() -> Vec<&'static str> {
-    vec![n_!(
-        "Stop the running job before sending G-code to the editor."
-    )]
+    vec![
+        n_!("Stop the running job before sending G-code to the editor."),
+        HANDOFF_DROPPED,
+    ]
 }
+
+/// Said on the pane whose handoff was dropped because another waits for an answer.
+const HANDOFF_DROPPED: &str =
+    n_!("Another program is waiting to go to the editor; this one was not sent.");
 
 /// `path` with `extension` when it has none (GTK's default extensions).
 fn with_default_extension(path: &Path, extension: &str) -> std::path::PathBuf {
@@ -347,8 +352,11 @@ impl GcodeKitApp {
             return;
         }
         if self.design.editor_after_confirm.is_some() {
-            // One question at a time: a second request while one waits is dropped.
+            // One question at a time: a second request while one waits is dropped, said on
+            // its pane, and its program discarded so a later answer cannot deliver it.
             tracing::warn!(?handoff, "editor handoff already waiting; request dropped");
+            let message = self.state.translator.tr(HANDOFF_DROPPED).into_owned();
+            self.drop_handoff(handoff, message);
             return;
         }
         if self.editor.borrow().buffer().is_dirty() {
@@ -370,15 +378,24 @@ impl GcodeKitApp {
             .translator
             .tr("Stop the running job before sending G-code to the editor.")
             .into_owned();
+        self.drop_handoff(handoff, message);
+        true
+    }
+
+    /// Discards `handoff`'s program and says `message` on the pane that asked.
+    fn drop_handoff(&mut self, handoff: Handoff, message: String) {
         match handoff {
-            Handoff::Designer(_) => self.designer.borrow_mut().set_notice(message),
+            Handoff::Designer(_) => {
+                let mut designer = self.designer.borrow_mut();
+                designer.take_editor_gcode();
+                designer.set_notice(message);
+            }
             Handoff::Cam(_) => {
                 let mut cam = self.cam_tools.borrow_mut();
                 cam.take_editor_gcode();
                 cam.set_notice(message);
             }
         }
-        true
     }
 
     /// Replaces the editor's program with the handoff's (generating the designer's now);

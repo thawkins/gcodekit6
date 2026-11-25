@@ -3461,3 +3461,12 @@ msgstr "Crea un patrón de cuadrícula en su tablero de sacrificio para alinear 
 
 msgid "Set the spindle's maximum RPM and power in the Device Manager."
 msgstr "Configure las RPM máximas y la potencia del husillo en el Administrador de dispositivos."
+
+msgid "Must not be larger than the hole"
+msgstr "No debe ser mayor que el agujero"
+
+msgid "The device is in laser mode ($32=1). Switch it to CNC mode to use the Drill Press."
+msgstr "El dispositivo está en modo láser ($32=1). Cámbielo a modo CNC para usar el taladro."
+
+msgid "Another program is waiting to go to the editor; this one was not sent."
+msgstr "Otro programa está esperando para ir al editor; este no se envió."

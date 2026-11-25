@@ -136,3 +136,38 @@ fn test_cam_picker_filters_by_category_and_search() {
     pane.set_search("PECK");
     assert_eq!(pane.listed_tools(&tr), [CamTool::DrillPress]);
 }
+
+/// One handoff at a time: a request made while another waits for the unsaved-changes answer
+/// is dropped with a notice, and its program can never be delivered later.
+#[test]
+fn test_second_handoff_while_one_waits_is_dropped_with_a_notice() {
+    use gcodekit5_ui_egui::panes::designer::ToEditor;
+    let (mut h, script) = cam_app(default_state());
+    crate::test_designer_files_app::add_rect(&mut h);
+    h.state()
+        .editor()
+        .borrow_mut()
+        .buffer_mut()
+        .set_text("G1 X9\n".to_string());
+    // The designer asks first (it is delivered first in the frame); the CAM request waits
+    // behind its prompt and is dropped.
+    h.state()
+        .designer()
+        .borrow_mut()
+        .request_to_editor(ToEditor::Generate);
+    answer(&script, [discard()]);
+    request(&mut h, CamDelivery::Editor);
+    assert_eq!(shown(&script), ["Unsaved changes"]);
+    let mut cam = h.state().cam_tools().borrow_mut();
+    assert_eq!(cam.notice(), Some(DROPPED));
+    assert_eq!(cam.take_editor_gcode(), None, "the dropped program is gone");
+    drop(cam);
+    let text = editor_text(&h);
+    assert!(
+        !text.contains("G1 X2 F100"),
+        "the dropped program reached the editor"
+    );
+}
+
+/// The notice shown when a handoff is dropped.
+const DROPPED: &str = "Another program is waiting to go to the editor; this one was not sent.";

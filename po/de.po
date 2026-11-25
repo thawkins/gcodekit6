@@ -3458,3 +3458,12 @@ msgstr "Erstellt ein Rastermuster auf Ihrer Opferplatte zum einfachen Ausrichten
 
 msgid "Set the spindle's maximum RPM and power in the Device Manager."
 msgstr "Legen Sie die maximale Drehzahl und die Leistung der Spindel im Geräte-Manager fest."
+
+msgid "Must not be larger than the hole"
+msgstr "Darf nicht größer als das Loch sein"
+
+msgid "The device is in laser mode ($32=1). Switch it to CNC mode to use the Drill Press."
+msgstr "Das Gerät ist im Lasermodus ($32=1). Schalten Sie es in den CNC-Modus, um die Bohrmaschine zu verwenden."
+
+msgid "Another program is waiting to go to the editor; this one was not sent."
+msgstr "Ein anderes Programm wartet darauf, an den Editor zu gehen; dieses wurde nicht gesendet."

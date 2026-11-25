@@ -15,8 +15,8 @@ use gcodekit5_camtools::spoilboard_surfacing::{
 use gcodekit5_core::units::{self, MeasurementSystem};
 
 use super::common::{
-    self, CamAction, CamError, FieldError, check, field_row, grid, heading, not_negative,
-    parse_len, parse_number, positive,
+    self, CamAction, CamError, FieldError, check, field_row, grid, heading, parse_len,
+    parse_number, positive,
 };
 
 /// Field label msgids.
@@ -125,9 +125,9 @@ impl SpoilboardSurfacingParams {
     /// The generator's parameters, or every problem with the input.
     ///
     /// # Errors
-    /// The fields that do not parse or are unsafe (a width, cutter, depth, feed or safe Z
-    /// that is not above 0, a negative height or speed, a stepover outside 0-100 %), and a
-    /// device with fewer than 3 axes.
+    /// The fields that do not parse or are unsafe (a size, cutter, depth, feed, speed or
+    /// safe Z that is not above 0, a stepover outside 0-100 %), and a device with fewer than
+    /// 3 axes.
     pub fn parameters(&self) -> Result<SpoilboardSurfacingParameters, Vec<FieldError>> {
         let mut errors = Vec::new();
         let u = self.units;
@@ -135,7 +135,7 @@ impl SpoilboardSurfacingParams {
             check(&mut errors, label, parse_len(text, u), rule)
         };
         let width = len(WIDTH, &self.width, positive);
-        let height = len(HEIGHT, &self.height, not_negative);
+        let height = len(HEIGHT, &self.height, positive);
         let tool_diameter = len(TOOL_DIAMETER, &self.tool_diameter, positive);
         let cut_depth = len(CUT_DEPTH, &self.cut_depth, positive);
         let safe_z = len(SAFE_Z, &self.safe_z, positive);
@@ -144,7 +144,7 @@ impl SpoilboardSurfacingParams {
         };
         let stepover_percent = num(STEPOVER, &self.stepover_percent, percent);
         let feed_rate = num(FEED_RATE, &self.feed_rate, positive);
-        let spindle_speed = num(SPINDLE_SPEED, &self.spindle_speed, not_negative);
+        let spindle_speed = num(SPINDLE_SPEED, &self.spindle_speed, positive);
         if self.num_axes < 3 {
             errors.push(FieldError::page(common::NEEDS_THREE_AXES));
         }
