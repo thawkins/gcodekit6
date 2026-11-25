@@ -775,3 +775,78 @@ fn test_stale_idle_before_jog_written_keeps_jog_outstanding() {
     let cancel = cancel.expect("no jog cancel for the written jog");
     assert!(cancel < closed.expect("closed"), "{:?}", shared.log());
 }
+
+/// Waits until a status report is polled.
+fn wait_report(controller: &mut MachineController) {
+    assert!(
+        wait_for(controller, |e| matches!(e, MachineEvent::StatusReport(_))).is_some(),
+        "no status report"
+    );
+}
+
+/// After a command line, the state is stale until a status report read after the line was
+/// written; a report read while the line still waits in the queue does not count.
+#[test]
+fn test_report_fresh_only_after_line_written() {
+    let shared = Arc::new(LoopbackShared::default());
+    let mut controller = loopback_controller(&shared, Duration::from_millis(1));
+    connect(&mut controller);
+    assert!(controller.report_fresh(), "fresh before any line");
+    controller.send_line("$H").expect("send");
+    assert!(!controller.report_fresh(), "fresh right after the send");
+    assert!(wait_until(|| shared
+        .log()
+        .contains(&Wrote::Line("$H".to_string()))));
+    shared.inject("<Home|MPos:0.000,0.000,0.000|FS:0,0>\n");
+    wait_report(&mut controller);
+    assert!(
+        controller.report_fresh(),
+        "a report after the write is fresh"
+    );
+    drop(controller);
+
+    // The line held back by a full window: reports meanwhile do not count.
+    let (shared, mut controller) = full_window();
+    controller.send_line("$X").expect("send");
+    shared.inject("<Idle|MPos:0.000,0.000,0.000|FS:0,0>\n");
+    wait_report(&mut controller);
+    assert!(
+        !controller.report_fresh(),
+        "fresh before the line was written"
+    );
+    shared.hold_acks.store(false, Ordering::SeqCst);
+    assert!(wait_until(|| shared
+        .log()
+        .contains(&Wrote::Line("$X".to_string()))));
+    shared.inject("<Idle|MPos:0.000,0.000,0.000|FS:0,0>\n");
+    wait_report(&mut controller);
+    assert!(
+        controller.report_fresh(),
+        "a report after the write is fresh"
+    );
+}
+
+/// A soft reset written as a raw real-time byte drops a queued jog, like jog cancel.
+#[test]
+fn test_soft_reset_drops_queued_jog() {
+    let (shared, mut controller) = full_window();
+    controller.jog(gcodekit5_app::machine::Axis::X, 100.0, 1000.0);
+    std::thread::sleep(Duration::from_millis(20));
+    controller.realtime(RealtimeCommand::SoftReset);
+    assert!(wait_until(|| shared.log().contains(&Wrote::Realtime(0x18))));
+    shared.hold_acks.store(false, Ordering::SeqCst);
+    assert!(
+        wait_until(|| shared.lines_written() == 4),
+        "{:?}",
+        shared.log()
+    );
+    std::thread::sleep(Duration::from_millis(50));
+    assert!(
+        !shared
+            .log()
+            .iter()
+            .any(|w| matches!(w, Wrote::Line(l) if l.starts_with("$J="))),
+        "jog started after a soft reset: {:?}",
+        shared.log()
+    );
+}

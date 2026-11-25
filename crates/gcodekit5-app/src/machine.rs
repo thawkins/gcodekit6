@@ -22,7 +22,7 @@
 pub mod grbl_stream;
 
 use std::collections::VecDeque;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::mpsc::{self, Receiver, RecvTimeoutError, Sender};
 use std::sync::{Arc, Mutex, PoisonError};
 use std::thread::JoinHandle;
@@ -237,6 +237,8 @@ enum Command {
     Resume,
     Stop,
     Line(String),
+    /// A command line that may change the machine state, with its sequence number.
+    StateLine(String, u64),
     Realtime(u8),
     Shutdown,
 }
@@ -261,6 +263,10 @@ pub struct MachineController {
     factory: TransportFactory,
     repaint: SharedHook,
     streaming: Arc<AtomicBool>,
+    /// Sequence number of the last command line sent with [`send_line`](Self::send_line).
+    requested: u64,
+    /// The highest such sequence number written before the latest status report.
+    fresh: Arc<AtomicU64>,
     worker: Option<Worker>,
     /// Workers told to shut down while still connecting; reaped once finished.
     closing: Vec<JoinHandle<()>>,
@@ -300,6 +306,8 @@ impl MachineController {
             factory,
             repaint: Arc::new(Mutex::new(None)),
             streaming: Arc::new(AtomicBool::new(false)),
+            requested: 0,
+            fresh: Arc::new(AtomicU64::new(0)),
             worker: None,
             closing: Vec::new(),
             pending: Vec::new(),
@@ -340,6 +348,8 @@ impl MachineController {
         // A fresh flag per connection: a detached worker from an earlier session keeps
         // its own clone, so it can never clear this session's streaming state.
         self.streaming = Arc::new(AtomicBool::new(false));
+        self.requested = 0;
+        self.fresh = Arc::new(AtomicU64::new(0));
         let state = WorkerState::new(
             (self.factory)(),
             cmd_rx,
@@ -349,6 +359,7 @@ impl MachineController {
             },
             self.streaming.clone(),
             ready.clone(),
+            self.fresh.clone(),
         );
         let handle = std::thread::Builder::new()
             .name("machine-controller".to_string())
@@ -479,7 +490,16 @@ impl MachineController {
         if self.streaming.load(Ordering::SeqCst) {
             return Err(MachineError::StreamInProgress);
         }
-        self.send(Command::Line(line.to_string()))
+        self.requested += 1;
+        self.send(Command::StateLine(line.to_string(), self.requested))
+    }
+
+    /// Whether the latest status report was read after every line sent with
+    /// [`send_line`](Self::send_line) had been written. A line such as `$H` changes the
+    /// machine state, so until then the last report may describe the machine before it (Idle
+    /// before homing): a front end must not jog on it. True before any line is sent.
+    pub fn report_fresh(&self) -> bool {
+        self.fresh.load(Ordering::SeqCst) >= self.requested
     }
 
     /// Whether a program is streaming: from a successful
@@ -619,9 +639,14 @@ struct WorkerState {
     /// One entry per line in `window`: true for a program line, false for a manual one.
     in_flight_is_program: VecDeque<bool>,
     splitter: ResponseLineSplitter,
-    manual: VecDeque<String>,
+    /// Manual lines waiting for room, each with its state-line sequence number (0 for a jog).
+    manual: VecDeque<(String, u64)>,
     stream: Option<Stream>,
     paused: bool,
+    /// The highest state-line sequence number written (or dropped, never to run).
+    written_seq: u64,
+    /// Shared with the controller: `written_seq` as of the latest status report.
+    fresh: Arc<AtomicU64>,
     /// A `$J` jog was queued and is not known to be over: set when it is queued and again when
     /// it is written, cleared by jog cancel (0x85, which also drops queued jogs), soft reset
     /// (0x18), or an `Idle` report after a `Jog` one received since it was written.
@@ -643,6 +668,7 @@ impl WorkerState {
         sink: EventSink,
         streaming: Arc<AtomicBool>,
         ready: Arc<AtomicBool>,
+        fresh: Arc<AtomicU64>,
     ) -> Self {
         Self {
             comm,
@@ -656,6 +682,8 @@ impl WorkerState {
             manual: VecDeque::new(),
             stream: None,
             paused: false,
+            written_seq: 0,
+            fresh,
             jog_outstanding: false,
             jog_seen: false,
         }
@@ -751,11 +779,12 @@ impl WorkerState {
         match cmd {
             Command::Realtime(byte) => {
                 self.write(&[byte])?;
-                if byte == RealtimeCommand::JogCancel.byte() {
-                    // A jog still waiting in the queue must not start after the cancel.
-                    self.manual.retain(|line| !line.starts_with("$J="));
-                    self.jog_outstanding = false;
-                } else if byte == RealtimeCommand::SoftReset.byte() {
+                if byte == RealtimeCommand::JogCancel.byte()
+                    || byte == RealtimeCommand::SoftReset.byte()
+                {
+                    // A jog still waiting in the queue must not start after the cancel or
+                    // the reset.
+                    self.manual.retain(|(line, _)| !line.starts_with("$J="));
                     self.jog_outstanding = false;
                 }
             }
@@ -773,19 +802,8 @@ impl WorkerState {
                 self.reset_buffers();
                 self.end_stream(false);
             }
-            Command::Line(line) => {
-                if !self.window.fits_at_all(&line) {
-                    self.sink.emit(MachineEvent::Error(format!(
-                        "line too long for the controller buffer: {line}"
-                    )));
-                } else {
-                    if line.starts_with("$J=") {
-                        self.jog_outstanding = true;
-                        self.jog_seen = false;
-                    }
-                    self.manual.push_back(line);
-                }
-            }
+            Command::Line(line) => self.queue_manual(line, 0),
+            Command::StateLine(line, seq) => self.queue_manual(line, seq),
             Command::Stream(program) => {
                 self.paused = false;
                 self.stream = Some(Stream {
@@ -801,12 +819,30 @@ impl WorkerState {
         Ok(())
     }
 
+    /// Queues a manual line (`seq` > 0 for a state line), or reports one too long for the
+    /// controller's buffer, which then never runs.
+    fn queue_manual(&mut self, line: String, seq: u64) {
+        if !self.window.fits_at_all(&line) {
+            self.sink.emit(MachineEvent::Error(format!(
+                "line too long for the controller buffer: {line}"
+            )));
+            self.written_seq = self.written_seq.max(seq);
+            return;
+        }
+        if line.starts_with("$J=") {
+            self.jog_outstanding = true;
+            self.jog_seen = false;
+        }
+        self.manual.push_back((line, seq));
+    }
+
     /// Writes manual lines, then program lines, while they fit in the RX buffer.
     fn feed(&mut self) -> Result<(), String> {
-        while let Some(line) = self.manual.front() {
+        while let Some((line, seq)) = self.manual.front() {
             if !self.window.can_send(line) {
                 return Ok(());
             }
+            let seq = *seq;
             let is_jog = line.starts_with("$J=");
             let line = format!("{line}\n");
             self.write(line.as_bytes())?;
@@ -817,6 +853,7 @@ impl WorkerState {
             }
             self.window.on_sent(line.trim_end_matches('\n'));
             self.in_flight_is_program.push_back(false);
+            self.written_seq = self.written_seq.max(seq);
             self.manual.pop_front();
         }
 
@@ -873,6 +910,8 @@ impl WorkerState {
                 let status = StatusParser::parse_full(&report);
                 self.follow_jog(status.machine_state.as_deref());
                 self.sink.emit(MachineEvent::StatusReport(Box::new(status)));
+                // After the event: a caller that sees the report fresh has the report too.
+                self.fresh.store(self.written_seq, Ordering::SeqCst);
             }
             GrblResponseLine::Reset(banner) => {
                 // Report the banner before the stream end it causes, so a consumer
@@ -965,7 +1004,9 @@ impl WorkerState {
         self.jog_outstanding = false;
         self.window = CharCountWindow::default();
         self.in_flight_is_program.clear();
-        self.manual.clear();
+        // Dropped state lines never run: a report after the reset describes the machine.
+        let dropped = self.manual.drain(..).map(|(_, seq)| seq).max().unwrap_or(0);
+        self.written_seq = self.written_seq.max(dropped);
         self.splitter.clear();
     }
 }
