@@ -28,6 +28,8 @@ mod test_dialogs;
 mod test_editor;
 #[path = "test_frame.rs"]
 mod test_frame;
+#[path = "test_hidpi.rs"]
+mod test_hidpi;
 #[path = "test_machine_jog.rs"]
 mod test_machine_jog;
 #[path = "test_machine_pane.rs"]
