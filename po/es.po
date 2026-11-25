@@ -3791,3 +3791,15 @@ msgstr "El grabado es demasiado grande: como máximo 25 millones de píxeles"
 
 msgid "The cancelled engraving is still finishing; try again in a moment."
 msgstr "El grabado cancelado aún está terminando; inténtelo de nuevo en un momento."
+
+msgid "A file is waiting to open in the editor; this program was not sent."
+msgstr "Un archivo está esperando para abrirse en el editor; este programa no se envió."
+
+msgid "Answer the question about the editor's unsaved changes before opening a file."
+msgstr "Responda a la pregunta sobre los cambios sin guardar del editor antes de abrir un archivo."
+
+msgid "Stop the running job before generating."
+msgstr "Detenga el trabajo en curso antes de generar."
+
+msgid "Must be at most 2000 mm"
+msgstr "Debe ser como máximo 2000 mm"

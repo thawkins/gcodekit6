@@ -3712,3 +3712,15 @@ msgstr ""
 
 msgid "The cancelled engraving is still finishing; try again in a moment."
 msgstr ""
+
+msgid "A file is waiting to open in the editor; this program was not sent."
+msgstr ""
+
+msgid "Answer the question about the editor's unsaved changes before opening a file."
+msgstr ""
+
+msgid "Stop the running job before generating."
+msgstr ""
+
+msgid "Must be at most 2000 mm"
+msgstr ""

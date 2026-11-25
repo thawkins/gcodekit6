@@ -6,7 +6,7 @@
 //! design (grouped, the border closed) and brings the designer to the front, as GTK's did.
 //! GTK silently used a default for a field it could not read; here the field shows the
 //! problem and Generate waits. The generator's limits are checked at the fields: pieces of
-//! at least 15 mm, 2 to 20 of them in each direction, a puzzle of at least 50 mm, tabs of
+//! at least 15 mm, 2 to 20 of them in each direction, a puzzle of 50 to 2000 mm, tabs of
 //! 10 to 30 %, jitter of 0 to 13 %, a corner radius of 0 to 10 mm.
 //!
 //! Dependencies: `egui`, `gcodekit5-camtools` (generator), `gcodekit5-app` (translations),
@@ -38,6 +38,7 @@ const DESCRIPTION: &str = n_!(
 
 /// Problem messages.
 const SIZE_TOO_SMALL: &str = n_!("Must be at least 50 mm");
+const SIZE_TOO_LARGE: &str = n_!("Must be at most 2000 mm");
 const PIECE_COUNT: &str = n_!("Must be a whole number from 2 to 20");
 const PIECES_TOO_NARROW: &str = n_!("Pieces would be narrower than 15 mm");
 const PIECES_TOO_SHORT: &str = n_!("Pieces would be shorter than 15 mm");
@@ -48,6 +49,21 @@ const SEED_RANGE: &str = n_!("Must be a whole number from 0 to 4294967295");
 
 /// The smallest piece the generator makes (mm).
 const MIN_PIECE_MM: f32 = 15.0;
+/// The smallest puzzle side the generator makes (mm).
+const MIN_SIZE_MM: f64 = 50.0;
+/// The largest puzzle side (mm): the generator's most pieces (20) at 100 mm each. The
+/// generator itself has no upper limit.
+const MAX_SIZE_MM: f64 = 2000.0;
+
+/// Rule for the puzzle's width and height: from [`MIN_SIZE_MM`] to [`MAX_SIZE_MM`].
+fn size_rule(v: f64) -> Option<&'static str> {
+    at_least(MIN_SIZE_MM, SIZE_TOO_SMALL)(v).or_else(|| at_most(MAX_SIZE_MM, v))
+}
+
+/// [`SIZE_TOO_LARGE`] above `max` (compared in `f32`, as the generator).
+fn at_most(max: f64, v: f64) -> Option<&'static str> {
+    (v as f32 > max as f32).then_some(SIZE_TOO_LARGE)
+}
 
 /// The msgids the page shows, for the translation check.
 pub fn msgids() -> Vec<&'static str> {
@@ -62,6 +78,7 @@ pub fn msgids() -> Vec<&'static str> {
         SEED,
         DESCRIPTION,
         SIZE_TOO_SMALL,
+        SIZE_TOO_LARGE,
         PIECE_COUNT,
         PIECES_TOO_NARROW,
         PIECES_TOO_SHORT,
@@ -155,8 +172,8 @@ impl JigsawParams {
         let mut len = |label, text: &str, rule: &dyn Fn(f64) -> Option<&'static str>| {
             check(&mut errors, label, parse_len(text, u), gated(strict, rule))
         };
-        let width = len(WIDTH, &self.width, &at_least(50.0, SIZE_TOO_SMALL));
-        let height = len(HEIGHT, &self.height, &at_least(50.0, SIZE_TOO_SMALL));
+        let width = len(WIDTH, &self.width, &size_rule);
+        let height = len(HEIGHT, &self.height, &size_rule);
         let corner_radius = len(
             CORNER_RADIUS,
             &self.corner_radius,

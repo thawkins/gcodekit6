@@ -3788,3 +3788,15 @@ msgstr "Die Gravur ist zu groß: höchstens 25 Millionen Pixel"
 
 msgid "The cancelled engraving is still finishing; try again in a moment."
 msgstr "Die abgebrochene Gravur wird noch beendet; bitte gleich erneut versuchen."
+
+msgid "A file is waiting to open in the editor; this program was not sent."
+msgstr "Eine Datei wartet darauf, im Editor geöffnet zu werden; dieses Programm wurde nicht gesendet."
+
+msgid "Answer the question about the editor's unsaved changes before opening a file."
+msgstr "Beantworten Sie die Frage zu den ungespeicherten Änderungen im Editor, bevor Sie eine Datei öffnen."
+
+msgid "Stop the running job before generating."
+msgstr "Beenden Sie den laufenden Auftrag, bevor Sie generieren."
+
+msgid "Must be at most 2000 mm"
+msgstr "Darf höchstens 2000 mm betragen"

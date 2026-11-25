@@ -230,6 +230,16 @@ impl DesignerPane {
         self.toolpaths.running()
     }
 
+    /// Test hook: while `on`, every toolpath preview build panics on its worker thread.
+    ///
+    /// # Arguments
+    /// * `on` - Whether builds panic.
+    #[doc(hidden)]
+    #[cfg(any(test, feature = "test-support"))]
+    pub fn set_toolpath_build_panics(&mut self, on: bool) {
+        self.toolpaths.set_build_panics(on);
+    }
+
     /// Toolpath preview builds started so far.
     #[doc(hidden)]
     pub fn toolpath_builds_started(&self) -> u64 {

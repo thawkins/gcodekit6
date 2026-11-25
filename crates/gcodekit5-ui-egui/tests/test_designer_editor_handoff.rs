@@ -172,3 +172,82 @@ fn test_generate_is_refused_while_a_job_runs() {
     );
     assert_eq!(designer.take_editor_gcode(), None, "nothing was generated");
 }
+
+/// Shows the editor as the active document, so File > Open reaches the editor.
+fn activate_editor(h: &mut egui_kittest::Harness<'static, gcodekit5_ui_egui::GcodeKitApp>) {
+    let shown = h
+        .state_mut()
+        .workspace_mut()
+        .apply(craft_ui::docking::Action::Activate {
+            panel: PaneId::Editor,
+        });
+    assert!(shown.is_ok(), "{shown:?}");
+    frames(h, 2);
+}
+
+/// Said on the designer when its handoff waits behind File > Open's question.
+const HANDOFF_BEHIND_OPEN: &str =
+    "A file is waiting to open in the editor; this program was not sent.";
+/// Said on the editor when File > Open waits behind a handoff's question.
+const OPEN_BEHIND_HANDOFF: &str =
+    "Answer the question about the editor's unsaved changes before opening a file.";
+
+/// One editor prompt at a time: File > Open asks first, so a handoff made while its prompt
+/// is up is refused with a notice, and the answer goes to Open, never to the handoff.
+#[test]
+fn test_handoff_while_open_asks_is_refused_and_the_answer_goes_to_open() {
+    let (mut h, script) = app(default_state());
+    add_rect(&mut h);
+    activate_editor(&mut h);
+    h.state()
+        .editor()
+        .borrow_mut()
+        .buffer_mut()
+        .set_text("G1 X9\n".to_string());
+    // Discard for Open's prompt; its Open dialog is then cancelled.
+    answer(&script, [discard(), Answer::Cancelled]);
+    h.state_mut().dispatch(Command::FileOpen);
+    generate(&mut h);
+    assert_eq!(shown(&script), ["Unsaved changes", "Open G-Code File"]);
+    assert_eq!(editor_text(&h), "G1 X9\n", "the handoff took Open's answer");
+    let mut designer = h.state().designer().borrow_mut();
+    assert_eq!(designer.notice(), Some(HANDOFF_BEHIND_OPEN));
+    assert_eq!(
+        designer.take_editor_gcode(),
+        None,
+        "the refused program is gone"
+    );
+}
+
+/// The reverse: a handoff asks first, so File > Open made while its prompt is up is refused
+/// with a notice on the editor, and the answer goes to the handoff.
+#[test]
+fn test_open_while_a_handoff_asks_is_refused_and_the_answer_goes_to_the_handoff() {
+    let (mut h, script) = app(default_state());
+    add_rect(&mut h);
+    activate_editor(&mut h);
+    h.state()
+        .editor()
+        .borrow_mut()
+        .buffer_mut()
+        .set_text("G1 X9\n".to_string());
+    answer(&script, [discard()]);
+    h.state()
+        .designer()
+        .borrow_mut()
+        .request_to_editor(ToEditor::Generate);
+    // The handoff's prompt is queued this frame, then File > Open arrives.
+    h.step();
+    h.state_mut().dispatch(Command::FileOpen);
+    // Said at once (the delivered program later replaces the notice with the editor's own).
+    assert_eq!(
+        h.state().editor().borrow().notice(),
+        Some(OPEN_BEHIND_HANDOFF)
+    );
+    h.state_mut()
+        .dialogs_mut()
+        .end_frame(None::<&eframe::Frame>);
+    frames(&mut h, 3);
+    assert_eq!(shown(&script), ["Unsaved changes"]);
+    assert!(editor_text(&h).contains(GENERATED));
+}

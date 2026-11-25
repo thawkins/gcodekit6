@@ -44,6 +44,16 @@ pub enum Handoff {
     Cam(CamDelivery),
 }
 
+/// What waits for the answer to the editor's unsaved-changes prompt. There is one slot, so
+/// only one such prompt is ever up and its answer cannot reach another request.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum EditorNext {
+    /// File > Open of a G-code file.
+    Open,
+    /// A handoff to the editor.
+    ToEditor(Handoff),
+}
+
 /// What runs once the design's unsaved changes are dealt with.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum DesignNext {
@@ -62,8 +72,6 @@ pub(super) struct DesignFlow {
     pub(super) after_confirm: Option<DesignNext>,
     /// What waits for the design's save dialog; `Some(None)` is a plain Save As.
     pub(super) after_save: Option<Option<DesignNext>>,
-    /// A handoff waiting for the editor's unsaved-changes answer.
-    pub(super) editor_after_confirm: Option<Handoff>,
 }
 
 /// The msgids the app shows for the designer, for the translation check.
@@ -71,12 +79,20 @@ pub fn msgids() -> Vec<&'static str> {
     vec![
         n_!("Stop the running job before sending G-code to the editor."),
         HANDOFF_DROPPED,
+        HANDOFF_BEHIND_OPEN,
+        OPEN_BEHIND_HANDOFF,
     ]
 }
 
 /// Said on the pane whose handoff was dropped because another waits for an answer.
 const HANDOFF_DROPPED: &str =
     n_!("Another program is waiting to go to the editor; this one was not sent.");
+/// Said on the pane whose handoff was refused because File > Open waits for an answer.
+const HANDOFF_BEHIND_OPEN: &str =
+    n_!("A file is waiting to open in the editor; this program was not sent.");
+/// Said on the editor when File > Open is refused because a handoff waits for an answer.
+pub(super) const OPEN_BEHIND_HANDOFF: &str =
+    n_!("Answer the question about the editor's unsaved changes before opening a file.");
 
 /// `path` with `extension` when it has none (GTK's default extensions).
 fn with_default_extension(path: &Path, extension: &str) -> std::path::PathBuf {
@@ -297,8 +313,8 @@ impl GcodeKitApp {
             DialogAnswer::Confirm {
                 request: ConfirmRequest::UnsavedGcode,
                 choice,
-            } if self.design.editor_after_confirm.is_some() => {
-                let Some(what) = self.design.editor_after_confirm.take() else {
+            } if matches!(self.editor_prompt, Some(EditorNext::ToEditor(_))) => {
+                let Some(EditorNext::ToEditor(what)) = self.editor_prompt.take() else {
                     return true;
                 };
                 match choice.as_unsaved() {
@@ -310,10 +326,10 @@ impl GcodeKitApp {
             DialogAnswer::Unavailable {
                 asked: Asked::Confirm(ConfirmRequest::UnsavedGcode),
                 reason,
-            } if self.design.editor_after_confirm.is_some() => {
+            } if matches!(self.editor_prompt, Some(EditorNext::ToEditor(_))) => {
                 // Without the answer the editor's edits could be lost: send nothing.
                 tracing::warn!(%reason, "unsaved-changes prompt unavailable; G-code not sent");
-                self.design.editor_after_confirm = None;
+                self.editor_prompt = None;
             }
             DialogAnswer::Unavailable {
                 asked: Asked::Confirm(ConfirmRequest::UnsavedDesign),
@@ -371,16 +387,25 @@ impl GcodeKitApp {
         if self.refuse_editor_gcode_during_job(handoff) {
             return;
         }
-        if self.design.editor_after_confirm.is_some() {
-            // One question at a time: a second request while one waits is dropped, said on
-            // its pane, and its program discarded so a later answer cannot deliver it.
-            tracing::warn!(?handoff, "editor handoff already waiting; request dropped");
-            let message = self.state.translator.tr(HANDOFF_DROPPED).into_owned();
+        if let Some(waiting) = self.editor_prompt {
+            // One question at a time: a request while one waits (another handoff's or File >
+            // Open's) is dropped, said on its pane, and its program discarded so a later
+            // answer cannot deliver it.
+            tracing::warn!(
+                ?handoff,
+                ?waiting,
+                "editor prompt already up; handoff dropped"
+            );
+            let msgid = match waiting {
+                EditorNext::Open => HANDOFF_BEHIND_OPEN,
+                EditorNext::ToEditor(_) => HANDOFF_DROPPED,
+            };
+            let message = self.state.translator.tr(msgid).into_owned();
             self.drop_handoff(handoff, message);
             return;
         }
         if self.editor.borrow().buffer().is_dirty() {
-            self.design.editor_after_confirm = Some(handoff);
+            self.editor_prompt = Some(EditorNext::ToEditor(handoff));
             self.dialogs.confirm(ConfirmRequest::UnsavedGcode);
         } else {
             self.send_to_editor(handoff);

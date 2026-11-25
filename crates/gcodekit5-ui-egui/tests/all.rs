@@ -22,6 +22,8 @@ mod machine_support;
 mod test_cam_bitmap_engraving;
 #[path = "test_cam_drill_press.rs"]
 mod test_cam_drill_press;
+#[path = "test_cam_generate_during_job.rs"]
+mod test_cam_generate_during_job;
 #[path = "test_cam_gerber.rs"]
 mod test_cam_gerber;
 #[path = "test_cam_input_bounds.rs"]

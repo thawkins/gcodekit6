@@ -11,7 +11,8 @@
 //! design never stalls the frame. The pane counts changes to the design (its revision); a
 //! revision newer than the preview's starts a build, at most one at a time: changes made
 //! while a build runs coalesce into the next build, which starts when the running one
-//! finishes. No build starts during a canvas drag; the release starts one.
+//! finishes. No build starts during a canvas drag; the release starts one. A build that
+//! panics clears the preview and is not retried until the design changes again.
 //! Rapid moves are dashed in the warning colour at 50%; cuts and arcs are in the success
 //! colour at 70% (GTK's colours).
 //!
@@ -206,6 +207,9 @@ pub struct ToolpathPreview {
     running: Option<(u64, Receiver<Vec<Toolpath>>)>,
     /// How many builds were started (for tests).
     started: u64,
+    /// Test hook: builds panic while set.
+    #[cfg(any(test, feature = "test-support"))]
+    panic_builds: bool,
 }
 
 impl ToolpathPreview {
@@ -232,6 +236,15 @@ impl ToolpathPreview {
     /// Builds started so far.
     pub fn started(&self) -> u64 {
         self.started
+    }
+
+    /// Test hook: while `on`, every build panics on its worker thread.
+    ///
+    /// # Arguments
+    /// * `on` - Whether builds panic.
+    #[cfg(any(test, feature = "test-support"))]
+    pub fn set_build_panics(&mut self, on: bool) {
+        self.panic_builds = on;
     }
 
     /// Takes a finished build, then starts one for `revision` when the toolpaths are older
@@ -268,7 +281,15 @@ impl ToolpathPreview {
                 }
                 Err(TryRecvError::Empty) => {}
                 Err(TryRecvError::Disconnected) => {
-                    tracing::warn!("toolpath preview build stopped without a result");
+                    // The build panicked. Retrying the same design would panic again, every
+                    // frame: mark this revision done (with nothing to show) and try again
+                    // only once the design changes.
+                    tracing::error!(
+                        revision = *key,
+                        "toolpath preview build stopped without a result"
+                    );
+                    self.toolpaths.clear();
+                    self.built_for = Some(*key);
                     self.running = None;
                 }
             }
@@ -277,9 +298,15 @@ impl ToolpathPreview {
             let (sender, receiver) = channel();
             let shapes = visible(state, flags);
             let settings = PreviewSettings::of(state);
+            #[cfg(any(test, feature = "test-support"))]
+            let panic_build = self.panic_builds;
             let spawned = std::thread::Builder::new()
                 .name("designer-toolpath-preview".into())
                 .spawn(move || {
+                    #[cfg(any(test, feature = "test-support"))]
+                    if panic_build {
+                        panic!("toolpath preview build panic requested by test hook");
+                    }
                     // The receiver is gone when the preview was switched off meanwhile.
                     let _ = sender.send(build(&shapes, &settings));
                 });

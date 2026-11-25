@@ -69,6 +69,23 @@ pub enum CamDelivery {
     Preview,
 }
 
+/// Said on a page whose generator runs on the UI thread when it is asked to run during a job.
+const GENERATE_DURING_JOB: &str = n_!("Stop the running job before generating.");
+
+/// Whether `tool`'s generator runs on the UI thread with no small bound on its work, so it
+/// must not run while a job streams (it would hold up the UI's Stop and Feed Hold).
+fn generates_heavily(tool: CamTool) -> bool {
+    match tool {
+        CamTool::Jigsaw | CamTool::TabbedBox | CamTool::Gerber => true,
+        CamTool::SpeedsFeeds
+        | CamTool::SpoilboardGrid
+        | CamTool::SpoilboardSurfacing
+        | CamTool::DrillPress
+        | CamTool::BitmapEngraving
+        | CamTool::ProbeRoutines => false,
+    }
+}
+
 /// The msgids the pane shows, for the translation check.
 pub fn msgids() -> Vec<&'static str> {
     let mut ids = vec![
@@ -82,6 +99,7 @@ pub fn msgids() -> Vec<&'static str> {
         n_!("Generated G-Code"),
         n_!("Load Error"),
         n_!("Save Error"),
+        GENERATE_DURING_JOB,
     ];
     ids.extend(Category::ALL.map(Category::msgid));
     for tool in CamTool::ALL {
@@ -371,6 +389,18 @@ impl CamToolsPane {
                     Err(_) => self.notice = Some(CamError::Invalid.message(tr)),
                 }
             }
+            return;
+        }
+        let generating = matches!(
+            action,
+            CamAction::Generate
+                | CamAction::SendToEditor
+                | CamAction::Preview
+                | CamAction::SendToDesigner
+        );
+        if generating && generates_heavily(tool) && machine.is_some_and(Machine::job_running) {
+            tracing::warn!(?tool, ?action, "CAM generation refused while a job runs");
+            self.notice = Some(tr.tr(GENERATE_DURING_JOB).into_owned());
             return;
         }
         let delivery = match action {

@@ -74,7 +74,7 @@ use crate::panes::visualizer::VisualizerPane;
 use crate::theme;
 use crate::windows::{AboutWindow, SettingsOutcome, SettingsWindow};
 use crate::workspace::{PaneContext, PaneId, Workspace};
-use designer_files::{DesignFlow, DesignNext};
+use designer_files::{DesignFlow, DesignNext, EditorNext, OPEN_BEHIND_HANDOFF};
 use gcodekit5_app::materials_manager_backend::MaterialsManagerBackend;
 use gcodekit5_app::tools_manager_backend::ToolsManagerBackend;
 
@@ -286,8 +286,9 @@ pub struct GcodeKitApp {
     cam_tools: Rc<RefCell<CamToolsPane>>,
     /// What waits for the editor's save dialog to be answered.
     after_save: Option<AfterSave>,
-    /// An Open asked first about the editor's unsaved changes.
-    open_after_confirm: bool,
+    /// What waits for the editor's unsaved-changes prompt (File > Open or a handoff); one
+    /// at a time.
+    editor_prompt: Option<EditorNext>,
     /// The design's New / Open / Save waiting for a dialog.
     design: DesignFlow,
     /// The egui frame whose machine events were last polled.
@@ -410,7 +411,7 @@ impl GcodeKitApp {
             designer_dirty: false,
             cam_tools,
             after_save: None,
-            open_after_confirm: false,
+            editor_prompt: None,
             design: DesignFlow::default(),
             machine_polled: None,
             #[cfg(target_os = "macos")]
@@ -769,8 +770,13 @@ impl GcodeKitApp {
                 if self.refuse_open_during_job() {
                     return;
                 }
-                if self.editor.borrow().buffer().is_dirty() {
-                    self.open_after_confirm = true;
+                if self.editor_prompt.is_some() {
+                    // One editor prompt at a time: its answer must not reach this Open.
+                    tracing::warn!("editor prompt already up; open refused");
+                    let message = self.state.translator.tr(OPEN_BEHIND_HANDOFF).into_owned();
+                    self.editor.borrow_mut().set_notice(message);
+                } else if self.editor.borrow().buffer().is_dirty() {
+                    self.editor_prompt = Some(EditorNext::Open);
                     self.dialogs.confirm(ConfirmRequest::UnsavedGcode);
                 } else {
                     self.ask_open_gcode();
@@ -894,16 +900,16 @@ impl GcodeKitApp {
             DialogAnswer::Unavailable {
                 asked: Asked::Confirm(ConfirmRequest::UnsavedGcode),
                 reason,
-            } if self.open_after_confirm => {
+            } if self.editor_prompt == Some(EditorNext::Open) => {
                 // Not opening without the answer: unsaved G-code would be lost.
                 tracing::warn!(%reason, "unsaved-changes prompt unavailable; open abandoned");
-                self.open_after_confirm = false;
+                self.editor_prompt = None;
             }
             DialogAnswer::Confirm {
                 request: ConfirmRequest::UnsavedGcode,
                 choice,
-            } if self.open_after_confirm => {
-                self.open_after_confirm = false;
+            } if self.editor_prompt == Some(EditorNext::Open) => {
+                self.editor_prompt = None;
                 match choice.as_unsaved() {
                     UnsavedChangesChoice::Save => self.save_editor(Some(AfterSave::Open)),
                     UnsavedChangesChoice::Discard => self.ask_open_gcode(),

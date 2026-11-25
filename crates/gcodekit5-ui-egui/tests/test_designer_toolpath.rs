@@ -189,3 +189,49 @@ fn test_no_preview_build_during_a_drag() {
         "the preview follows the moved shape"
     );
 }
+
+/// Runs `n` frames a few milliseconds apart, so a build thread has time to end.
+fn spin(h: &mut Harness<'_, DesignerPane>, n: usize) {
+    for _ in 0..n {
+        h.step();
+        std::thread::sleep(Duration::from_millis(5));
+    }
+}
+
+/// A preview build that panics is tried once per design revision, not once per frame; the
+/// next edit tries again, and a working build then shows the design.
+#[test]
+fn test_panicking_preview_build_is_tried_once_per_revision() {
+    let mut pane = pane_with_rects(&[(20.0, 20.0, 40.0, 30.0)]);
+    pane.state_mut().show_toolpaths = true;
+    pane.set_toolpath_build_panics(true);
+    let mut h = harness(pane);
+    spin(&mut h, 30);
+    assert_eq!(
+        h.state().toolpath_builds_started(),
+        1,
+        "rebuilt every frame"
+    );
+    assert!(
+        h.state().preview_toolpaths().is_empty(),
+        "nothing previewed for the failed revision"
+    );
+    // An edit is a new revision: one more try.
+    h.state_mut()
+        .state_mut()
+        .add_shape_with_undo(gcodekit5_designer::model::Shape::Rectangle(
+            gcodekit5_designer::model::DesignRectangle::new(80.0, 20.0, 10.0, 10.0),
+        ));
+    spin(&mut h, 30);
+    assert_eq!(h.state().toolpath_builds_started(), 2);
+    // Fixed: the next revision builds.
+    h.state_mut().set_toolpath_build_panics(false);
+    h.state_mut()
+        .state_mut()
+        .add_shape_with_undo(gcodekit5_designer::model::Shape::Rectangle(
+            gcodekit5_designer::model::DesignRectangle::new(100.0, 20.0, 10.0, 10.0),
+        ));
+    wait_for_preview(&mut h);
+    assert_eq!(h.state().toolpath_builds_started(), 3);
+    assert!(!cut_points(h.state()).is_empty());
+}
