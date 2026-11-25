@@ -3417,3 +3417,18 @@ msgstr "Profundidade e bicadas"
 
 msgid "Machine Settings"
 msgstr "Configurações da máquina"
+
+msgid "Cut Depth:"
+msgstr "Profundidade de corte:"
+
+msgid "Stepover (%):"
+msgstr "Passo lateral (%):"
+
+msgid "Safe Z Height:"
+msgstr "Altura Z segura:"
+
+msgid "Generate G-code for surfacing your CNC spoilboard to ensure a flat, level work surface."
+msgstr "Gera código G para facear a mesa de sacrifício da sua CNC e garantir uma superfície de trabalho plana e nivelada."
+
+msgid "Spoilboard Dimensions"
+msgstr "Dimensões da mesa de sacrifício"

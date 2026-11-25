@@ -120,3 +120,19 @@ fn test_send_is_refused_while_a_job_runs() {
     );
     assert_eq!(cam.take_editor_gcode(), None, "the program was dropped");
 }
+
+/// The picker filters by category and by the search text (title or description).
+#[test]
+fn test_cam_picker_filters_by_category_and_search() {
+    use gcodekit5_app::i18n::Translator;
+    use gcodekit5_ui_egui::panes::cam_tools::{CamTool, CamToolsPane, Category};
+    let tr = Translator::new("en");
+    let mut pane = CamToolsPane::new();
+    pane.set_category(Category::Maintenance);
+    let listed = pane.listed_tools(&tr);
+    assert!(listed.contains(&CamTool::SpoilboardSurfacing));
+    assert!(!listed.contains(&CamTool::DrillPress));
+    pane.set_category(Category::All);
+    pane.set_search("PECK");
+    assert_eq!(pane.listed_tools(&tr), [CamTool::DrillPress]);
+}

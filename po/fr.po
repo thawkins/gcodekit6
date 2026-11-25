@@ -3429,3 +3429,18 @@ msgstr "Profondeur et débourrage"
 
 msgid "Machine Settings"
 msgstr "Paramètres de la machine"
+
+msgid "Cut Depth:"
+msgstr "Profondeur de coupe :"
+
+msgid "Stepover (%):"
+msgstr "Pas latéral (%) :"
+
+msgid "Safe Z Height:"
+msgstr "Hauteur Z de sécurité :"
+
+msgid "Generate G-code for surfacing your CNC spoilboard to ensure a flat, level work surface."
+msgstr "Génère du code G pour surfacer la plaque martyre de votre CNC afin d'obtenir une surface de travail plane et de niveau."
+
+msgid "Spoilboard Dimensions"
+msgstr "Dimensions de la plaque martyre"

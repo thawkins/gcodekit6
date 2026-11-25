@@ -3346,3 +3346,18 @@ msgstr ""
 
 msgid "Machine Settings"
 msgstr ""
+
+msgid "Cut Depth:"
+msgstr ""
+
+msgid "Stepover (%):"
+msgstr ""
+
+msgid "Safe Z Height:"
+msgstr ""
+
+msgid "Generate G-code for surfacing your CNC spoilboard to ensure a flat, level work surface."
+msgstr ""
+
+msgid "Spoilboard Dimensions"
+msgstr ""

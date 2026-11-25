@@ -89,6 +89,8 @@ pub struct DrillPressParams {
     pub safe_z: String,
     /// Home the machine before drilling.
     pub home_before: bool,
+    /// The active device's axis count (the pane refreshes it from the device status).
+    pub num_axes: u8,
 }
 
 impl DrillPressParams {
@@ -124,6 +126,7 @@ impl DrillPressParams {
             spindle_speed: "10000".into(),
             safe_z: len(5.0),
             home_before: false,
+            num_axes: device_status::get_active_num_axes(),
         }
     }
 
@@ -182,7 +185,7 @@ impl DrillPressParams {
         if top_ok && safe_ok && safe_z <= top_z {
             errors.push(FieldError::field(SAFE_Z, ABOVE_TOP));
         }
-        if device_status::get_active_num_axes() < 3 {
+        if self.num_axes < 3 {
             errors.push(FieldError::page(common::NEEDS_THREE_AXES));
         }
         if !errors.is_empty() {

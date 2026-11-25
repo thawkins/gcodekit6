@@ -3422,3 +3422,18 @@ msgstr "Tiefe und Zustellung"
 
 msgid "Machine Settings"
 msgstr "Maschineneinstellungen"
+
+msgid "Cut Depth:"
+msgstr "Schnitttiefe:"
+
+msgid "Stepover (%):"
+msgstr "Zustellung seitlich (%):"
+
+msgid "Safe Z Height:"
+msgstr "Sichere Z-Höhe:"
+
+msgid "Generate G-code for surfacing your CNC spoilboard to ensure a flat, level work surface."
+msgstr "Erzeugt G-Code zum Planfräsen Ihrer CNC-Opferplatte für eine flache, ebene Arbeitsfläche."
+
+msgid "Spoilboard Dimensions"
+msgstr "Abmessungen der Opferplatte"

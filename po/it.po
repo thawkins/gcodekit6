@@ -3425,3 +3425,18 @@ msgstr "Profondità e scarico"
 
 msgid "Machine Settings"
 msgstr "Impostazioni macchina"
+
+msgid "Cut Depth:"
+msgstr "Profondità di taglio:"
+
+msgid "Stepover (%):"
+msgstr "Passo laterale (%):"
+
+msgid "Safe Z Height:"
+msgstr "Altezza Z di sicurezza:"
+
+msgid "Generate G-code for surfacing your CNC spoilboard to ensure a flat, level work surface."
+msgstr "Genera codice G per spianare il piano sacrificale della tua CNC e ottenere una superficie di lavoro piana e livellata."
+
+msgid "Spoilboard Dimensions"
+msgstr "Dimensioni del piano sacrificale"

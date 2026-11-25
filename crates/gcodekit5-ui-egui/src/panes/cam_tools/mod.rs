@@ -15,33 +15,39 @@
 
 pub mod common;
 pub mod drill_press;
+pub mod spoilboard_surfacing;
 
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use gcodekit5_app::device_status;
 use gcodekit5_app::i18n::Translator;
 use gcodekit5_core::units::MeasurementSystem;
 use gcodekit5_settings::config::Config;
 
 pub use common::{CamAction, CamError, FieldError};
 use drill_press::DrillPressParams;
+use spoilboard_surfacing::SpoilboardSurfacingParams;
 
 use crate::workspace::{Pane, PaneContext, PaneId};
 
 /// One CAM tool of the picker.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum CamTool {
+    /// Spoilboard Surfacing.
+    SpoilboardSurfacing,
     /// Drill Press.
     DrillPress,
 }
 
 impl CamTool {
     /// Every tool, in GTK's list order.
-    pub const ALL: [CamTool; 1] = [CamTool::DrillPress];
+    pub const ALL: [CamTool; 2] = [CamTool::SpoilboardSurfacing, CamTool::DrillPress];
 
     /// The msgid of the tool's title.
     pub fn title_msgid(self) -> &'static str {
         match self {
+            CamTool::SpoilboardSurfacing => n_!("Spoilboard Surfacing"),
             CamTool::DrillPress => n_!("Drill Press"),
         }
     }
@@ -49,6 +55,9 @@ impl CamTool {
     /// The msgid of the tool's description.
     pub fn description_msgid(self) -> &'static str {
         match self {
+            CamTool::SpoilboardSurfacing => {
+                n_!("Generate surfacing toolpaths to flatten your spoilboard")
+            }
             CamTool::DrillPress => {
                 n_!("Emulate a drill press with peck drilling and helical cycles")
             }
@@ -58,6 +67,7 @@ impl CamTool {
     /// The picker category the tool is listed under.
     pub fn category(self) -> Category {
         match self {
+            CamTool::SpoilboardSurfacing => Category::Maintenance,
             CamTool::DrillPress => Category::Generators,
         }
     }
@@ -127,6 +137,7 @@ pub fn msgids() -> Vec<&'static str> {
         ids.push(tool.description_msgid());
     }
     ids.extend(common::msgids());
+    ids.extend(spoilboard_surfacing::msgids());
     ids.extend(drill_press::msgids());
     ids
 }
@@ -150,6 +161,8 @@ pub struct CamToolsPane {
     notice: Option<String>,
     /// The Drill Press page.
     drill_press: DrillPressParams,
+    /// The Spoilboard Surfacing page.
+    spoilboard_surfacing: SpoilboardSurfacingParams,
     /// Send to Editor / Preview, waiting for the app.
     editor_request: Option<CamDelivery>,
     /// The program the request hands to the editor.
@@ -173,6 +186,7 @@ impl CamToolsPane {
             search: String::new(),
             category: Category::All,
             drill_press: DrillPressParams::new(units),
+            spoilboard_surfacing: SpoilboardSurfacingParams::new(units),
             output: None,
             notice: None,
             editor_request: None,
@@ -280,12 +294,18 @@ impl CamToolsPane {
     /// Shows the pages' lengths in `units`, converting what is typed.
     fn set_units(&mut self, units: MeasurementSystem) {
         self.units = units;
+        self.spoilboard_surfacing.set_units(units);
         self.drill_press.set_units(units);
     }
 
     /// The Drill Press page's input.
     pub fn drill_press_mut(&mut self) -> &mut DrillPressParams {
         &mut self.drill_press
+    }
+
+    /// The Spoilboard Surfacing page's input.
+    pub fn spoilboard_surfacing_mut(&mut self) -> &mut SpoilboardSurfacingParams {
+        &mut self.spoilboard_surfacing
     }
 
     /// Runs a page's action.
@@ -311,6 +331,7 @@ impl CamToolsPane {
     /// Generates `tool`'s program from its page.
     fn generate(&mut self, tool: CamTool) -> Result<String, CamError> {
         match tool {
+            CamTool::SpoilboardSurfacing => self.spoilboard_surfacing.generate(),
             CamTool::DrillPress => self.drill_press.generate(),
         }
     }
@@ -318,12 +339,19 @@ impl CamToolsPane {
     /// Draws `tool`'s page.
     fn show_page(&mut self, ui: &mut egui::Ui, tool: CamTool, tr: &Translator) -> CamAction {
         match tool {
+            CamTool::SpoilboardSurfacing => {
+                spoilboard_surfacing::show(ui, &mut self.spoilboard_surfacing, tr)
+            }
             CamTool::DrillPress => drill_press::show(ui, &mut self.drill_press, tr),
         }
     }
 
     /// Draws the pane.
     fn ui(&mut self, ui: &mut egui::Ui, tr: &Translator) {
+        // GTK checked the device's axes when Generate was pressed.
+        let axes = device_status::get_active_num_axes();
+        self.drill_press.num_axes = axes;
+        self.spoilboard_surfacing.num_axes = axes;
         if let Some(notice) = self.notice.clone() {
             ui.horizontal(|ui| {
                 ui.colored_label(ui.visuals().error_fg_color, notice);
