@@ -1,3 +1,20 @@
+## [Unreleased] - 2026-11-25 (egui + craft-libs migration, milestone M1: app shell)
+
+### Added
+- **egui front end (opt-in)**: `cargo run --no-default-features --features egui` starts the new front end; GTK stays the default
+- **Window frame**: title bar follows craft-window's decision per desktop; new setting `use_system_title_bar` (Preferences: "Use system title bar") lets the desktop draw the frame
+- **Docking workspace**: Machine Control, Console, Editor, Visualizer, Designer, Layers, Properties and CAM Tools panels (placeholders until later milestones), reachable at any window size
+- **Commands, shortcuts and menus**: command catalog with craft-keymap bindings and craft-menu menus laid out per platform (native menu on macOS). Soft Reset and jog have no default keys for safety
+- **Dialogs and Preferences**: non-blocking file and message dialogs (craft-dialogs) with "All Files" on every platform; Preferences window that saves only the fields it edits; About window
+- **Quit flow**: window close, Quit and restart all ask about a running job, then unsaved work; the app stays open if a prompt cannot be shown
+
+### Changed
+- **Translations**: `scripts/update-po.sh` also extracts `tr!`/`trn!`; new labels translated in de, es, fr, it, pt
+- **cargo-deny**: audits all features, so the egui front end's dependencies are checked; stale allow entries removed
+
+### Known gaps
+- Windows log-off and macOS logout end the app without the unsaved-work prompt (same as the GTK app)
+
 ## [Unreleased] - 2026-11-25 (egui + craft-libs migration, milestone M0)
 
 ### Added

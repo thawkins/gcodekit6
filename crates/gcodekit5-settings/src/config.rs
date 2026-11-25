@@ -215,6 +215,11 @@ pub struct UiSettings {
     /// Grid minor line width in pixels (fine grid lines)
     #[serde(default = "default_grid_minor_line_width")]
     pub grid_minor_line_width: f64,
+
+    /// "Use system title bar": the desktop draws the window frame instead of the
+    /// app's own title bar (egui front end; read before the window opens)
+    #[serde(default)]
+    pub use_system_title_bar: bool,
 }
 
 impl Default for UiSettings {
@@ -251,6 +256,7 @@ impl Default for UiSettings {
             tools_manager_selected_tool: None,
             grid_major_line_width: 2.0,
             grid_minor_line_width: 1.0,
+            use_system_title_bar: false,
         }
     }
 }

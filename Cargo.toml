@@ -36,6 +36,8 @@ tempfile = "3.8"
 egui = { version = "0.37", default-features = false }
 eframe = { version = "0.37", default-features = false, features = ["default_fonts", "wgpu", "accesskit", "wayland", "x11"] }
 egui_extras = "0.37"
+# Window handles for craft-dialogs' parent window (the version eframe and craft-dialogs use).
+raw-window-handle = "0.6.2"
 egui_kittest = "0.37"
 egui-wgpu = "0.37"
 craft-ui = { git = "https://github.com/storytold/craft-libs", rev = "d15bf1f35b17b759870f9e5111b9a5d243f64888" }
@@ -79,8 +81,15 @@ codegen-units = 1
 [profile.dev]
 opt-level = 1
 
+[features]
+default = ["gtk"]
+# Exactly one front end: the GTK4 build (default) or the egui + craft-libs build.
+gtk = ["dep:gcodekit5-ui"]
+egui = ["dep:gcodekit5-ui-egui"]
+
 [dependencies]
-gcodekit5-ui = { path = "crates/gcodekit5-ui" }
+gcodekit5-ui = { path = "crates/gcodekit5-ui", optional = true }
+gcodekit5-ui-egui = { path = "crates/gcodekit5-ui-egui", optional = true }
 
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = [

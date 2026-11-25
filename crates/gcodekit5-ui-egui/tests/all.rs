@@ -16,5 +16,19 @@ pub fn global_env_lock() -> std::sync::MutexGuard<'static, ()> {
         .unwrap_or_else(std::sync::PoisonError::into_inner)
 }
 
+#[path = "test_commands.rs"]
+mod test_commands;
+#[path = "test_dialogs.rs"]
+mod test_dialogs;
+#[path = "test_frame.rs"]
+mod test_frame;
+#[path = "test_quit.rs"]
+mod test_quit;
+#[path = "test_settings_window.rs"]
+mod test_settings_window;
 #[path = "test_smoke.rs"]
 mod test_smoke;
+#[path = "test_translations.rs"]
+mod test_translations;
+#[path = "test_workspace.rs"]
+mod test_workspace;

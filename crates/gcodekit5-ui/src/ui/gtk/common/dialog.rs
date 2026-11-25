@@ -214,45 +214,16 @@ pub fn show_confirmation(
     );
 }
 
-/// The user's answer to an unsaved-changes prompt
-/// (see [`show_unsaved_changes`]).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum UnsavedChangesChoice {
-    /// Save the work, then carry on with the pending action.
-    Save,
-    /// Carry on with the pending action without saving.
-    Discard,
-    /// Abandon the pending action and keep the work as it is.
-    Cancel,
-}
+/// The user's answer to an unsaved-changes prompt (see [`show_unsaved_changes`]); the
+/// toolkit-free type lives in `gcodekit5-app`.
+pub use gcodekit5_app::UnsavedChangesChoice;
 
-impl UnsavedChangesChoice {
-    /// Button order of [`show_unsaved_changes`], left to right.
-    pub const BUTTONS: [Self; 3] = [Self::Cancel, Self::Discard, Self::Save];
-
-    /// Choice for the index of the button pressed in [`show_unsaved_changes`].
-    ///
-    /// # Arguments
-    /// * `index` - The pressed button's index, or `None` when the dialog was
-    ///   dismissed with Escape or by closing it.
-    ///
-    /// # Returns
-    /// The matching choice; dismissing the dialog or an unknown index is
-    /// [`UnsavedChangesChoice::Cancel`], so nothing is lost by accident.
-    pub fn from_button_index(index: Option<i32>) -> Self {
-        index
-            .and_then(|i| usize::try_from(i).ok())
-            .and_then(|i| Self::BUTTONS.get(i).copied())
-            .unwrap_or(Self::Cancel)
-    }
-
-    /// Translated button label.
-    fn label(self) -> String {
-        match self {
-            Self::Save => t!("Save"),
-            Self::Discard => t!("Discard"),
-            Self::Cancel => t!("Cancel"),
-        }
+/// Translated button label of `choice` in [`show_unsaved_changes`].
+fn unsaved_choice_label(choice: UnsavedChangesChoice) -> String {
+    match choice {
+        UnsavedChangesChoice::Save => t!("Save"),
+        UnsavedChangesChoice::Discard => t!("Discard"),
+        UnsavedChangesChoice::Cancel => t!("Cancel"),
     }
 }
 
@@ -277,7 +248,7 @@ pub fn show_unsaved_changes(
 ) {
     let labels: Vec<String> = UnsavedChangesChoice::BUTTONS
         .iter()
-        .map(|choice| choice.label())
+        .map(|choice| unsaved_choice_label(*choice))
         .collect();
     let labels: Vec<&str> = labels.iter().map(String::as_str).collect();
     let dialog = AlertDialog::builder()

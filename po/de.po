@@ -3002,3 +3002,162 @@ msgstr "die Steuerung antwortete"
 
 msgid "no reply from the controller"
 msgstr "keine Antwort von der Steuerung"
+
+msgid "Layers"
+msgstr "Ebenen"
+
+msgid "Minimize"
+msgstr "Minimieren"
+
+msgid "Maximize"
+msgstr "Maximieren"
+
+msgid "View"
+msgstr "Ansicht"
+
+msgid "Tools"
+msgstr "Extras"
+
+msgid "Start Streaming"
+msgstr "Streaming starten"
+
+msgid "Pause Streaming"
+msgstr "Streaming anhalten"
+
+msgid "Stop Streaming"
+msgstr "Streaming beenden"
+
+msgid "Feed Hold"
+msgstr "Vorschub halten"
+
+msgid "Cycle Start"
+msgstr "Zyklusstart"
+
+msgid "Zoom to Fit"
+msgstr "Einpassen"
+
+msgid "Reset View"
+msgstr "Ansicht zurücksetzen"
+
+msgid "Front"
+msgstr "Vorne"
+
+msgid "Isometric"
+msgstr "Isometrisch"
+
+msgid "Materials Manager"
+msgstr "Materialverwaltung"
+
+msgid "About {app}"
+msgstr "Über {app}"
+
+msgid "Settings…"
+msgstr "Einstellungen…"
+
+msgid "Settings"
+msgstr "Einstellungen"
+
+msgid "Appearance"
+msgstr "Erscheinungsbild"
+
+msgid "Hide {app}"
+msgstr "{app} ausblenden"
+
+msgid "Hide Others"
+msgstr "Andere ausblenden"
+
+msgid "Quit {app}"
+msgstr "{app} beenden"
+
+msgid "Preferences…"
+msgstr "Einstellungen…"
+
+msgid "Exit"
+msgstr "Beenden"
+
+msgid "Window"
+msgstr "Fenster"
+
+msgid "Services"
+msgstr "Dienste"
+
+msgid "Show All"
+msgstr "Alle einblenden"
+
+msgid "Bring All to Front"
+msgstr "Alle nach vorne bringen"
+
+msgid "Close Window"
+msgstr "Fenster schließen"
+
+msgid "Menu"
+msgstr "Menü"
+
+msgid "Scroll menu up"
+msgstr "Menü nach oben scrollen"
+
+msgid "Scroll menu down"
+msgstr "Menü nach unten scrollen"
+
+msgid "Apply"
+msgstr "Übernehmen"
+
+msgid "Metric"
+msgstr "Metrisch"
+
+msgid "Imperial"
+msgstr "Zöllig"
+
+msgid "Jog Step Size (Linear)"
+msgstr "Jog-Schrittweite (linear)"
+
+msgid "Jog Feed Rate"
+msgstr "Jog-Vorschub"
+
+msgid "X Axis Limit"
+msgstr "Grenze X-Achse"
+
+msgid "Y Axis Limit"
+msgstr "Grenze Y-Achse"
+
+msgid "Z Axis Limit"
+msgstr "Grenze Z-Achse"
+
+msgid "Light"
+msgstr "Hell"
+
+msgid "Dark"
+msgstr "Dunkel"
+
+msgid "Use system title bar"
+msgstr "Titelleiste des Systems verwenden"
+
+msgid "Arc Segment Length"
+msgstr "Bogensegmentlänge"
+
+msgid "Max Line Length"
+msgstr "Maximale Zeilenlänge"
+
+msgid "3D Stock Removal Visualization"
+msgstr "3D-Visualisierung des Materialabtrags"
+
+msgid "STL File Import"
+msgstr "STL-Dateiimport"
+
+msgid "License:"
+msgstr "Lizenz:"
+
+msgid "G-Code Files"
+msgstr "G-Code-Dateien"
+
+msgid "Restart to apply settings?"
+msgstr "Neu starten, um die Einstellungen zu übernehmen?"
+
+msgid "GCodeKit5 must restart to use the new settings. The machine connection will be closed. Restart now?"
+msgstr "GCodeKit5 muss neu starten, um die neuen Einstellungen zu verwenden. Die Maschinenverbindung wird getrennt. Jetzt neu starten?"
+
+msgid "Stop job and quit?"
+msgstr "Auftrag stoppen und beenden?"
+
+msgid "A job is running. Quitting stops it and closes the machine connection."
+msgstr "Ein Auftrag läuft. Beenden stoppt ihn und schließt die Maschinenverbindung."

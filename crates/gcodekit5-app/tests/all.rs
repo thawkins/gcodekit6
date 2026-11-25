@@ -35,3 +35,5 @@ mod test_materials_manager_backend;
 mod test_report_units;
 #[path = "test_tools_manager_backend.rs"]
 mod test_tools_manager_backend;
+#[path = "test_unsaved_changes_choice.rs"]
+mod test_unsaved_changes_choice;

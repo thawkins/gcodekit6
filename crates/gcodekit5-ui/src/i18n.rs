@@ -8,6 +8,8 @@
 //! marks it, and `gtk_app::main` runs [`restart_command`] after the GTK main
 //! loop has ended.
 
+pub use gcodekit5_app::i18n::needs_restart;
+use gcodekit5_app::i18n::normalized_language;
 use std::process::Command;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Once, OnceLock};
@@ -23,11 +25,6 @@ static ORIGINAL_LANGUAGE: OnceLock<Option<std::ffi::OsString>> = OnceLock::new()
 /// Set when the application should relaunch itself once it has quit.
 static RESTART_REQUESTED: AtomicBool = AtomicBool::new(false);
 
-/// Maps a stored language preference to its canonical form (`""` -> `"system"`).
-fn normalized(lang: &str) -> &str {
-    if lang.is_empty() { "system" } else { lang }
-}
-
 /// Applies the UI language preference and binds the gettext domain.
 ///
 /// # Arguments
@@ -35,7 +32,8 @@ fn normalized(lang: &str) -> &str {
 pub fn init(lang: Option<String>) {
     INIT.call_once(|| {
         let _ = ORIGINAL_LANGUAGE.set(std::env::var_os("LANGUAGE"));
-        let _ = APPLIED_LANGUAGE.set(normalized(lang.as_deref().unwrap_or("system")).to_string());
+        let _ = APPLIED_LANGUAGE
+            .set(normalized_language(lang.as_deref().unwrap_or("system")).to_string());
         if let Some(l) = lang
             && l != "system"
             && !l.is_empty()
@@ -88,16 +86,6 @@ pub fn applied_language() -> &'static str {
 /// * `saved` - the language preference just saved in Preferences
 pub fn language_change_pending(saved: &str) -> bool {
     needs_restart(applied_language(), saved)
-}
-
-/// True when switching from the `applied` language preference to `saved`
-/// needs a restart (`""` and `"system"` are the same preference).
-///
-/// # Arguments
-/// * `applied` - the preference in effect
-/// * `saved` - the preference just saved
-pub fn needs_restart(applied: &str, saved: &str) -> bool {
-    normalized(saved) != normalized(applied)
 }
 
 /// Asks for the application to relaunch itself after it quits.

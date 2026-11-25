@@ -68,3 +68,29 @@ fn test_persistence_save_leaves_legacy_config_json_untouched() {
     let (store, _) = SettingsStore::<Config>::open_at(&dirs.config);
     assert_eq!(store.get().ui.language, "it");
 }
+
+#[test]
+fn test_manager_apply_saves_and_keeps_config() {
+    let root = scratch("test_manager_apply_saves_and_keeps_config");
+    let dirs = ConfigDirs::new(root.join("legacy"), root.join("new"));
+
+    let (mut manager, error) = SettingsManager::open(dirs.clone());
+    assert!(error.is_none(), "{error:?}");
+    let mut config = manager.config().clone();
+    config.ui.language = "de".to_string();
+    manager.apply(config.clone()).expect("apply");
+    assert_eq!(manager.config(), &config, "applied config kept in memory");
+
+    let (reloaded, error) = SettingsManager::open(dirs);
+    assert!(error.is_none(), "{error:?}");
+    assert_eq!(reloaded.config().ui.language, "de");
+}
+
+#[test]
+fn test_detached_manager_refuses_to_apply() {
+    let mut manager = SettingsManager::detached(Config::default());
+    let mut config = Config::default();
+    config.ui.language = "de".to_string();
+    assert!(manager.apply(config).is_err(), "nowhere to save");
+    assert_eq!(manager.config(), &Config::default(), "unchanged on failure");
+}
