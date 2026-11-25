@@ -26,3 +26,6 @@ proptest = "1.4"
 [[test]]
 name = "all"
 path = "tests/all.rs"
+
+[lints]
+workspace = true

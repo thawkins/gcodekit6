@@ -1,7 +1,7 @@
 //! Tests for the shared busy guard and the Stop sequence state check
 //! (audit car 3, issue #74).
 
-use gcodekit5_ui::device_status;
+use gcodekit5_app::device_status;
 
 #[test]
 fn test_console_and_settings_are_blocked_while_a_job_runs() {

@@ -10,3 +10,16 @@ failure-output = "immediate-final"
 slow-timeout = { period = "30s", terminate-after = 5 }
 failure-output = "immediate-final"
 fail-fast = false
+
+# egui_kittest renders through wgpu (lavapipe on CI runners without a GPU),
+# which is slow; bound concurrency so tests stay under the 150 s kill timeout.
+[test-groups]
+gpu = { max-threads = 2 }
+
+[[profile.default.overrides]]
+filter = 'package(gcodekit5-ui-egui)'
+test-group = "gpu"
+
+[[profile.ci.overrides]]
+filter = 'package(gcodekit5-ui-egui)'
+test-group = "gpu"

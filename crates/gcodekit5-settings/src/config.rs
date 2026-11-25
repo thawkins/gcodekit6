@@ -39,7 +39,7 @@ impl std::fmt::Display for ConnectionType {
 }
 
 /// Connection settings
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct ConnectionSettings {
     /// Last used connection type
@@ -135,7 +135,7 @@ impl std::fmt::Display for StartupTab {
 }
 
 /// UI preference settings
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct UiSettings {
     /// Window width
@@ -266,7 +266,7 @@ fn default_grid_minor_line_width() -> f64 {
 }
 
 /// File processing settings
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct FileProcessingSettings {
     /// Default preprocessors to enable
@@ -303,7 +303,7 @@ impl Default for FileProcessingSettings {
 }
 
 /// Machine preference settings
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct MachineSettings {
     /// Default jog increment in mm (linear axes)
@@ -394,7 +394,7 @@ impl Default for MachineSettings {
 /// Probe settings for WCS auto-update and persistent storage.
 ///
 /// Stores probe default parameters and last probe results for each WCS.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct ProbeSettings {
     /// Default safe height for probe operations (mm).
@@ -455,7 +455,7 @@ impl Default for ProbeSettings {
 /// Complete application configuration
 ///
 /// Aggregates all settings sections and provides file I/O operations.
-#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Default)]
 // Missing fields (e.g. from older config files) fall back to Default
 // instead of failing the whole load and discarding the user's settings.
 #[serde(default)]

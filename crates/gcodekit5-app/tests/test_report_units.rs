@@ -2,7 +2,7 @@
 //! (review of #86), and for applying a setting only once the controller
 //! accepts it.
 
-use gcodekit5_ui::device_status;
+use gcodekit5_app::device_status;
 
 /// Sends `command` and answers it with `ok`.
 fn accept(command: &str) {

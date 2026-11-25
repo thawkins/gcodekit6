@@ -32,7 +32,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgtk-4-dev libadwaita-1-dev libgtksourceview-5-dev libudev-dev
+          sudo apt-get install -y libgtk-4-dev libadwaita-1-dev libgtksourceview-5-dev libudev-dev libxkbcommon-dev libwayland-dev libx11-dev libxcursor-dev libxrandr-dev libxi-dev libvulkan1 mesa-vulkan-drivers gettext
 
       - name: Cache cargo registry
         uses: actions/cache@v6
@@ -54,8 +54,16 @@ jobs:
       - name: Check workspace compiles on MSRV
         run: cargo check --workspace --all-targets
 
+      - name: Install cargo-nextest
+        uses: taiki-e/install-action@nextest
+
       - name: Run tests on MSRV
-        run: cargo test --workspace
+        run: cargo nextest run --workspace
+        env:
+          WGPU_BACKEND: vulkan
+
+      - name: Run doc tests on MSRV
+        run: cargo test --workspace --doc
 
   msrv-verify:
     name: Verify MSRV in Cargo.toml

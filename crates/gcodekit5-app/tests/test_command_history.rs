@@ -1,6 +1,6 @@
-//! Tests for `gcodekit5_ui::ui::gtk::command_history` (moved from the inline test module).
+//! Tests for `gcodekit5_app::command_history` (moved from the inline test module).
 
-use gcodekit5_ui::ui::gtk::command_history::*;
+use gcodekit5_app::command_history::*;
 
 #[test]
 fn test_add_command() {

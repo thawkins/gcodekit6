@@ -4,8 +4,8 @@
 //! handling command input, and maintaining console state. Inspired by UGS
 //! ConsolePanel and CommandPanel architecture.
 
+use crate::console::{ConsolePanel, MessageLevel};
 use crate::device_status;
-use crate::ui::console_panel::{ConsolePanel, MessageLevel};
 use gcodekit5_communication::CommunicatorListener;
 use gcodekit5_core::{DataCallback, ThreadSafe, ThreadSafeVec, thread_safe, thread_safe_vec};
 use std::sync::Arc;

@@ -1,0 +1,36 @@
+[
+  {
+    "id": "save_tool_ok",
+    "name": "Second",
+    "description": "",
+    "tool_type": "EndMillFlat",
+    "diameter": 3.175,
+    "shaft_diameter": null,
+    "length": 38.0,
+    "flute_length": 28.0,
+    "flutes": 2,
+    "corner_radius": null,
+    "tip_angle": null,
+    "material": "Carbide",
+    "coating": "TiN",
+    "shank": "Collet",
+    "params": {
+      "rpm": 12000,
+      "rpm_range": [
+        8000,
+        18000
+      ],
+      "feed_rate": 1500.0,
+      "plunge_rate": 750.0,
+      "stepover_percent": 50.0,
+      "depth_per_pass": 3.0,
+      "min_doc": 0.1,
+      "max_doc_percent": 100.0
+    },
+    "manufacturer": null,
+    "part_number": null,
+    "cost": null,
+    "notes": "",
+    "custom": true
+  }
+]

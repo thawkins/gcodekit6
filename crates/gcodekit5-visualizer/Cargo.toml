@@ -32,3 +32,6 @@ harness = false
 [[test]]
 name = "all"
 path = "tests/all.rs"
+
+[lints]
+workspace = true

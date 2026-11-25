@@ -57,10 +57,14 @@ fn running_app() -> Result<Application> {
 }
 
 fn get_current_language() -> String {
-    let language = gcodekit5_settings::SettingsManager::config_file_path()
+    let language = gcodekit5_settings::SettingsManager::config_dirs()
         .ok()
-        .and_then(|path| gcodekit5_settings::SettingsPersistence::load_from_file(&path).ok())
-        .map(|p| p.config().ui.language.clone())
+        .map(|dirs| {
+            gcodekit5_settings::SettingsManager::load(&dirs)
+                .0
+                .ui
+                .language
+        })
         .unwrap_or_else(|| "system".to_string());
 
     if language == "system" {

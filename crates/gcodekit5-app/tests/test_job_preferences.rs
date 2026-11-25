@@ -1,8 +1,8 @@
 //! Tests for Preferences that change what is sent to the machine
 //! (owner decision A-02, issue #76): comments, line length and jog direction.
 
-use gcodekit5_ui::device_status;
-use gcodekit5_ui::ui::gtk::machine_control::grbl_stream::prepare_program;
+use gcodekit5_app::device_status;
+use gcodekit5_app::machine::grbl_stream::prepare_program;
 
 #[test]
 fn test_comments_are_removed_unless_preserved() {

@@ -5,18 +5,17 @@
 //! Provides validation, migration, and synchronization of settings.
 
 use crate::config::Config;
+use crate::migrate::ConfigDirs;
 use crate::view_model::{
     KeyboardShortcut, Setting, SettingValue, SettingsCategory, SettingsDialog,
 };
 use gcodekit5_core::Result;
 use std::path::Path;
 
+/// Translates a settings label into the current language.
 macro_rules! t {
     ($s:expr) => {
-        gettextrs::gettext($s)
-    };
-    ($s:expr, $($args:tt)*) => {
-        format!(gettext_rs::gettext($s), $($args)*)
+        $crate::tr!($s).into_owned()
     };
 }
 
@@ -27,6 +26,8 @@ pub struct SettingsPersistence {
     /// The config file on disk could not be loaded: copy it aside before the
     /// first save replaces it.
     backup_before_save: bool,
+    /// Where [`Self::persist`] saves; the platform folders when `None`.
+    dirs: Option<ConfigDirs>,
 }
 
 impl SettingsPersistence {
@@ -35,6 +36,7 @@ impl SettingsPersistence {
         Self {
             config: Config::default(),
             backup_before_save: false,
+            dirs: None,
         }
     }
 
@@ -44,6 +46,7 @@ impl SettingsPersistence {
         Ok(Self {
             config,
             backup_before_save: false,
+            dirs: None,
         })
     }
 
@@ -69,20 +72,41 @@ impl SettingsPersistence {
         }
     }
 
-    /// Saves the settings to the standard config file
-    /// ([`crate::SettingsManager::config_file_path`]), creating its directory
-    /// and first backing up a file that failed to load.
+    /// Loads the settings from the craft-settings store in `dirs`, importing
+    /// the GTK build's files on first use (see [`crate::SettingsManager::load`]).
+    /// Later [`Self::persist`] calls save to the same folder.
     ///
-    /// # Errors
-    /// Returns an error if the backup or the write fails; nothing is
-    /// overwritten when the backup fails.
-    pub fn persist(&mut self) -> Result<()> {
-        let path = crate::SettingsManager::config_file_path()?;
-        crate::SettingsManager::ensure_config_dir()?;
-        self.persist_to(&path)
+    /// # Returns
+    /// The settings, and a description of any load problem.
+    pub fn load_from_dirs(dirs: &ConfigDirs) -> (Self, Option<String>) {
+        let (config, error) = crate::SettingsManager::load(dirs);
+        (
+            Self {
+                config,
+                backup_before_save: false,
+                dirs: Some(dirs.clone()),
+            },
+            error,
+        )
     }
 
-    /// [`Self::persist`] to an explicit file instead of the standard one.
+    /// Saves the settings to `config.toml` through craft-settings: in the
+    /// folder given to [`Self::load_from_dirs`], else in the platform folder
+    /// ([`crate::SettingsManager::config_dirs`]). The legacy `config.json` is
+    /// never written.
+    ///
+    /// # Errors
+    /// Returns an error if there is no settings folder or the save fails.
+    pub fn persist(&mut self) -> Result<()> {
+        let dirs = match &self.dirs {
+            Some(dirs) => dirs.clone(),
+            None => crate::SettingsManager::config_dirs()?,
+        };
+        crate::SettingsManager::save(&dirs, &self.config)
+    }
+
+    /// Saves to an explicit file (JSON or TOML by extension) instead of the
+    /// store, first backing up a file that failed to load.
     ///
     /// # Errors
     /// Returns an error if the backup or the write fails.

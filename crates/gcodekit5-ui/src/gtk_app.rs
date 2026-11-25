@@ -37,10 +37,16 @@ use tracing::debug;
 pub fn main() {
     // The language preference is applied before GLib or GTK starts: it sets
     // LANGUAGE/LANG, which must happen while this is the only thread.
-    let language = gcodekit5_settings::SettingsManager::config_file_path()
+    // The first load also imports the GTK build's config.json into the
+    // craft-settings store (config.toml), once.
+    let language = gcodekit5_settings::SettingsManager::config_dirs()
         .ok()
-        .and_then(|path| gcodekit5_settings::SettingsPersistence::load_from_file(&path).ok())
-        .map(|p| p.config().ui.language.clone())
+        .map(|dirs| {
+            gcodekit5_settings::SettingsManager::load(&dirs)
+                .0
+                .ui
+                .language
+        })
         .unwrap_or_else(|| "system".to_string());
     i18n::init(Some(language));
 
@@ -245,18 +251,19 @@ fn on_activate(app: &Application) {
     // Initialize Controllers
     let settings_dialog = Rc::new(RefCell::new(gcodekit5_settings::SettingsDialog::new()));
 
-    // Load settings from file if it exists, otherwise use defaults
-    // A config file that fails to load is kept: the defaults are used and
-    // the file is backed up before the first save replaces it.
+    // Load settings from the craft-settings store (config.toml), otherwise
+    // use defaults. A damaged config.toml is moved aside by the store and
+    // the previous version is kept as config.toml.bak.
     let mut settings_load_error: Option<String> = None;
     // No settings file (first start) or an unreadable one: there is no saved
     // window size, so the window opens maximized and saves that size.
     let mut window_size_saved = false;
-    let settings_persistence = match gcodekit5_settings::SettingsManager::config_file_path() {
-        Ok(config_path) => {
-            let file_exists = config_path.exists();
+    let settings_persistence = match gcodekit5_settings::SettingsManager::config_dirs() {
+        Ok(dirs) => {
+            let config_path = dirs.config.join("config.toml");
             let (persistence, error) =
-                gcodekit5_settings::SettingsPersistence::load_or_default(&config_path);
+                gcodekit5_settings::SettingsPersistence::load_from_dirs(&dirs);
+            let file_exists = config_path.exists();
             match &error {
                 Some(e) => tracing::error!(
                     path = %config_path.display(),

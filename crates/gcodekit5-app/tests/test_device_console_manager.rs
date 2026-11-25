@@ -1,6 +1,6 @@
-//! Tests for `gcodekit5_ui::ui::device_console_manager` (moved from the inline test module).
+//! Tests for `gcodekit5_app::device_console_manager` (moved from the inline test module).
 
-use gcodekit5_ui::ui::device_console_manager::*;
+use gcodekit5_app::device_console_manager::*;
 
 #[test]
 fn test_manager_creation() {

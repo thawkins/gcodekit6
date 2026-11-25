@@ -1,7 +1,7 @@
-//! Tests for `gcodekit5_ui::ui::materials_manager_backend` (moved from the inline test module).
+//! Tests for `gcodekit5_app::materials_manager_backend` (moved from the inline test module).
 
+use gcodekit5_app::materials_manager_backend::*;
 use gcodekit5_core::data::materials::{Material, MaterialCategory, MaterialId};
-use gcodekit5_ui::ui::materials_manager_backend::*;
 
 /// A storage file of this test's own under `target/temp`, so no test reads or
 /// overwrites the user's `custom_materials.json` (PR #99 review). Each test and process
