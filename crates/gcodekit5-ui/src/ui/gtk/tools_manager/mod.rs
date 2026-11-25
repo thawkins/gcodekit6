@@ -25,8 +25,8 @@ use crate::ui::gtk::help_browser;
 use crate::ui::gtk::platform;
 use crate::ui::tools_manager_backend::ToolsManagerBackend;
 use gcodekit5_app::tool_form::{
-    COATINGS, ShankChoice, TOOL_MATERIALS, ToolFilter, ToolForm, has_corner_radius, has_tip_angle,
-    tool_contents_equal, tool_material_from_filter_id, tool_type_from_filter_id,
+    COATINGS, ShankChoice, TOOL_MATERIALS, ToolFilter, ToolForm, can_delete, has_corner_radius,
+    has_tip_angle, tool_contents_equal, tool_material_from_filter_id, tool_type_from_filter_id,
 };
 
 use gcodekit5_core::data::tools::{ShankType, Tool, ToolCoating, ToolId, ToolMaterial, ToolType};
@@ -653,7 +653,8 @@ impl ToolsManagerView {
 
             self.right_panel_stack.set_visible_child_name("edit");
             self.cancel_btn.set_sensitive(true);
-            self.delete_btn.set_sensitive(true);
+            // Only custom tools can be deleted (as in the egui build).
+            self.delete_btn.set_sensitive(can_delete(tool));
 
             self.update_type_dependent_fields();
             self.update_save_state();
@@ -889,6 +890,9 @@ impl ToolsManagerView {
 
     fn delete_tool(&self) {
         if let Some(ref tool) = *self.selected_tool.borrow() {
+            if !can_delete(tool) {
+                return;
+            }
             let tool_id = tool.id.clone();
 
             if let Some(window) = self.widget.root().and_downcast::<gtk4::Window>() {

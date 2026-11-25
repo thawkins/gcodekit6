@@ -271,3 +271,18 @@ fn test_reset_custom_tools_removes_file_and_overrides() {
     assert!(tools.get_tool(&ToolId("c1".into())).is_none());
     assert!(tools.get_all_tools().iter().all(|t| !t.custom));
 }
+
+#[test]
+fn test_only_custom_tools_can_be_deleted() {
+    let backend = ToolsManagerBackend::with_storage_path(scratch("can_delete").join(TOOLS_FILE));
+    let standard = backend.get_all_tools()[0].clone();
+    assert!(!gcodekit5_app::tool_form::can_delete(&standard));
+    let custom = ToolForm {
+        id: "c".into(),
+        name: "C".into(),
+        ..ToolForm::default()
+    }
+    .build(None)
+    .expect("valid");
+    assert!(gcodekit5_app::tool_form::can_delete(&custom));
+}

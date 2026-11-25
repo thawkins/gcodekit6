@@ -403,7 +403,7 @@ impl ToolsManagerWindow {
         let Some(original) = self.edit.as_ref().and_then(|e| e.original.as_ref()) else {
             return;
         };
-        if original.custom {
+        if tool_form::can_delete(original) {
             self.question = Some(Question::Delete(
                 original.id.0.clone(),
                 original.name.clone(),

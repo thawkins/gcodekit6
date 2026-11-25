@@ -6,8 +6,8 @@
 
 use gcodekit5_app::i18n::Translator;
 use gcodekit5_app::tool_form::{
-    COATINGS, ShankChoice, TOOL_MATERIALS, TOOL_TYPES, ToolForm, coating_label, has_corner_radius,
-    has_tip_angle, tool_material_label, tool_summary, tool_type_label,
+    COATINGS, ShankChoice, TOOL_MATERIALS, TOOL_TYPES, ToolForm, can_delete, coating_label,
+    has_corner_radius, has_tip_angle, tool_material_label, tool_summary, tool_type_label,
 };
 
 use super::{GtcFile, Next, Question, Tab, ToolsFileRequest, ToolsManagerWindow};
@@ -253,7 +253,7 @@ impl ToolsManagerWindow {
             .edit
             .as_ref()
             .and_then(|e| e.original.as_ref())
-            .is_some_and(|t| t.custom);
+            .is_some_and(can_delete);
         let mut action = None;
         ui.horizontal(|ui| {
             ui.add_enabled_ui(!asking, |ui| {

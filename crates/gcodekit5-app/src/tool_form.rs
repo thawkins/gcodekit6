@@ -170,6 +170,12 @@ pub fn has_tip_angle(tool_type: ToolType) -> bool {
     )
 }
 
+/// Whether `tool` may be deleted: only custom tools (a standard tool would come back on the
+/// next start, and deleting a custom override brings the standard tool back).
+pub fn can_delete(tool: &Tool) -> bool {
+    tool.custom
+}
+
 /// The edit form: every field GTK's Basic Info, Geometry, Manufacturer and Notes tabs edit,
 /// lengths as typed (millimetres).
 #[derive(Debug, Clone, PartialEq)]
