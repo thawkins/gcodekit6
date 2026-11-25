@@ -3803,3 +3803,42 @@ msgstr "Arresta il lavoro in corso prima di generare."
 
 msgid "Must be at most 2000 mm"
 msgstr "Deve essere al massimo 2000 mm"
+
+msgid "connect failed"
+msgstr "connessione non riuscita"
+
+msgid "write failed"
+msgstr "scrittura non riuscita"
+
+msgid "read failed"
+msgstr "lettura non riuscita"
+
+msgid "machine worker thread panicked"
+msgstr "il thread di lavoro della macchina si è arrestato"
+
+msgid "cycle start ignored: probe stream halting"
+msgstr "avvio ciclo ignorato: il programma di tastatura si sta arrestando"
+
+msgid "line too long for the controller buffer"
+msgstr "riga troppo lunga per il buffer del controller"
+
+msgid "program line too long for the controller buffer"
+msgstr "riga di programma troppo lunga per il buffer del controller"
+
+msgid "on program line"
+msgstr "alla riga di programma"
+
+msgid "dropped: controller reset after probe error"
+msgstr "scartato: controller reimpostato dopo un errore di tastatura"
+
+msgid "jog ignored: invalid distance or feed"
+msgstr "jog ignorato: distanza o avanzamento non validi"
+
+msgid "jog ignored: a program is streaming"
+msgstr "jog ignorato: è in corso l'invio di un programma"
+
+msgid "Failed to load image file"
+msgstr "Impossibile caricare il file immagine"
+
+msgid "The engraving worker stopped"
+msgstr "Il processo di incisione si è interrotto"

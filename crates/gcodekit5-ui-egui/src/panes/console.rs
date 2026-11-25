@@ -25,7 +25,7 @@ use gcodekit5_app::console::{ConsolePanel, MessageLevel};
 use gcodekit5_app::i18n::Translator;
 use gcodekit5_app::machine::{MachineController, MachineEvent};
 
-use crate::machine::{MachineStatus, lock};
+use crate::machine::{MachineStatus, lock, worker_message};
 use crate::workspace::{Pane, PaneContext, PaneId};
 
 /// Messages the log keeps; older ones are dropped (the GTK console keeps 5000 lines too).
@@ -117,12 +117,12 @@ impl ConsolePane {
                     .add_message(MessageLevel::Info, tr.tr("Device disconnected")),
                 MachineEvent::Error(message) => self.log.add_message(
                     MessageLevel::Error,
-                    format!("{}: {message}", tr.tr("Error")),
+                    format!("{}: {}", tr.tr("Error"), worker_message(message, tr)),
                 ),
                 MachineEvent::Sent(line) => self.log.add_command(line),
                 MachineEvent::StreamHalted { reason } => self.log.add_message(
                     MessageLevel::Error,
-                    format!("{}: {reason}", tr.tr(PROGRAM_HALTED)),
+                    format!("{}: {}", tr.tr(PROGRAM_HALTED), worker_message(reason, tr)),
                 ),
                 MachineEvent::Received(line) => {
                     let line = line.trim();

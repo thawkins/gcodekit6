@@ -3800,3 +3800,42 @@ msgstr "Beenden Sie den laufenden Auftrag, bevor Sie generieren."
 
 msgid "Must be at most 2000 mm"
 msgstr "Darf höchstens 2000 mm betragen"
+
+msgid "connect failed"
+msgstr "Verbindung fehlgeschlagen"
+
+msgid "write failed"
+msgstr "Schreiben fehlgeschlagen"
+
+msgid "read failed"
+msgstr "Lesen fehlgeschlagen"
+
+msgid "machine worker thread panicked"
+msgstr "Maschinen-Arbeitsthread abgestürzt"
+
+msgid "cycle start ignored: probe stream halting"
+msgstr "Zyklusstart ignoriert: Antastprogramm wird angehalten"
+
+msgid "line too long for the controller buffer"
+msgstr "Zeile zu lang für den Puffer der Steuerung"
+
+msgid "program line too long for the controller buffer"
+msgstr "Programmzeile zu lang für den Puffer der Steuerung"
+
+msgid "on program line"
+msgstr "in Programmzeile"
+
+msgid "dropped: controller reset after probe error"
+msgstr "verworfen: Steuerung nach Antastfehler zurückgesetzt"
+
+msgid "jog ignored: invalid distance or feed"
+msgstr "Joggen ignoriert: ungültige Strecke oder ungültiger Vorschub"
+
+msgid "jog ignored: a program is streaming"
+msgstr "Joggen ignoriert: ein Programm wird gesendet"
+
+msgid "Failed to load image file"
+msgstr "Bilddatei konnte nicht geladen werden"
+
+msgid "The engraving worker stopped"
+msgstr "Der Gravurprozess wurde beendet"

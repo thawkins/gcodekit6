@@ -88,7 +88,10 @@ pub fn summary(status: &MachineStatus, units: MeasurementSystem, tr: &Translator
             .filter(|_| status.connected)
             .map(|xyz| position_text(xyz, units)),
         progress,
-        error: status.last_error.clone(),
+        error: status
+            .last_error
+            .as_deref()
+            .map(|message| crate::machine::worker_message(message, tr)),
     }
 }
 

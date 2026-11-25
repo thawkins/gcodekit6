@@ -16,8 +16,9 @@
 
 use std::sync::{Arc, Mutex, PoisonError};
 
+use gcodekit5_app::i18n::Translator;
 use gcodekit5_app::machine::grbl_stream::{MAX_LINE_LENGTH, prepare_program};
-use gcodekit5_app::machine::{MachineController, MachineEvent};
+use gcodekit5_app::machine::{MachineController, MachineEvent, worker_text};
 use gcodekit5_communication::firmware::grbl::status_parser::{
     FullStatus, WorkCoordinateOffset, parse_probe_report_in,
 };
@@ -235,6 +236,45 @@ pub fn coalesce_progress(events: Vec<MachineEvent>) -> Vec<MachineEvent> {
         .filter(|(i, e)| !matches!(e, MachineEvent::StreamProgress { .. }) || Some(*i) == last)
         .map(|(_, e)| e)
         .collect()
+}
+
+/// The controller's own message texts, for the translation check.
+pub fn worker_msgids() -> Vec<&'static str> {
+    worker_text::ALL.to_vec()
+}
+
+/// Translates `message` when it is one of `msgids`, alone or followed by `": "` and a
+/// detail (which is kept as it is); anything else is returned unchanged.
+///
+/// # Arguments
+/// * `message` - The English message.
+/// * `msgids` - The texts it may start with.
+/// * `tr` - Translator for the current UI language.
+pub fn translate_prefixed(message: &str, msgids: &[&str], tr: &Translator) -> String {
+    for msgid in msgids {
+        if let Some(rest) = message.strip_prefix(msgid)
+            && (rest.is_empty() || rest.starts_with(": "))
+        {
+            return format!("{}{rest}", tr.tr(msgid));
+        }
+    }
+    message.to_string()
+}
+
+/// The text shown for a controller or worker message ([`MachineEvent::Error`],
+/// [`MachineEvent::StreamHalted`]): the controller's own English texts
+/// ([`worker_text`]) translated, its details and the controller's replies (`error:N`,
+/// `ALARM:N`) kept as they are.
+///
+/// # Arguments
+/// * `message` - The message as the controller reported it.
+/// * `tr` - Translator for the current UI language.
+pub fn worker_message(message: &str, tr: &Translator) -> String {
+    let joiner = format!(" {} ", worker_text::ON_PROGRAM_LINE);
+    if let Some((reply, line)) = message.split_once(&joiner) {
+        return format!("{reply} {} {line}", tr.tr(worker_text::ON_PROGRAM_LINE));
+    }
+    translate_prefixed(message, &worker_text::ALL, tr)
 }
 
 /// Locks `controller`, recovering it if a previous holder panicked (the controller's state

@@ -3807,3 +3807,42 @@ msgstr "Arrêtez la tâche en cours avant de générer."
 
 msgid "Must be at most 2000 mm"
 msgstr "Doit être d'au plus 2000 mm"
+
+msgid "connect failed"
+msgstr "échec de la connexion"
+
+msgid "write failed"
+msgstr "échec de l'écriture"
+
+msgid "read failed"
+msgstr "échec de la lecture"
+
+msgid "machine worker thread panicked"
+msgstr "le fil de travail de la machine a planté"
+
+msgid "cycle start ignored: probe stream halting"
+msgstr "départ cycle ignoré : le programme de palpage s'arrête"
+
+msgid "line too long for the controller buffer"
+msgstr "ligne trop longue pour le tampon du contrôleur"
+
+msgid "program line too long for the controller buffer"
+msgstr "ligne de programme trop longue pour le tampon du contrôleur"
+
+msgid "on program line"
+msgstr "à la ligne de programme"
+
+msgid "dropped: controller reset after probe error"
+msgstr "abandonné : contrôleur réinitialisé après une erreur de palpage"
+
+msgid "jog ignored: invalid distance or feed"
+msgstr "déplacement manuel ignoré : distance ou avance invalide"
+
+msgid "jog ignored: a program is streaming"
+msgstr "déplacement manuel ignoré : un programme est en cours d'envoi"
+
+msgid "Failed to load image file"
+msgstr "Impossible de charger le fichier image"
+
+msgid "The engraving worker stopped"
+msgstr "Le processus de gravure s'est arrêté"

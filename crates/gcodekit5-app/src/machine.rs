@@ -58,6 +58,52 @@ const MAX_UNANSWERED_QUERIES: usize = 64;
 /// How long an idle worker waits for a command before reading the transport again.
 const IDLE_WAIT: Duration = Duration::from_millis(2);
 
+/// The English texts of the messages the controller and its worker word themselves in
+/// [`MachineEvent::Error`] and [`MachineEvent::StreamHalted`]. Each is a msgid: this crate
+/// stays toolkit-free and emits English, and a front end translates at display time. A
+/// message is a text alone, or a text followed by `": "` and a detail (a line, a transport
+/// error); [`ON_PROGRAM_LINE`](worker_text::ON_PROGRAM_LINE) joins a controller reply
+/// (`error:N`) to its line number. The controller's own replies are protocol, not texts.
+pub mod worker_text {
+    /// The transport could not be opened; followed by the transport's error.
+    pub const CONNECT_FAILED: &str = "connect failed";
+    /// A write to the transport failed; followed by the transport's error.
+    pub const WRITE_FAILED: &str = "write failed";
+    /// A read from the transport failed; followed by the transport's error.
+    pub const READ_FAILED: &str = "read failed";
+    /// The worker thread ended unexpectedly.
+    pub const WORKER_PANICKED: &str = "machine worker thread panicked";
+    /// Cycle start refused while a stop-on-error stream halts.
+    pub const CYCLE_START_IGNORED: &str = "cycle start ignored: probe stream halting";
+    /// A manual line too long for the controller; followed by the line.
+    pub const LINE_TOO_LONG: &str = "line too long for the controller buffer";
+    /// A program line too long for the controller; followed by its line number.
+    pub const PROGRAM_LINE_TOO_LONG: &str = "program line too long for the controller buffer";
+    /// Joins a controller reply to the program line it refused: `error:9 on program line 41`.
+    pub const ON_PROGRAM_LINE: &str = "on program line";
+    /// A manual line dropped by a halt's reset; followed by the line.
+    pub const DROPPED_AFTER_PROBE_ERROR: &str = "dropped: controller reset after probe error";
+    /// A jog with an unusable distance or feed; followed by both.
+    pub const JOG_INVALID: &str = "jog ignored: invalid distance or feed";
+    /// A jog refused while a program streams.
+    pub const JOG_WHILE_STREAMING: &str = "jog ignored: a program is streaming";
+
+    /// Every text above, for a front end's translation table.
+    pub const ALL: [&str; 11] = [
+        CONNECT_FAILED,
+        WRITE_FAILED,
+        READ_FAILED,
+        WORKER_PANICKED,
+        CYCLE_START_IGNORED,
+        LINE_TOO_LONG,
+        PROGRAM_LINE_TOO_LONG,
+        ON_PROGRAM_LINE,
+        DROPPED_AFTER_PROBE_ERROR,
+        JOG_INVALID,
+        JOG_WHILE_STREAMING,
+    ];
+}
+
 /// Errors returned by [`MachineController`] calls.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum MachineError {
@@ -512,13 +558,14 @@ impl MachineController {
     pub fn jog(&mut self, axis: Axis, distance_mm: f32, feed_mm_min: f32) {
         if !distance_mm.is_finite() || !(feed_mm_min.is_finite() && feed_mm_min > 0.0) {
             self.pending.push(MachineEvent::Error(format!(
-                "jog ignored: invalid distance {distance_mm} or feed {feed_mm_min}"
+                "{}: {distance_mm}, {feed_mm_min}",
+                worker_text::JOG_INVALID
             )));
             return;
         }
         if self.streaming.load(Ordering::SeqCst) {
             self.pending.push(MachineEvent::Error(
-                "jog ignored: a program is streaming".to_string(),
+                worker_text::JOG_WHILE_STREAMING.to_string(),
             ));
             return;
         }
@@ -640,7 +687,7 @@ impl MachineController {
         self.pending.extend(worker.events.try_iter());
         if joined.is_err() {
             self.pending.push(MachineEvent::Error(
-                "machine worker thread panicked".to_string(),
+                worker_text::WORKER_PANICKED.to_string(),
             ));
             self.pending.push(MachineEvent::Disconnected);
         }
@@ -812,8 +859,10 @@ impl WorkerState {
     /// disconnects.
     fn run(mut self, params: &ConnectionParams) {
         if let Err(e) = self.comm.connect(params) {
-            self.sink
-                .emit(MachineEvent::Error(format!("connect failed: {e}")));
+            self.sink.emit(MachineEvent::Error(format!(
+                "{}: {e}",
+                worker_text::CONNECT_FAILED
+            )));
             // A stream queued while connecting never started.
             self.streaming.store(false, Ordering::SeqCst);
             self.sink.emit(MachineEvent::Disconnected);
@@ -887,7 +936,9 @@ impl WorkerState {
                         self.handle_response(&line);
                     }
                 }
-                Err(e) => return Exit::TransportError(format!("read failed: {e}")),
+                Err(e) => {
+                    return Exit::TransportError(format!("{}: {e}", worker_text::READ_FAILED));
+                }
             }
         }
     }
@@ -896,7 +947,7 @@ impl WorkerState {
         self.comm
             .send(data)
             .map(|_| ())
-            .map_err(|e| format!("write failed: {e}"))
+            .map_err(|e| format!("{}: {e}", worker_text::WRITE_FAILED))
     }
 
     fn handle_command(&mut self, cmd: Command) -> Result<(), String> {
@@ -968,7 +1019,7 @@ impl WorkerState {
     fn refuse_cycle_start(&self) {
         tracing::warn!("cycle start ignored while a probe stream halts");
         self.sink.emit(MachineEvent::Error(
-            "cycle start ignored: probe stream halting".to_string(),
+            worker_text::CYCLE_START_IGNORED.to_string(),
         ));
     }
 
@@ -1016,7 +1067,8 @@ impl WorkerState {
     fn queue_manual(&mut self, line: String, seq: u64) {
         if !self.window.fits_at_all(&line) {
             self.sink.emit(MachineEvent::Error(format!(
-                "line too long for the controller buffer: {line}"
+                "{}: {line}",
+                worker_text::LINE_TOO_LONG
             )));
             // The refused line never runs, but a lower state line still queued must be
             // written first: hand the sequence number to the last queued state line.
@@ -1073,7 +1125,8 @@ impl WorkerState {
             let line = raw.trim();
             if !self.window.fits_at_all(line) {
                 self.sink.emit(MachineEvent::Error(format!(
-                    "line {} is too long for the controller buffer",
+                    "{}: {}",
+                    worker_text::PROGRAM_LINE_TOO_LONG,
                     sent + 1
                 )));
                 self.end_stream(false);
@@ -1183,11 +1236,10 @@ impl WorkerState {
         let (sent, acked, total) = (stream.sent, stream.acked, stream.program.len());
         let halt = error.is_some() && stream.mode == StreamMode::StopOnError;
         if let Some(code) = error {
-            self.sink.emit(MachineEvent::Error(format!(
-                "error:{code} on program line {acked}"
-            )));
+            let message = format!("error:{code} {} {acked}", worker_text::ON_PROGRAM_LINE);
+            self.sink.emit(MachineEvent::Error(message.clone()));
             if halt && self.halt.is_none() {
-                self.begin_halt(format!("error:{code} on program line {acked}"));
+                self.begin_halt(message);
             }
         }
         self.sink
@@ -1260,7 +1312,8 @@ impl WorkerState {
         let dropped: Vec<String> = self.manual.iter().map(|(line, _)| line.clone()).collect();
         for line in dropped {
             self.sink.emit(MachineEvent::Error(format!(
-                "dropped: controller reset after probe error: {line}"
+                "{}: {line}",
+                worker_text::DROPPED_AFTER_PROBE_ERROR
             )));
         }
         self.reset_buffers();

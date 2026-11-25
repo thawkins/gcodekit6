@@ -3724,3 +3724,42 @@ msgstr ""
 
 msgid "Must be at most 2000 mm"
 msgstr ""
+
+msgid "connect failed"
+msgstr ""
+
+msgid "write failed"
+msgstr ""
+
+msgid "read failed"
+msgstr ""
+
+msgid "machine worker thread panicked"
+msgstr ""
+
+msgid "cycle start ignored: probe stream halting"
+msgstr ""
+
+msgid "line too long for the controller buffer"
+msgstr ""
+
+msgid "program line too long for the controller buffer"
+msgstr ""
+
+msgid "on program line"
+msgstr ""
+
+msgid "dropped: controller reset after probe error"
+msgstr ""
+
+msgid "jog ignored: invalid distance or feed"
+msgstr ""
+
+msgid "jog ignored: a program is streaming"
+msgstr ""
+
+msgid "Failed to load image file"
+msgstr ""
+
+msgid "The engraving worker stopped"
+msgstr ""

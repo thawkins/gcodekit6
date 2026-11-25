@@ -65,6 +65,23 @@ const AT_LEAST_ONE: &str = n_!("Must be at least 1");
 const BYTE_RANGE: &str = n_!("Must be between 0 and 255");
 const TOO_LARGE: &str = n_!("The engraving is too large: at most 10000 pixels per line");
 const TOO_MANY_PIXELS: &str = n_!("The engraving is too large: at most 25 million pixels");
+/// The engraving worker's refusals: the image could not be read (followed by why), or the
+/// worker ended without a result.
+const LOAD_FAILED: &str = n_!("Failed to load image file");
+pub(super) const WORKER_STOPPED: &str = n_!("The engraving worker stopped");
+
+/// The worker's own texts, which its refusals start with; see [`refusal_text`].
+const WORKER_TEXTS: [&str; 3] = [TOO_MANY_PIXELS, LOAD_FAILED, WORKER_STOPPED];
+
+/// The text shown for an engraving worker's refusal: its own texts translated, a detail
+/// after them (and the engraver's own wording) kept as it is.
+///
+/// # Arguments
+/// * `error` - The refusal as the worker reported it.
+/// * `tr` - Translator for the current UI language.
+pub fn refusal_text(error: &str, tr: &gcodekit5_app::i18n::Translator) -> String {
+    crate::machine::translate_prefixed(error, &WORKER_TEXTS, tr)
+}
 
 /// The most pixels one engraved line may have (width times pixels per mm).
 pub const MAX_LINE_PIXELS: f32 = 10_000.0;
@@ -121,6 +138,8 @@ pub fn msgids() -> Vec<&'static str> {
         BYTE_RANGE,
         TOO_LARGE,
         TOO_MANY_PIXELS,
+        LOAD_FAILED,
+        WORKER_STOPPED,
     ];
     ids.extend(page::msgids());
     ids.extend(job::msgids());
@@ -521,7 +540,7 @@ fn run_engraver(
     params: EngravingParameters,
     progress: impl FnMut(f32),
 ) -> Result<String, String> {
-    let img = image::open(image).map_err(|e| format!("Failed to load image file: {e}"))?;
+    let img = image::open(image).map_err(|e| format!("{LOAD_FAILED}: {e}"))?;
     // Before the engraver resizes the whole image to the output size.
     if output_pixels(&params, [img.width(), img.height()]) > MAX_PIXELS {
         return Err(TOO_MANY_PIXELS.to_string());

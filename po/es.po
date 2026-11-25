@@ -3803,3 +3803,42 @@ msgstr "Detenga el trabajo en curso antes de generar."
 
 msgid "Must be at most 2000 mm"
 msgstr "Debe ser como máximo 2000 mm"
+
+msgid "connect failed"
+msgstr "la conexión falló"
+
+msgid "write failed"
+msgstr "la escritura falló"
+
+msgid "read failed"
+msgstr "la lectura falló"
+
+msgid "machine worker thread panicked"
+msgstr "el hilo de trabajo de la máquina falló"
+
+msgid "cycle start ignored: probe stream halting"
+msgstr "inicio de ciclo ignorado: el programa de sondeo se está deteniendo"
+
+msgid "line too long for the controller buffer"
+msgstr "línea demasiado larga para el búfer del controlador"
+
+msgid "program line too long for the controller buffer"
+msgstr "línea de programa demasiado larga para el búfer del controlador"
+
+msgid "on program line"
+msgstr "en la línea de programa"
+
+msgid "dropped: controller reset after probe error"
+msgstr "descartado: controlador reiniciado tras un error de sondeo"
+
+msgid "jog ignored: invalid distance or feed"
+msgstr "desplazamiento ignorado: distancia o avance no válidos"
+
+msgid "jog ignored: a program is streaming"
+msgstr "desplazamiento ignorado: se está enviando un programa"
+
+msgid "Failed to load image file"
+msgstr "No se pudo cargar el archivo de imagen"
+
+msgid "The engraving worker stopped"
+msgstr "El proceso de grabado se detuvo"

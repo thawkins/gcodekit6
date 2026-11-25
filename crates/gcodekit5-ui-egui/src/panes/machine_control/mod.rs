@@ -395,7 +395,10 @@ impl Pane for MachineControlPane {
                     ui.colored_label(ui.visuals().error_fg_color, notice);
                 }
                 if let Some(error) = &status.last_error {
-                    ui.colored_label(ui.visuals().warn_fg_color, error);
+                    ui.colored_label(
+                        ui.visuals().warn_fg_color,
+                        crate::machine::worker_message(error, tr),
+                    );
                 }
                 ui.separator();
                 self.show_safety(ui, tr, status);
