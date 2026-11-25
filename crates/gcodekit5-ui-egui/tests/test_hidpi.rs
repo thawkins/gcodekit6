@@ -247,3 +247,24 @@ fn test_designer_click_selects_same_shape_at_every_scale() -> TestResult {
     }
     Ok(())
 }
+
+#[test]
+fn test_designer_toolbox_button_click_picks_same_tool_at_every_scale() -> TestResult {
+    use crate::test_designer_canvas::{click, harness_at};
+    use gcodekit5_ui_egui::panes::designer::DesignerPane;
+    use gcodekit5_ui_egui::panes::designer::canvas::DesignerTool;
+    let _guard = crate::global_env_lock();
+    for ppp in SCALES {
+        let mut harness = harness_at(DesignerPane::new(), ppp);
+        for (label, tool) in [
+            ("Gear", DesignerTool::Gear),
+            ("Rectangle", DesignerTool::Rectangle),
+            ("Polyline", DesignerTool::Polyline),
+        ] {
+            let pos = harness.get_by_label(label).rect().center();
+            click(&mut harness, pos);
+            assert_eq!(harness.state().tool(), tool, "{label} at ppp {ppp}");
+        }
+    }
+    Ok(())
+}

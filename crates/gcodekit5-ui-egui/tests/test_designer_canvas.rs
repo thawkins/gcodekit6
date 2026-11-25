@@ -49,8 +49,8 @@ pub fn screen(harness: &Harness<'_, DesignerPane>, x: f32, y: f32) -> Pos2 {
 }
 
 /// Presses or releases `button` at `pos` with `modifiers` held.
-pub fn button(
-    harness: &Harness<'_, DesignerPane>,
+pub fn button<S>(
+    harness: &Harness<'_, S>,
     pos: Pos2,
     button: PointerButton,
     pressed: bool,
@@ -65,8 +65,8 @@ pub fn button(
 }
 
 /// Clicks `pos` with `button` and `modifiers` held.
-pub fn click_with(
-    harness: &mut Harness<'_, DesignerPane>,
+pub fn click_with<S>(
+    harness: &mut Harness<'_, S>,
     pos: Pos2,
     which: PointerButton,
     modifiers: Modifiers,
@@ -83,13 +83,13 @@ pub fn click_with(
 }
 
 /// Clicks `pos` with the primary button.
-pub fn click(harness: &mut Harness<'_, DesignerPane>, pos: Pos2) {
+pub fn click<S>(harness: &mut Harness<'_, S>, pos: Pos2) {
     click_with(harness, pos, PointerButton::Primary, Modifiers::NONE);
 }
 
 /// Drags from `from` to `to` with `which` held, in a few pointer moves.
-pub fn drag_with(
-    harness: &mut Harness<'_, DesignerPane>,
+pub fn drag_with<S>(
+    harness: &mut Harness<'_, S>,
     from: Pos2,
     to: Pos2,
     which: PointerButton,
@@ -111,12 +111,12 @@ pub fn drag_with(
 }
 
 /// Drags from `from` to `to` with the primary button.
-pub fn drag(harness: &mut Harness<'_, DesignerPane>, from: Pos2, to: Pos2) {
+pub fn drag<S>(harness: &mut Harness<'_, S>, from: Pos2, to: Pos2) {
     drag_with(harness, from, to, PointerButton::Primary, Modifiers::NONE);
 }
 
 /// Presses `key` (the canvas has the keyboard after a click).
-pub fn press(harness: &mut Harness<'_, DesignerPane>, key: egui::Key) {
+pub fn press<S>(harness: &mut Harness<'_, S>, key: egui::Key) {
     harness.key_press(key);
     harness.run();
 }

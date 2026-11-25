@@ -6,8 +6,7 @@
 //! pixels-per-point. The zoom and pan are the model's [`Viewport`], with the canvas size in
 //! points.
 //!
-//! [`DesignerTool`] is the current tool; the pane's tool strip sets it until the toolbox
-//! lands. [`CanvasInput`] holds the drag, polyline and context-menu state between frames
+//! [`DesignerTool`] is the current tool; the toolbox sets it. [`CanvasInput`] holds the drag, polyline and context-menu state between frames
 //! ([`input`]); [`editing`] has the edits (shape creation, resize, rotate, snap) and
 //! [`rendering`] the painting.
 //!

@@ -22,7 +22,7 @@ fn snapshot_options() -> SnapshotOptions {
 fn gpu_harness() -> Harness<'static, DesignerPane> {
     let tr = Translator::new("en");
     let mut harness = Harness::builder()
-        .with_size(egui::vec2(480.0, 360.0))
+        .with_size(egui::vec2(640.0, 400.0))
         .with_step_dt(STEP_DT)
         .with_theme(egui::Theme::Dark)
         .wgpu()
@@ -93,4 +93,24 @@ fn test_snapshot_each_drawing_tool() {
         failures.push(format!("designer_selection: {error}"));
     }
     assert!(failures.is_empty(), "{failures:#?}");
+}
+
+/// The toolbox in CNC mode with the stock settings open, and a tool picked.
+#[test]
+fn test_snapshot_toolbox_cnc() {
+    use egui_kittest::kittest::Queryable;
+    let mut h = gpu_harness();
+    h.state_mut()
+        .state_mut()
+        .set_machine_mode(gcodekit5_designer::designer_state::MachineMode::Cnc3D);
+    h.state_mut().set_tool(DesignerTool::Gear);
+    h.get_by_label("Tool Settings").click();
+    h.run();
+    h.get_by_label("Stock Settings").click();
+    h.run();
+    h.event(egui::Event::PointerGone);
+    h.run();
+    if let Err(error) = h.try_snapshot_options("designer_toolbox_cnc", &snapshot_options()) {
+        panic!("designer_toolbox_cnc: {error}");
+    }
 }

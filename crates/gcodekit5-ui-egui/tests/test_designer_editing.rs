@@ -223,7 +223,9 @@ fn test_zoom_commands_and_fit() {
     let (a, b) = (screen(&h, 20.0, 20.0), screen(&h, 60.0, 60.0));
     assert!(view.rect().contains(a) && view.rect().contains(b));
     let side = (b.y - a.y).abs().max((b.x - a.x).abs());
-    assert!(side > view.rect().height() * 0.85, "{side}");
+    // The limiting side of the canvas (the toolbox leaves it narrower than tall).
+    let limit = view.rect().width().min(view.rect().height());
+    assert!(side > limit * 0.85, "{side}");
     assert!(h.state_mut().command(Command::ResetView, &mut ctx));
     h.run();
     assert!((h.state().view().zoom() - 1.0).abs() < 1e-6);

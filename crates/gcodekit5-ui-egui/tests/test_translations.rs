@@ -14,7 +14,7 @@ const LANGUAGES: [&str; 5] = ["de", "es", "fr", "it", "pt"];
 
 /// Translations that are spelled like the English msgid; the Translator cannot tell them
 /// from a missing entry, so the po file is checked for them instead.
-const IDENTICAL: [(&str, &str); 73] = [
+const IDENTICAL: [(&str, &str); 83] = [
     ("de", "G-Code Editor"),
     ("de", "Designer"),
     ("it", "Designer"),
@@ -91,6 +91,17 @@ const IDENTICAL: [(&str, &str); 73] = [
     ("fr", "180°"),
     ("it", "180°"),
     ("pt", "180°"),
+    // Designer toolbox: technical terms kept as in English.
+    ("de", "CNC 3D"),
+    ("de", "Laser 2D"),
+    ("es", "CNC 3D"),
+    ("fr", "CNC 3D"),
+    ("fr", "Laser 2D"),
+    ("fr", "Passes"),
+    ("it", "CNC 3D"),
+    ("it", "Laser 2D"),
+    ("pt", "CNC 3D"),
+    ("pt", "Laser 2D"),
 ];
 
 fn msgids() -> Vec<&'static str> {

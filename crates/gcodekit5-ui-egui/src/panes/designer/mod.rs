@@ -1,5 +1,4 @@
-//! The Designer pane: the design canvas, with a tool strip (until the toolbox lands) and
-//! grid and snap switches.
+//! The Designer pane: the toolbox (a side panel) and the design canvas.
 //!
 //! The design is a `gcodekit5_designer::DesignerState`: shapes, selection, the undo/redo
 //! stack, the viewport, and the grid and snap settings. The pane owns it; the app shares the
@@ -8,20 +7,22 @@
 //! [`Pane::command`] when the Designer is the pane the user works in. The app copies
 //! [`DesignerPane::is_modified`] into `AppState::dirty.designer` for the quit prompt.
 //!
-//! Ported from the GTK `ui/gtk/designer_canvas/*`. Not ported here: the toolbox, layers and
-//! properties panels, the Text tool (it needs the text dialog), shape gallery placement,
+//! Ported from the GTK `ui/gtk/designer_canvas/*` and `designer_toolbox.rs` ([`toolbox`]);
+//! [`layers`] is the Layers pane. Not ported here: the properties panel, the Text tool (it needs the text dialog), shape gallery placement,
 //! the array dialog, the toolpath preview, file operations, scrollbars, the device's work
 //! area (the default 250 x 250 mm is shown), and the context menu's other entries.
 //!
 //! Dependencies: `egui`, `gcodekit5-designer` (model), `gcodekit5-app` (translations),
-//! `gcodekit5-settings` (grid line widths).
+//! `gcodekit5-settings` (grid line widths, display units), `gcodekit5-core` (units).
 
 pub mod canvas;
+pub mod toolbox;
 
 use std::cell::RefCell;
 use std::rc::Rc;
 
 use gcodekit5_app::i18n::Translator;
+use gcodekit5_core::units::MeasurementSystem;
 use gcodekit5_designer::DesignerState;
 use gcodekit5_designer::model::Point;
 use gcodekit5_settings::config::Config;
@@ -34,11 +35,7 @@ use crate::workspace::{Pane, PaneContext, PaneId};
 
 /// The msgids the pane shows, for the translation check.
 pub fn msgids() -> Vec<&'static str> {
-    let mut ids: Vec<&'static str> = DesignerTool::ALL
-        .into_iter()
-        .map(DesignerTool::label_msgid)
-        .collect();
-    ids.extend([n_!("Show Grid"), n_!("Snap to grid")]);
+    let mut ids = toolbox::msgids();
     ids.extend(canvas::input::msgids());
     ids
 }
@@ -53,6 +50,8 @@ pub struct DesignerPane {
     /// Whether the view was fitted to the work area (on the first frame with a size).
     fitted: bool,
     widths: LineWidths,
+    /// The display units of the toolbox's settings.
+    units: MeasurementSystem,
 }
 
 impl std::fmt::Debug for DesignerPane {
@@ -81,6 +80,7 @@ impl DesignerPane {
             view: CanvasView::default(),
             fitted: false,
             widths: LineWidths::default(),
+            units: MeasurementSystem::default(),
         }
     }
 
@@ -157,23 +157,6 @@ impl DesignerPane {
         editing::rotate_selected_by(&mut self.state, degrees);
     }
 
-    /// The tool strip and the grid and snap switches.
-    fn show_tools(&mut self, ui: &mut egui::Ui, tr: &Translator) {
-        ui.horizontal_wrapped(|ui| {
-            for tool in DesignerTool::ALL {
-                if ui
-                    .selectable_label(self.tool == tool, tr.tr(tool.label_msgid()))
-                    .clicked()
-                {
-                    self.set_tool(tool);
-                }
-            }
-            ui.separator();
-            ui.checkbox(&mut self.state.show_grid, tr.tr("Show Grid"));
-            ui.checkbox(&mut self.state.snap_enabled, tr.tr("Snap to grid"));
-        });
-    }
-
     /// The canvas: input, then painting with the view the input left.
     fn show_canvas(&mut self, ui: &mut egui::Ui, tr: &Translator) {
         let rect = ui.available_rect_before_wrap();
@@ -212,9 +195,15 @@ impl Pane for DesignerPane {
 
     fn ui(&mut self, ui: &mut egui::Ui, ctx: &mut PaneContext) {
         let tr = ctx.tr;
-        egui::Panel::top("gcodekit5-designer-tools")
-            .show_separator_line(false)
-            .show(ui, |ui| self.show_tools(ui, tr));
+        let picked = egui::Panel::left("gcodekit5-designer-toolbox")
+            .default_size(190.0)
+            .show(ui, |ui| {
+                toolbox::show(ui, &mut self.state, self.tool, self.units, tr)
+            })
+            .inner;
+        if let Some(tool) = picked {
+            self.set_tool(tool);
+        }
         self.show_canvas(ui, tr);
     }
 
@@ -274,6 +263,7 @@ impl Pane for DesignerPane {
     }
 
     fn configure(&mut self, config: &Config) {
+        self.units = config.ui.measurement_system;
         self.widths = LineWidths {
             grid_major: config.ui.grid_major_line_width as f32,
             grid_minor: config.ui.grid_minor_line_width as f32,

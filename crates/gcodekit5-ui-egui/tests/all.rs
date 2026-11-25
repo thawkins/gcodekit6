@@ -30,6 +30,8 @@ mod test_designer_canvas;
 mod test_designer_editing;
 #[path = "test_designer_snapshots.rs"]
 mod test_designer_snapshots;
+#[path = "test_designer_toolbox.rs"]
+mod test_designer_toolbox;
 #[path = "test_dialogs.rs"]
 mod test_dialogs;
 #[path = "test_editor.rs"]
