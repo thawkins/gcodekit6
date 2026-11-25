@@ -18,3 +18,5 @@ pub fn global_env_lock() -> std::sync::MutexGuard<'static, ()> {
 
 #[path = "test_smoke.rs"]
 mod test_smoke;
+#[path = "test_workspace.rs"]
+mod test_workspace;

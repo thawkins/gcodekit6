@@ -79,8 +79,15 @@ codegen-units = 1
 [profile.dev]
 opt-level = 1
 
+[features]
+default = ["gtk"]
+# Exactly one front end: the GTK4 build (default) or the egui + craft-libs build.
+gtk = ["dep:gcodekit5-ui"]
+egui = ["dep:gcodekit5-ui-egui"]
+
 [dependencies]
-gcodekit5-ui = { path = "crates/gcodekit5-ui" }
+gcodekit5-ui = { path = "crates/gcodekit5-ui", optional = true }
+gcodekit5-ui-egui = { path = "crates/gcodekit5-ui-egui", optional = true }
 
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = [

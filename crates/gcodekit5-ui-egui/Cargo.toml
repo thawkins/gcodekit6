@@ -13,10 +13,17 @@ autotests = false
 anyhow = { workspace = true }
 egui = { workspace = true }
 eframe = { workspace = true }
-craft-ui = { workspace = true }
+craft-ui = { workspace = true, features = ["serde"] }
+craft-window = { workspace = true, features = ["egui"] }
+craft-platform = { workspace = true, features = ["egui", "appearance"] }
+gcodekit5-app = { path = "../gcodekit5-app" }
+gcodekit5-settings = { path = "../gcodekit5-settings" }
+serde = { workspace = true }
+tracing = { workspace = true }
 
 [dev-dependencies]
 egui_kittest = { workspace = true }
+serde_json = { workspace = true }
 
 [[test]]
 name = "all"
