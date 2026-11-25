@@ -281,6 +281,8 @@ impl ProbeRun {
     /// # Returns
     /// What happened, in order; after `Succeeded`, `Restored` or `Aborted` the run is over.
     pub fn handle(&mut self, events: &[MachineEvent], tr: &Translator) -> Vec<Outcome> {
+        // Also with no events: the controller may have gone quiet.
+        self.check_backstop();
         let mut outcomes = Vec::new();
         for event in events {
             if matches!(event, MachineEvent::Disconnected) {
@@ -302,22 +304,36 @@ impl ProbeRun {
         outcomes
     }
 
-    fn while_streaming(&mut self, event: &MachineEvent, tr: &Translator) -> Option<Outcome> {
-        // Backstop: the controller halts a stop-on-error stream itself; reset only if it has
-        // not ended the stream well after the error. The long wait (the controller's
-        // deceleration cap) applies only once it has confirmed the halt.
+    /// How long until the backstop resets the controller (zero once it is due), or `None`
+    /// while none is armed: before any `error:`, after the run sent its reset, or once the
+    /// routine stopped streaming. The app hands the run an empty batch of events when it is
+    /// due and asks for a repaint then, so the backstop fires even when no machine event
+    /// arrives.
+    pub fn backstop_in(&self) -> Option<Duration> {
+        if self.phase != Phase::Streaming || self.reset_sent {
+            return None;
+        }
+        // The long wait (the controller's deceleration cap) applies only once the controller
+        // has confirmed the halt.
         let delay = if self.halt_confirmed {
             BACKSTOP_DELAY
         } else {
             UNCONFIRMED_BACKSTOP_DELAY
         };
-        if let Some(at) = self.error_at
-            && !self.reset_sent
-            && at.elapsed() >= delay
-        {
+        self.error_at.map(|at| delay.saturating_sub(at.elapsed()))
+    }
+
+    /// Backstop: the controller halts a stop-on-error stream itself; reset only if it has
+    /// not ended the stream well after the error ([`Self::backstop_in`]).
+    fn check_backstop(&mut self) {
+        if self.backstop_in() == Some(Duration::ZERO) {
             tracing::warn!("probe stream still running after an error; stopping it");
             self.stop();
         }
+    }
+
+    fn while_streaming(&mut self, event: &MachineEvent, tr: &Translator) -> Option<Outcome> {
+        self.check_backstop();
         match event {
             MachineEvent::Received(line) => {
                 if let Some(inches) = parse_report_inches(line) {

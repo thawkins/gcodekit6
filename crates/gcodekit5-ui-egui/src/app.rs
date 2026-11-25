@@ -683,6 +683,21 @@ impl GcodeKitApp {
             self.state.machine.poll();
         }
         self.deliver_machine_events();
+        self.drive_probe_backstop(ctx);
+    }
+
+    /// A probe run's backstop must fire even when the controller has gone quiet: when it is
+    /// due, the run gets an empty batch of events (which fires it); until then a repaint is
+    /// requested for the moment it falls due.
+    fn drive_probe_backstop(&mut self, ctx: &egui::Context) {
+        let Ok(mut cam) = self.cam_tools.try_borrow_mut() else {
+            return;
+        };
+        match cam.probe_backstop_in() {
+            Some(wait) if wait.is_zero() => cam.probe_events(&[], &self.state.translator),
+            Some(wait) => ctx.request_repaint_after(wait),
+            None => {}
+        }
     }
 
     /// Hands the events no pane has seen yet to every pane, drawn or not.
