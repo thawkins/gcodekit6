@@ -64,3 +64,11 @@ fn test_theme_override_beats_desktop() {
         egui::Theme::Light
     );
 }
+
+/// The main window opens maximized by default, restoring to 1280x800.
+#[test]
+fn test_main_window_opens_maximized() {
+    let viewport = gcodekit5_ui_egui::main_viewport();
+    assert_eq!(viewport.maximized, Some(true));
+    assert_eq!(viewport.inner_size, Some(egui::vec2(1280.0, 800.0)));
+}
