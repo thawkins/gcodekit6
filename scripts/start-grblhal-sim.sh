@@ -21,6 +21,14 @@ fi
 
 # Check if grblHAL_sim is available
 SIM_BIN="$(command -v grblHAL_sim)"
+# Under sudo (needed to create the link in /dev) PATH is reset; use the invoking
+# user's ~/.local/bin instead.
+if [ -z "${SIM_BIN}" ] && [ -n "${SUDO_USER:-}" ]; then
+    SUDO_HOME="$(getent passwd "${SUDO_USER}" | cut -d: -f6)"
+    if [ -x "${SUDO_HOME}/.local/bin/grblHAL_sim" ]; then
+        SIM_BIN="${SUDO_HOME}/.local/bin/grblHAL_sim"
+    fi
+fi
 if [ -z "${SIM_BIN}" ]; then
     echo "Error: grblHAL_sim not found in PATH"
     echo "Please ensure grblHAL simulator is installed."
