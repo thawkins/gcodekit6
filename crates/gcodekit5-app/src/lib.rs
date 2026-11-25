@@ -24,7 +24,8 @@ pub mod device_console_manager;
 pub mod device_identity;
 pub mod device_profiles;
 pub mod device_status;
-pub mod files;
+/// Saving files safely; lives in `gcodekit5-core` so `gcodekit5-devicedb` can use it too.
+pub use gcodekit5_core::files;
 pub mod firmware_settings;
 pub mod i18n;
 pub mod machine;

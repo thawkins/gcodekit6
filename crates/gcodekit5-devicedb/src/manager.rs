@@ -190,9 +190,11 @@ impl DeviceManager {
 
     /// Persist all profiles and the active profile id to the configuration file.
     ///
-    /// The write is atomic (temp file + rename). If the last load skipped unreadable
-    /// data, the original file is first copied to a timestamped `.bak-` file; if that
-    /// backup fails the save is aborted so nothing is lost.
+    /// The write goes through `gcodekit5_core::files::write_atomic` (temp file flushed to
+    /// disk, then renamed; a read-only file is refused and the file's permissions are
+    /// kept). If the last load skipped unreadable data, the original file is first copied
+    /// to a timestamped `.bak-` file; if that backup fails the save is aborted so nothing
+    /// is lost.
     ///
     /// # Errors
     /// Returns an error if the backup, serialisation or file write fails.
@@ -220,12 +222,10 @@ impl DeviceManager {
             serde_json::to_string_pretty(&data)?
         };
 
-        // Write to a sibling temp file and rename so a crash mid-write cannot leave a
-        // truncated profiles file (which would then fail to load).
-        let tmp_path = self.config_path.with_extension("json.tmp");
-        fs::write(&tmp_path, content).context("Failed to write device profiles file")?;
-        fs::rename(&tmp_path, &self.config_path)
-            .context("Failed to replace device profiles file")?;
+        // A crash or power loss mid-write must not leave a truncated profiles file (which
+        // would then fail to load).
+        gcodekit5_core::files::write_atomic(&self.config_path, &content)
+            .context("Failed to write device profiles file")?;
 
         Ok(())
     }

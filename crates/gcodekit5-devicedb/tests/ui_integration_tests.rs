@@ -169,3 +169,57 @@ fn test_devicedb_set_active_rolls_back_when_save_fails() {
         Some("first".to_string())
     );
 }
+
+/// A fresh folder `target/temp/devicedb/<name>-<pid>`.
+fn scratch(name: &str) -> std::path::PathBuf {
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../target/temp/devicedb")
+        .join(format!("{name}-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).expect("scratch folder");
+    dir
+}
+
+/// devices.json is saved through the shared atomic writer: the file's permissions are
+/// kept, no temporary file is left, and a read-only file is refused rather than replaced.
+#[cfg(unix)]
+#[test]
+fn test_devicedb_save_keeps_permissions_and_refuses_a_read_only_file() {
+    use std::os::unix::fs::PermissionsExt;
+    let dir = scratch("atomic_save");
+    let path = dir.join("devices.json");
+    let manager = DeviceManager::new(path.clone());
+    manager
+        .save_profile(DeviceProfile {
+            id: "first".to_string(),
+            ..DeviceProfile::default()
+        })
+        .expect("save");
+    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).expect("chmod");
+    manager
+        .save_profile(DeviceProfile {
+            id: "second".to_string(),
+            ..DeviceProfile::default()
+        })
+        .expect("save over the private file");
+    let mode = std::fs::metadata(&path).expect("meta").permissions().mode() & 0o777;
+    assert_eq!(mode, 0o600, "permissions not kept: {mode:o}");
+    let reloaded = DeviceManager::new(path.clone());
+    reloaded.load().expect("reload");
+    assert_eq!(reloaded.get_all_profiles().len(), 2);
+    let leftovers: Vec<_> = std::fs::read_dir(&dir)
+        .expect("read_dir")
+        .filter_map(|e| e.ok().map(|e| e.file_name().to_string_lossy().into_owned()))
+        .filter(|n| n.ends_with(".tmp"))
+        .collect();
+    assert!(leftovers.is_empty(), "{leftovers:?}");
+
+    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o400)).expect("chmod");
+    let before = std::fs::read_to_string(&path).expect("read");
+    assert!(
+        manager.delete_profile("second").is_err(),
+        "a read-only file was replaced"
+    );
+    assert_eq!(std::fs::read_to_string(&path).expect("read"), before);
+    std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600)).expect("chmod");
+}

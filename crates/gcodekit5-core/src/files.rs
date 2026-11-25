@@ -1,9 +1,10 @@
 //! Saving files safely: write a temporary file beside the target, flush it to disk, then
 //! rename it over the target, so a crash, a power loss or a full disk never leaves a
 //! half-written file. Shared by both front ends (the egui editor, designer and CAM presets,
-//! and the tool and material library back ends).
+//! the tool and material library back ends, and the device profiles file), re-exported as
+//! `gcodekit5_app::files`.
 //!
-//! Dependencies: `std` only.
+//! Dependencies: `std`, `tracing` (a temporary file left behind is logged).
 
 use std::path::Path;
 
@@ -26,9 +27,9 @@ pub fn write_atomic(path: &Path, text: &str) -> std::io::Result<()> {
 }
 
 /// Writes `path` through `write`, which writes a temporary file beside it, then flushes the
-/// temporary file to disk and renames it over `path`. A read-only target is refused (the rename would replace it,
-/// which a plain write refuses); an existing file's permissions are kept; the temporary file
-/// is removed when anything fails.
+/// temporary file to disk and renames it over `path`. A read-only target is refused (the
+/// rename would replace it, which a plain write refuses); an existing file's permissions are
+/// kept; the temporary file is removed when anything fails.
 ///
 /// # Arguments
 /// * `path` - The file to write.

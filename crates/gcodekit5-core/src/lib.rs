@@ -9,6 +9,7 @@ pub mod constants;
 pub mod core;
 pub mod data;
 pub mod error;
+pub mod files;
 pub mod gcode;
 pub mod probe;
 pub mod types;
