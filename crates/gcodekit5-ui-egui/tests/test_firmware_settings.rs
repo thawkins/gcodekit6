@@ -172,12 +172,12 @@ fn test_firmware_settings_write_sends_exactly_the_line() {
 fn test_firmware_settings_rejected_write_keeps_the_value() {
     let (mut h, shared) = open_window(|_| {});
     shared.hold_acks.store(true, Ordering::SeqCst);
-    edit_110(&mut h, "-5");
+    edit_110(&mut h, "5");
     h.get_by_label("Apply").click();
     h.run_steps(2);
     assert!(wait_until(|| shared
         .log()
-        .contains(&Wrote::Line("$110=-5".to_string()))));
+        .contains(&Wrote::Line("$110=5".to_string()))));
     shared.inject("error:3\n");
     assert!(
         step_until(&mut h, |app| app.firmware_settings().notice().is_some_and(
@@ -578,4 +578,46 @@ fn test_firmware_settings_mismatched_read_back_is_reported() {
     );
     let notice = h.state().firmware_settings().notice().unwrap_or_default();
     assert!(!notice.contains("Setting written"), "{notice:?}");
+}
+
+/// A value GRBL would refuse (negative) or truncate (a byte mask over 255, a fraction) is
+/// refused with a notice and never sent.
+#[test]
+fn test_firmware_settings_value_grbl_would_truncate_is_not_sent() {
+    let (mut h, shared) = open_window(|_| {});
+    shared.inject("$3=0\n");
+    assert!(step_until(&mut h, |app| app
+        .firmware_settings()
+        .visible_rows()
+        .iter()
+        .any(|r| r.number == 3)));
+    h.run_steps(3);
+    for (bad, reason) in [
+        ("257", "out of range"),
+        ("1.5", "whole number"),
+        ("-1", "0 or more"),
+    ] {
+        set_field(&mut h, "Filter:", "$3");
+        h.run_steps(2);
+        h.get_by_label("$3").click();
+        h.run_steps(2);
+        set_field(&mut h, "Value:", bad);
+        h.get_by_label("Apply").click();
+        h.run_steps(2);
+        let notice = h.state().firmware_settings().notice().unwrap_or_default();
+        assert!(
+            notice.contains("Setting not changed") && notice.contains(reason),
+            "{bad:?}: {notice:?}"
+        );
+    }
+    std::thread::sleep(Duration::from_millis(30));
+    h.run_steps(2);
+    assert!(
+        !shared
+            .log()
+            .iter()
+            .any(|w| matches!(w, Wrote::Line(l) if l.starts_with("$3="))),
+        "{:?}",
+        shared.log()
+    );
 }

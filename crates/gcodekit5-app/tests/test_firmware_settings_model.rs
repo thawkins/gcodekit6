@@ -96,7 +96,9 @@ fn test_firmware_settings_typed_value_is_checked() {
     use gcodekit5_app::firmware_settings::{ValueError, check_value};
     let max_rate = setting(110, "500.000", None);
     assert_eq!(check_value(&max_rate, " 5000 "), Ok("5000".to_string()));
-    assert_eq!(check_value(&max_rate, "-2.5"), Ok("-2.5".to_string()));
+    // GRBL answers a negative value with `error:4`.
+    assert_eq!(check_value(&max_rate, "-2.5"), Err(ValueError::Negative));
+    assert_eq!(check_value(&max_rate, "0.5"), Ok("0.5".to_string()));
     assert_eq!(check_value(&max_rate, ""), Err(ValueError::Empty));
     assert_eq!(check_value(&max_rate, "   "), Err(ValueError::Empty));
     for bad in ["5,000", "abc", "1e", "inf", "NaN", "5 000"] {
@@ -125,4 +127,28 @@ fn test_firmware_settings_typed_value_is_checked() {
     assert_eq!(check_value(&byte, "255"), Ok("255".to_string()));
     let short = setting(1030, "1", Some(1));
     assert_eq!(check_value(&short, "40000"), Err(ValueError::OutOfRange));
+}
+
+/// The GRBL masks and switches below `$100` (stored in a byte by GRBL 1.1) take a whole
+/// number from 0 to 255; other GRBL settings take any number of 0 or more.
+#[test]
+fn test_firmware_settings_byte_settings_take_a_whole_number_up_to_255() {
+    use gcodekit5_app::firmware_settings::{ValueError, check_value};
+    let direction = setting(3, "0", None);
+    let laser = setting(32, "0", None);
+    for byte in [&direction, &laser] {
+        assert_eq!(check_value(byte, "255"), Ok("255".to_string()));
+        assert_eq!(check_value(byte, "0"), Ok("0".to_string()));
+        assert_eq!(check_value(byte, "257"), Err(ValueError::OutOfRange));
+        assert_eq!(check_value(byte, "1.5"), Err(ValueError::NotAWholeNumber));
+        assert_eq!(check_value(byte, "-1"), Err(ValueError::Negative));
+    }
+    // Not a byte: a float below $100 and a setting above it.
+    let pull_off = setting(27, "1.000", None);
+    assert_eq!(check_value(&pull_off, "1.5"), Ok("1.5".to_string()));
+    let steps = setting(100, "250.000", None);
+    assert_eq!(check_value(&steps, "300.25"), Ok("300.25".to_string()));
+    // A Repetier byte position keeps its own type rule.
+    let repetier = setting(1028, "1", Some(0));
+    assert_eq!(check_value(&repetier, "-1"), Err(ValueError::OutOfRange));
 }

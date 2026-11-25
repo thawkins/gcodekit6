@@ -510,6 +510,7 @@ pub fn msgids() -> Vec<&'static str> {
             ValueError::NotANumber,
             ValueError::NotAWholeNumber,
             ValueError::OutOfRange,
+            ValueError::Negative,
         ]
         .map(ValueError::msgid),
     );

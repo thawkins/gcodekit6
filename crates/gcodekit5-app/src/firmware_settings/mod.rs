@@ -293,6 +293,8 @@ pub enum ValueError {
     NotAWholeNumber,
     /// The integer does not fit the Repetier position's type.
     OutOfRange,
+    /// GRBL refuses a negative value (`error:4`).
+    Negative,
 }
 
 impl ValueError {
@@ -303,6 +305,7 @@ impl ValueError {
             ValueError::NotANumber => n_!("Enter a number"),
             ValueError::NotAWholeNumber => n_!("Enter a whole number"),
             ValueError::OutOfRange => n_!("The value is out of range"),
+            ValueError::Negative => n_!("Enter a value of 0 or more"),
         }
     }
 }
@@ -310,9 +313,11 @@ impl ValueError {
 /// Checks a typed value before it is written, and trims it.
 ///
 /// A Repetier position takes what its reported type holds (a byte, a 16- or 32-bit
-/// integer, or a float). A GRBL setting whose reported value is a number takes a number
-/// (with a decimal point, never a comma); one reported as text (a grblHAL host name) takes
-/// any text.
+/// integer, or a float). A GRBL setting whose reported value is a number takes a number of
+/// 0 or more (with a decimal point, never a comma; GRBL answers a negative with `error:4`);
+/// a mask or switch below `$100` ([`grbl_definitions`] unit `mask` or `bool`), which
+/// GRBL 1.1 stores in a byte, takes a whole number from 0 to 255. A setting reported as
+/// text (a grblHAL host name) takes any text.
 ///
 /// # Arguments
 /// * `setting` - The setting as the controller reported it.
@@ -332,15 +337,20 @@ pub fn check_value(setting: &Setting, value: &str) -> Result<String, ValueError>
             .filter(|v| v.is_finite() && !value.contains(|c: char| c.is_alphabetic()))
             .ok_or(ValueError::NotANumber)
     };
+    let byte = Some((0, i64::from(u8::MAX)));
     let range = match setting.eeprom_type {
-        Some(0) => Some((0, i64::from(u8::MAX))),
+        Some(0) => byte,
         Some(1) => Some((i64::from(i16::MIN), i64::from(i16::MAX))),
         Some(2) => Some((i64::from(i32::MIN), i64::from(i32::MAX))),
         Some(_) => None,
         None if setting.numeric_value.is_none() => return Ok(value.to_string()),
+        None if is_grbl_byte_setting(setting.number) => byte,
         None => None,
     };
-    number()?;
+    let parsed = number()?;
+    if setting.number < REPETIER_OFFSET && parsed < 0.0 {
+        return Err(ValueError::Negative);
+    }
     if let Some((min, max)) = range {
         let integer: i64 = value.parse().map_err(|_| ValueError::NotAWholeNumber)?;
         if integer < min || integer > max {
@@ -348,6 +358,15 @@ pub fn check_value(setting: &Setting, value: &str) -> Result<String, ValueError>
         }
     }
     Ok(value.to_string())
+}
+
+/// Whether GRBL setting `number` is a mask or switch below `$100` (unit `mask` or `bool` in
+/// [`grbl_definitions`]), which GRBL 1.1 stores in a byte.
+fn is_grbl_byte_setting(number: u16) -> bool {
+    number < 100
+        && grbl_definitions()
+            .iter()
+            .any(|&(n, _, _, _, unit)| n == number && matches!(unit, "mask" | "bool"))
 }
 
 /// Why a settings command (`$$`, `$I`, `$n=v`) must not be sent now.
