@@ -18,7 +18,10 @@ use std::sync::{Arc, Mutex, PoisonError};
 
 use gcodekit5_app::machine::grbl_stream::{MAX_LINE_LENGTH, prepare_program};
 use gcodekit5_app::machine::{MachineController, MachineEvent};
-use gcodekit5_communication::firmware::grbl::status_parser::{FullStatus, WorkCoordinateOffset};
+use gcodekit5_communication::firmware::grbl::status_parser::{
+    FullStatus, WorkCoordinateOffset, parse_probe_report_in,
+};
+use gcodekit5_core::ProbeResult;
 
 /// Stream progress: program lines written and acknowledged out of `total`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -62,17 +65,33 @@ pub struct MachineStatus {
     /// Whether the controller reports positions in inches (`$13=1`). Until a `$$` line says
     /// so, reports are taken as mm, GRBL's default (as the GTK front end does).
     pub report_inches: bool,
+    /// The latest `[PRB:...]` probe report, in mm whatever `$13` says (converted the same
+    /// way as the status reports).
+    pub probe: Option<ProbeResult>,
 }
 
 /// X, Y and Z in millimetres.
 pub type Xyz = [f32; 3];
 
-/// The `$13` report-inches setting a `$$` line reports.
-fn parse_report_inches(line: &str) -> Option<bool> {
+/// The `$13` report-inches setting a `$$` line reports, if the line is one.
+///
+/// # Arguments
+/// * `line` - One line received from the controller.
+pub fn parse_report_inches(line: &str) -> Option<bool> {
     let (key, value) = line.trim().split_once('=')?;
     (key == "$13").then_some(())?;
     let value: f32 = value.trim().parse().ok()?;
     Some(value >= 1.0)
+}
+
+/// A `[PRB:...]` probe report in mm: converted from inches when the controller reports in
+/// inches (`$13=1`), as status reports are.
+///
+/// # Arguments
+/// * `line` - One line received from the controller.
+/// * `report_inches` - Whether the controller reports in inches.
+pub fn probe_report(line: &str, report_inches: bool) -> Option<ProbeResult> {
+    parse_probe_report_in(line.trim(), report_inches)
 }
 
 /// The `$130`-`$132` max-travel setting a `$$` line reports: axis index and value in mm.
@@ -142,6 +161,7 @@ impl MachineStatus {
                     self.wco = None;
                     self.grbl_travel = [None; 3];
                     self.report_inches = false;
+                    self.probe = None;
                 }
                 MachineEvent::StatusReport(report) => {
                     // Positions, offsets and feed are kept in mm whatever `$13` says.
@@ -152,6 +172,9 @@ impl MachineStatus {
                     self.report = Some(report);
                 }
                 MachineEvent::Received(line) => {
+                    if let Some(probe) = probe_report(line, self.report_inches) {
+                        self.probe = Some(probe);
+                    }
                     if let Some((index, travel)) = parse_travel(line) {
                         self.grbl_travel[index] = Some(travel);
                     }

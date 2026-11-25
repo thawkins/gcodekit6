@@ -92,6 +92,8 @@ mod test_hidpi;
 mod test_machine_jog;
 #[path = "test_machine_pane.rs"]
 mod test_machine_pane;
+#[path = "test_machine_probe_report.rs"]
+mod test_machine_probe_report;
 #[path = "test_quit.rs"]
 mod test_quit;
 #[path = "test_settings_window.rs"]
