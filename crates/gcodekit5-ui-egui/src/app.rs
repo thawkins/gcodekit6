@@ -32,6 +32,9 @@
 //! `craft-menu`, `craft-dialogs`, `craft-quit`, `gcodekit5-app` (translations, the
 //! unsaved-changes answer), `gcodekit5-settings` (configuration).
 
+use std::cell::RefCell;
+use std::path::{Path, PathBuf};
+use std::rc::Rc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, OnceLock};
 use std::time::{Duration, Instant};
@@ -48,11 +51,15 @@ use gcodekit5_settings::SettingsManager;
 use gcodekit5_settings::config::Config;
 
 use crate::commands::{self, Command};
-use crate::dialogs::{Asked, ConfirmChoice, ConfirmRequest, DialogAnswer, Dialogs, FilePurpose};
+use crate::dialogs::{
+    Asked, ConfirmChoice, ConfirmRequest, DialogAnswer, Dialogs, FileFilter, FilePurpose,
+};
 use crate::machine::{Machine, lock};
 use crate::menu::Menus;
 use crate::panes::console::ConsolePane;
+use crate::panes::editor::{EditorPane, SharedEditor};
 use crate::panes::machine_control::MachineControlPane;
+use crate::panes::visualizer::VisualizerPane;
 use crate::theme;
 use crate::windows::{AboutWindow, SettingsOutcome, SettingsWindow};
 use crate::workspace::{PaneContext, PaneId, Workspace};
@@ -110,8 +117,8 @@ pub struct AppState {
     /// Set when the user asked to restart; the app relaunches itself when it exits
     /// (`eframe::App::on_exit`). Cleared when the quit is cancelled.
     pub restart: Arc<AtomicBool>,
-    /// Which documents have unsaved changes; asked about on quit. The editor and designer
-    /// panes set it once they exist (Tasks 9 and 12); until then only tests do.
+    /// Which documents have unsaved changes; asked about on quit. The app copies the editor's
+    /// flag here whenever it changes; the designer sets its own once it exists (Task 12).
     pub dirty: DirtyState,
     /// The machine connection: the shared controller, this frame's events and the state
     /// derived from them. Replace it (with [`AppState::with_machine`]) before the app is built
@@ -188,6 +195,15 @@ struct QuitFlow {
     confirmed: bool,
 }
 
+/// What to do once the editor's G-code is saved.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum AfterSave {
+    /// Go on quitting (the quit prompt's Save).
+    Quit,
+    /// Ask for a file to open (Open with unsaved changes, Save chosen).
+    Open,
+}
+
 /// Root application of the egui front end.
 pub struct GcodeKitApp {
     state: AppState,
@@ -217,6 +233,14 @@ pub struct GcodeKitApp {
     last_dispatched: Option<Command>,
     /// The quit being decided, if any.
     quit: QuitFlow,
+    /// The G-code editor, also drawn by the workspace.
+    editor: Rc<RefCell<EditorPane>>,
+    /// The editor's dirty flag as last copied to [`AppState::dirty`].
+    editor_dirty: bool,
+    /// What waits for the editor's save dialog to be answered.
+    after_save: Option<AfterSave>,
+    /// An Open asked first about the editor's unsaved changes.
+    open_after_confirm: bool,
     /// The egui frame whose machine events were last polled.
     machine_polled: Option<u64>,
     /// The `movable` flag last set on the macOS window (`title_bar::sync_movable`).
@@ -249,6 +273,10 @@ impl GcodeKitApp {
     /// * `state` - The front end's state.
     pub fn new(cc: &eframe::CreationContext, state: AppState) -> Self {
         theme::install(&cc.egui_ctx);
+        match &cc.wgpu_render_state {
+            Some(render_state) => crate::panes::visualizer::install(render_state),
+            None => tracing::warn!("no wgpu renderer; the visualizer shows no toolpath"),
+        }
         #[cfg_attr(not(target_os = "macos"), allow(unused_mut))]
         let mut app = Self {
             system_theme: craft_platform::appearance::egui_service(),
@@ -289,6 +317,9 @@ impl GcodeKitApp {
         workspace.set_pane(Box::new(ConsolePane::new(Arc::clone(
             state.machine.controller(),
         ))));
+        let editor = Rc::new(RefCell::new(EditorPane::new()));
+        workspace.set_pane(Box::new(SharedEditor(Rc::clone(&editor))));
+        workspace.set_pane(Box::new(VisualizerPane::new()));
         workspace.configure(state.config());
         {
             // Wake the event loop whenever the machine reports something.
@@ -315,6 +346,10 @@ impl GcodeKitApp {
             about_window,
             last_dispatched: None,
             quit: QuitFlow::default(),
+            editor,
+            editor_dirty: false,
+            after_save: None,
+            open_after_confirm: false,
             machine_polled: None,
             #[cfg(target_os = "macos")]
             movable: None,
@@ -360,10 +395,12 @@ impl GcodeKitApp {
             }
             return;
         }
-        if self.quit.asking.is_none() {
+        // While the editor's save dialog for this quit is up, the quit waits for it.
+        let saving = self.after_save == Some(AfterSave::Quit);
+        if self.quit.asking.is_none() && !saving {
             self.continue_quit();
         }
-        if self.quit.asking.is_some() {
+        if self.quit.asking.is_some() || saving {
             self.viewport_commands
                 .push(egui::ViewportCommand::CancelClose);
         }
@@ -424,9 +461,12 @@ impl GcodeKitApp {
                         }
                         self.continue_quit();
                     }
+                    UnsavedChangesChoice::Save if request == ConfirmRequest::UnsavedGcode => {
+                        self.save_editor(Some(AfterSave::Quit));
+                    }
                     UnsavedChangesChoice::Save => {
-                        // No editor or designer can save in this front end yet (Tasks 9 and
-                        // 12), so nothing is saved and the app stays open.
+                        // The designer cannot save in this front end yet (Task 12), so nothing
+                        // is saved and the app stays open.
                         tracing::warn!(?request, "cannot save before quitting yet; quit cancelled");
                         self.cancel_quit();
                     }
@@ -523,6 +563,7 @@ impl GcodeKitApp {
         for command in queue.drain(..) {
             self.dispatch(command);
         }
+        self.sync_editor(false);
         self.deliver_machine_events();
         self.queue = queue;
         self.show_windows(&ctx);
@@ -599,13 +640,14 @@ impl GcodeKitApp {
         }
     }
 
-    /// Hands a machine command to the pane that runs it (Machine Control).
-    fn route_machine_command(&mut self, cmd: Command) {
+    /// Hands a command to the pane that runs it: Machine Control the machine commands, the
+    /// Visualizer the view commands.
+    fn route_pane_command(&mut self, cmd: Command) {
         let mut requested = Vec::new();
         let mut ctx = PaneContext::new(&self.state.translator, &mut requested)
             .with_machine(&self.state.machine);
         if !self.workspace.route(cmd, &mut ctx) {
-            tracing::warn!(?cmd, "no pane runs this machine command");
+            tracing::warn!(?cmd, "no pane runs this command");
         }
         self.queue.extend(requested);
     }
@@ -640,13 +682,22 @@ impl GcodeKitApp {
     pub fn dispatch(&mut self, cmd: Command) {
         self.last_dispatched = Some(cmd);
         match cmd {
-            Command::FileOpen => self
-                .dialogs
-                .open_file(FilePurpose::OpenGcode, &FilePurpose::OpenGcode.filters()),
-            // No document has a path of its own yet, so Save asks where to save too.
-            Command::FileSave | Command::FileSaveAs => self
-                .dialogs
-                .save_file(FilePurpose::SaveGcode, &FilePurpose::SaveGcode.filters()),
+            Command::FileOpen => {
+                if self.refuse_open_during_job() {
+                    return;
+                }
+                if self.editor.borrow().buffer().is_dirty() {
+                    self.open_after_confirm = true;
+                    self.dialogs.confirm(ConfirmRequest::UnsavedGcode);
+                } else {
+                    self.ask_open_gcode();
+                }
+            }
+            Command::FileSave => self.save_editor(None),
+            Command::FileSaveAs => {
+                self.after_save = None;
+                self.ask_save_gcode();
+            }
             Command::OpenSettings => self.settings_window.open(&self.state.settings),
             Command::About => self.about_window.open(),
             Command::Quit => self.request_quit(QuitSource::MenuQuit),
@@ -668,9 +719,16 @@ impl GcodeKitApp {
             | Command::FileRun
             | Command::Undo
             | Command::Redo => tracing::debug!(?cmd, "document command not available yet"),
+            Command::StreamStart => {
+                // Stream exactly what the editor shows, also within the typing pause.
+                if self.sync_editor(true) {
+                    self.route_pane_command(cmd);
+                } else {
+                    tracing::warn!("Start not sent: the editor could not be synced");
+                }
+            }
             Command::Connect
             | Command::Disconnect
-            | Command::StreamStart
             | Command::StreamPause
             | Command::StreamStop
             | Command::FeedHold
@@ -683,14 +741,14 @@ impl GcodeKitApp {
             | Command::JogYPos
             | Command::JogYNeg
             | Command::JogZPos
-            | Command::JogZNeg => self.route_machine_command(cmd),
-            Command::ZoomFit
+            | Command::JogZNeg
+            | Command::ZoomFit
             | Command::ZoomIn
             | Command::ZoomOut
             | Command::ResetView
             | Command::ViewTop
             | Command::ViewFront
-            | Command::ViewIso => tracing::debug!(?cmd, "view command not available yet"),
+            | Command::ViewIso => self.route_pane_command(cmd),
             Command::OpenDeviceManager
             | Command::OpenToolsManager
             | Command::OpenMaterialsManager
@@ -719,10 +777,47 @@ impl GcodeKitApp {
         self.about_window.show(ctx, &self.state.translator);
     }
 
-    /// Acts on a dialog's answer. Answers for features that do not exist yet (opening and
-    /// saving files, Task 9) are kept in [`GcodeKitApp::last_dialog_answer`].
+    /// Acts on a dialog's answer; every answer is also kept in
+    /// [`GcodeKitApp::last_dialog_answer`].
     fn handle_answer(&mut self, answer: DialogAnswer) {
         match &answer {
+            DialogAnswer::File {
+                purpose: FilePurpose::OpenGcode,
+                path,
+            } => self.open_gcode(path),
+            DialogAnswer::File {
+                purpose: FilePurpose::SaveGcode,
+                path,
+            } => self.save_editor_as(path),
+            DialogAnswer::Cancelled {
+                purpose: FilePurpose::SaveGcode,
+            } => self.abandon_after_save(),
+            DialogAnswer::Unavailable {
+                asked: Asked::File(FilePurpose::SaveGcode),
+                reason,
+            } => {
+                tracing::warn!(%reason, "save dialog unavailable");
+                self.abandon_after_save();
+            }
+            DialogAnswer::Unavailable {
+                asked: Asked::Confirm(ConfirmRequest::UnsavedGcode),
+                reason,
+            } if self.open_after_confirm => {
+                // Not opening without the answer: unsaved G-code would be lost.
+                tracing::warn!(%reason, "unsaved-changes prompt unavailable; open abandoned");
+                self.open_after_confirm = false;
+            }
+            DialogAnswer::Confirm {
+                request: ConfirmRequest::UnsavedGcode,
+                choice,
+            } if self.open_after_confirm => {
+                self.open_after_confirm = false;
+                match choice.as_unsaved() {
+                    UnsavedChangesChoice::Save => self.save_editor(Some(AfterSave::Open)),
+                    UnsavedChangesChoice::Discard => self.ask_open_gcode(),
+                    UnsavedChangesChoice::Cancel => {}
+                }
+            }
             DialogAnswer::QuitConfirm { request, choice } if self.quit.asking == Some(*request) => {
                 self.quit_answer(*request, *choice);
             }
@@ -755,6 +850,170 @@ impl GcodeKitApp {
             }
         }
         self.last_dialog_answer = Some(answer);
+    }
+
+    /// Opens `path` in the editor and hands its text to the machine as the program to
+    /// stream. A file that cannot be read leaves the editor as it was, with a notice.
+    ///
+    /// # Arguments
+    /// * `path` - The G-code file.
+    pub fn open_gcode(&mut self, path: &Path) {
+        if self.refuse_open_during_job() {
+            return;
+        }
+        {
+            let mut editor = self.editor.borrow_mut();
+            if let Err(error) = editor.load(path) {
+                tracing::warn!(%error, "cannot open G-code");
+                let tr = &self.state.translator;
+                editor.set_notice(format!("{}: {error:#}", tr.tr("Could not open file")));
+            }
+        }
+        self.sync_editor(true);
+    }
+
+    /// While a job streams, opening a file would swap the editor (and the program armed for
+    /// the next Start) under the toolpath the job is drawing: says so in the editor and
+    /// returns `true`.
+    fn refuse_open_during_job(&mut self) -> bool {
+        if !self.state.job_running() {
+            return false;
+        }
+        let message = self
+            .state
+            .translator
+            .tr("Stop the running job before opening a file.")
+            .into_owned();
+        self.editor.borrow_mut().set_notice(message);
+        true
+    }
+
+    /// Opens the first G-code file named on the command line in the editor: the first path
+    /// whose extension is one of the Open dialog's G-code types (any case). Every other path
+    /// is logged and skipped, so a design, an image or a stray argument never becomes the
+    /// program to stream.
+    ///
+    /// # Arguments
+    /// * `files` - The paths from the command line.
+    pub fn open_startup_files(&mut self, files: &[PathBuf]) {
+        let mut opened = false;
+        for path in files {
+            if !opened && is_gcode_path(path) {
+                opened = true;
+                self.open_gcode(path);
+            } else {
+                tracing::warn!(path = %path.display(), "startup file skipped: not the first G-code file");
+            }
+        }
+    }
+
+    /// The G-code editor.
+    pub fn editor(&self) -> &Rc<RefCell<EditorPane>> {
+        &self.editor
+    }
+
+    /// Copies the editor's dirty flag to [`AppState::dirty`] when it changed, and hands the
+    /// editor's text to the machine when it changed and typing paused (or `force`), unless a
+    /// job is streaming. Returns `false` when the editor could not be reached (it is
+    /// borrowed), so the caller must not act on a program that may be out of date.
+    fn sync_editor(&mut self, force: bool) -> bool {
+        let Ok(mut editor) = self.editor.try_borrow_mut() else {
+            tracing::warn!("editor busy; program not synced");
+            return false;
+        };
+        let dirty = editor.buffer().is_dirty();
+        if dirty != self.editor_dirty {
+            self.editor_dirty = dirty;
+            self.state.dirty.editor = dirty;
+        }
+        if !editor.program_stale()
+            || !(force || editor.edit_settled(Instant::now()))
+            || self.state.job_running()
+        {
+            return true;
+        }
+        match self.state.machine.set_program(editor.buffer().text()) {
+            Ok(0) => {
+                self.state.machine.clear_program();
+                editor.program_fed();
+            }
+            Ok(_) => editor.program_fed(),
+            Err(reason) => {
+                self.state.machine.clear_program();
+                let tr = &self.state.translator;
+                editor
+                    .program_rejected(format!("{}: {reason}", tr.tr("Cannot stream this program")));
+            }
+        }
+        true
+    }
+
+    /// Asks for a G-code file to open.
+    fn ask_open_gcode(&mut self) {
+        self.dialogs
+            .open_file(FilePurpose::OpenGcode, &FilePurpose::OpenGcode.filters());
+    }
+
+    /// Asks where to save the editor's G-code.
+    fn ask_save_gcode(&mut self) {
+        self.dialogs
+            .save_file(FilePurpose::SaveGcode, &FilePurpose::SaveGcode.filters());
+    }
+
+    /// Saves the editor's G-code to its file, or asks where when it has none; `then` runs
+    /// once it is saved.
+    fn save_editor(&mut self, then: Option<AfterSave>) {
+        let has_path = self.editor.borrow().buffer().path().is_some();
+        if has_path {
+            let result = self.editor.borrow_mut().buffer_mut().save();
+            self.after_saving(result, then);
+        } else {
+            self.after_save = then;
+            self.ask_save_gcode();
+        }
+    }
+
+    /// Saves the editor's G-code to `path`, chosen in the save dialog.
+    fn save_editor_as(&mut self, path: &Path) {
+        let result = self.editor.borrow_mut().buffer_mut().save_as(path);
+        let then = self.after_save.take();
+        self.after_saving(result, then);
+    }
+
+    /// Reports a failed save, and runs `then` after a successful one; a failed save for a
+    /// quit cancels the quit.
+    fn after_saving(&mut self, result: anyhow::Result<()>, then: Option<AfterSave>) {
+        let saved = match result {
+            Ok(()) => {
+                // The G-code is saved whatever the flag said (also when only the quit flow
+                // thought it dirty).
+                self.editor_dirty = false;
+                self.state.dirty.editor = false;
+                self.editor.borrow_mut().clear_notice();
+                true
+            }
+            Err(error) => {
+                tracing::warn!(%error, "cannot save G-code");
+                let tr = &self.state.translator;
+                self.editor
+                    .borrow_mut()
+                    .set_notice(format!("{}: {error:#}", tr.tr("Could not save file")));
+                false
+            }
+        };
+        match (saved, then) {
+            (true, Some(AfterSave::Quit)) => self.continue_quit(),
+            (true, Some(AfterSave::Open)) => self.ask_open_gcode(),
+            (false, Some(AfterSave::Quit)) => self.cancel_quit(),
+            (false, Some(AfterSave::Open)) | (_, None) => {}
+        }
+    }
+
+    /// The save dialog was closed without saving: a quit waiting for it is cancelled.
+    fn abandon_after_save(&mut self) {
+        if self.after_save.take() == Some(AfterSave::Quit) {
+            self.cancel_quit();
+        }
     }
 
     /// The dialog queue.
@@ -828,6 +1087,20 @@ impl GcodeKitApp {
             ctx.set_theme(mode);
         }
     }
+}
+
+/// Whether `path` has one of the G-code extensions the Open dialog offers
+/// ([`FileFilter::GCODE`], any case). The filter itself is used rather than
+/// `FilePurpose::OpenGcode.filters()`, which is empty on macOS and adds "All Files" elsewhere.
+fn is_gcode_path(path: &Path) -> bool {
+    path.extension()
+        .and_then(|e| e.to_str())
+        .is_some_and(|extension| {
+            FileFilter::GCODE
+                .extensions
+                .iter()
+                .any(|known| known.eq_ignore_ascii_case(extension))
+        })
 }
 
 /// The Machine Control pane over `state`'s controller, with the configured connection and jog

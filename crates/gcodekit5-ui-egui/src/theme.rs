@@ -41,6 +41,27 @@ pub struct Palette {
     pub error: Color32,
     /// Widget fills for egui's interaction states.
     pub widgets: craft_ui::theme::WidgetPalette,
+    /// G-code syntax colours of the editor.
+    pub syntax: Syntax,
+}
+
+/// G-code syntax colours of the editor, one per highlight class.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Syntax {
+    /// `G` and `M` words (`G1`, `M3`).
+    pub command: Color32,
+    /// Coordinates and arc parameters (`X10`, `I-2.5`, `R5`).
+    pub coordinate: Color32,
+    /// Line numbers (`N10`).
+    pub line_number: Color32,
+    /// Comments (`; ...`, `( ... )`).
+    pub comment: Color32,
+    /// Everything else: other words (`F`, `S`, `T`) and spaces.
+    pub plain: Color32,
+    /// Line numbers in the gutter.
+    pub gutter: Color32,
+    /// Background of the current line (the cursor's or the streaming job's).
+    pub current_line_bg: Color32,
 }
 
 /// The light palette (libadwaita light).
@@ -63,6 +84,15 @@ pub const LIGHT: Palette = Palette {
         active: Color32::from_rgb(0xcc, 0xcc, 0xcc),
         open: Color32::from_rgb(0xe0, 0xe0, 0xe0),
     },
+    syntax: Syntax {
+        command: Color32::from_rgb(0x1c, 0x71, 0xd8),
+        coordinate: Color32::from_rgb(0x26, 0xa2, 0x69),
+        line_number: Color32::from_rgb(0x91, 0x41, 0xac),
+        comment: Color32::from_rgb(0x77, 0x76, 0x7b),
+        plain: Color32::from_rgb(0x32, 0x32, 0x32),
+        gutter: Color32::from_rgb(0x9a, 0x99, 0x96),
+        current_line_bg: Color32::from_rgba_unmultiplied_const(0x35, 0x84, 0xe4, 40),
+    },
 };
 
 /// The dark palette (libadwaita dark).
@@ -84,6 +114,15 @@ pub const DARK: Palette = Palette {
         hovered: Color32::from_gray(60),
         active: Color32::from_gray(76),
         open: Color32::from_gray(52),
+    },
+    syntax: Syntax {
+        command: Color32::from_rgb(0x78, 0xae, 0xed),
+        coordinate: Color32::from_rgb(0x8f, 0xf0, 0xa4),
+        line_number: Color32::from_rgb(0xdc, 0x8a, 0xdd),
+        comment: Color32::from_rgb(0x9a, 0x99, 0x96),
+        plain: Color32::from_rgb(0xff, 0xff, 0xff),
+        gutter: Color32::from_rgb(0x77, 0x76, 0x7b),
+        current_line_bg: Color32::from_rgba_unmultiplied_const(0x35, 0x84, 0xe4, 56),
     },
 };
 

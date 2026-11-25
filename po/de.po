@@ -3194,3 +3194,66 @@ msgstr "Gerät getrennt"
 
 msgid "Error"
 msgstr "Fehler"
+
+msgid "Matches:"
+msgstr "Treffer:"
+
+msgid "Line:"
+msgstr "Zeile:"
+
+msgid "Edit anyway"
+msgstr "Trotzdem bearbeiten"
+
+msgid "Large file: shown read-only to stay fast."
+msgstr "Große Datei: schreibgeschützt angezeigt, damit es schnell bleibt."
+
+msgid "Could not open file"
+msgstr "Datei konnte nicht geöffnet werden"
+
+msgid "Could not save file"
+msgstr "Datei konnte nicht gespeichert werden"
+
+msgid "Cannot stream this program"
+msgstr "Dieses Programm kann nicht gesendet werden"
+
+msgid "Read-only while a job is running."
+msgstr "Schreibgeschützt, solange ein Auftrag läuft."
+
+msgid "Front View"
+msgstr "Vorderansicht"
+
+msgid "Left View"
+msgstr "Linke Ansicht"
+
+msgid "Right View"
+msgstr "Rechte Ansicht"
+
+msgid "Bottom View"
+msgstr "Untersicht"
+
+msgid "Isometric (NW)"
+msgstr "Isometrisch (NW)"
+
+msgid "Isometric (NE)"
+msgstr "Isometrisch (NO)"
+
+msgid "Isometric (SW)"
+msgstr "Isometrisch (SW)"
+
+msgid "Isometric (SE)"
+msgstr "Isometrisch (SO)"
+
+msgid "Fit"
+msgstr "Einpassen"
+
+msgid "Toolpath too large to display on this GPU."
+msgstr "Werkzeugbahn zu groß für die Anzeige auf dieser GPU."
+
+msgid "Bounds {axis}: {min} to {max} {unit}"
+msgstr "Grenzen {axis}: {min} bis {max} {unit}"
+
+msgid "Could not draw this toolpath."
+msgstr "Diese Werkzeugbahn konnte nicht gezeichnet werden."
+
+msgid "Stop the running job before opening a file."
+msgstr "Beenden Sie den laufenden Auftrag, bevor Sie eine Datei öffnen."

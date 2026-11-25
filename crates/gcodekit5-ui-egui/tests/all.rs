@@ -24,8 +24,12 @@ mod test_commands;
 mod test_console_pane;
 #[path = "test_dialogs.rs"]
 mod test_dialogs;
+#[path = "test_editor.rs"]
+mod test_editor;
 #[path = "test_frame.rs"]
 mod test_frame;
+#[path = "test_hidpi.rs"]
+mod test_hidpi;
 #[path = "test_machine_jog.rs"]
 mod test_machine_jog;
 #[path = "test_machine_pane.rs"]
@@ -40,5 +44,7 @@ mod test_smoke;
 mod test_status_bar;
 #[path = "test_translations.rs"]
 mod test_translations;
+#[path = "test_visualizer.rs"]
+mod test_visualizer;
 #[path = "test_workspace.rs"]
 mod test_workspace;

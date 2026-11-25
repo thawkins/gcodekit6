@@ -25,3 +25,8 @@ mutants-output.txt
 
 # Temporary files
 tmp/
+
+# egui_kittest writes these next to a failing snapshot.
+/crates/*/tests/snapshots/*.new.png
+/crates/*/tests/snapshots/*.diff.png
+/crates/*/tests/snapshots/*.old.png

@@ -335,14 +335,99 @@ fn test_quit_asks_job_first_then_unsaved_work() {
     assert!(commands.contains(&ViewportCommand::Close), "{commands:?}");
 }
 
-/// "Save" cannot save yet (no editor or designer in this front end): the app stays open.
+/// Answers the unsaved-changes prompt with Save and every file dialog with `path` (Cancel
+/// when `None`), recording what was shown.
+fn save_answering(app: &mut GcodeKitApp, shown: &Shown, path: Option<std::path::PathBuf>) {
+    let shown = Arc::clone(shown);
+    app.dialogs_mut()
+        .set_override(Some(Box::new(move |request: &Request| {
+            let (title, answer) = match (request, &path) {
+                (Request::Message(message), _) => (message.title.clone(), Answer::Message(save())),
+                (Request::File(file), Some(path)) => (
+                    file.title.clone().unwrap_or_default(),
+                    Answer::Paths(vec![path.clone()]),
+                ),
+                (Request::File(file), None) => {
+                    (file.title.clone().unwrap_or_default(), Answer::Cancelled)
+                }
+            };
+            if let Ok(mut shown) = shown.lock() {
+                shown.push(title);
+            }
+            answer
+        })));
+}
+
+/// A fresh scratch folder for a quit test under `target/temp/egui_quit`.
+fn scratch(name: &str) -> std::io::Result<std::path::PathBuf> {
+    let dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../target/temp/egui_quit")
+        .join(format!("{name}-{}", std::process::id()));
+    if dir.exists() {
+        std::fs::remove_dir_all(&dir)?;
+    }
+    std::fs::create_dir_all(&dir)?;
+    Ok(dir)
+}
+
+/// "Save" for G-code with no file yet asks where to save; cancelling that keeps the app open.
 #[test]
 fn test_quit_save_without_save_path_keeps_app_open() {
-    let (mut harness, _shown) = harness(Work::EditorDirty, save());
+    let (mut harness, shown) = harness(Work::EditorDirty, save());
+    save_answering(harness.state_mut(), &shown, None);
     quit_from(&mut harness, QuitSource::MenuQuit);
+    frame(&mut harness, false);
     let commands = frame(&mut harness, false);
     assert!(!commands.contains(&ViewportCommand::Close), "{commands:?}");
     assert!(!harness.state().quit_confirmed());
+    let shown = shown.lock().map(|s| s.clone()).unwrap_or_default();
+    assert_eq!(shown, ["Unsaved changes", "Save G-Code File"]);
+}
+
+/// "Save" for G-code with no file yet: the chosen file is written, then the app quits.
+#[test]
+fn test_quit_save_to_chosen_path_quits() -> std::io::Result<()> {
+    let target = scratch("save_chosen")?.join("out.gcode");
+    let (mut harness, shown) = harness(Work::Clean, save());
+    harness
+        .state()
+        .editor()
+        .borrow_mut()
+        .buffer_mut()
+        .set_text("G1 X3\n".to_string());
+    save_answering(harness.state_mut(), &shown, Some(target.clone()));
+    frame(&mut harness, false);
+    quit_from(&mut harness, QuitSource::MenuQuit);
+    frame(&mut harness, false);
+    let commands = frame(&mut harness, false);
+    assert!(commands.contains(&ViewportCommand::Close), "{commands:?}");
+    assert!(harness.state().quit_confirmed());
+    assert_eq!(std::fs::read_to_string(&target)?, "G1 X3\n");
+    Ok(())
+}
+
+/// "Save" for G-code opened from a file writes it back without asking where, then quits.
+#[test]
+fn test_quit_save_with_path_saves_and_quits() -> std::io::Result<()> {
+    let path = scratch("save_path")?.join("part.gcode");
+    std::fs::write(&path, "G0 X0\n")?;
+    let (mut harness, shown) = harness(Work::Clean, save());
+    harness.state_mut().open_gcode(&path);
+    harness
+        .state()
+        .editor()
+        .borrow_mut()
+        .buffer_mut()
+        .set_text("G0 X7\n".to_string());
+    save_answering(harness.state_mut(), &shown, None);
+    frame(&mut harness, false);
+    quit_from(&mut harness, QuitSource::WindowClose);
+    let commands = frame(&mut harness, false);
+    assert!(commands.contains(&ViewportCommand::Close), "{commands:?}");
+    assert_eq!(std::fs::read_to_string(&path)?, "G0 X7\n");
+    let shown = shown.lock().map(|s| s.clone()).unwrap_or_default();
+    assert_eq!(shown, ["Unsaved changes"]);
+    Ok(())
 }
 
 /// Stop job: No keeps the app open.

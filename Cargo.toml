@@ -40,6 +40,9 @@ egui_extras = "0.37"
 raw-window-handle = "0.6.2"
 egui_kittest = "0.37"
 egui-wgpu = "0.37"
+# Shared by the visualizer crates (the egui front end's wgpu visualizer).
+glam = "0.34"
+bytemuck = { version = "1.25", features = ["derive"] }
 craft-ui = { git = "https://github.com/storytold/craft-libs", rev = "d15bf1f35b17b759870f9e5111b9a5d243f64888" }
 craft-window = { git = "https://github.com/storytold/craft-libs", rev = "d15bf1f35b17b759870f9e5111b9a5d243f64888" }
 craft-menu = { git = "https://github.com/storytold/craft-libs", rev = "d15bf1f35b17b759870f9e5111b9a5d243f64888" }

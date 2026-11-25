@@ -3118,3 +3118,66 @@ msgstr ""
 
 msgid "Error"
 msgstr ""
+
+msgid "Matches:"
+msgstr ""
+
+msgid "Line:"
+msgstr ""
+
+msgid "Edit anyway"
+msgstr ""
+
+msgid "Large file: shown read-only to stay fast."
+msgstr ""
+
+msgid "Could not open file"
+msgstr ""
+
+msgid "Could not save file"
+msgstr ""
+
+msgid "Cannot stream this program"
+msgstr ""
+
+msgid "Read-only while a job is running."
+msgstr ""
+
+msgid "Front View"
+msgstr ""
+
+msgid "Left View"
+msgstr ""
+
+msgid "Right View"
+msgstr ""
+
+msgid "Bottom View"
+msgstr ""
+
+msgid "Isometric (NW)"
+msgstr ""
+
+msgid "Isometric (NE)"
+msgstr ""
+
+msgid "Isometric (SW)"
+msgstr ""
+
+msgid "Isometric (SE)"
+msgstr ""
+
+msgid "Fit"
+msgstr ""
+
+msgid "Toolpath too large to display on this GPU."
+msgstr ""
+
+msgid "Bounds {axis}: {min} to {max} {unit}"
+msgstr ""
+
+msgid "Could not draw this toolpath."
+msgstr ""
+
+msgid "Stop the running job before opening a file."
+msgstr ""

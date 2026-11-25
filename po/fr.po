@@ -3201,3 +3201,66 @@ msgstr "Appareil déconnecté"
 
 msgid "Error"
 msgstr "Erreur"
+
+msgid "Matches:"
+msgstr "Occurrences :"
+
+msgid "Line:"
+msgstr "Ligne :"
+
+msgid "Edit anyway"
+msgstr "Modifier quand même"
+
+msgid "Large file: shown read-only to stay fast."
+msgstr "Fichier volumineux : affiché en lecture seule pour rester rapide."
+
+msgid "Could not open file"
+msgstr "Impossible d'ouvrir le fichier"
+
+msgid "Could not save file"
+msgstr "Impossible d'enregistrer le fichier"
+
+msgid "Cannot stream this program"
+msgstr "Impossible d'envoyer ce programme"
+
+msgid "Read-only while a job is running."
+msgstr "Lecture seule pendant l'exécution d'une tâche."
+
+msgid "Front View"
+msgstr "Vue de face"
+
+msgid "Left View"
+msgstr "Vue de gauche"
+
+msgid "Right View"
+msgstr "Vue de droite"
+
+msgid "Bottom View"
+msgstr "Vue de dessous"
+
+msgid "Isometric (NW)"
+msgstr "Isométrique (NO)"
+
+msgid "Isometric (NE)"
+msgstr "Isométrique (NE)"
+
+msgid "Isometric (SW)"
+msgstr "Isométrique (SO)"
+
+msgid "Isometric (SE)"
+msgstr "Isométrique (SE)"
+
+msgid "Fit"
+msgstr "Ajuster"
+
+msgid "Toolpath too large to display on this GPU."
+msgstr "Parcours d'outil trop grand pour être affiché sur ce GPU."
+
+msgid "Bounds {axis}: {min} to {max} {unit}"
+msgstr "Limites {axis} : {min} à {max} {unit}"
+
+msgid "Could not draw this toolpath."
+msgstr "Impossible de dessiner ce parcours d'outil."
+
+msgid "Stop the running job before opening a file."
+msgstr "Arrêtez le travail en cours avant d'ouvrir un fichier."
