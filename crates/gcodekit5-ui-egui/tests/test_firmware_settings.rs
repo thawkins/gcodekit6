@@ -474,3 +474,39 @@ fn test_firmware_settings_unreported_rows_are_not_editable() {
             .is_some()
     );
 }
+
+#[test]
+fn test_firmware_settings_disconnect_keeps_an_unread_result() {
+    let (mut h, shared) = open_window(|_| {});
+    edit_110(&mut h, "5000");
+    h.get_by_label("Apply").click();
+    h.run_steps(2);
+    assert!(wait_until(|| wrote(&shared, "$$")));
+    shared.inject("$110=5000.000\n");
+    assert!(step_until(&mut h, |app| app
+        .firmware_settings()
+        .notice()
+        .is_some_and(|n| n.contains("Setting written"))));
+
+    h.state_mut().state_mut().machine.disconnect();
+    h.run_steps(3);
+    let notice = h.state().firmware_settings().notice().unwrap_or_default();
+    assert!(notice.contains("Setting written"), "notice: {notice:?}");
+    assert!(
+        h.query_by_label("Not connected").is_some(),
+        "the connection state shows"
+    );
+}
+
+#[test]
+fn test_firmware_settings_disconnect_ends_a_retrieve_with_a_notice() {
+    let (mut h, shared) = open_window(|_| {});
+    shared.hold_acks.store(true, Ordering::SeqCst);
+    h.get_by_label("Retrieve").click();
+    h.run_steps(2);
+    assert!(wait_until(|| wrote(&shared, "$I")));
+    h.state_mut().state_mut().machine.disconnect();
+    h.run_steps(3);
+    let notice = h.state().firmware_settings().notice().unwrap_or_default();
+    assert_eq!(notice, "Not connected");
+}

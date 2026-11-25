@@ -155,9 +155,12 @@ impl FirmwareSettingsWindow {
             match event {
                 MachineEvent::Received(line) => self.received(line.trim()),
                 MachineEvent::Disconnected => {
-                    self.retrieval = None;
                     self.reported.clear();
-                    self.say(tr.tr(n_!("Not connected")).into_owned(), false);
+                    // Ends a retrieval in progress; an earlier result stays until read (the
+                    // window shows the connection state beside it).
+                    if self.retrieval.take().is_some() {
+                        self.say(tr.tr(n_!("Not connected")).into_owned(), false);
+                    }
                 }
                 MachineEvent::Connected
                 | MachineEvent::StatusReport(_)
@@ -475,12 +478,20 @@ impl FirmwareSettingsWindow {
         });
         let rows = self.visible_rows();
         ui.horizontal(|ui| {
+            let not_connected = tr.tr(n_!("Not connected"));
             match &self.notice {
-                Some((text, true)) => ui.colored_label(ui.visuals().error_fg_color, text),
-                Some((text, false)) => ui.label(text),
-                None if !machine.status().connected => ui.label(tr.tr(n_!("Not connected"))),
-                None => ui.label(""),
-            };
+                Some((text, true)) => {
+                    ui.colored_label(ui.visuals().error_fg_color, text);
+                }
+                Some((text, false)) => {
+                    ui.label(text);
+                }
+                None => {}
+            }
+            let shown = self.notice.as_ref().map(|(text, _)| text.as_str());
+            if !machine.status().connected && shown != Some(&*not_connected) {
+                ui.weak(not_connected);
+            }
             let count = format!(
                 "{} / {} {}",
                 rows.len(),
