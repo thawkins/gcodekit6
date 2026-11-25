@@ -4,7 +4,7 @@
 
 [graph]
 targets = []
-all-features = false
+all-features = true
 no-default-features = false
 
 [output]
@@ -16,6 +16,8 @@ unmaintained = "none"
 ignore = []
 
 [licenses]
+# One expected parse-error warning: hershey 0.1.2 (via csgrs) uses the deprecated SPDX id
+# "LGPL-3.0"; it needs an upstream fix and cannot be clarified here.
 allow = [
     "MIT", "Apache-2.0", "Apache-2.0 WITH LLVM-exception", "BSD-2-Clause",
     "BSD-3-Clause", "ISC", "Zlib", "Unicode-3.0",
@@ -25,6 +27,8 @@ confidence-threshold = 0.8
 exceptions = [
     # Pure-Rust libbzip2 port pulled in by zip 9 (bzip2 support); permissive BSD-style licence.
     { allow = ["bzip2-1.0.6"], crate = "libbz2-rs-sys" },
+    # Bundled egui fonts (Hack/Ubuntu/Noto Emoji); font licences OFL-1.1 and Ubuntu-font-1.0.
+    { allow = ["OFL-1.1", "Ubuntu-font-1.0"], crate = "epaint_default_fonts" },
 ]
 
 [licenses.private]
@@ -51,6 +55,9 @@ allow-registry = ["https://github.com/rust-lang/crates.io-index"]
 allow-git = [
     "https://github.com/bbqsrc/core2",
     "https://github.com/storytold/craft-libs",
+    # egui and winit forks that craft-libs requires (ADR-011); audited via the egui feature.
+    "https://github.com/storytold/egui",
+    "https://github.com/storytold/winit",
 ]
 
 [sources.allow-org]
