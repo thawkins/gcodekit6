@@ -4504,3 +4504,6 @@ msgstr ""
 
 msgid "stored"
 msgstr ""
+
+msgid "The device profile has unsaved changes. Save them before continuing?"
+msgstr ""

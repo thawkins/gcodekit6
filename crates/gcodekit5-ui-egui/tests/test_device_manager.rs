@@ -594,3 +594,59 @@ fn test_device_manager_stored_dump_refreshes_the_open_form() {
     assert!(profiles[0].has_laser);
     assert_eq!(profiles[0].grbl_settings.len(), 13);
 }
+
+#[test]
+fn test_device_manager_quit_asks_and_saves_an_unsaved_profile() {
+    let file = devices_file("quit_save", Some(GTK_DEVICES));
+    let mut h = app_with(&file);
+    click(&mut h, "Router 4040");
+    set_field(&mut h, "Name:", "Quit Saved Router");
+    let shown = crate::test_tools_manager::quit_answering(
+        &mut h,
+        craft_dialogs::MessageResult::Custom("Save".into()),
+    );
+    assert_eq!(shown, ["Unsaved changes"]);
+    assert!(
+        stored(&file)
+            .0
+            .iter()
+            .any(|p| p.name == "Quit Saved Router"),
+        "{:?}",
+        stored(&file).0
+    );
+    assert!(h.state().quit_confirmed());
+}
+
+#[test]
+fn test_device_manager_quit_cancel_keeps_the_edit_and_discard_quits() {
+    let file = devices_file("quit_cancel", Some(GTK_DEVICES));
+    let mut h = app_with(&file);
+    click(&mut h, "Router 4040");
+    set_field(&mut h, "Name:", "Unsaved Router");
+    let shown =
+        crate::test_tools_manager::quit_answering(&mut h, craft_dialogs::MessageResult::Cancel);
+    assert_eq!(shown, ["Unsaved changes"]);
+    assert!(!h.state().quit_confirmed());
+    assert!(h.state().device_manager().has_unsaved_changes());
+    assert!(stored(&file).0.iter().all(|p| p.name != "Unsaved Router"));
+
+    let shown = crate::test_tools_manager::quit_answering(
+        &mut h,
+        craft_dialogs::MessageResult::Custom("Discard".into()),
+    );
+    assert_eq!(shown, ["Unsaved changes"]);
+    assert!(h.state().quit_confirmed());
+    assert!(stored(&file).0.iter().all(|p| p.name != "Unsaved Router"));
+}
+
+#[test]
+fn test_device_manager_unchanged_form_is_not_asked_about() {
+    let file = devices_file("quit_unchanged", Some(GTK_DEVICES));
+    let mut h = app_with(&file);
+    click(&mut h, "Router 4040");
+    assert!(!h.state().device_manager().has_unsaved_changes());
+    let shown =
+        crate::test_tools_manager::quit_answering(&mut h, craft_dialogs::MessageResult::Cancel);
+    assert!(shown.is_empty(), "{shown:?}");
+    assert!(h.state().quit_confirmed());
+}

@@ -4575,3 +4575,6 @@ msgstr "escrito"
 
 msgid "stored"
 msgstr "guardado"
+
+msgid "The device profile has unsaved changes. Save them before continuing?"
+msgstr "O perfil do dispositivo tem alterações não guardadas. Guardá-las antes de continuar?"

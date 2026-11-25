@@ -16,6 +16,9 @@
 //!   Settings (GTK's Sync from Device, `$130`-`$132`, `$30`, `$32`).
 //! - The active profile can never be deleted, nor the only one (GTK cleared it). While a
 //!   job runs the active profile cannot be changed or replaced.
+//! - Unsaved form edits (a Sync from Device result included) are asked about on quit, as
+//!   the editor's, the designer's and the library windows' are
+//!   ([`DeviceManagerWindow::has_unsaved_changes`]).
 //! - A GRBL dump retrieved in Firmware Settings is stored in the profile GTK chose
 //!   ([`device_profiles::dump_target`]) by [`DeviceManagerWindow::store_dump`].
 //!
@@ -68,6 +71,8 @@ impl Tab {
 struct Edit {
     id: String,
     form: ProfileForm,
+    /// The form as opened, to tell unsaved edits (a Sync from Device result included).
+    original: ProfileForm,
     /// The units the form's lengths and feed rate are in.
     units: MeasurementSystem,
     feed_units: FeedRateUnits,
@@ -252,9 +257,11 @@ impl DeviceManagerWindow {
         };
         self.confirm_delete = None;
         self.notice = None;
+        let form = ProfileForm::from_profile(&profile, units, feed_units);
         self.edit = Some(Edit {
             id: profile.id.clone(),
-            form: ProfileForm::from_profile(&profile, units, feed_units),
+            original: form.clone(),
+            form,
             units,
             feed_units,
             tab: Tab::General,
@@ -281,6 +288,28 @@ impl DeviceManagerWindow {
         tracing::warn!(%error, "device profiles not saved");
         let title = tr.tr(n_!("Failed to save device"));
         self.say(format!("{title}: {error}"), true);
+    }
+
+    /// Whether the open form holds edits not saved yet; asked about on quit.
+    pub fn has_unsaved_changes(&self) -> bool {
+        self.edit
+            .as_ref()
+            .is_some_and(|edit| edit.form != edit.original)
+    }
+
+    /// Saves the open form for the quit flow, showing the window with the reason when the
+    /// save is refused.
+    ///
+    /// # Arguments
+    /// * `job_running` - Whether a job streams (the active profile is then not replaced).
+    /// * `tr` - Translator for the notice.
+    ///
+    /// # Returns
+    /// Whether the form was saved.
+    pub fn save_for_quit(&mut self, job_running: bool, tr: &Translator) -> bool {
+        self.open = true;
+        self.save(job_running, tr);
+        self.edit.is_none()
     }
 
     /// The refusal for changing the active profile while a job runs.

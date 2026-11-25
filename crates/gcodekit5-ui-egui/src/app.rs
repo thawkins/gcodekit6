@@ -263,6 +263,8 @@ struct QuitFlow {
     discarded_tool: bool,
     /// The user chose to discard the Materials Manager's unsaved material for this quit.
     discarded_material: bool,
+    /// The user chose to discard the Device Manager's unsaved profile for this quit.
+    discarded_device: bool,
     /// Quitting was decided: the app sent `Close` and lets the close request through.
     confirmed: bool,
 }
@@ -540,6 +542,8 @@ impl GcodeKitApp {
             Some(ConfirmRequest::UnsavedTool)
         } else if self.materials_manager.has_unsaved_changes() && !quit.discarded_material {
             Some(ConfirmRequest::UnsavedMaterial)
+        } else if self.device_manager.has_unsaved_changes() && !quit.discarded_device {
+            Some(ConfirmRequest::UnsavedDevice)
         } else {
             None
         };
@@ -596,6 +600,7 @@ impl GcodeKitApp {
             (ConfirmRequest::UnsavedTool | ConfirmRequest::UnsavedMaterial, choice) => {
                 self.library_quit_answer(request, choice.as_unsaved());
             }
+            (ConfirmRequest::UnsavedDevice, choice) => self.device_quit_answer(choice.as_unsaved()),
             // The quit flow never asks this; forget the quit rather than act on it.
             (ConfirmRequest::Restart, _) => self.cancel_quit(),
         }

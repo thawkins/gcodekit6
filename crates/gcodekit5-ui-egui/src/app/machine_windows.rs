@@ -13,6 +13,7 @@ use crate::dialogs::{Asked, DialogAnswer, FilePurpose};
 use crate::machine::lock;
 use crate::windows::firmware_settings::{EXPORT_FILE_NAME, FileRequest};
 use crate::windows::{DeviceInfoWindow, DeviceManagerWindow, FirmwareSettingsWindow};
+use gcodekit5_app::UnsavedChangesChoice;
 use gcodekit5_app::machine::MachineEvent;
 use gcodekit5_devicedb::{ControllerType, DeviceProfile};
 
@@ -67,6 +68,33 @@ impl GcodeKitApp {
                 }
             }
             self.sync_active_device();
+        }
+    }
+
+    /// Acts on the quit flow's question about an unsaved device profile: Save saves it and
+    /// goes on quitting (a refused save stops the quit and shows the window with the
+    /// reason), Discard goes on without it, Cancel stops the quit and shows the window.
+    pub(super) fn device_quit_answer(&mut self, choice: UnsavedChangesChoice) {
+        let tr = &self.state.translator;
+        match choice {
+            UnsavedChangesChoice::Save => {
+                let job_running = self.state.job_running();
+                let saved = self.device_manager.save_for_quit(job_running, tr);
+                self.sync_active_device();
+                if saved {
+                    self.continue_quit();
+                } else {
+                    self.cancel_quit();
+                }
+            }
+            UnsavedChangesChoice::Discard => {
+                self.quit.discarded_device = true;
+                self.continue_quit();
+            }
+            UnsavedChangesChoice::Cancel => {
+                self.device_manager.open(tr);
+                self.cancel_quit();
+            }
         }
     }
 

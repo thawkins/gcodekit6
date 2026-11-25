@@ -229,6 +229,8 @@ pub enum ConfirmRequest {
     UnsavedTool,
     /// The Materials Manager holds an unsaved material: Save, Discard or Cancel.
     UnsavedMaterial,
+    /// The Device Manager holds an unsaved device profile: Save, Discard or Cancel.
+    UnsavedDevice,
     /// Changed settings take effect after a restart: restart now (Yes) or later (No).
     Restart,
     /// A job is running while the user quits: stop it and quit (Yes) or keep running (No).
@@ -254,6 +256,10 @@ impl ConfirmRequest {
             Self::UnsavedMaterial => (
                 n_!("Unsaved changes"),
                 n_!("The material has unsaved changes. Save them before continuing?"),
+            ),
+            Self::UnsavedDevice => (
+                n_!("Unsaved changes"),
+                n_!("The device profile has unsaved changes. Save them before continuing?"),
             ),
             Self::Restart => (
                 n_!("Restart to apply settings?"),
@@ -282,7 +288,8 @@ pub enum ConfirmChoice {
 impl ConfirmChoice {
     /// The answer to an unsaved-changes prompt ([`ConfirmRequest::UnsavedGcode`],
     /// [`ConfirmRequest::UnsavedDesign`], [`ConfirmRequest::UnsavedTool`],
-    /// [`ConfirmRequest::UnsavedMaterial`]): Yes is Save, No is Discard.
+    /// [`ConfirmRequest::UnsavedMaterial`], [`ConfirmRequest::UnsavedDevice`]): Yes is Save,
+    /// No is Discard.
     pub fn as_unsaved(self) -> UnsavedChangesChoice {
         match self {
             Self::Yes => UnsavedChangesChoice::Save,
@@ -463,7 +470,8 @@ impl Dialogs {
             ConfirmRequest::UnsavedGcode
             | ConfirmRequest::UnsavedDesign
             | ConfirmRequest::UnsavedTool
-            | ConfirmRequest::UnsavedMaterial => (
+            | ConfirmRequest::UnsavedMaterial
+            | ConfirmRequest::UnsavedDevice => (
                 MessageLevel::Warning,
                 MessageButtons::YesNoCancelCustom(
                     save.clone(),
@@ -613,6 +621,7 @@ pub fn msgids() -> Vec<&'static str> {
         ConfirmRequest::UnsavedDesign,
         ConfirmRequest::UnsavedTool,
         ConfirmRequest::UnsavedMaterial,
+        ConfirmRequest::UnsavedDevice,
         ConfirmRequest::Restart,
         ConfirmRequest::StopJob,
     ]
