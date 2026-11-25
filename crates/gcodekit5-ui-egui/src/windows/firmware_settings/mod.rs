@@ -8,8 +8,9 @@
 //!   so it marks the dump complete; after 5 s the retrieval ends as incomplete. A dump with
 //!   no settings hints at the active profile's controller in the Device Manager.
 //! - The first complete GRBL dump of a connection with at least 10 settings is handed to
-//!   the app ([`FirmwareSettingsWindow::take_dump_for_profile`]) to keep in the active
-//!   device profile, as GTK's Device Config page did.
+//!   the app ([`FirmwareSettingsWindow::take_dump_for_profile`]), even when the connection
+//!   closes right after it, to keep in the device profile of that machine, as GTK's Device
+//!   Config page did; [`FirmwareSettingsWindow::note`] then says where it went.
 //! - `$n=v` lines update the list whenever they arrive (a `$$` typed in the console too);
 //!   the GRBL definitions are loaded first when the list is empty.
 //! - Clicking a writable row the controller has reported (on this connection, since the
@@ -157,7 +158,19 @@ impl FirmwareSettingsWindow {
             .collect()
     }
 
-    /// Takes the dump to keep in the active device profile, once per connection.
+    /// Adds `text` to the current notice (what became of a retrieved dump).
+    ///
+    /// # Arguments
+    /// * `text` - The translated note.
+    /// * `error` - Whether it reports a failure.
+    pub fn note(&mut self, text: &str, error: bool) {
+        self.notice = Some(match self.notice.take() {
+            Some((old, was_error)) => (format!("{old} {text}"), was_error || error),
+            None => (text.to_string(), error),
+        });
+    }
+
+    /// Takes the dump to keep in a device profile, once per connection.
     pub fn take_dump_for_profile(&mut self) -> Option<HashMap<u16, String>> {
         self.dump_for_profile.take()
     }
@@ -191,9 +204,10 @@ impl FirmwareSettingsWindow {
             match event {
                 MachineEvent::Received(line) => self.received(line.trim()),
                 MachineEvent::Disconnected => {
+                    // A dump completed in this batch is finished (and handed over) first.
+                    self.tick(tr);
                     self.reported.clear();
                     self.dump_stored = false;
-                    self.dump_for_profile = None;
                     // Ends a retrieval in progress; an earlier result stays until read (the
                     // window shows the connection state beside it).
                     if self.retrieval.take().is_some() {

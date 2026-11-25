@@ -4140,3 +4140,12 @@ msgstr "Le seul appareil ne peut pas être supprimé."
 
 msgid "Check that the active device's controller in the Device Manager matches the machine."
 msgstr "Vérifiez que le contrôleur de l'appareil actif dans le Gestionnaire d'appareils correspond à la machine."
+
+msgid "A copy of the unreadable profiles file was kept in"
+msgstr "Une copie du fichier de profils illisible a été conservée dans"
+
+msgid "Settings stored in device profile:"
+msgstr "Paramètres enregistrés dans le profil d'appareil :"
+
+msgid "Settings not stored in a device profile: no profile matches the connected port."
+msgstr "Paramètres non enregistrés dans un profil d'appareil : aucun profil ne correspond au port connecté."

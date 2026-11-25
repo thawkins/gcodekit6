@@ -4133,3 +4133,12 @@ msgstr "Das einzige Gerät kann nicht gelöscht werden."
 
 msgid "Check that the active device's controller in the Device Manager matches the machine."
 msgstr "Prüfen Sie, ob die Steuerung des aktiven Geräts in der Geräteverwaltung zur Maschine passt."
+
+msgid "A copy of the unreadable profiles file was kept in"
+msgstr "Eine Kopie der unlesbaren Profildatei wurde gespeichert unter"
+
+msgid "Settings stored in device profile:"
+msgstr "Einstellungen im Geräteprofil gespeichert:"
+
+msgid "Settings not stored in a device profile: no profile matches the connected port."
+msgstr "Einstellungen nicht in einem Geräteprofil gespeichert: Kein Profil passt zum verbundenen Port."

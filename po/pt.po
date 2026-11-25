@@ -4128,3 +4128,12 @@ msgstr "O único dispositivo não pode ser eliminado."
 
 msgid "Check that the active device's controller in the Device Manager matches the machine."
 msgstr "Verifique se o controlador do dispositivo ativo no Gestor de dispositivos corresponde à máquina."
+
+msgid "A copy of the unreadable profiles file was kept in"
+msgstr "Foi guardada uma cópia do ficheiro de perfis ilegível em"
+
+msgid "Settings stored in device profile:"
+msgstr "Definições guardadas no perfil de dispositivo:"
+
+msgid "Settings not stored in a device profile: no profile matches the connected port."
+msgstr "Definições não guardadas num perfil de dispositivo: nenhum perfil corresponde à porta ligada."

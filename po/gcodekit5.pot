@@ -4057,3 +4057,12 @@ msgstr ""
 
 msgid "Check that the active device's controller in the Device Manager matches the machine."
 msgstr ""
+
+msgid "A copy of the unreadable profiles file was kept in"
+msgstr ""
+
+msgid "Settings stored in device profile:"
+msgstr ""
+
+msgid "Settings not stored in a device profile: no profile matches the connected port."
+msgstr ""

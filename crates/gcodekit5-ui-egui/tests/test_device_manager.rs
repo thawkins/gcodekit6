@@ -30,7 +30,7 @@ const GTK_DEVICES: &str = r#"{
       "name": "Router 4040",
       "description": "Shop router",
       "device_type": "CncMill",
-      "controller_type": "Grbl",
+      "controller_type": "GrblHal",
       "x_axis": { "min": 0.0, "max": 400.0, "enabled": true },
       "y_axis": { "min": 0.0, "max": 400.0, "enabled": true },
       "z_axis": { "min": -80.0, "max": 0.0, "enabled": true },
@@ -173,7 +173,11 @@ fn test_device_manager_gtk_file_loads_and_round_trips() {
     for name in ["Router 4040", "Diode Laser"] {
         click(&mut h, name);
         click(&mut h, "Save");
-        assert!(!notice(&h).contains("Invalid"), "refused: {}", notice(&h));
+        assert!(
+            notice(&h).contains("Device saved"),
+            "refused: {}",
+            notice(&h)
+        );
     }
     let after: serde_json::Value =
         serde_json::from_str(&std::fs::read_to_string(&file).expect("read")).expect("json");
@@ -271,15 +275,32 @@ fn firmware_with_profile(
     std::sync::Arc<gcodekit5_app::test_support::LoopbackShared>,
     PathBuf,
 ) {
-    let file = devices_file(name, None);
-    let manager = DeviceManager::new(file.clone());
     let profile = DeviceProfile {
         name: "Bench Mill".to_string(),
         controller_type: controller,
         ..DeviceProfile::default()
     };
-    manager.save_profile(profile.clone()).expect("save");
-    manager.set_active_profile(&profile.id).expect("active");
+    let active = profile.id.clone();
+    firmware_with_profiles(name, vec![profile], &active)
+}
+
+/// A connected app (loopback host `loopback:23`) over `profiles` with `active` active, with
+/// Firmware Settings open.
+fn firmware_with_profiles(
+    name: &str,
+    profiles: Vec<DeviceProfile>,
+    active: &str,
+) -> (
+    Harness<'static, GcodeKitApp>,
+    std::sync::Arc<gcodekit5_app::test_support::LoopbackShared>,
+    PathBuf,
+) {
+    let file = devices_file(name, None);
+    let manager = DeviceManager::new(file.clone());
+    for profile in profiles {
+        manager.save_profile(profile).expect("save");
+    }
+    manager.set_active_profile(active).expect("active");
     let (mut state, shared) = loopback_state(Duration::from_millis(1));
     connect(&mut state);
     let mut h = app_harness(GcodeKitApp::from_state(
@@ -370,13 +391,206 @@ fn test_device_manager_retrieve_stores_settings_and_syncs_the_form() {
 }
 
 #[test]
-fn test_device_manager_unreadable_file_is_reported_and_kept() {
+fn test_device_manager_unreadable_file_is_backed_up_and_named() {
     let file = devices_file("unreadable", Some("{ not json"));
     let h = app_with(&file);
-    assert!(notice(&h).contains("could not be read"), "{}", notice(&h));
-    assert_eq!(
-        std::fs::read_to_string(&file).expect("read"),
-        "{ not json",
-        "the file was replaced"
+    let text = notice(&h);
+    assert!(
+        text.contains("could not be read") && text.contains(".bak-"),
+        "{text}"
     );
+    let backups: Vec<_> = std::fs::read_dir(file.parent().expect("dir"))
+        .expect("dir")
+        .filter_map(Result::ok)
+        .filter(|e| e.file_name().to_string_lossy().contains(".bak-"))
+        .collect();
+    assert_eq!(backups.len(), 1, "one backup");
+    assert_eq!(
+        std::fs::read_to_string(backups[0].path()).expect("read"),
+        "{ not json"
+    );
+    // A valid active profile replaces the unreadable file.
+    assert!(h.state().active_device().is_some());
+}
+
+/// The app over `file` without opening any window.
+fn app_only(file: &Path) -> GcodeKitApp {
+    let state = AppState::new(
+        SettingsManager::detached(Config::default()),
+        crate::test_smoke::native_decision(),
+    )
+    .with_device_file(file.to_path_buf());
+    GcodeKitApp::from_state(state)
+}
+
+#[test]
+fn test_device_manager_startup_without_a_file_creates_the_active_default() {
+    let file = devices_file("startup_none", None);
+    let app = app_only(&file);
+    assert!(file.exists(), "devices.json not created at startup");
+    let (profiles, active) = stored(&file);
+    assert_eq!(profiles.len(), 1);
+    assert_eq!(active.as_deref(), Some(profiles[0].id.as_str()));
+    assert_eq!(app.active_device().map(|p| p.id), active);
+}
+
+#[test]
+fn test_device_manager_startup_repairs_a_missing_or_dangling_active_id() {
+    for (name, active) in [("null_active", "null"), ("dangling_active", "\"gone\"")] {
+        let content = GTK_DEVICES.replace(
+            "\"active_id\": \"b-laser\"",
+            &format!("\"active_id\": {active}"),
+        );
+        let file = devices_file(name, Some(&content));
+        let app = app_only(&file);
+        // The first profile by name becomes active, in memory and on disk.
+        assert_eq!(
+            app.active_device().map(|p| p.name).as_deref(),
+            Some("Diode Laser")
+        );
+        assert_eq!(stored(&file).1.as_deref(), Some("b-laser"));
+    }
+}
+
+#[test]
+fn test_device_manager_save_of_active_profile_refused_during_a_job() {
+    let file = devices_file("busy_save", Some(GTK_DEVICES));
+    let (mut state, shared) = loopback_state(Duration::from_millis(1));
+    start_held_stream(&mut state, &shared, 20);
+    let mut h = open_manager(GcodeKitApp::from_state(
+        state.with_device_file(file.clone()),
+    ));
+    click(&mut h, "Diode Laser");
+    set_field(&mut h, "Name:", "Renamed");
+    click(&mut h, "Save");
+    assert!(notice(&h).contains("a job is running"), "{}", notice(&h));
+    assert!(stored(&file).0.iter().all(|p| p.name != "Renamed"));
+    // A profile that is not active can still be saved.
+    click(&mut h, "Router 4040");
+    set_field(&mut h, "Name:", "Router Renamed");
+    click(&mut h, "Save");
+    assert!(stored(&file).0.iter().any(|p| p.name == "Router Renamed"));
+    shared
+        .hold_acks
+        .store(false, std::sync::atomic::Ordering::SeqCst);
+}
+
+/// A GRBL dump of 13 settings, then the identity reply that ends it.
+fn grbl_dump() -> String {
+    let dump: String = [
+        "$0=10",
+        "$1=25",
+        "$2=0",
+        "$3=0",
+        "$4=0",
+        "$5=0",
+        "$6=0",
+        "$30=1000",
+        "$32=1",
+        "$110=5000.000",
+        "$130=410.000",
+        "$131=290.000",
+        "$132=60.000",
+    ]
+    .iter()
+    .map(|l| format!("{l}\n"))
+    .collect();
+    format!("{dump}[VER:1.1h.20190825:]\n")
+}
+
+/// Clicks Retrieve and answers it with [`grbl_dump`].
+fn retrieve_dump(
+    h: &mut Harness<'_, GcodeKitApp>,
+    shared: &gcodekit5_app::test_support::LoopbackShared,
+) {
+    click(h, "Retrieve");
+    assert!(wait_until(|| shared
+        .log()
+        .contains(&Wrote::Line("$I".to_string()))));
+    shared.inject(&grbl_dump());
+}
+
+#[test]
+fn test_device_manager_dump_goes_to_the_profile_on_the_connected_port() {
+    // The active profile is on another port; the loopback host matches "Laser".
+    let router = DeviceProfile {
+        name: "Router".to_string(),
+        port: "/dev/ttyUSB0".to_string(),
+        ..DeviceProfile::default()
+    };
+    let laser = DeviceProfile {
+        name: "Laser".to_string(),
+        port: "/dev/ttyACM0".to_string(),
+        tcp_host: "loopback".to_string(),
+        tcp_port: 23,
+        ..DeviceProfile::default()
+    };
+    let active = router.id.clone();
+    let (mut h, shared, file) = firmware_with_profiles("port_match", vec![router, laser], &active);
+    retrieve_dump(&mut h, &shared);
+    assert!(step_until(&mut h, |app| app
+        .firmware_settings()
+        .notice()
+        .is_some_and(|n| n.contains("Laser"))));
+    let (profiles, _) = stored(&file);
+    let by_name = |n: &str| profiles.iter().find(|p| p.name == n).cloned().expect(n);
+    assert_eq!(by_name("Laser").grbl_settings.len(), 13);
+    assert!(
+        by_name("Router").grbl_settings.is_empty(),
+        "the router was overwritten"
+    );
+    assert!(!by_name("Router").has_laser);
+}
+
+#[test]
+fn test_device_manager_dump_without_a_matching_profile_is_reported() {
+    let router = DeviceProfile {
+        name: "Router".to_string(),
+        port: "/dev/ttyUSB0".to_string(),
+        ..DeviceProfile::default()
+    };
+    let active = router.id.clone();
+    let (mut h, shared, file) = firmware_with_profiles("port_none", vec![router], &active);
+    retrieve_dump(&mut h, &shared);
+    assert!(step_until(&mut h, |app| app
+        .firmware_settings()
+        .notice()
+        .is_some_and(|n| n.contains("not stored"))));
+    assert!(stored(&file).0[0].grbl_settings.is_empty());
+}
+
+#[test]
+fn test_device_manager_dump_completed_before_a_disconnect_is_stored() {
+    let (mut h, shared, file) = firmware_with_profile("disconnect", ControllerType::Grbl);
+    click(&mut h, "Retrieve");
+    assert!(wait_until(|| shared
+        .log()
+        .contains(&Wrote::Line("$I".to_string()))));
+    shared.inject(&grbl_dump());
+    // Let the worker read the reply, then disconnect before the app sees any of it.
+    std::thread::sleep(Duration::from_millis(300));
+    gcodekit5_ui_egui::machine::lock(h.state().state().machine.controller()).disconnect();
+    h.run_steps(3);
+    assert_eq!(stored(&file).0[0].grbl_settings.len(), 13);
+}
+
+#[test]
+fn test_device_manager_stored_dump_refreshes_the_open_form() {
+    let (mut h, shared, file) = firmware_with_profile("stale_form", ControllerType::Grbl);
+    h.state_mut().dispatch(Command::OpenDeviceManager);
+    h.run_steps(3);
+    click(&mut h, "Bench Mill");
+    retrieve_dump(&mut h, &shared);
+    assert!(step_until(&mut h, |app| app
+        .firmware_settings()
+        .notice()
+        .is_some_and(|n| n.contains("Settings retrieved"))));
+    h.run_steps(2);
+    h.state_mut().firmware_settings_mut().close();
+    h.run_steps(2);
+    click(&mut h, "Save");
+    let (profiles, _) = stored(&file);
+    assert_eq!(profiles[0].max_s_value, 1000.0);
+    assert!(profiles[0].has_laser);
+    assert_eq!(profiles[0].grbl_settings.len(), 13);
 }

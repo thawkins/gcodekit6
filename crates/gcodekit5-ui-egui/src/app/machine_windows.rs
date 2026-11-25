@@ -10,6 +10,7 @@
 
 use super::GcodeKitApp;
 use crate::dialogs::{Asked, DialogAnswer, FilePurpose};
+use crate::machine::lock;
 use crate::windows::firmware_settings::{EXPORT_FILE_NAME, FileRequest};
 use crate::windows::{DeviceInfoWindow, DeviceManagerWindow, FirmwareSettingsWindow};
 use gcodekit5_app::machine::MachineEvent;
@@ -42,13 +43,29 @@ impl GcodeKitApp {
     }
 
     /// Hands the machine events no observer has seen yet to the windows, open or not, and
-    /// keeps a retrieved dump in the active device profile.
+    /// keeps a retrieved dump in the profile of the machine it came from.
     pub(super) fn machine_windows_events(&mut self, events: &[MachineEvent]) {
         let tr = &self.state.translator;
         self.firmware_settings.machine_events(events, tr);
         self.device_info.machine_events(events, tr);
         if let Some(dump) = self.firmware_settings.take_dump_for_profile() {
-            self.device_manager.store_reported_settings(&dump);
+            let connection = lock(self.state.machine.controller())
+                .last_connection()
+                .cloned();
+            let tr = &self.state.translator;
+            match self.device_manager.store_dump(&dump, connection.as_ref()) {
+                Some(name) => {
+                    let title = tr.tr(n_!("Settings stored in device profile:"));
+                    self.firmware_settings
+                        .note(&format!("{title} {name}"), false);
+                }
+                None => {
+                    let text = n_!(
+                        "Settings not stored in a device profile: no profile matches the connected port."
+                    );
+                    self.firmware_settings.note(&tr.tr(text), true);
+                }
+            }
             self.sync_active_device();
         }
     }

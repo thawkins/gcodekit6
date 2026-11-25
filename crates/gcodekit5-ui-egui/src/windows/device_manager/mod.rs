@@ -3,17 +3,21 @@
 //! Connection, Dimensions, Capabilities).
 //!
 //! - Profiles are kept in the GTK build's `devices.json` through `gcodekit5-devicedb`'s
-//!   `DeviceManager`, so a profile written by either build loads in the other. An existing
-//!   file is read when the app starts; opening the window without one creates the default
-//!   profile and makes it active, as GTK does at startup.
+//!   `DeviceManager`, so a profile written by either build loads in the other. The file is
+//!   read when the app starts; without one the default profile is created and made active,
+//!   as GTK does. A file with no valid active profile gets one (the first by name), and an
+//!   unreadable file is backed up (`devices.json.bak-<time>`, named in the window's
+//!   notice) and replaced by the default profile, so there is always a valid active
+//!   profile.
 //! - **Add Device** stores a new default profile and opens it; **Save** checks the form
 //!   with [`ProfileForm::apply`] (GTK's rules and messages); **Cancel** drops the edits;
 //!   **Delete** asks first; **Set Active** makes the profile the active one; **Sync from
 //!   Device** fills the form from the settings the controller reported in Firmware
 //!   Settings (GTK's Sync from Device, `$130`-`$132`, `$30`, `$32`).
-//! - The active profile can never be deleted, nor the only one, so the app always keeps
-//!   a valid active profile (GTK cleared it). While a job runs the active profile cannot
-//!   be changed or replaced.
+//! - The active profile can never be deleted, nor the only one (GTK cleared it). While a
+//!   job runs the active profile cannot be changed or replaced.
+//! - A GRBL dump retrieved in Firmware Settings is stored in the profile GTK chose
+//!   ([`device_profiles::dump_target`]) by [`DeviceManagerWindow::store_dump`].
 //!
 //! Dependencies: `egui`, `gcodekit5-app` (form rules, translations), `gcodekit5-devicedb`
 //! (profiles and their file), `gcodekit5-core` (units).
@@ -22,11 +26,13 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 
 use gcodekit5_app::device_profiles::{
-    self, ProfileForm, ReportedLimits, delete_refusal, matches_search,
+    self, ProfileForm, ReportedLimits, delete_refusal, dump_target, ensure_active_profile,
+    matches_search,
 };
 use gcodekit5_app::i18n::Translator;
 use gcodekit5_core::units::{FeedRateUnits, MeasurementSystem};
 use gcodekit5_devicedb::{DeviceManager, DeviceProfile};
+use gcodekit5_settings::ConnectionSettings;
 
 mod view;
 
@@ -81,10 +87,10 @@ pub struct DeviceManagerWindow {
     open: bool,
     /// The profiles and their file; `None` without a settings folder.
     store: Option<DeviceManager>,
-    /// The file was read (or created) on this run.
-    loaded: bool,
-    /// Why the file could not be read, until the window shows it.
+    /// Why the file could not be read or repaired, until the window shows it.
     load_error: Option<String>,
+    /// The backup of an unreadable file the notice last named.
+    backup_named: Option<PathBuf>,
     search: String,
     edit: Option<Edit>,
     confirm_delete: Option<ConfirmDelete>,
@@ -97,27 +103,23 @@ pub struct DeviceManagerWindow {
 }
 
 impl DeviceManagerWindow {
-    /// The window over the profiles in `file`, read now if it exists (nothing is written).
+    /// The window over the profiles in `file`, read now; a missing file is created with the
+    /// default profile and a missing active profile is chosen (see the module docs).
     ///
     /// # Arguments
     /// * `file` - The profiles file; `None` without a settings folder.
     pub fn new(file: Option<PathBuf>) -> Self {
-        let mut loaded = false;
         let mut load_error = None;
         let store = file.map(|file| {
-            let exists = file.exists();
             let store = DeviceManager::new(file);
-            if exists {
-                loaded = true;
-                load_error = load(&store);
-            }
+            load_error = load(&store);
             store
         });
         Self {
             open: false,
             store,
-            loaded,
             load_error,
+            backup_named: None,
             search: String::new(),
             edit: None,
             confirm_delete: None,
@@ -127,29 +129,42 @@ impl DeviceManagerWindow {
         }
     }
 
-    /// Opens the window; without a profiles file the default profile is created and made
-    /// active (GTK's first start).
+    /// Opens the window, telling why the profiles could not be read (and where the
+    /// unreadable file was kept) if they could not.
     ///
     /// # Arguments
     /// * `tr` - Translator for a notice.
     pub fn open(&mut self, tr: &Translator) {
         self.open = true;
-        match &self.store {
-            Some(store) if !self.loaded => {
-                self.loaded = true;
-                self.load_error = load(store);
-                self.changed = true;
-            }
-            Some(_) => {}
-            None => {
-                let text = n_!("No settings folder: device profiles cannot be loaded or saved.");
-                self.say(tr.tr(text).into_owned(), true);
-            }
+        if self.store.is_none() {
+            let text = n_!("No settings folder: device profiles cannot be loaded or saved.");
+            self.say(tr.tr(text).into_owned(), true);
         }
         if let Some(error) = self.load_error.take() {
             let title = tr.tr(n_!("Device profiles could not be read:"));
             self.say(format!("{title} {error}"), true);
         }
+        self.name_backup(tr);
+    }
+
+    /// Adds the path of a backup the profiles file got since the last notice to the notice.
+    fn name_backup(&mut self, tr: &Translator) {
+        let Some(backup) = self.store.as_ref().and_then(DeviceManager::last_backup) else {
+            return;
+        };
+        if self.backup_named.as_ref() == Some(&backup) {
+            return;
+        }
+        let note = format!(
+            "{} {}",
+            tr.tr(n_!("A copy of the unreadable profiles file was kept in")),
+            backup.display()
+        );
+        self.notice = Some(match self.notice.take() {
+            Some((text, _)) => (format!("{text} {note}"), true),
+            None => (note, true),
+        });
+        self.backup_named = Some(backup);
     }
 
     /// Whether the window is open.
@@ -196,22 +211,38 @@ impl DeviceManagerWindow {
         self.active_profile().map(|p| p.id)
     }
 
-    /// Keeps a GRBL `$$` dump in the active profile (GTK's Device Config page rule).
+    /// Keeps a GRBL `$$` dump in the profile of the machine it came from
+    /// ([`dump_target`], GTK's Device Config page rule); the form, if that profile is open,
+    /// takes the stored S value and laser mode so a later Save keeps them.
     ///
     /// # Arguments
     /// * `settings` - The reported settings.
-    pub fn store_reported_settings(&mut self, settings: &HashMap<u16, String>) {
-        let Some(store) = &self.store else {
-            return;
-        };
-        let Some(mut profile) = store.get_active_profile() else {
-            return;
-        };
+    /// * `connection` - The connection the dump was read over, if known.
+    ///
+    /// # Returns
+    /// The name of the profile it was stored in, or `None` when no profile matches the
+    /// connection (or it could not be saved).
+    pub fn store_dump(
+        &mut self,
+        settings: &HashMap<u16, String>,
+        connection: Option<&ConnectionSettings>,
+    ) -> Option<String> {
+        let store = self.store.as_ref()?;
+        let active = store.get_active_profile().map(|p| p.id);
+        let id = dump_target(&store.get_all_profiles(), active.as_deref(), connection?)?;
+        let mut profile = store.get_profile(&id)?;
         device_profiles::store_reported_settings(&mut profile, settings);
-        match store.save_profile(profile) {
-            Ok(()) => self.changed = true,
-            Err(error) => tracing::warn!(%error, "reported settings not stored in the profile"),
+        let stored = profile.clone();
+        if let Err(error) = store.save_profile(profile) {
+            tracing::warn!(%error, "reported settings not stored in the profile");
+            return None;
         }
+        self.changed |= active.as_deref() == Some(id.as_str());
+        if let Some(edit) = self.edit.as_mut().filter(|e| e.id == id) {
+            edit.form.max_s_value = format!("{:.0}", stored.max_s_value);
+            edit.form.has_laser = stored.has_laser;
+        }
+        Some(stored.name)
     }
 
     /// Opens profile `id` in the form, with lengths in `units` and feed in `feed_units`.
@@ -238,7 +269,10 @@ impl DeviceManagerWindow {
         let profile = DeviceProfile::default();
         let id = profile.id.clone();
         match store.save_profile(profile) {
-            Ok(()) => self.select(&id, units, feed_units),
+            Ok(()) => {
+                self.select(&id, units, feed_units);
+                self.name_backup(tr);
+            }
             Err(error) => self.failed(&error, tr),
         }
     }
@@ -284,6 +318,7 @@ impl DeviceManagerWindow {
                 self.edit = None;
                 self.changed |= is_active;
                 self.say(format!("{} {name}", tr.tr(n_!("Device saved:"))), false);
+                self.name_backup(tr);
             }
             Err(error) => self.failed(&error, tr),
         }
@@ -326,6 +361,7 @@ impl DeviceManagerWindow {
                 self.edit = None;
                 let title = tr.tr(n_!("Device deleted:"));
                 self.say(format!("{title} {}", confirm.name), false);
+                self.name_backup(tr);
             }
             Err(error) => self.failed(&error, tr),
         }
@@ -346,6 +382,7 @@ impl DeviceManagerWindow {
                 let title = tr.tr(n_!("Active device:"));
                 self.say(format!("{title} {}", edit.form.name), false);
                 self.edit = None;
+                self.name_backup(tr);
             }
             Err(error) => self.failed(&error, tr),
         }
@@ -385,14 +422,26 @@ impl DeviceManagerWindow {
     }
 }
 
-/// Reads the profiles file (creating it with the default profile when missing).
+/// Reads the profiles file (creating it with the default profile when missing) and makes
+/// sure a valid profile is active; an unreadable file is backed up by the save that
+/// replaces it.
 ///
 /// # Returns
-/// Why it could not be read, if it could not.
+/// Why the file could not be read or repaired, if it could not.
 fn load(store: &DeviceManager) -> Option<String> {
-    let error = store.load().err()?;
-    tracing::warn!(%error, "device profiles not loaded");
-    Some(error.to_string())
+    let read = store.load().err();
+    if let Some(error) = &read {
+        tracing::warn!(%error, "device profiles not loaded");
+    }
+    let repaired = ensure_active_profile(store).err();
+    if let Some(error) = &repaired {
+        tracing::warn!(%error, "no active device profile could be set");
+    }
+    match (read, repaired) {
+        (None, None) => None,
+        (Some(error), None) | (None, Some(error)) => Some(error.to_string()),
+        (Some(read), Some(repaired)) => Some(format!("{read}; {repaired}")),
+    }
 }
 
 /// The English msgids this window shows, for the translation test.
@@ -442,6 +491,9 @@ pub fn msgids() -> Vec<&'static str> {
         n_!("Has Coolant"),
         n_!("Pen Mode (Repetier: M3/M5 become pen down/up Z moves)"),
         n_!("Device profiles could not be read:"),
+        n_!("A copy of the unreadable profiles file was kept in"),
+        n_!("Settings stored in device profile:"),
+        n_!("Settings not stored in a device profile: no profile matches the connected port."),
         n_!("No settings folder: device profiles cannot be loaded or saved."),
         n_!("Failed to save device"),
         n_!("Device not changed"),
