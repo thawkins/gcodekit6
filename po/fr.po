@@ -3009,3 +3009,12 @@ msgstr "le contrôleur a répondu"
 
 msgid "no reply from the controller"
 msgstr "aucune réponse du contrôleur"
+
+msgid "Layers"
+msgstr "Calques"
+
+msgid "Minimize"
+msgstr "Réduire"
+
+msgid "Maximize"
+msgstr "Agrandir"

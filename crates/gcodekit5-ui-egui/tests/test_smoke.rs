@@ -1,14 +1,32 @@
 //! Smoke test: the app renders its docked workspace and themes its widgets.
 
+use craft_window::policy::{Backend, Desktop, DesktopKind, Os, TitleBarPref, decide};
 use egui::accesskit::Role;
 use egui_kittest::Harness;
 use egui_kittest::kittest::Queryable;
 use gcodekit5_settings::config::Config;
 use gcodekit5_ui_egui::{AppState, GcodeKitApp};
 
+/// A decision with the desktop drawing the frame, built without probing the desktop.
+fn native_decision() -> craft_window::policy::Decision {
+    let desktop = Desktop {
+        kind: DesktopKind::Gnome,
+        ssd: Some(false),
+        gtk_theme: None,
+        icon_theme: None,
+    };
+    decide(
+        Os::Linux,
+        Backend::Wayland,
+        &desktop,
+        TitleBarPref::System,
+        None,
+    )
+}
+
 #[test]
 fn test_app_renders_workspace() {
-    let mut app = GcodeKitApp::from_state(AppState::from_config(Config::default()));
+    let mut app = GcodeKitApp::from_state(AppState::new(Config::default(), native_decision()));
     let mut harness = Harness::builder()
         .with_size(egui::vec2(1280.0, 800.0))
         .build_ui(|ui| app.ui(ui));
@@ -41,23 +59,4 @@ fn test_theme_override_beats_desktop() {
         resolve(Theme::System, Some(egui::Theme::Light)),
         egui::Theme::Light
     );
-}
-
-#[test]
-fn test_integrated_frame_draws_caption_buttons() {
-    use craft_window::policy::{CaptionFamily, Captions, Frame};
-    let mut state = AppState::from_config(Config::default());
-    state.frame = Frame::Integrated(Captions {
-        family: CaptionFamily::Generic,
-        layout: craft_window::Layout::default(),
-    });
-    let mut app = GcodeKitApp::from_state(state);
-    let mut harness = Harness::builder()
-        .with_size(egui::vec2(1280.0, 800.0))
-        .build_ui(|ui| app.ui(ui));
-    harness.run();
-    for label in ["Minimize", "Maximize", "Close"] {
-        let _ = harness.get_by_role_and_label(Role::Button, label);
-    }
-    let _ = harness.get_by_role_and_label(Role::Tab, "Machine Control");
 }

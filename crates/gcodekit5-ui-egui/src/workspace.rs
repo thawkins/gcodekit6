@@ -49,14 +49,14 @@ impl PaneId {
     /// The English msgid of the pane's title, as listed in `po/gcodekit5.pot`.
     pub fn title_msgid(self) -> &'static str {
         match self {
-            PaneId::MachineControl => "Machine Control",
-            PaneId::Console => "Device Console",
-            PaneId::Editor => "G-Code Editor",
-            PaneId::Visualizer => "Visualizer",
-            PaneId::Designer => "Designer",
-            PaneId::DesignerLayers => "Layers",
-            PaneId::DesignerProperties => "Properties",
-            PaneId::CamTools => "CAM Tools",
+            PaneId::MachineControl => n_!("Machine Control"),
+            PaneId::Console => n_!("Device Console"),
+            PaneId::Editor => n_!("G-Code Editor"),
+            PaneId::Visualizer => n_!("Visualizer"),
+            PaneId::Designer => n_!("Designer"),
+            PaneId::DesignerLayers => n_!("Layers"),
+            PaneId::DesignerProperties => n_!("Properties"),
+            PaneId::CamTools => n_!("CAM Tools"),
         }
     }
 }
@@ -114,7 +114,10 @@ impl Pane for PlaceholderPane {
 
     fn ui(&mut self, ui: &mut egui::Ui, ctx: &mut PaneContext) {
         ui.centered_and_justified(|ui| {
-            ui.weak(self.title(ctx.tr));
+            // Not selectable: a selectable label fills the body and takes every drag in it.
+            ui.add(
+                egui::Label::new(egui::RichText::new(self.title(ctx.tr)).weak()).selectable(false),
+            );
         });
     }
 }

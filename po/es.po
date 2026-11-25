@@ -3005,3 +3005,12 @@ msgstr "el controlador respondió"
 
 msgid "no reply from the controller"
 msgstr "sin respuesta del controlador"
+
+msgid "Layers"
+msgstr "Capas"
+
+msgid "Minimize"
+msgstr "Minimizar"
+
+msgid "Maximize"
+msgstr "Maximizar"

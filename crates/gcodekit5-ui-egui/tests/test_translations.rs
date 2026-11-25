@@ -1,0 +1,48 @@
+//! Every new UI msgid of the egui front end has a translation in each shipped language.
+
+use craft_window::Button;
+use gcodekit5_app::i18n::Translator;
+use gcodekit5_ui_egui::frame::caption_msgid;
+use gcodekit5_ui_egui::workspace::PaneId;
+
+const LANGUAGES: [&str; 5] = ["de", "es", "fr", "it", "pt"];
+
+/// Translations that are spelled like the English msgid; the Translator cannot tell them
+/// from a missing entry, so the po file is checked for them instead.
+const IDENTICAL: [(&str, &str); 4] = [
+    ("de", "G-Code Editor"),
+    ("de", "Designer"),
+    ("it", "Designer"),
+    ("pt", "Designer"),
+];
+
+fn msgids() -> Vec<&'static str> {
+    PaneId::ALL
+        .into_iter()
+        .map(PaneId::title_msgid)
+        .chain([Button::Minimize, Button::Maximize, Button::Close].map(caption_msgid))
+        .collect()
+}
+
+#[test]
+fn test_every_ui_msgid_is_translated() {
+    let po_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../po");
+    for lang in LANGUAGES {
+        let tr = Translator::new(lang);
+        assert_eq!(tr.language(), Some(lang), "no catalog for {lang}");
+        let po = std::fs::read_to_string(po_dir.join(format!("{lang}.po"))).expect("read po file");
+        for msgid in msgids() {
+            let translated = tr.tr(msgid);
+            if IDENTICAL.contains(&(lang, msgid)) {
+                assert_eq!(
+                    translated, msgid,
+                    "{lang}: {msgid:?} is no longer identical"
+                );
+                let entry = format!("msgid \"{msgid}\"\nmsgstr \"{msgid}\"\n");
+                assert!(po.contains(&entry), "{lang}: {msgid:?} has no entry");
+            } else {
+                assert_ne!(translated, msgid, "{lang}: {msgid:?} is not translated");
+            }
+        }
+    }
+}

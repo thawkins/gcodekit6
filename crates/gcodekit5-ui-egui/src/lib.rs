@@ -6,7 +6,17 @@
 
 #![deny(unsafe_code)]
 
+/// Marks a string literal for translation extraction without translating it, for msgids
+/// returned from a `match` and translated later through a variable. `scripts/update-po.sh`
+/// passes `--keyword=n_!`, as for the GTK crate's macro of the same name.
+macro_rules! n_ {
+    ($s:literal) => {
+        $s
+    };
+}
+
 pub mod app;
+pub mod frame;
 pub mod theme;
 pub mod workspace;
 
@@ -29,20 +39,20 @@ pub struct LaunchOptions {
 pub fn run(options: LaunchOptions) -> anyhow::Result<()> {
     // `options.files` is consumed once the app opens files (Tasks 4 and 9).
     let LaunchOptions { files: _ } = options;
-    let mut state = AppState::load();
-    gcodekit5_app::i18n::set_language(&state.config.ui.language);
+    let config = AppState::load_config();
+    gcodekit5_app::i18n::set_language(&config.ui.language);
     let decision = craft_window::policy::decide_for(
         craft_window::Prefix::new("GCODEKIT5"),
         craft_window::policy::Backend::from_env(),
-        craft_window::policy::TitleBarPref::Integrated,
+        frame::title_bar_pref(&config.ui),
     );
-    state.frame = decision.frame;
+    let state = AppState::new(config, decision);
     let viewport = egui::ViewportBuilder::default()
         .with_title("GCodeKit")
         .with_inner_size([1280.0, 800.0])
         .with_min_inner_size([640.0, 400.0]);
     let native = eframe::NativeOptions {
-        viewport: craft_window::policy::apply(viewport, &state.frame),
+        viewport: craft_window::policy::apply(viewport, &state.decision.frame),
         ..eframe::NativeOptions::default()
     };
     eframe::run_native(

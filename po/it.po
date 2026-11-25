@@ -3005,3 +3005,12 @@ msgstr "il controller ha risposto"
 
 msgid "no reply from the controller"
 msgstr "nessuna risposta dal controller"
+
+msgid "Layers"
+msgstr "Livelli"
+
+msgid "Minimize"
+msgstr "Riduci a icona"
+
+msgid "Maximize"
+msgstr "Ingrandisci"

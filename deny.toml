@@ -13,14 +13,7 @@ feature-depth = 1
 [advisories]
 # Permitimos paquetes obsoletos de terceros para saltarnos las 3 versiones de ttf-parser
 unmaintained = "none"
-ignore = [
-    # gettext-rs < 0.8: setlocale/TextDomain::init touch the environment
-    # without synchronisation. The app calls setlocale once, on the main
-    # thread, before any other thread starts (gcodekit5-ui i18n::init). The
-    # fix in 0.8 makes these functions `unsafe`, which needs a sanctioned
-    # unsafe block to adopt.
-    "RUSTSEC-2026-0244",
-]
+ignore = []
 
 [licenses]
 allow = [
