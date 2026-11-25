@@ -2,9 +2,10 @@
 //! the current feed rate and spindle speed, from the latest status report.
 //!
 //! Positions are millimetres internally, shown in the user's measurement system (two
-//! decimals for mm, three for inches) (ported from the GTK `osd_format::format_length_with_unit` and the GTK status
-//! report's DRO). A report carries either `MPos` or `WPos`; the
-//! other is derived with the last work coordinate offset (`WCO`) when one is known.
+//! decimals for mm, three for inches); ported from the GTK
+//! `osd_format::format_length_with_unit` and the GTK status report's DRO. A report carries
+//! either `MPos` or `WPos`; the other is derived with the last work coordinate offset
+//! (`WCO`) when one is known.
 //!
 //! Dependencies: `egui`, `gcodekit5-app` (translations).
 

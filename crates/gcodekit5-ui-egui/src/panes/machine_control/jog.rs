@@ -9,9 +9,12 @@
 //! In step mode a click jogs one step. In continuous mode a hold is GRBL's documented
 //! continuous jog: one `$J` move toward the end of travel, cancelled with jog cancel (0x85).
 //! The move is clamped to the travel left in that direction (see [`remaining_travel`]); with
-//! no known machine position, or no travel left, nothing moves and the pane says why. The
+//! no known machine position, or no travel left, nothing moves and the pane says why.
+//!
 //! Jogging (step and hold) is enabled only while the last status report says `Idle` or
-//! `Jog` and was read after the last command line (`$H`, `$X`, MDI) was written. The hold is tracked here rather than with egui's "pointer down on" flag, which this egui
+//! `Jog` and was read after the last command line (`$H`, `$X`, MDI) was written.
+//!
+//! The hold is tracked here rather than with egui's "pointer down on" flag, which this egui
 //! clears once a press can no longer be a click: it lasts while the primary button that
 //! was pressed on the button stays down, the pointer stays on the button and the button
 //! stays enabled. Anything else ends it with 0x85, and the pane and the app end it on
