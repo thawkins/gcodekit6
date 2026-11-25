@@ -3440,3 +3440,21 @@ msgstr "Genera código G para planear el tablero de sacrificio de su CNC y obten
 
 msgid "Spoilboard Dimensions"
 msgstr "Dimensiones del tablero de sacrificio"
+
+msgid "Grid Spacing:"
+msgstr "Espaciado de la cuadrícula:"
+
+msgid "Laser Power (S):"
+msgstr "Potencia del láser (S):"
+
+msgid "Laser Mode:"
+msgstr "Modo láser:"
+
+msgid "M3 (Constant Power)"
+msgstr "M3 (potencia constante)"
+
+msgid "M4 (Dynamic Power)"
+msgstr "M4 (potencia dinámica)"
+
+msgid "Create a grid pattern on your spoilboard for easy workpiece alignment and fixturing."
+msgstr "Crea un patrón de cuadrícula en su tablero de sacrificio para alinear y sujetar piezas fácilmente."

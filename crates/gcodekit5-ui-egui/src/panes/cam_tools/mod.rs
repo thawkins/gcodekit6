@@ -15,6 +15,7 @@
 
 pub mod common;
 pub mod drill_press;
+pub mod spoilboard_grid;
 pub mod spoilboard_surfacing;
 
 use std::cell::RefCell;
@@ -27,6 +28,7 @@ use gcodekit5_settings::config::Config;
 
 pub use common::{CamAction, CamError, FieldError};
 use drill_press::DrillPressParams;
+use spoilboard_grid::SpoilboardGridParams;
 use spoilboard_surfacing::SpoilboardSurfacingParams;
 
 use crate::workspace::{Pane, PaneContext, PaneId};
@@ -34,6 +36,8 @@ use crate::workspace::{Pane, PaneContext, PaneId};
 /// One CAM tool of the picker.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum CamTool {
+    /// Create Spoilboard Grid.
+    SpoilboardGrid,
     /// Spoilboard Surfacing.
     SpoilboardSurfacing,
     /// Drill Press.
@@ -42,11 +46,16 @@ pub enum CamTool {
 
 impl CamTool {
     /// Every tool, in GTK's list order.
-    pub const ALL: [CamTool; 2] = [CamTool::SpoilboardSurfacing, CamTool::DrillPress];
+    pub const ALL: [CamTool; 3] = [
+        CamTool::SpoilboardSurfacing,
+        CamTool::SpoilboardGrid,
+        CamTool::DrillPress,
+    ];
 
     /// The msgid of the tool's title.
     pub fn title_msgid(self) -> &'static str {
         match self {
+            CamTool::SpoilboardGrid => n_!("Create Spoilboard Grid"),
             CamTool::SpoilboardSurfacing => n_!("Spoilboard Surfacing"),
             CamTool::DrillPress => n_!("Drill Press"),
         }
@@ -55,6 +64,7 @@ impl CamTool {
     /// The msgid of the tool's description.
     pub fn description_msgid(self) -> &'static str {
         match self {
+            CamTool::SpoilboardGrid => n_!("Generate grid patterns for spoilboard alignment"),
             CamTool::SpoilboardSurfacing => {
                 n_!("Generate surfacing toolpaths to flatten your spoilboard")
             }
@@ -67,6 +77,7 @@ impl CamTool {
     /// The picker category the tool is listed under.
     pub fn category(self) -> Category {
         match self {
+            CamTool::SpoilboardGrid => Category::Maintenance,
             CamTool::SpoilboardSurfacing => Category::Maintenance,
             CamTool::DrillPress => Category::Generators,
         }
@@ -137,6 +148,7 @@ pub fn msgids() -> Vec<&'static str> {
         ids.push(tool.description_msgid());
     }
     ids.extend(common::msgids());
+    ids.extend(spoilboard_grid::msgids());
     ids.extend(spoilboard_surfacing::msgids());
     ids.extend(drill_press::msgids());
     ids
@@ -163,6 +175,8 @@ pub struct CamToolsPane {
     drill_press: DrillPressParams,
     /// The Spoilboard Surfacing page.
     spoilboard_surfacing: SpoilboardSurfacingParams,
+    /// The Create Spoilboard Grid page.
+    spoilboard_grid: SpoilboardGridParams,
     /// Send to Editor / Preview, waiting for the app.
     editor_request: Option<CamDelivery>,
     /// The program the request hands to the editor.
@@ -187,6 +201,7 @@ impl CamToolsPane {
             category: Category::All,
             drill_press: DrillPressParams::new(units),
             spoilboard_surfacing: SpoilboardSurfacingParams::new(units),
+            spoilboard_grid: SpoilboardGridParams::new(units),
             output: None,
             notice: None,
             editor_request: None,
@@ -294,6 +309,7 @@ impl CamToolsPane {
     /// Shows the pages' lengths in `units`, converting what is typed.
     fn set_units(&mut self, units: MeasurementSystem) {
         self.units = units;
+        self.spoilboard_grid.set_units(units);
         self.spoilboard_surfacing.set_units(units);
         self.drill_press.set_units(units);
     }
@@ -306,6 +322,11 @@ impl CamToolsPane {
     /// The Spoilboard Surfacing page's input.
     pub fn spoilboard_surfacing_mut(&mut self) -> &mut SpoilboardSurfacingParams {
         &mut self.spoilboard_surfacing
+    }
+
+    /// The Create Spoilboard Grid page's input.
+    pub fn spoilboard_grid_mut(&mut self) -> &mut SpoilboardGridParams {
+        &mut self.spoilboard_grid
     }
 
     /// Runs a page's action.
@@ -331,6 +352,7 @@ impl CamToolsPane {
     /// Generates `tool`'s program from its page.
     fn generate(&mut self, tool: CamTool) -> Result<String, CamError> {
         match tool {
+            CamTool::SpoilboardGrid => self.spoilboard_grid.generate(),
             CamTool::SpoilboardSurfacing => self.spoilboard_surfacing.generate(),
             CamTool::DrillPress => self.drill_press.generate(),
         }
@@ -339,6 +361,7 @@ impl CamToolsPane {
     /// Draws `tool`'s page.
     fn show_page(&mut self, ui: &mut egui::Ui, tool: CamTool, tr: &Translator) -> CamAction {
         match tool {
+            CamTool::SpoilboardGrid => spoilboard_grid::show(ui, &mut self.spoilboard_grid, tr),
             CamTool::SpoilboardSurfacing => {
                 spoilboard_surfacing::show(ui, &mut self.spoilboard_surfacing, tr)
             }

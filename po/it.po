@@ -3440,3 +3440,21 @@ msgstr "Genera codice G per spianare il piano sacrificale della tua CNC e ottene
 
 msgid "Spoilboard Dimensions"
 msgstr "Dimensioni del piano sacrificale"
+
+msgid "Grid Spacing:"
+msgstr "Spaziatura griglia:"
+
+msgid "Laser Power (S):"
+msgstr "Potenza laser (S):"
+
+msgid "Laser Mode:"
+msgstr "Modalità laser:"
+
+msgid "M3 (Constant Power)"
+msgstr "M3 (potenza costante)"
+
+msgid "M4 (Dynamic Power)"
+msgstr "M4 (potenza dinamica)"
+
+msgid "Create a grid pattern on your spoilboard for easy workpiece alignment and fixturing."
+msgstr "Crea una griglia sul piano sacrificale per allineare e fissare facilmente i pezzi."

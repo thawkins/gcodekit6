@@ -3361,3 +3361,21 @@ msgstr ""
 
 msgid "Spoilboard Dimensions"
 msgstr ""
+
+msgid "Grid Spacing:"
+msgstr ""
+
+msgid "Laser Power (S):"
+msgstr ""
+
+msgid "Laser Mode:"
+msgstr ""
+
+msgid "M3 (Constant Power)"
+msgstr ""
+
+msgid "M4 (Dynamic Power)"
+msgstr ""
+
+msgid "Create a grid pattern on your spoilboard for easy workpiece alignment and fixturing."
+msgstr ""

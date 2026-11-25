@@ -3432,3 +3432,21 @@ msgstr "Gera código G para facear a mesa de sacrifício da sua CNC e garantir u
 
 msgid "Spoilboard Dimensions"
 msgstr "Dimensões da mesa de sacrifício"
+
+msgid "Grid Spacing:"
+msgstr "Espaçamento da grade:"
+
+msgid "Laser Power (S):"
+msgstr "Potência do laser (S):"
+
+msgid "Laser Mode:"
+msgstr "Modo do laser:"
+
+msgid "M3 (Constant Power)"
+msgstr "M3 (potência constante)"
+
+msgid "M4 (Dynamic Power)"
+msgstr "M4 (potência dinâmica)"
+
+msgid "Create a grid pattern on your spoilboard for easy workpiece alignment and fixturing."
+msgstr "Cria um padrão de grade na mesa de sacrifício para alinhar e fixar peças com facilidade."

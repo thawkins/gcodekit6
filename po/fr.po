@@ -3444,3 +3444,21 @@ msgstr "Génère du code G pour surfacer la plaque martyre de votre CNC afin d'o
 
 msgid "Spoilboard Dimensions"
 msgstr "Dimensions de la plaque martyre"
+
+msgid "Grid Spacing:"
+msgstr "Espacement de la grille :"
+
+msgid "Laser Power (S):"
+msgstr "Puissance laser (S) :"
+
+msgid "Laser Mode:"
+msgstr "Mode laser :"
+
+msgid "M3 (Constant Power)"
+msgstr "M3 (puissance constante)"
+
+msgid "M4 (Dynamic Power)"
+msgstr "M4 (puissance dynamique)"
+
+msgid "Create a grid pattern on your spoilboard for easy workpiece alignment and fixturing."
+msgstr "Crée un motif de grille sur votre plaque martyre pour aligner et brider facilement les pièces."
