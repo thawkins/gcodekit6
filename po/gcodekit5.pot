@@ -3770,7 +3770,16 @@ msgstr ""
 msgid "a program is already streaming"
 msgstr ""
 
+msgid "Firmware Settings"
+msgstr ""
+
 msgid "Device Info"
+msgstr ""
+
+msgid "Protocol mismatch: No valid parameters received from device"
+msgstr ""
+
+msgid "Setting written:"
 msgstr ""
 
 msgid "a job is running"

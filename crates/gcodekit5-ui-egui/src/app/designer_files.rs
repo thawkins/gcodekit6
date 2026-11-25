@@ -280,7 +280,9 @@ impl GcodeKitApp {
                     | FilePurpose::LoadCamPreset
                     | FilePurpose::SaveCamPreset
                     | FilePurpose::OpenGerberFolder
-                    | FilePurpose::OpenEngravingImage => return false,
+                    | FilePurpose::OpenEngravingImage
+                    | FilePurpose::ExportFirmwareSettings
+                    | FilePurpose::ImportFirmwareSettings => return false,
                 }
             }
             DialogAnswer::Cancelled {

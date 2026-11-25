@@ -3849,8 +3849,17 @@ msgstr "ya conectado"
 msgid "a program is already streaming"
 msgstr "ya se está enviando un programa"
 
+msgid "Firmware Settings"
+msgstr "Ajustes del firmware"
+
 msgid "Device Info"
 msgstr "Información del dispositivo"
+
+msgid "Protocol mismatch: No valid parameters received from device"
+msgstr "Protocolo incompatible: no se recibieron parámetros válidos del dispositivo"
+
+msgid "Setting written:"
+msgstr "Ajuste escrito:"
 
 msgid "a job is running"
 msgstr "hay un trabajo en curso"

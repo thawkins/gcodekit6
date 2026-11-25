@@ -50,6 +50,10 @@ pub enum FilePurpose {
     OpenGerberFolder,
     /// Choose the image the Laser Image Engraver engraves.
     OpenEngravingImage,
+    /// Choose where to save the firmware settings list.
+    ExportFirmwareSettings,
+    /// Choose a saved firmware settings list to load.
+    ImportFirmwareSettings,
 }
 
 impl FilePurpose {
@@ -68,6 +72,8 @@ impl FilePurpose {
             Self::SaveCamPreset => n_!("Save Parameters"),
             Self::OpenGerberFolder => n_!("Open Gerber Directory"),
             Self::OpenEngravingImage => n_!("Select Image"),
+            Self::ExportFirmwareSettings => n_!("Export Settings"),
+            Self::ImportFirmwareSettings => n_!("Import Settings"),
         }
     }
 
@@ -99,6 +105,8 @@ impl FilePurpose {
             // A folder has no file types.
             Self::OpenGerberFolder => Vec::new(),
             Self::OpenEngravingImage => vec![FileFilter::ENGRAVING_IMAGE],
+            // GTK's firmware settings dialogs offered no file types.
+            Self::ExportFirmwareSettings | Self::ImportFirmwareSettings => Vec::new(),
         }
     }
 }
@@ -542,6 +550,8 @@ pub fn msgids() -> Vec<&'static str> {
         FilePurpose::SaveCamPreset,
         FilePurpose::OpenGerberFolder,
         FilePurpose::OpenEngravingImage,
+        FilePurpose::ExportFirmwareSettings,
+        FilePurpose::ImportFirmwareSettings,
     ]
     .map(FilePurpose::title_msgid);
     let filters = [

@@ -96,6 +96,8 @@ mod test_device_info;
 mod test_dialogs;
 #[path = "test_editor.rs"]
 mod test_editor;
+#[path = "test_firmware_settings.rs"]
+mod test_firmware_settings;
 #[path = "test_frame.rs"]
 mod test_frame;
 #[path = "test_hidpi.rs"]

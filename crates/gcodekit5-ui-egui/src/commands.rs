@@ -119,6 +119,8 @@ pub enum Command {
     OpenToolsManager,
     /// Open the materials manager.
     OpenMaterialsManager,
+    /// Open the firmware settings.
+    OpenFirmwareSettings,
     /// Open the device information.
     OpenDeviceInfo,
     /// Open the documentation.
@@ -146,7 +148,7 @@ struct Spec {
 
 impl Command {
     /// Every command, in menu order.
-    pub const ALL: [Command; 46] = [
+    pub const ALL: [Command; 47] = [
         Command::FileNew,
         Command::FileNew3d,
         Command::FileOpen,
@@ -190,6 +192,7 @@ impl Command {
         Command::OpenDeviceManager,
         Command::OpenToolsManager,
         Command::OpenMaterialsManager,
+        Command::OpenFirmwareSettings,
         Command::OpenDeviceInfo,
         Command::OpenHelp,
         Command::About,
@@ -261,6 +264,12 @@ impl Command {
             Command::OpenMaterialsManager => (
                 "tools.materials_manager",
                 n_!("Materials Manager"),
+                App,
+                &[],
+            ),
+            Command::OpenFirmwareSettings => (
+                "tools.firmware_settings",
+                n_!("Firmware Settings"),
                 App,
                 &[],
             ),

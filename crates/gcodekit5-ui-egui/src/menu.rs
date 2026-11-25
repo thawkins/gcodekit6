@@ -169,6 +169,7 @@ pub fn menu_bar(tr: &Translator) -> MenuBar {
                 Some(C::OpenToolsManager),
                 Some(C::OpenMaterialsManager),
                 None,
+                Some(C::OpenFirmwareSettings),
                 Some(C::OpenDeviceInfo),
             ],
         ),

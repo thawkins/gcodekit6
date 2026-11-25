@@ -73,7 +73,9 @@ use crate::panes::editor::{EditorPane, SharedEditor};
 use crate::panes::machine_control::MachineControlPane;
 use crate::panes::visualizer::VisualizerPane;
 use crate::theme;
-use crate::windows::{AboutWindow, DeviceInfoWindow, SettingsOutcome, SettingsWindow};
+use crate::windows::{
+    AboutWindow, DeviceInfoWindow, FirmwareSettingsWindow, SettingsOutcome, SettingsWindow,
+};
 use crate::workspace::{PaneContext, PaneId, Workspace};
 use designer_files::{DesignFlow, DesignNext, EditorNext, OPEN_BEHIND_HANDOFF};
 use gcodekit5_app::materials_manager_backend::MaterialsManagerBackend;
@@ -271,6 +273,8 @@ pub struct GcodeKitApp {
     settings_window: SettingsWindow,
     /// The About window.
     about_window: AboutWindow,
+    /// The Firmware Settings window.
+    firmware_settings: FirmwareSettingsWindow,
     /// The Device Info window.
     device_info: DeviceInfoWindow,
     /// The last command dispatched.
@@ -406,6 +410,7 @@ impl GcodeKitApp {
             last_dialog_answer: None,
             settings_window,
             about_window,
+            firmware_settings: FirmwareSettingsWindow::default(),
             device_info: DeviceInfoWindow::default(),
             last_dispatched: None,
             quit: QuitFlow::default(),
@@ -809,6 +814,7 @@ impl GcodeKitApp {
             }
             Command::OpenSettings => self.settings_window.open(&self.state.settings),
             Command::About => self.about_window.open(),
+            Command::OpenFirmwareSettings => self.firmware_settings.open(),
             Command::OpenDeviceInfo => self.device_info.open(),
             Command::Quit => self.request_quit(QuitSource::MenuQuit),
             Command::Cut => self
@@ -896,7 +902,10 @@ impl GcodeKitApp {
     /// Acts on a dialog's answer; every answer is also kept in
     /// [`GcodeKitApp::last_dialog_answer`].
     fn handle_answer(&mut self, answer: DialogAnswer) {
-        if self.handle_design_answer(&answer) || self.handle_cam_preset_answer(&answer) {
+        if self.handle_design_answer(&answer)
+            || self.handle_cam_preset_answer(&answer)
+            || self.handle_firmware_settings_answer(&answer)
+        {
             self.last_dialog_answer = Some(answer);
             return;
         }
