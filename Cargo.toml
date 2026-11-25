@@ -34,7 +34,8 @@ tempfile = "3.8"
 # egui front end (ADR-011). egui family must match the craft-libs pin; the
 # [patch.crates-io] block below replicates craft-libs' egui/winit forks.
 egui = { version = "0.37", default-features = false }
-eframe = { version = "0.37", default-features = false, features = ["default_fonts", "wgpu", "accesskit", "wayland", "x11"] }
+# `links`: egui-winit opens the URL of a clicked hyperlink (the help browser's web links).
+eframe = { version = "0.37", default-features = false, features = ["default_fonts", "wgpu", "accesskit", "wayland", "x11", "links"] }
 egui_extras = "0.37"
 # Window handles for craft-dialogs' parent window (the version eframe and craft-dialogs use).
 raw-window-handle = "0.6.2"

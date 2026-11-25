@@ -4568,3 +4568,6 @@ msgstr "ID ist erforderlich"
 
 msgid "ID must not contain spaces"
 msgstr "ID darf keine Leerzeichen enthalten"
+
+msgid "Index"
+msgstr "Index"

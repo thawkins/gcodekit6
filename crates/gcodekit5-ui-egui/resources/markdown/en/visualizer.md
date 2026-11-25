@@ -1,5 +1,5 @@
 # Visualizer
-<img src="../../help_images/visualizer_3d.png" alt="Visualizer_3d" width="1200">
+<img src="../../help_images/visualizer3d.png" alt="Visualizer_3d" width="1200">
 
 The Visualizer displays a preview of the toolpaths and (optionally) the machine's work area limits.
 
@@ -17,11 +17,11 @@ This simulation can also be started via the File/Run menu.
 
 - There is a Simulation dropdown menu with a checkbox that generates a 3D visualization of the material and the area being cut by the tool.
 
-- "Inspector" dropdown menu with the bounds values ​​of the route
+- "Inspector" dropdown menu with the bounds values of the route
 
 <img src="../../help_images/visualizer.png" alt="Visualizer" width="1200">
 
-<img src="../../help_images/visualizer_3d_1.png" alt="Visualizer_3d_1" width="1200">
+<img src="../../help_images/visualizer3d1.png" alt="Visualizer_3d_1" width="1200">
 
 ## Related
 [Settings](help:settings)

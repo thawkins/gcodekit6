@@ -13,15 +13,15 @@ A *device profile* is separate from the live machine connection: it’s a saved 
 Device profiles are edited via tabs (e.g. Connection, Work Area, Capabilities).
 
 ### Action buttons
-- **💾 Save** - Saves changes to the device profile
-- **❌ Cancel** - Discards changes and closes the edit form
-- **🗑️ Delete** - Removes the device profile (with confirmation)
-- **🔄 Sync from Device** - Updates device information from the currently connected device (only enabled when connected). This reads:
+- **Save** - Saves changes to the device profile
+- **Cancel** - Discards changes and closes the edit form
+- **Delete** - Removes the device profile (with confirmation)
+- **Sync from Device** - Updates device information from the currently connected device (only enabled when connected). This reads:
   - Maximum travel dimensions from $130, $131, $132 (X/Y/Z max travel)
   - Max spindle speed from $30
   - Laser mode capability from $32
   - Firmware version information
-- **✓ Set Active** - Makes this profile the default device
+- **Set Active** - Makes this profile the default device
 
 ### Connection
 Configure how to reach the controller:
@@ -37,8 +37,8 @@ Set machine travel limits (X/Y/Z min/max). These are used across the app for:
 
 ### Capabilities
 Enable features that affect UI and toolpaths:
-- **Has Spindle** → enables spindle power + max spindle speed fields
-- **Has Laser** → enables laser power fields
+- **Has Spindle** -> enables spindle power + max spindle speed fields
+- **Has Laser** -> enables laser power fields
 - Coolant support (if your controller/machine uses it)
 
 ## Workflow tips

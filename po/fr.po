@@ -4575,3 +4575,6 @@ msgstr "L'identifiant est obligatoire"
 
 msgid "ID must not contain spaces"
 msgstr "L'identifiant ne doit pas contenir d'espaces"
+
+msgid "Index"
+msgstr "Index"

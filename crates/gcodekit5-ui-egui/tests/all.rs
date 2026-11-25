@@ -102,6 +102,8 @@ mod test_editor;
 mod test_firmware_settings;
 #[path = "test_frame.rs"]
 mod test_frame;
+#[path = "test_help.rs"]
+mod test_help;
 #[path = "test_hidpi.rs"]
 mod test_hidpi;
 #[path = "test_machine_jog.rs"]

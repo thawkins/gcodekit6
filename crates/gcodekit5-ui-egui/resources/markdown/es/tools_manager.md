@@ -3,9 +3,9 @@
 La pestaña Herramientas CNC gestiona las definiciones de herramientas de corte utilizadas por los generadores CAM y los cálculos de avance/velocidad.
 
 ## Qué es (y qué no es) esta biblioteca
-- ✅ Una **biblioteca de herramientas** para CAM y generadores.
+- Una **biblioteca de herramientas** para CAM y generadores.
 
-- ❌ No es una "tabla de herramientas" del controlador (no incluye compensaciones automáticas de longitud de herramienta, etc.).
+- No es una "tabla de herramientas" del controlador (no incluye compensaciones automáticas de longitud de herramienta, etc.).
 
 ## Panel izquierdo: explorar y filtrar
 Utilice el panel izquierdo para encontrar herramientas rápidamente:
@@ -37,8 +37,8 @@ Utilice el panel **Biblioteca** para:
 - Restablecer herramientas personalizadas/importadas (destructivo)
 
 ## Ejemplos de flujo de trabajo
-- Crear una herramienta → definir geometría → Guardar.
-- Importar un catálogo GTC → filtrar por diámetro/material → revisar/editar una herramienta.
+- Crear una herramienta -> definir geometría -> Guardar.
+- Importar un catálogo GTC -> filtrar por diámetro/material -> revisar/editar una herramienta.
 - Exportar herramientas personalizadas a JSON para copias de seguridad/uso compartido.
 
 ## Relacionado

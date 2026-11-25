@@ -75,8 +75,8 @@ use crate::panes::machine_control::MachineControlPane;
 use crate::panes::visualizer::VisualizerPane;
 use crate::theme;
 use crate::windows::{
-    AboutWindow, DeviceInfoWindow, DeviceManagerWindow, FirmwareSettingsWindow,
-    MaterialsManagerWindow, SettingsOutcome, SettingsWindow, ToolsManagerWindow,
+    AboutWindow, DeviceInfoWindow, DeviceManagerWindow, FirmwareSettingsWindow, HelpWindow,
+    MaterialsManagerWindow, SettingsOutcome, SettingsWindow, ToolsManagerWindow, help,
 };
 use crate::workspace::{PaneContext, PaneId, Workspace};
 use designer_files::{DesignFlow, DesignNext, EditorNext, OPEN_BEHIND_HANDOFF};
@@ -304,6 +304,8 @@ pub struct GcodeKitApp {
     settings_window: SettingsWindow,
     /// The About window.
     about_window: AboutWindow,
+    /// The help browser.
+    help_window: HelpWindow,
     /// The Firmware Settings window.
     firmware_settings: FirmwareSettingsWindow,
     /// The Device Info window.
@@ -352,6 +354,7 @@ impl std::fmt::Debug for GcodeKitApp {
             .field("last_dialog_answer", &self.last_dialog_answer)
             .field("settings_window", &self.settings_window)
             .field("about_window", &self.about_window)
+            .field("help_window", &self.help_window)
             .field("last_dispatched", &self.last_dispatched)
             .field("quit", &self.quit)
             .finish_non_exhaustive()
@@ -452,6 +455,7 @@ impl GcodeKitApp {
             last_dialog_answer: None,
             settings_window,
             about_window,
+            help_window: HelpWindow::default(),
             firmware_settings: FirmwareSettingsWindow::default(),
             device_info: DeviceInfoWindow::default(),
             device_manager,
@@ -925,14 +929,12 @@ impl GcodeKitApp {
             }
             Command::OpenToolsManager => self.tools_manager.open(&self.state.translator),
             Command::OpenMaterialsManager => self.materials_manager.open(&self.state.translator),
-            Command::OpenHelp => {
-                tracing::debug!(?cmd, "window command not available yet")
-            }
+            Command::OpenHelp => self.help_window.open(help::HelpTopic::Index),
         }
     }
 
-    /// Draws the Preferences and About windows while they are open, and acts on what
-    /// Preferences decided.
+    /// Draws the Preferences, About, machine, library and help windows while they are
+    /// open, acts on what Preferences decided and opens the topic a help button asked for.
     fn show_windows(&mut self, ctx: &egui::Context) {
         let outcome =
             self.settings_window
@@ -952,6 +954,10 @@ impl GcodeKitApp {
         self.about_window.show(ctx, &self.state.translator);
         self.show_machine_windows(ctx);
         self.show_library_windows(ctx);
+        if let Some(topic) = help::take_request(ctx) {
+            self.help_window.open(topic);
+        }
+        self.help_window.show(ctx, &self.state.translator);
     }
 
     /// Acts on a dialog's answer; every answer is also kept in
@@ -1090,6 +1096,11 @@ impl GcodeKitApp {
                 tracing::warn!(path = %path.display(), "startup file skipped: not the first G-code file");
             }
         }
+    }
+
+    /// The help browser.
+    pub fn help(&self) -> &HelpWindow {
+        &self.help_window
     }
 
     /// The G-code editor.
