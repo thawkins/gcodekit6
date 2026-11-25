@@ -473,8 +473,7 @@ pub(crate) fn quit_answering(
             .dialogs_mut()
             .end_frame(None::<&eframe::Frame>);
     }
-    let titles = shown.lock().expect("shown").clone();
-    titles
+    shown.lock().expect("shown").clone()
 }
 
 #[test]
