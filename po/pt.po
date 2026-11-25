@@ -3774,3 +3774,12 @@ msgstr "relatório(s) de sondagem recebido(s)."
 
 msgid "Program halted (feed hold, then reset)"
 msgstr "Programa parado (retenção de avanço e reinício)"
+
+msgid "Diameter:"
+msgstr "Diâmetro:"
+
+msgid "The engraving is too large: at most 25 million pixels"
+msgstr "A gravação é grande demais: no máximo 25 milhões de pixels"
+
+msgid "The cancelled engraving is still finishing; try again in a moment."
+msgstr "A gravação cancelada ainda está terminando; tente novamente em instantes."

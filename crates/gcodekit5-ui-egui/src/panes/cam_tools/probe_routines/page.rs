@@ -5,6 +5,7 @@
 //! Dependencies: `egui`, `gcodekit5-core` (probe types), `gcodekit5-app` (translations).
 
 use gcodekit5_app::i18n::Translator;
+use gcodekit5_core::units;
 use gcodekit5_core::{Corner, ProbeAxis, ProbeDirection};
 
 use super::super::common::{self, CamAction, check_row, field_row, grid, heading};
@@ -165,6 +166,7 @@ pub fn show(
         ui.colored_label(ui.visuals().error_fg_color, tr.tr(OFFLINE));
     }
     let errors = params.parameters().err().unwrap_or_default();
+    let unit = units::get_unit_label(params.units);
     heading(ui, tr, n_!("Routine Selection"));
     grid(ui, "cam-probe-routine", |ui| {
         let kinds = RoutineKind::ALL.map(|k| (k, k.msgid()));
@@ -179,11 +181,11 @@ pub fn show(
     });
     heading(ui, tr, n_!("Parameters"));
     grid(ui, "cam-probe-params", |ui| {
-        field_row(ui, tr, SAFE_HEIGHT, &mut params.safe_height, "mm", &errors);
+        field_row(ui, tr, SAFE_HEIGHT, &mut params.safe_height, unit, &errors);
         field_row(ui, tr, FAST_FEED, &mut params.fast_feed, "mm/min", &errors);
         field_row(ui, tr, SLOW_FEED, &mut params.slow_feed, "mm/min", &errors);
-        field_row(ui, tr, BACKOFF, &mut params.backoff, "mm", &errors);
-        field_row(ui, tr, MAX_DEPTH, &mut params.max_depth, "mm", &errors);
+        field_row(ui, tr, BACKOFF, &mut params.backoff, unit, &errors);
+        field_row(ui, tr, MAX_DEPTH, &mut params.max_depth, unit, &errors);
         let wcs: Vec<(u8, &'static str)> = vec![
             (54, "G54"),
             (55, "G55"),
@@ -198,13 +200,21 @@ pub fn show(
     ui.weak(tr.tr(AUTO_UPDATE_HELP));
     heading(ui, tr, n_!("Routine Settings"));
     grid(ui, "cam-probe-settings", |ui| {
-        routine_settings(ui, params, tr, &errors);
+        routine_settings(ui, params, tr, &errors, unit);
     });
     if let Some(result) = &view.result {
         heading(ui, tr, n_!("Results"));
         ui.label(result);
     }
     common::page_errors(ui, tr, &errors);
+    // A field the routine does not show (one loaded from a preset) is named here.
+    let shown = shown_fields(params.routine);
+    for error in &errors {
+        if let Some(field) = error.field.filter(|f| !shown.contains(f)) {
+            let text = format!("{} {}", tr.tr(field), tr.tr(error.message));
+            ui.colored_label(ui.visuals().error_fg_color, text);
+        }
+    }
     let valid = errors.is_empty();
     let mut action = common::gcode_actions(ui, tr, valid);
     ui.horizontal_wrapped(|ui| {
@@ -237,6 +247,7 @@ fn routine_settings(
     p: &mut ProbeParams,
     tr: &Translator,
     errors: &[common::FieldError],
+    unit: &str,
 ) {
     let kind = p.routine;
     let sideways = matches!(
@@ -254,19 +265,19 @@ fn routine_settings(
         optional_combo(ui, tr, CORNER, &mut p.corner, &CORNERS);
     }
     if matches!(kind, RoutineKind::EdgeFind | RoutineKind::CornerFind) {
-        field_row(ui, tr, EDGE_DISTANCE, &mut p.edge_distance, "mm", errors);
+        field_row(ui, tr, EDGE_DISTANCE, &mut p.edge_distance, unit, errors);
     }
     if matches!(kind, RoutineKind::BoreCenter | RoutineKind::BossCenter) {
-        field_row(ui, tr, DIAMETER, &mut p.diameter, "", errors);
+        field_row(ui, tr, DIAMETER, &mut p.diameter, unit, errors);
     }
     if kind == RoutineKind::ToolLength {
-        field_row(ui, tr, SETTER_X, &mut p.setter_x, "mm", errors);
-        field_row(ui, tr, SETTER_Y, &mut p.setter_y, "mm", errors);
-        field_row(ui, tr, SETTER_Z, &mut p.setter_z, "mm", errors);
+        field_row(ui, tr, SETTER_X, &mut p.setter_x, unit, errors);
+        field_row(ui, tr, SETTER_Y, &mut p.setter_y, unit, errors);
+        field_row(ui, tr, SETTER_Z, &mut p.setter_z, unit, errors);
     }
     if sideways {
-        field_row(ui, tr, PROBE_DEPTH, &mut p.probe_depth, "mm", errors);
-        field_row(ui, tr, TIP_RADIUS, &mut p.tip_radius, "mm", errors);
+        field_row(ui, tr, PROBE_DEPTH, &mut p.probe_depth, unit, errors);
+        field_row(ui, tr, TIP_RADIUS, &mut p.tip_radius, unit, errors);
     }
     if matches!(kind, RoutineKind::ZTouch | RoutineKind::EdgeFind) {
         field_row(
@@ -274,8 +285,37 @@ fn routine_settings(
             tr,
             PLATE_THICKNESS,
             &mut p.plate_thickness,
-            "mm",
+            unit,
             errors,
         );
     }
+}
+
+/// The fields the page shows for `kind`: the common parameters and the routine's settings
+/// (GTK's visibility rules, as [`routine_settings`] draws them).
+fn shown_fields(kind: RoutineKind) -> Vec<&'static str> {
+    let mut fields = vec![SAFE_HEIGHT, FAST_FEED, SLOW_FEED, BACKOFF, MAX_DEPTH];
+    let sideways = matches!(
+        kind,
+        RoutineKind::EdgeFind
+            | RoutineKind::CornerFind
+            | RoutineKind::BoreCenter
+            | RoutineKind::BossCenter
+    );
+    if matches!(kind, RoutineKind::EdgeFind | RoutineKind::CornerFind) {
+        fields.push(EDGE_DISTANCE);
+    }
+    if matches!(kind, RoutineKind::BoreCenter | RoutineKind::BossCenter) {
+        fields.push(DIAMETER);
+    }
+    if kind == RoutineKind::ToolLength {
+        fields.extend([SETTER_X, SETTER_Y, SETTER_Z]);
+    }
+    if sideways {
+        fields.extend([PROBE_DEPTH, TIP_RADIUS]);
+    }
+    if matches!(kind, RoutineKind::ZTouch | RoutineKind::EdgeFind) {
+        fields.push(PLATE_THICKNESS);
+    }
+    fields
 }

@@ -3786,3 +3786,12 @@ msgstr "rapport(s) de palpage reçu(s)."
 
 msgid "Program halted (feed hold, then reset)"
 msgstr "Programme arrêté (suspension d'avance, puis réinitialisation)"
+
+msgid "Diameter:"
+msgstr "Diamètre :"
+
+msgid "The engraving is too large: at most 25 million pixels"
+msgstr "La gravure est trop grande : au plus 25 millions de pixels"
+
+msgid "The cancelled engraving is still finishing; try again in a moment."
+msgstr "La gravure annulée se termine encore ; réessayez dans un instant."

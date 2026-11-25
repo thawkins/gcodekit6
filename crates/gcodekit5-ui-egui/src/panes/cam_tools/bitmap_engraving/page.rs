@@ -72,6 +72,7 @@ const HALFTONES: [(HalftoneMethod, &str); 5] = [
 /// * `ui` - The page's `Ui`.
 /// * `params` - The page's input.
 /// * `preview` - The chosen image, once decoded.
+/// * `image_size` - The image's size in pixels, once its preview is decoded.
 /// * `busy` - Whether an engraving is running (the actions wait for it).
 /// * `tr` - Translator for the current UI language.
 ///
@@ -82,12 +83,14 @@ pub fn show(
     ui: &mut egui::Ui,
     params: &mut BitmapEngravingParams,
     preview: Option<&egui::TextureHandle>,
+    image_size: Option<[usize; 2]>,
     busy: bool,
     tr: &Translator,
 ) -> CamAction {
     let mut action = CamAction::None;
     ui.label(tr.tr(DESCRIPTION));
-    let errors = params.parameters().err().unwrap_or_default();
+    let mut errors = params.parameters().err().unwrap_or_default();
+    errors.extend(image_size.and_then(|size| params.size_problem(size)));
     let unit = units::get_unit_label(params.units);
     heading(ui, tr, n_!("Image File"));
     ui.horizontal(|ui| {

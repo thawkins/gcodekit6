@@ -377,7 +377,7 @@ impl GcodeKitApp {
         if let Some(dirs) = state.settings.dirs() {
             load_cam_libraries(&mut cam_tools.borrow_mut(), &dirs.legacy);
         }
-        workspace.set_pane(Box::new(SharedCamTools(Rc::clone(&cam_tools))));
+        workspace.set_pane(Box::new(SharedCamTools::new(Rc::clone(&cam_tools))));
         workspace.configure(state.config());
         {
             // Wake the event loop whenever the machine reports something.

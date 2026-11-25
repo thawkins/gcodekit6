@@ -23,11 +23,11 @@ use crate::test_cam_probe_routines::gtk_run_lines;
 use crate::test_cam_tools::cam_app;
 use crate::test_designer_files_app::frames;
 
-const IDLE: &str = "<Idle|MPos:1.000,2.000,3.000|FS:0,0>";
-const ALARM: &str = "<Alarm|MPos:1.000,2.000,3.000|FS:0,0>";
+pub const IDLE: &str = "<Idle|MPos:1.000,2.000,3.000|FS:0,0>";
+pub const ALARM: &str = "<Alarm|MPos:1.000,2.000,3.000|FS:0,0>";
 
 /// The lines written to the loopback so far.
-fn lines(shared: &LoopbackShared) -> Vec<String> {
+pub fn lines(shared: &LoopbackShared) -> Vec<String> {
     shared
         .log()
         .into_iter()
@@ -39,17 +39,17 @@ fn lines(shared: &LoopbackShared) -> Vec<String> {
 }
 
 /// Has the loopback answer with `line` (a status report answers the next `?`).
-fn reply(shared: &LoopbackShared, line: &str) {
+pub fn reply(shared: &LoopbackShared, line: &str) {
     shared.inject(&format!("{line}\n"));
 }
 
 /// Whether a soft reset (0x18) was written.
-fn reset_written(shared: &LoopbackShared) -> bool {
+pub fn reset_written(shared: &LoopbackShared) -> bool {
     shared.log().contains(&Wrote::Realtime(0x18))
 }
 
 /// The machine state of the app's latest status report.
-fn machine_state(app: &GcodeKitApp) -> Option<String> {
+pub fn machine_state(app: &GcodeKitApp) -> Option<String> {
     app.state()
         .machine
         .status()
@@ -60,12 +60,22 @@ fn machine_state(app: &GcodeKitApp) -> Option<String> {
 
 /// The Probe Tools page open in a tall window, the loopback connected (when `connected`)
 /// with `report` as its status. Acks are held so a run keeps streaming until released.
-fn probe_app(
+pub fn probe_app(
     connected: bool,
     report: &str,
 ) -> (Harness<'static, GcodeKitApp>, Arc<LoopbackShared>) {
-    let (mut state, shared) = loopback_state(Duration::from_millis(1));
-    shared.hold_acks.store(true, Ordering::SeqCst);
+    probe_app_with(connected, report, Duration::from_millis(1), true)
+}
+
+/// [`probe_app`] with acks after `ok_delay`, held or not.
+pub fn probe_app_with(
+    connected: bool,
+    report: &str,
+    ok_delay: Duration,
+    hold: bool,
+) -> (Harness<'static, GcodeKitApp>, Arc<LoopbackShared>) {
+    let (mut state, shared) = loopback_state(ok_delay);
+    shared.hold_acks.store(hold, Ordering::SeqCst);
     reply(&shared, report);
     if connected {
         connect(&mut state);
@@ -95,12 +105,16 @@ fn probe_app(
 }
 
 /// Steps until `cond` holds on the CAM pane.
-fn until(h: &mut Harness<'static, GcodeKitApp>, what: &str, cond: impl Fn(&GcodeKitApp) -> bool) {
+pub fn until(
+    h: &mut Harness<'static, GcodeKitApp>,
+    what: &str,
+    cond: impl Fn(&GcodeKitApp) -> bool,
+) {
     assert!(step_until(h, cond), "timed out waiting for {what}");
 }
 
 /// The probe page's result text.
-fn result(app: &GcodeKitApp) -> String {
+pub fn result(app: &GcodeKitApp) -> String {
     app.cam_tools()
         .borrow()
         .probe_result_text()
@@ -109,7 +123,7 @@ fn result(app: &GcodeKitApp) -> String {
 }
 
 /// Steps frames for `ms` milliseconds.
-fn settle(h: &mut Harness<'static, GcodeKitApp>, ms: u64) {
+pub fn settle(h: &mut Harness<'static, GcodeKitApp>, ms: u64) {
     let end = Instant::now() + Duration::from_millis(ms);
     while Instant::now() < end {
         h.step();
@@ -118,7 +132,7 @@ fn settle(h: &mut Harness<'static, GcodeKitApp>, ms: u64) {
 }
 
 /// Runs a Z-touch whose two probe reports are `prb` and returns the app after the result.
-fn z_touch_with(
+pub fn z_touch_with(
     h: &mut Harness<'static, GcodeKitApp>,
     shared: &LoopbackShared,
     prb: &str,

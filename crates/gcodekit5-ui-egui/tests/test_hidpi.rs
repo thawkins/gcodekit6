@@ -330,7 +330,7 @@ fn test_cam_generate_click_makes_the_program_at_every_scale() -> TestResult {
                     let mut ctx = PaneContext::new(&tr, &mut requested);
                     pane.ui(ui, &mut ctx);
                 },
-                SharedCamTools(Rc::clone(&cam)),
+                SharedCamTools::new(Rc::clone(&cam)),
             );
         harness.run();
         let pos = harness.get_by_label("Generate").rect().center();

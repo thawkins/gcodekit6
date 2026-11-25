@@ -344,3 +344,76 @@ fn test_cam_bitmap_preset_loads_the_gtk_file_and_round_trips() {
     assert!(p.apply_preset("[1, 2]").is_err());
     assert_eq!(format!("{p:?}"), before);
 }
+
+/// A 10 x 100000 pixel image under `target/temp` (made once per test process).
+fn tall_image() -> PathBuf {
+    let dir = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../target/temp/egui_bitmap")
+        .join(format!("tall-{}", std::process::id()));
+    let file = dir.join("tall.png");
+    if !file.exists() {
+        std::fs::create_dir_all(&dir).expect("scratch folder");
+        image::GrayImage::from_pixel(10, 100_000, image::Luma([128]))
+            .save(&file)
+            .expect("write the tall image");
+    }
+    file
+}
+
+const TOO_MANY_PIXELS: &str = "The engraving is too large: at most 25 million pixels";
+
+#[test]
+fn test_cam_bitmap_refuses_a_tall_image_by_its_pixel_count() {
+    // 100 mm at 10 pixels per mm of a 10 x 100000 image is 1000 x 10,000,000 pixels.
+    let mut p = BitmapEngravingParams::new(METRIC);
+    p.set_image(Some(tall_image()));
+    let started = Instant::now();
+    assert_eq!(p.engrave(), Err(TOO_MANY_PIXELS.to_string()));
+    assert!(started.elapsed() < Duration::from_secs(5));
+    // The page says so once the preview knows the image's size, and waits.
+    let mut h = open_tool_tall(CamTool::BitmapEngraving);
+    pane(&h).choose_bitmap_image(&tall_image());
+    wait_for(&mut h, "the preview", |cam| {
+        cam.bitmap_preview_size() == Some([10, 100_000])
+    });
+    frames(&mut h, 2);
+    assert!(h.query_by_label(TOO_MANY_PIXELS).is_some(), "not shown");
+    click(&mut h, "Generate");
+    assert!(!pane(&h).bitmap_job_running());
+}
+
+#[test]
+fn test_cam_bitmap_runs_one_engraving_worker_at_a_time() {
+    let mut h = open_basic();
+    {
+        let mut cam = pane(&h);
+        let p = cam.bitmap_engraving_mut();
+        p.width = "400".into();
+        p.pixels_per_mm = "10".into();
+    }
+    frames(&mut h, 2);
+    h.get_by_label("Generate").click();
+    frames(&mut h, 2);
+    assert!(pane(&h).bitmap_job_running());
+    pane(&h).cancel_bitmap_job();
+    // The progress row goes away; click where Generate is drawn now.
+    frames(&mut h, 1);
+    // The cancelled worker still runs: a new engraving waits for it.
+    h.get_by_label("Generate").click();
+    frames(&mut h, 2);
+    assert!(!pane(&h).bitmap_job_running(), "a second worker started");
+    assert_eq!(
+        pane(&h).notice(),
+        Some("The cancelled engraving is still finishing; try again in a moment.")
+    );
+    wait_for(&mut h, "the cancelled worker", |cam| {
+        !cam.bitmap_worker_busy()
+    });
+    h.get_by_label("Generate").click();
+    frames(&mut h, 2);
+    assert!(
+        pane(&h).bitmap_job_running(),
+        "no engraving after the worker finished"
+    );
+    pane(&h).cancel_bitmap_job();
+}

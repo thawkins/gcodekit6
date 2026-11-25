@@ -6,10 +6,12 @@
 //! `MachineController`, the `[PRB:...]` reports are read as they arrive, and the result can
 //! be written into a work coordinate system with Apply to WCS (`G10 L2`).
 //!
-//! Every value is in millimetres (feeds in mm/min) whatever the display units, as on the
-//! GTK page: its comment explains that unit-aware fields once read imperial values as mm.
-//! GTK reported a field that was not a number in a dialog at Generate; here every field
-//! is checked where it is typed, with the generator's own limits, and the actions wait.
+//! Lengths are typed in the display units (mm or inch, the shared `units` module) and held
+//! in mm; feeds stay in mm/min as on every CAM page. (GTK's page took every value in mm
+//! whatever the setting; the controller ruled that the setting applies here too.) The
+//! program is the same for the same physical values. GTK reported a field that was not a
+//! number in a dialog at Generate; here every field is checked where it is typed, with the
+//! generator's own limits, and the actions wait.
 //!
 //! Dependencies: `egui`, `gcodekit5-camtools` (routine engine, presets), `gcodekit5-core`
 //! (routine types), `gcodekit5-app` (translations).
@@ -22,9 +24,12 @@ use gcodekit5_camtools::cam_presets::ProbePreset;
 use gcodekit5_camtools::probe_routines::{
     ProbeOptions, ProbeRoutineEngine, ProbeRoutineOutput, defaults,
 };
+use gcodekit5_core::units::MeasurementSystem;
 use gcodekit5_core::{Corner, Position, ProbeAxis, ProbeDirection, ProbeRoutine};
 
-use super::common::{self, CamError, FieldError, check, not_negative, parse_number, positive};
+use super::common::{
+    self, CamError, FieldError, check, not_negative, parse_len, parse_number, positive,
+};
 pub use page::{ProbeView, show};
 
 /// Field label msgids (GTK's titles).
@@ -34,7 +39,7 @@ const SLOW_FEED: &str = n_!("Slow Feed Rate:");
 const BACKOFF: &str = n_!("Backoff Distance:");
 const MAX_DEPTH: &str = n_!("Max Probe Depth");
 const EDGE_DISTANCE: &str = n_!("Probe Distance");
-const DIAMETER: &str = n_!("Diameter (mm)");
+const DIAMETER: &str = n_!("Diameter:");
 const SETTER_X: &str = n_!("Setter Plate X");
 const SETTER_Y: &str = n_!("Setter Plate Y");
 const SETTER_Z: &str = n_!("Setter Plate Z");
@@ -154,12 +159,14 @@ fn from_id<T: Copy>(table: &[(T, &'static str)], id: Option<&str>) -> Option<T> 
     table.iter().find(|(_, i)| *i == id).map(|(v, _)| *v)
 }
 
-/// The page's input: every length in mm and every feed in mm/min, as typed.
+/// The page's input: lengths as typed in [`ProbeParams::units`], feeds in mm/min.
 ///
 /// The edge axis, direction and corner start unchosen (`None`), as GTK's drop-downs did;
 /// unchosen they mean X, negative and X-min / Y-min, and a preset saves them as `null`.
 #[derive(Clone, Debug, PartialEq)]
 pub struct ProbeParams {
+    /// The units the lengths are typed in.
+    pub units: MeasurementSystem,
     /// The routine.
     pub routine: RoutineKind,
     /// Safe height.
@@ -201,30 +208,71 @@ pub struct ProbeParams {
 }
 
 impl Default for ProbeParams {
-    /// GTK's initial values.
+    /// GTK's initial values in millimetres.
     fn default() -> Self {
-        let mm = |v: f64| format!("{v:.2}");
+        Self::new(MeasurementSystem::Metric)
+    }
+}
+
+/// The length fields of the page, for unit conversion.
+fn length_fields(p: &mut ProbeParams) -> [&mut String; 11] {
+    [
+        &mut p.safe_height,
+        &mut p.backoff,
+        &mut p.max_depth,
+        &mut p.edge_distance,
+        &mut p.diameter,
+        &mut p.setter_x,
+        &mut p.setter_y,
+        &mut p.setter_z,
+        &mut p.probe_depth,
+        &mut p.tip_radius,
+        &mut p.plate_thickness,
+    ]
+}
+
+impl ProbeParams {
+    /// GTK's initial values, lengths shown in `units` (feeds as GTK wrote them).
+    ///
+    /// # Arguments
+    /// * `units` - The display units.
+    pub fn new(units: MeasurementSystem) -> Self {
+        let len = |mm: f64| common::format_len(mm, units);
+        let feed = |v: f64| format!("{v:.2}");
         Self {
+            units,
             routine: RoutineKind::ZTouch,
-            safe_height: mm(defaults::SAFE_HEIGHT),
-            fast_feed: mm(defaults::FAST_FEED),
-            slow_feed: mm(defaults::SLOW_FEED),
-            backoff: mm(defaults::BACKOFF),
-            max_depth: format!("{:.1}", defaults::MAX_PROBE_DEPTH),
+            safe_height: len(defaults::SAFE_HEIGHT),
+            fast_feed: feed(defaults::FAST_FEED),
+            slow_feed: feed(defaults::SLOW_FEED),
+            backoff: len(defaults::BACKOFF),
+            max_depth: len(defaults::MAX_PROBE_DEPTH),
             wcs: 54,
             auto_update: false,
             edge_axis: None,
             edge_direction: None,
-            edge_distance: format!("{:.1}", defaults::PROBE_DISTANCE),
+            edge_distance: len(defaults::PROBE_DISTANCE),
             corner: None,
-            diameter: "20.0".into(),
-            setter_x: "100.0".into(),
-            setter_y: "100.0".into(),
-            setter_z: "-50.0".into(),
-            probe_depth: mm(defaults::PROBE_DEPTH),
-            tip_radius: mm(0.0),
-            plate_thickness: mm(0.0),
+            diameter: len(20.0),
+            setter_x: len(100.0),
+            setter_y: len(100.0),
+            setter_z: len(-50.0),
+            probe_depth: len(defaults::PROBE_DEPTH),
+            tip_radius: len(0.0),
+            plate_thickness: len(0.0),
         }
+    }
+
+    /// Shows the lengths in `units` instead, converting the typed values.
+    ///
+    /// # Arguments
+    /// * `units` - The new display units.
+    pub fn set_units(&mut self, units: MeasurementSystem) {
+        let from = self.units;
+        for text in length_fields(self) {
+            common::convert_len(text, from, units);
+        }
+        self.units = units;
     }
 }
 
@@ -242,12 +290,23 @@ impl ProbeParams {
     /// probe depth, tip radius or plate thickness.
     pub fn parameters(&self) -> Result<(ProbeRoutine, ProbeOptions), Vec<FieldError>> {
         let mut errors = Vec::new();
+        let u = self.units;
+        let fast_feed = check(
+            &mut errors,
+            FAST_FEED,
+            parse_number(&self.fast_feed),
+            positive,
+        );
+        let slow_feed = check(
+            &mut errors,
+            SLOW_FEED,
+            parse_number(&self.slow_feed),
+            positive,
+        );
         let mut num = |label, text: &str, rule: fn(f64) -> Option<&'static str>| {
-            check(&mut errors, label, parse_number(text), rule)
+            check(&mut errors, label, parse_len(text, u), rule)
         };
         let safe_height = num(SAFE_HEIGHT, &self.safe_height, positive);
-        let fast_feed = num(FAST_FEED, &self.fast_feed, positive);
-        let slow_feed = num(SLOW_FEED, &self.slow_feed, positive);
         let backoff = num(BACKOFF, &self.backoff, not_negative);
         let probe_depth = num(PROBE_DEPTH, &self.probe_depth, not_negative);
         let tip_radius = num(TIP_RADIUS, &self.tip_radius, not_negative);
@@ -347,12 +406,13 @@ impl ProbeParams {
     /// The first field that is not a number (GTK refused to save then too).
     pub fn preset_json(&self, tr: &Translator) -> Result<String, String> {
         let preset = (|| {
-            let n = |label, text: &str| common::preset_number(label, text);
+            let feed = |label, text: &str| common::preset_number(label, text);
+            let n = |label, text: &str| common::preset_len(label, text, self.units).map(f64::from);
             Ok(ProbePreset {
                 routine: Some(self.routine.id().to_string()),
                 safe_height: n(SAFE_HEIGHT, &self.safe_height)?,
-                fast_feed: n(FAST_FEED, &self.fast_feed)?,
-                slow_feed: n(SLOW_FEED, &self.slow_feed)?,
+                fast_feed: feed(FAST_FEED, &self.fast_feed)?,
+                slow_feed: feed(SLOW_FEED, &self.slow_feed)?,
                 backoff: n(BACKOFF, &self.backoff)?,
                 max_depth: n(MAX_DEPTH, &self.max_depth)?,
                 edge_axis: id_of(&AXES, self.edge_axis),
@@ -378,8 +438,9 @@ impl ProbeParams {
         preset.to_json().map_err(|e| e.to_string())
     }
 
-    /// Sets the page from a preset file in GTK's format (values written with three
-    /// decimals, as GTK did); ids GTK did not know leave their choice as it is.
+    /// Sets the page from a preset file in GTK's format (lengths in mm, shown in the page's
+    /// units; feeds written with three decimals, as GTK did); ids GTK did not know leave
+    /// their choice as it is.
     ///
     /// # Arguments
     /// * `json` - The file's text.
@@ -394,13 +455,15 @@ impl ProbeParams {
             tracing::warn!(%warning, "probe preset loaded with a warning");
         }
         let p = loaded.preset;
-        let mm = |v: f64| format!("{v:.3}");
+        let u = self.units;
+        let mm = |v: f64| common::format_len(v, u);
+        let feed = |v: f64| format!("{v:.3}");
         if let Some(kind) = p.routine.as_deref().and_then(RoutineKind::from_id) {
             self.routine = kind;
         }
         self.safe_height = mm(p.safe_height);
-        self.fast_feed = mm(p.fast_feed);
-        self.slow_feed = mm(p.slow_feed);
+        self.fast_feed = feed(p.fast_feed);
+        self.slow_feed = feed(p.slow_feed);
         self.backoff = mm(p.backoff);
         self.max_depth = mm(p.max_depth);
         if let Some(v) = from_id(&AXES, p.edge_axis.as_deref()) {

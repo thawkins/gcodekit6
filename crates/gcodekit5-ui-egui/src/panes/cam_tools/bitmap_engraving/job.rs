@@ -26,6 +26,7 @@ pub fn msgids() -> Vec<&'static str> {
         n_!("Generating G-code..."),
         n_!("Finalizing..."),
         n_!("Cancel"),
+        super::super::bitmap_pane::CANCELLED_BUSY,
     ]
 }
 
@@ -60,6 +61,8 @@ enum EngraveMessage {
 pub struct EngraveJob {
     messages: Receiver<EngraveMessage>,
     cancel: Arc<AtomicBool>,
+    /// Set by the worker thread when it has finished.
+    finished: Arc<AtomicBool>,
     progress: f32,
 }
 
@@ -85,6 +88,8 @@ impl EngraveJob {
         let (tx, rx) = mpsc::channel();
         let cancel = Arc::new(AtomicBool::new(false));
         let stop = cancel.clone();
+        let finished = Arc::new(AtomicBool::new(false));
+        let done = finished.clone();
         std::thread::Builder::new()
             .name("bitmap-engraving".to_string())
             .spawn(move || {
@@ -95,13 +100,20 @@ impl EngraveJob {
                     }
                 });
                 let _ = tx.send(EngraveMessage::Done(result));
+                done.store(true, Ordering::SeqCst);
             })
             .map_err(|e| e.to_string())?;
         Ok(Self {
             messages: rx,
             cancel,
+            finished,
             progress: 0.0,
         })
+    }
+
+    /// Whether the worker thread has finished (also after a cancel).
+    pub fn finished(&self) -> bool {
+        self.finished.load(Ordering::SeqCst)
     }
 
     /// The fraction done so far.

@@ -171,3 +171,22 @@ fn test_second_handoff_while_one_waits_is_dropped_with_a_notice() {
 
 /// The notice shown when a handoff is dropped.
 const DROPPED: &str = "Another program is waiting to go to the editor; this one was not sent.";
+
+/// Machine events that reach the pane while it is borrowed wait for the next call.
+#[test]
+fn test_cam_pane_keeps_machine_events_while_busy() {
+    use gcodekit5_app::machine::MachineEvent;
+    use gcodekit5_ui_egui::panes::cam_tools::SharedCamTools;
+    use gcodekit5_ui_egui::workspace::Pane;
+    let (h, _script) = cam_app(default_state());
+    let tr = h.state().state().translator;
+    let rc = std::rc::Rc::clone(h.state().cam_tools());
+    let mut shared = SharedCamTools::new(std::rc::Rc::clone(&rc));
+    {
+        let _busy = rc.borrow_mut();
+        shared.machine_events(&[MachineEvent::Connected], &tr);
+    }
+    assert_eq!(shared.waiting_events(), 1);
+    shared.machine_events(&[], &tr);
+    assert_eq!(shared.waiting_events(), 0);
+}

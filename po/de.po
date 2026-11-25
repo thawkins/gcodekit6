@@ -3779,3 +3779,12 @@ msgstr "Antastbericht(e) empfangen."
 
 msgid "Program halted (feed hold, then reset)"
 msgstr "Programm angehalten (Vorschub-Halt, dann Reset)"
+
+msgid "Diameter:"
+msgstr "Durchmesser:"
+
+msgid "The engraving is too large: at most 25 million pixels"
+msgstr "Die Gravur ist zu groß: höchstens 25 Millionen Pixel"
+
+msgid "The cancelled engraving is still finishing; try again in a moment."
+msgstr "Die abgebrochene Gravur wird noch beendet; bitte gleich erneut versuchen."

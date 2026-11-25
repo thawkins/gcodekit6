@@ -3782,3 +3782,12 @@ msgstr "rapporto/i di tastatura ricevuto/i."
 
 msgid "Program halted (feed hold, then reset)"
 msgstr "Programma fermato (sospensione avanzamento, poi reset)"
+
+msgid "Diameter:"
+msgstr "Diametro:"
+
+msgid "The engraving is too large: at most 25 million pixels"
+msgstr "L'incisione è troppo grande: al massimo 25 milioni di pixel"
+
+msgid "The cancelled engraving is still finishing; try again in a moment."
+msgstr "L'incisione annullata sta ancora terminando; riprova tra un momento."

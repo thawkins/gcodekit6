@@ -5,8 +5,11 @@
 //! S1000, horizontal bidirectional scans, no transformation, 10 mm offsets. GTK silently
 //! used a default for a field it could not read; here the field shows the problem and the
 //! actions wait. The engraving runs on a worker thread ([`job`]), as GTK's did, so a large
-//! image never stalls the UI; an output wider than [`MAX_LINE_PIXELS`] is refused (beyond
-//! GTK) because resizing the image to it needs that many pixels per line in memory.
+//! image never stalls the UI. Beyond GTK, an output wider than [`MAX_LINE_PIXELS`] or with
+//! more than [`MAX_PIXELS`] pixels in all is refused: the engraver resizes the whole image
+//! to the output size in memory, and its height follows the image's aspect, so a tall
+//! narrow image could ask for gigabytes. The total is checked on the page once the preview
+//! knows the image's size, and again by the worker after decoding, before the resize.
 //!
 //! GTK's page has no laser-mode (`$32`) or connection check, so neither has this one: the
 //! program goes to the editor, whose send path has its own guards.
@@ -61,9 +64,32 @@ const MIN_ABOVE_MAX: &str = n_!("Must not be more than the maximum power");
 const AT_LEAST_ONE: &str = n_!("Must be at least 1");
 const BYTE_RANGE: &str = n_!("Must be between 0 and 255");
 const TOO_LARGE: &str = n_!("The engraving is too large: at most 10000 pixels per line");
+const TOO_MANY_PIXELS: &str = n_!("The engraving is too large: at most 25 million pixels");
 
 /// The most pixels one engraved line may have (width times pixels per mm).
 pub const MAX_LINE_PIXELS: f32 = 10_000.0;
+/// The most pixels the engraving may have in all (width times height in pixels).
+pub const MAX_PIXELS: f64 = 25_000_000.0;
+
+/// The engraving's size in pixels for an image of `size` pixels, as the engraver computes
+/// it: the width from the output width, the height from the image's aspect after the
+/// rotation.
+///
+/// # Arguments
+/// * `params` - The engraving parameters.
+/// * `size` - The image's width and height in pixels.
+pub fn output_pixels(params: &EngravingParameters, size: [u32; 2]) -> f64 {
+    let [w, h] = match params.transformations.rotation {
+        RotationAngle::Degrees90 | RotationAngle::Degrees270 => [size[1], size[0]],
+        RotationAngle::Degrees0 | RotationAngle::Degrees180 => size,
+    };
+    let width = (params.width_mm * params.pixels_per_mm) as u32;
+    let height = match params.height_mm {
+        Some(mm) => (mm * params.pixels_per_mm) as u32,
+        None => (width as f32 * (h as f32 / w.max(1) as f32)) as u32,
+    };
+    f64::from(width) * f64::from(height)
+}
 
 /// The msgids the page shows, for the translation check.
 pub fn msgids() -> Vec<&'static str> {
@@ -94,6 +120,7 @@ pub fn msgids() -> Vec<&'static str> {
         AT_LEAST_ONE,
         BYTE_RANGE,
         TOO_LARGE,
+        TOO_MANY_PIXELS,
     ];
     ids.extend(page::msgids());
     ids.extend(job::msgids());
@@ -290,6 +317,17 @@ impl BitmapEngravingParams {
         Ok((image, params))
     }
 
+    /// The problem with engraving an image of `size` pixels, if its output has more than
+    /// [`MAX_PIXELS`] pixels.
+    ///
+    /// # Arguments
+    /// * `size` - The image's width and height in pixels.
+    pub fn size_problem(&self, size: [usize; 2]) -> Option<FieldError> {
+        let (_, params) = self.parameters().ok()?;
+        let size = size.map(|v| u32::try_from(v).unwrap_or(u32::MAX));
+        (output_pixels(&params, size) > MAX_PIXELS).then(|| FieldError::page(TOO_MANY_PIXELS))
+    }
+
     /// Engraves the image here, on the calling thread (the pane runs this on a worker
     /// thread, see [`job`]).
     ///
@@ -483,7 +521,12 @@ fn run_engraver(
     params: EngravingParameters,
     progress: impl FnMut(f32),
 ) -> Result<String, String> {
-    BitmapImageEngraver::from_file(image, params)
+    let img = image::open(image).map_err(|e| format!("Failed to load image file: {e}"))?;
+    // Before the engraver resizes the whole image to the output size.
+    if output_pixels(&params, [img.width(), img.height()]) > MAX_PIXELS {
+        return Err(TOO_MANY_PIXELS.to_string());
+    }
+    BitmapImageEngraver::from_image(img, params)
         .and_then(|engraver| engraver.generate_gcode_with_progress(progress))
         .map_err(|e| format!("{e:#}"))
 }

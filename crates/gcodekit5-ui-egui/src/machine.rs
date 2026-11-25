@@ -65,9 +65,6 @@ pub struct MachineStatus {
     /// Whether the controller reports positions in inches (`$13=1`). Until a `$$` line says
     /// so, reports are taken as mm, GRBL's default (as the GTK front end does).
     pub report_inches: bool,
-    /// The latest `[PRB:...]` probe report, in mm whatever `$13` says (converted the same
-    /// way as the status reports).
-    pub probe: Option<ProbeResult>,
 }
 
 /// X, Y and Z in millimetres.
@@ -161,7 +158,6 @@ impl MachineStatus {
                     self.wco = None;
                     self.grbl_travel = [None; 3];
                     self.report_inches = false;
-                    self.probe = None;
                 }
                 MachineEvent::StatusReport(report) => {
                     // Positions, offsets and feed are kept in mm whatever `$13` says.
@@ -172,9 +168,6 @@ impl MachineStatus {
                     self.report = Some(report);
                 }
                 MachineEvent::Received(line) => {
-                    if let Some(probe) = probe_report(line, self.report_inches) {
-                        self.probe = Some(probe);
-                    }
                     if let Some((index, travel)) = parse_travel(line) {
                         self.grbl_travel[index] = Some(travel);
                     }

@@ -122,3 +122,12 @@ fn test_cam_tabbed_box_bounds_show_inline_and_disable_generate() {
         );
     }
 }
+
+#[test]
+fn test_cam_tabbed_box_dividers_checked_beside_other_problems() {
+    let mut p = TabbedBoxParams::new(METRIC);
+    p.dividers_x = "100".into();
+    p.feed_rate = "0".into();
+    assert_eq!(box_errors(&p, "Dividers X:"), [TOO_MANY_DIVIDERS]);
+    assert_eq!(box_errors(&p, "Feed Rate:"), ["Must be greater than 0"]);
+}

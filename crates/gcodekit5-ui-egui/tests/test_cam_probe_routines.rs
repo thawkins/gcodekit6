@@ -87,7 +87,7 @@ fn test_cam_probe_default_page_renders() {
         assert!(h.query_by_label(label).is_some(), "{label} not shown");
     }
     // Z-touch shows only the plate thickness of the routine settings.
-    for label in ["Probe Axis", "Corner", "Diameter (mm)", "Setter Plate X"] {
+    for label in ["Probe Axis", "Corner", "Diameter:", "Setter Plate X"] {
         assert!(
             h.query_by_label(label).is_none(),
             "{label} shown for Z-touch"
@@ -96,11 +96,11 @@ fn test_cam_probe_default_page_renders() {
     let mut cam = pane(&h);
     let p = cam.probe_mut();
     assert_eq!(*p, ProbeParams::default());
-    assert_eq!(p.safe_height, "5.00");
+    assert_eq!(p.safe_height, "5.000");
     assert_eq!(p.fast_feed, "100.00");
-    assert_eq!(p.max_depth, "20.0");
-    assert_eq!(p.edge_distance, "10.0");
-    assert_eq!(p.setter_z, "-50.0");
+    assert_eq!(p.max_depth, "20.000");
+    assert_eq!(p.edge_distance, "10.000");
+    assert_eq!(p.setter_z, "-50.000");
     assert_eq!(p.wcs, 54);
     assert!(p.parameters().is_ok());
 }
@@ -131,11 +131,11 @@ fn test_cam_probe_routine_shows_its_settings() {
         ),
         (
             RoutineKind::BoreCenter,
-            &["Diameter (mm)", "Probe Depth:", "Probe Tip Radius:"],
+            &["Diameter:", "Probe Depth:", "Probe Tip Radius:"],
         ),
         (
             RoutineKind::BossCenter,
-            &["Diameter (mm)", "Probe Depth:", "Probe Tip Radius:"],
+            &["Diameter:", "Probe Depth:", "Probe Tip Radius:"],
         ),
         (
             RoutineKind::ToolLength,
@@ -203,7 +203,7 @@ fn test_cam_probe_invalid_input_shows_error_and_disables_the_actions() {
         (|p| p.backoff = "-1".into(), "Must not be negative"),
         (|p| p.max_depth = "0".into(), "Must be greater than 0"),
         (|p| p.plate_thickness = "-1".into(), "Must not be negative"),
-        (|p| p.safe_height = "high".into(), "Not a number"),
+        (|p| p.safe_height = "high".into(), "Not a valid length"),
         (
             |p| {
                 p.routine = RoutineKind::EdgeFind;

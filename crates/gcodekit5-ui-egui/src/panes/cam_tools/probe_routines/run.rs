@@ -8,11 +8,14 @@
 //!   I/O).
 //! - **Progress** ([`ProbeRun::handle`]): the run reads the machine events in order: each
 //!   `[PRB:...]` report in mm (following `$13` through the `$$` lines, as the DRO does), the
-//!   first `ALARM:` / `error:`, and the stream's end. An `error:` reply makes the run reset
-//!   the controller at once (beyond GTK, which streamed on): the routine's remaining lines
-//!   are relative moves that must not run after a refused probe line. An alarm, the user's
-//!   Stop, feed hold then reset, or E-STOP end the stream in the controller, so no further
-//!   line of the routine is sent.
+//!   first `ALARM:` / `error:`, and the stream's end. The routine streams in the
+//!   controller's `StreamMode::StopOnError` (beyond GTK, which streamed on): on an
+//!   `error:` reply the worker stops feeding at once, feed-holds, then soft-resets, because
+//!   the routine's remaining lines are relative moves (and maybe a `G10 L20`) that must not
+//!   run after a refused probe line. If the stream is somehow still running
+//!   [`BACKSTOP_DELAY`] after the error, the run resets the controller itself. An alarm,
+//!   the user's Stop, feed hold then reset, or E-STOP end the stream in the controller, so
+//!   no further line of the routine is sent.
 //! - **After a failure** the controller was left in incremental mode (G91): once it is
 //!   Idle again (the user cleared the alarm) and nothing streams, `G90` is sent, as GTK did.
 //!   A disconnect ends the run without it.
@@ -21,16 +24,21 @@
 //! `gcodekit5-camtools` (result computation, WCS command), `gcodekit5-core` (probe types).
 
 use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant};
 
 use gcodekit5_app::i18n::Translator;
 use gcodekit5_app::machine::grbl_stream::{MAX_LINE_LENGTH, prepare_program};
-use gcodekit5_app::machine::{MachineController, MachineEvent};
+use gcodekit5_app::machine::{MachineController, MachineEvent, StreamMode};
 use gcodekit5_camtools::probe_routines::{ProbeOptions, ProbeRoutineEngine};
 use gcodekit5_camtools::wcs_service::{WcsUpdateConfig, WcsUpdateService};
 use gcodekit5_core::{Position, ProbeAxis, ProbeReport, ProbeRoutine};
 
 use super::ProbeParams;
 use crate::machine::{Machine, lock, parse_report_inches, probe_report};
+
+/// How long after an `error:` reply the run waits for the controller's own halt (a feed
+/// hold, then a reset within a second) before it resets the controller itself.
+pub const BACKSTOP_DELAY: Duration = Duration::from_secs(2);
 
 const NOT_CONNECTED: &str = n_!("The machine is not connected.");
 const RUN_IN_PROGRESS: &str = n_!("A probe run is still in progress.");
@@ -170,6 +178,8 @@ pub struct ProbeRun {
     reports: Vec<gcodekit5_core::ProbeResult>,
     failure: Option<String>,
     reset_sent: bool,
+    /// When the first `error:` reply arrived, for the backstop.
+    error_at: Option<Instant>,
     phase: Phase,
 }
 
@@ -217,7 +227,7 @@ impl ProbeRun {
         let output = params.generate(start).map_err(|e| e.message(tr))?;
         let lines: Arc<[String]> = program_lines(&output.gcode)?.into();
         lock(machine.controller())
-            .start_stream(lines)
+            .start_stream_with(lines, StreamMode::StopOnError)
             .map_err(|e| format!("{}: {e}", tr.tr(NOT_STARTED)))?;
         tracing::info!(routine = %output.description, "probe run started");
         let run = Self {
@@ -228,6 +238,7 @@ impl ProbeRun {
             reports: Vec::new(),
             failure: None,
             reset_sent: false,
+            error_at: None,
             phase: Phase::Streaming,
         };
         Ok((run, format!("{}: {}", tr.tr(PROBING), output.description)))
@@ -277,6 +288,15 @@ impl ProbeRun {
     }
 
     fn while_streaming(&mut self, event: &MachineEvent, tr: &Translator) -> Option<Outcome> {
+        // Backstop: the controller halts a stop-on-error stream itself; reset only if it has
+        // not ended the stream well after the error.
+        if let Some(at) = self.error_at
+            && !self.reset_sent
+            && at.elapsed() >= BACKSTOP_DELAY
+        {
+            tracing::warn!("probe stream still running after an error; stopping it");
+            self.stop();
+        }
         match event {
             MachineEvent::Received(line) => {
                 if let Some(inches) = parse_report_inches(line) {
@@ -293,9 +313,9 @@ impl ProbeRun {
                 if failed && self.failure.is_none() {
                     self.failure = Some(message.clone());
                 }
-                if lower.starts_with("error:") && !self.reset_sent {
-                    tracing::warn!(%message, "probe line refused; stopping the routine");
-                    self.stop();
+                if lower.starts_with("error:") && self.error_at.is_none() {
+                    tracing::warn!(%message, "probe line refused; the controller halts it");
+                    self.error_at = Some(Instant::now());
                 }
                 None
             }

@@ -3703,3 +3703,12 @@ msgstr ""
 
 msgid "Program halted (feed hold, then reset)"
 msgstr ""
+
+msgid "Diameter:"
+msgstr ""
+
+msgid "The engraving is too large: at most 25 million pixels"
+msgstr ""
+
+msgid "The cancelled engraving is still finishing; try again in a moment."
+msgstr ""

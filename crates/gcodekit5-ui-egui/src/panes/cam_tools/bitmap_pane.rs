@@ -13,6 +13,10 @@ use gcodekit5_app::i18n::Translator;
 use super::bitmap_engraving::job::{EngraveJob, JobState, PreviewLoad};
 use super::{CamDelivery, CamError, CamTool, CamToolsPane, Output};
 
+/// Notice: a new engraving waits for a cancelled one's worker.
+pub(super) const CANCELLED_BUSY: &str =
+    n_!("The cancelled engraving is still finishing; try again in a moment.");
+
 /// How often the pane looks at a running engraving while nothing else repaints.
 const POLL_INTERVAL: Duration = Duration::from_millis(50);
 
@@ -32,6 +36,9 @@ struct Running {
 pub(super) struct BitmapRun {
     /// The engraving, while it runs.
     running: Option<Running>,
+    /// A cancelled engraving whose worker may still be running; a new one waits for it, so
+    /// repeated Generate and Cancel never stack CPU-bound workers.
+    cancelled: Option<EngraveJob>,
     /// The chosen image's preview.
     preview: Option<PreviewLoad>,
     /// Browse, waiting for the app.
@@ -60,7 +67,18 @@ impl CamToolsPane {
     pub fn cancel_bitmap_job(&mut self) {
         if let Some(run) = self.bitmap_run.running.take() {
             run.job.cancel();
+            self.bitmap_run.cancelled = Some(run.job);
         }
+    }
+
+    /// Whether an engraving worker is still running, including a cancelled one.
+    pub fn bitmap_worker_busy(&self) -> bool {
+        self.bitmap_job_running()
+            || self
+                .bitmap_run
+                .cancelled
+                .as_ref()
+                .is_some_and(|job| !job.finished())
     }
 
     /// The chosen image's size in pixels, once its preview is decoded.
@@ -100,6 +118,11 @@ impl CamToolsPane {
         if self.bitmap_job_running() {
             return;
         }
+        if self.bitmap_worker_busy() {
+            self.notice = Some(tr.tr(CANCELLED_BUSY).into_owned());
+            return;
+        }
+        self.bitmap_run.cancelled = None;
         let Ok((image, params)) = self.bitmap_engraving.parameters() else {
             self.notice = Some(CamError::Invalid.message(tr));
             return;
@@ -147,7 +170,10 @@ impl CamToolsPane {
                 }
                 Some(delivery) => self.request_to_editor(gcode, delivery),
             },
-            Err(error) => self.notice = Some(CamError::Generator(error).message(tr)),
+            // The worker's own refusals are msgids.
+            Err(error) => {
+                self.notice = Some(CamError::Generator(tr.tr(&error).into_owned()).message(tr));
+            }
         }
     }
 

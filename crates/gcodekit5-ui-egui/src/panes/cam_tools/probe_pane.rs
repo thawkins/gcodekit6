@@ -14,6 +14,28 @@ use super::probe_routines::{ProbeParams, ProbeView};
 use super::{CamAction, CamToolsPane};
 use crate::machine::Machine;
 
+/// Whether `event` makes a probe result stale: an alarm, a controller reset (its banner or
+/// the reset byte) or homing (`$H`), after which the machine coordinates may differ.
+fn invalidates_result(event: &MachineEvent) -> bool {
+    match event {
+        MachineEvent::Error(message) => message.to_ascii_lowercase().starts_with("alarm:"),
+        MachineEvent::Received(line) => {
+            let lower = line.trim().to_ascii_lowercase();
+            lower.starts_with("grbl ") || lower.starts_with("grblhal ")
+        }
+        MachineEvent::Sent(line) => {
+            let line = line.trim().to_ascii_uppercase();
+            line.starts_with("$H") || line.starts_with("0X18")
+        }
+        MachineEvent::Disconnected | MachineEvent::StreamHalted { .. } => true,
+        MachineEvent::Connected
+        | MachineEvent::StatusReport(_)
+        | MachineEvent::StreamProgress { .. }
+        | MachineEvent::StreamFinished { .. }
+        | MachineEvent::StreamStopped { .. } => false,
+    }
+}
+
 /// The Probe Tools page's state.
 #[derive(Debug, Default)]
 pub(super) struct ProbeState {
@@ -62,6 +84,10 @@ impl CamToolsPane {
     /// * `events` - Machine events, oldest first.
     /// * `tr` - Translator for the current UI language.
     pub fn probe_events(&mut self, events: &[MachineEvent], tr: &Translator) {
+        if self.probe.last.is_some() && events.iter().any(invalidates_result) {
+            // The machine's coordinates may have changed: the result no longer applies.
+            self.probe.last = None;
+        }
         let Some(run) = self.probe.run.as_mut() else {
             return;
         };

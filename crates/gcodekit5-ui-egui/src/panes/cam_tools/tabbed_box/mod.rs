@@ -308,9 +308,15 @@ impl TabbedBoxParams {
             |v: f64| at_least_one(v).or_else(|| (v > MAX_PASSES).then_some(TOO_MANY_PASSES));
         let passes = whole(PASSES, &self.passes, &passes_rule);
         let power = whole(POWER, &self.power, &not_negative);
+        // The dividers need their sides and the thickness, whatever else is wrong.
+        let sizes_read = !errors
+            .iter()
+            .any(|e| matches!(e.field, Some(f) if [WIDTH, DEPTH, THICKNESS].contains(&f)));
+        if strict && sizes_read {
+            self.check_dividers(&mut errors, [x, y], thickness, [dividers_x, dividers_y]);
+        }
         if strict && errors.is_empty() {
             self.check_joint_and_walls(&mut errors, [x, y, h], thickness, finger, space);
-            self.check_dividers(&mut errors, [x, y], thickness, [dividers_x, dividers_y]);
         }
         if !errors.is_empty() {
             return Err(errors);

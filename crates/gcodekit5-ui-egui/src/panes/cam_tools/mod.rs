@@ -24,28 +24,25 @@ pub mod common;
 pub mod drill_press;
 pub mod gerber;
 pub mod jigsaw;
+mod preset_fields;
 mod probe_pane;
 pub mod probe_routines;
 pub mod requests;
+mod shared;
 pub mod speeds_feeds;
 pub mod spoilboard_grid;
 pub mod spoilboard_surfacing;
 pub mod tabbed_box;
 pub mod tools;
 
-use std::cell::RefCell;
-use std::rc::Rc;
-
 use gcodekit5_app::device_status;
 use gcodekit5_app::i18n::Translator;
 use gcodekit5_core::units::MeasurementSystem;
-use gcodekit5_settings::config::Config;
 
 use bitmap_engraving::BitmapEngravingParams;
 use bitmap_pane::BitmapRun;
 pub use common::{CamAction, CamError, FieldError};
 use drill_press::DrillPressParams;
-use gcodekit5_app::machine::MachineEvent;
 use gcodekit5_core::data::materials::{Material, init_standard_library as material_library};
 use gcodekit5_core::data::tools::{Tool, init_standard_library as tool_library};
 use gcodekit5_devicedb::model::DeviceProfile;
@@ -54,6 +51,7 @@ use jigsaw::JigsawParams;
 use probe_pane::ProbeState;
 pub use requests::{DesignerPath, PresetRequest};
 use requests::{DesignerPaths, PendingPreset};
+pub use shared::SharedCamTools;
 use speeds_feeds::SpeedsFeedsParams;
 use spoilboard_grid::SpoilboardGridParams;
 use spoilboard_surfacing::SpoilboardSurfacingParams;
@@ -61,7 +59,6 @@ use tabbed_box::TabbedBoxParams;
 pub use tools::{CamTool, Category};
 
 use crate::machine::Machine;
-use crate::workspace::{Pane, PaneContext, PaneId};
 
 /// How a page's program reaches the editor.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -301,6 +298,7 @@ impl CamToolsPane {
         self.tabbed_box.set_units(units);
         self.gerber.set_units(units);
         self.bitmap_engraving.set_units(units);
+        self.probe.params.set_units(units);
     }
 
     /// The Drill Press page's input.
@@ -458,7 +456,15 @@ impl CamToolsPane {
             CamTool::BitmapEngraving => {
                 let preview = self.bitmap_run.preview_texture(ui.ctx());
                 let busy = self.bitmap_job_running();
-                bitmap_engraving::show(ui, &mut self.bitmap_engraving, preview.as_ref(), busy, tr)
+                let size = self.bitmap_preview_size();
+                bitmap_engraving::show(
+                    ui,
+                    &mut self.bitmap_engraving,
+                    preview.as_ref(),
+                    size,
+                    busy,
+                    tr,
+                )
             }
             CamTool::SpeedsFeeds => speeds_feeds::show(ui, &mut self.speeds_feeds, tr),
             CamTool::SpoilboardGrid => spoilboard_grid::show(ui, &mut self.spoilboard_grid, tr),
@@ -534,41 +540,5 @@ impl CamToolsPane {
                     .labelled_by(name.id);
                 }
             });
-    }
-}
-
-/// The CAM Tools pane shared between the workspace, which draws it, and the app, which takes
-/// its editor requests.
-#[derive(Debug, Clone)]
-pub struct SharedCamTools(pub Rc<RefCell<CamToolsPane>>);
-
-impl Pane for SharedCamTools {
-    fn id(&self) -> PaneId {
-        PaneId::CamTools
-    }
-
-    fn title(&self, tr: &Translator) -> String {
-        tr.tr(PaneId::CamTools.title_msgid()).into_owned()
-    }
-
-    fn ui(&mut self, ui: &mut egui::Ui, ctx: &mut PaneContext) {
-        match self.0.try_borrow_mut() {
-            Ok(mut pane) => pane.ui(ui, ctx.tr, ctx.machine()),
-            Err(error) => tracing::warn!(%error, "CAM tools busy; not drawn this frame"),
-        }
-    }
-
-    fn machine_events(&mut self, events: &[MachineEvent], tr: &Translator) {
-        match self.0.try_borrow_mut() {
-            Ok(mut pane) => pane.probe_events(events, tr),
-            Err(error) => tracing::warn!(%error, "CAM tools busy; machine events not taken"),
-        }
-    }
-
-    fn configure(&mut self, config: &Config) {
-        match self.0.try_borrow_mut() {
-            Ok(mut pane) => pane.set_units(config.ui.measurement_system),
-            Err(error) => tracing::warn!(%error, "CAM tools busy; settings not applied"),
-        }
     }
 }
