@@ -3161,3 +3161,36 @@ msgstr "Auftrag stoppen und beenden?"
 
 msgid "A job is running. Quitting stops it and closes the machine connection."
 msgstr "Ein Auftrag läuft. Beenden stoppt ihn und schließt die Maschinenverbindung."
+
+msgid "Rapid:"
+msgstr "Eilgang:"
+
+msgid "No program loaded"
+msgstr "Kein Programm geladen"
+
+msgid "Emergency stop (soft reset, {shortcut})"
+msgstr "Not-Aus (Soft-Reset, {shortcut})"
+
+msgid "Jog refused: the machine position is unknown."
+msgstr "Tippen abgelehnt: Die Maschinenposition ist unbekannt."
+
+msgid "Jog refused: no travel left in that direction."
+msgstr "Tippen abgelehnt: In dieser Richtung ist kein Verfahrweg mehr frei."
+
+msgid "Jog refused: the machine is not idle."
+msgstr "Tippen abgelehnt: Die Maschine ist nicht im Leerlauf."
+
+msgid "Clear"
+msgstr "Löschen"
+
+msgid "Type a command and press Enter..."
+msgstr "Befehl eingeben und Eingabetaste drücken..."
+
+msgid "Device connected"
+msgstr "Gerät verbunden"
+
+msgid "Device disconnected"
+msgstr "Gerät getrennt"
+
+msgid "Error"
+msgstr "Fehler"

@@ -3168,3 +3168,36 @@ msgstr "Arrêter la tâche et quitter ?"
 
 msgid "A job is running. Quitting stops it and closes the machine connection."
 msgstr "Une tâche est en cours. Quitter l'arrête et ferme la connexion à la machine."
+
+msgid "Rapid:"
+msgstr "Rapide :"
+
+msgid "No program loaded"
+msgstr "Aucun programme chargé"
+
+msgid "Emergency stop (soft reset, {shortcut})"
+msgstr "Arrêt d'urgence (réinitialisation logicielle, {shortcut})"
+
+msgid "Jog refused: the machine position is unknown."
+msgstr "Jog refusé : la position de la machine est inconnue."
+
+msgid "Jog refused: no travel left in that direction."
+msgstr "Jog refusé : plus de course disponible dans cette direction."
+
+msgid "Jog refused: the machine is not idle."
+msgstr "Jog refusé : la machine n'est pas au repos."
+
+msgid "Clear"
+msgstr "Effacer"
+
+msgid "Type a command and press Enter..."
+msgstr "Saisissez une commande et appuyez sur Entrée..."
+
+msgid "Device connected"
+msgstr "Appareil connecté"
+
+msgid "Device disconnected"
+msgstr "Appareil déconnecté"
+
+msgid "Error"
+msgstr "Erreur"

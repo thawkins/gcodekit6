@@ -15,6 +15,11 @@
 //! end of the frame and answered on a later one, so the event loop never blocks. The
 //! Preferences and About windows are drawn over the workspace while open.
 //!
+//! The machine connection ([`AppState::machine`]) is polled once per frame, in
+//! [`GcodeKitApp::logic`] or, when only [`GcodeKitApp::ui`] runs, there; its events and status
+//! reach the panes through [`PaneContext::with_machine`]. Machine commands are run by the
+//! Machine Control pane ([`Workspace::route`]).
+//!
 //! Quitting goes through [`GcodeKitApp::request_quit`] whatever asked for it (the window's
 //! close button, the Quit command, a confirmed restart; session end is not hooked, see
 //! [`QuitSource`]). A running job is asked about
@@ -29,6 +34,7 @@
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, OnceLock};
+use std::time::{Duration, Instant};
 
 use craft_keymap::egui::Dispatcher;
 use craft_keymap::{Active, Keymap};
@@ -37,15 +43,22 @@ use craft_platform::appearance::SystemThemeFn;
 use craft_window::policy::{Decision, Frame};
 use gcodekit5_app::UnsavedChangesChoice;
 use gcodekit5_app::i18n::Translator;
+use gcodekit5_app::machine::{MachineController, MachineEvent};
 use gcodekit5_settings::SettingsManager;
 use gcodekit5_settings::config::Config;
 
 use crate::commands::{self, Command};
 use crate::dialogs::{Asked, ConfirmChoice, ConfirmRequest, DialogAnswer, Dialogs, FilePurpose};
+use crate::machine::{Machine, lock};
 use crate::menu::Menus;
+use crate::panes::console::ConsolePane;
+use crate::panes::machine_control::MachineControlPane;
 use crate::theme;
 use crate::windows::{AboutWindow, SettingsOutcome, SettingsWindow};
-use crate::workspace::{PaneContext, Workspace};
+use crate::workspace::{PaneContext, PaneId, Workspace};
+
+/// How long quitting waits for a stopped job to be confirmed by the controller.
+const STOP_JOB_TIMEOUT: Duration = Duration::from_secs(2);
 
 /// What asked the app to quit. Every source goes through [`GcodeKitApp::request_quit`] and is
 /// treated the same; the source is logged.
@@ -100,9 +113,10 @@ pub struct AppState {
     /// Which documents have unsaved changes; asked about on quit. The editor and designer
     /// panes set it once they exist (Tasks 9 and 12); until then only tests do.
     pub dirty: DirtyState,
-    /// Whether a job is streaming to the machine; asked about on quit. Set from the machine
-    /// controller once the app holds it (Task 8); until then only tests do.
-    pub job_running: bool,
+    /// The machine connection: the shared controller, this frame's events and the state
+    /// derived from them. Replace it (with [`AppState::with_machine`]) before the app is built
+    /// from the state, since the Machine Control pane shares its controller.
+    pub machine: Machine,
 }
 
 impl AppState {
@@ -119,8 +133,22 @@ impl AppState {
             decision,
             restart: Arc::new(AtomicBool::new(false)),
             dirty: DirtyState::default(),
-            job_running: false,
+            machine: Machine::new(MachineController::new()),
         }
+    }
+
+    /// The same state driving `controller` (a test transport, for example).
+    ///
+    /// # Arguments
+    /// * `controller` - The machine controller to use.
+    pub fn with_machine(mut self, controller: MachineController) -> Self {
+        self.machine = Machine::new(controller);
+        self
+    }
+
+    /// Whether a job is streaming to the machine; asked about on quit.
+    pub fn job_running(&self) -> bool {
+        self.machine.job_running()
     }
 
     /// The current settings.
@@ -189,6 +217,8 @@ pub struct GcodeKitApp {
     last_dispatched: Option<Command>,
     /// The quit being decided, if any.
     quit: QuitFlow,
+    /// The egui frame whose machine events were last polled.
+    machine_polled: Option<u64>,
     /// The `movable` flag last set on the macOS window (`title_bar::sync_movable`).
     #[cfg(target_os = "macos")]
     movable: Option<bool>,
@@ -254,9 +284,24 @@ impl GcodeKitApp {
         if state.config().ui.show_about_on_startup {
             about_window.open();
         }
+        let mut workspace = Workspace::default_layout();
+        workspace.set_pane(Box::new(machine_control_pane(&state)));
+        workspace.set_pane(Box::new(ConsolePane::new(Arc::clone(
+            state.machine.controller(),
+        ))));
+        workspace.configure(state.config());
+        {
+            // Wake the event loop whenever the machine reports something.
+            let wake_ctx = Arc::clone(&wake_ctx);
+            lock(state.machine.controller()).set_repaint_hook(Box::new(move || {
+                if let Some(ctx) = wake_ctx.get() {
+                    ctx.request_repaint();
+                }
+            }));
+        }
         Self {
             state,
-            workspace: Workspace::default_layout(),
+            workspace,
             system_theme: None,
             keymap,
             dispatcher: Dispatcher::new(),
@@ -270,6 +315,7 @@ impl GcodeKitApp {
             about_window,
             last_dispatched: None,
             quit: QuitFlow::default(),
+            machine_polled: None,
             #[cfg(target_os = "macos")]
             movable: None,
         }
@@ -284,6 +330,8 @@ impl GcodeKitApp {
     /// * `ctx` - The egui context of the root window.
     pub fn logic(&mut self, ctx: &egui::Context) {
         let _ = self.wake_ctx.set(ctx.clone());
+        self.poll_machine(ctx);
+        self.cancel_holds_without_focus(ctx);
         while let Some(answer) = self.dialogs.poll() {
             self.handle_answer(answer);
         }
@@ -324,7 +372,7 @@ impl GcodeKitApp {
     /// Asks the next quit question, or closes the window when none is left.
     fn continue_quit(&mut self) {
         let (state, quit) = (&self.state, &self.quit);
-        let next = if state.job_running && !quit.stop_job {
+        let next = if state.job_running() && !quit.stop_job {
             Some(ConfirmRequest::StopJob)
         } else if state.dirty.editor && !quit.discarded.editor {
             Some(ConfirmRequest::UnsavedGcode)
@@ -358,10 +406,9 @@ impl GcodeKitApp {
     fn quit_answer(&mut self, request: ConfirmRequest, choice: ConfirmChoice) {
         self.quit.asking = None;
         match (request, choice) {
-            // Quitting ends the process and with it the stream; stopping the job cleanly
-            // before that is wired with the machine controller (Task 8).
             (ConfirmRequest::StopJob, ConfirmChoice::Yes) => {
                 self.quit.stop_job = true;
+                self.stop_job_for_quit();
                 self.continue_quit();
             }
             (ConfirmRequest::StopJob, ConfirmChoice::No | ConfirmChoice::Cancel) => {
@@ -388,6 +435,35 @@ impl GcodeKitApp {
             }
             // The quit flow never asks this; forget the quit rather than act on it.
             (ConfirmRequest::Restart, _) => self.cancel_quit(),
+        }
+    }
+
+    /// Stops the running job (soft reset, queued lines dropped) and waits until the controller
+    /// reports the stream ended or the connection closed, at most [`STOP_JOB_TIMEOUT`]; the
+    /// events seen meanwhile join this frame's events.
+    fn stop_job_for_quit(&mut self) {
+        let controller = Arc::clone(self.state.machine.controller());
+        lock(&controller).stop();
+        let deadline = Instant::now() + STOP_JOB_TIMEOUT;
+        loop {
+            let events = lock(&controller).poll();
+            let ended = events.iter().any(|e| {
+                matches!(
+                    e,
+                    MachineEvent::StreamStopped { .. }
+                        | MachineEvent::StreamFinished { .. }
+                        | MachineEvent::Disconnected
+                )
+            });
+            self.state.machine.absorb(events);
+            if ended || !self.state.job_running() {
+                return;
+            }
+            if Instant::now() >= deadline {
+                tracing::warn!("job did not confirm the stop in time; quitting anyway");
+                return;
+            }
+            std::thread::sleep(Duration::from_millis(5));
         }
     }
 
@@ -418,6 +494,8 @@ impl GcodeKitApp {
         self.sync_theme(ui.ctx());
         let ctx = ui.ctx().clone();
         let _ = self.wake_ctx.set(ctx.clone());
+        self.poll_machine(&ctx);
+        self.cancel_holds_without_focus(&ctx);
         while let Some(answer) = self.dialogs.poll() {
             self.handle_answer(answer);
         }
@@ -429,11 +507,23 @@ impl GcodeKitApp {
         let mut queue = std::mem::take(&mut self.queue);
         queue.extend(self.menus.take_native(&ctx, gate));
         self.show_frame_and_menu(ui, gate, &mut queue);
-        let mut panes = PaneContext::new(&self.state.translator, &mut queue);
+        egui::Panel::bottom("gcodekit5-status-bar").show(ui, |ui| {
+            if crate::status_bar::show(
+                ui,
+                &self.state.translator,
+                self.state.machine.status(),
+                self.state.config().ui.measurement_system,
+            ) {
+                queue.push(Command::SoftReset);
+            }
+        });
+        let mut panes =
+            PaneContext::new(&self.state.translator, &mut queue).with_machine(&self.state.machine);
         self.workspace.show(ui, &mut panes);
         for command in queue.drain(..) {
             self.dispatch(command);
         }
+        self.deliver_machine_events();
         self.queue = queue;
         self.show_windows(&ctx);
         for command in self.viewport_commands.drain(..) {
@@ -455,10 +545,9 @@ impl GcodeKitApp {
         if craft_menu::bar::is_open(ctx) || craft_menu::bar::is_focused(ctx) {
             return;
         }
-        // No pane reports keyboard focus yet, so panel-scoped bindings (jogging, the
-        // visualizer's view keys) wait for the panes that track it.
         let active = Active {
             typing: ctx.text_edit_focused(),
+            panel: self.keyboard_panel(ctx),
             ..Active::NONE
         };
         let hits = ctx.input_mut(|input| self.dispatcher.dispatch(input, &self.keymap, &active));
@@ -466,6 +555,59 @@ impl GcodeKitApp {
             hits.iter()
                 .filter_map(|hit| Command::from_ref(&hit.command)),
         );
+    }
+
+    /// The keymap scope of the pane that has the keyboard: the pane the user last pressed the
+    /// pointer in, but only while no widget has keyboard focus and no popup (an open dropdown)
+    /// is up, so a pane's keys never take a key from a focused widget.
+    fn keyboard_panel(&self, ctx: &egui::Context) -> Option<&'static str> {
+        let widget_has_keys =
+            ctx.memory(|m| m.focused().is_some()) || egui::Popup::is_any_open(ctx);
+        if widget_has_keys {
+            return None;
+        }
+        self.workspace.focused_pane().and_then(PaneId::keymap_scope)
+    }
+
+    /// Takes the machine controller's events once per egui frame and fans them out
+    /// ([`AppState::machine`]); a second call in the same frame does nothing.
+    fn poll_machine(&mut self, ctx: &egui::Context) {
+        let frame = ctx.cumulative_frame_nr();
+        if self.machine_polled != Some(frame) {
+            self.machine_polled = Some(frame);
+            self.state.machine.poll();
+        }
+        self.deliver_machine_events();
+    }
+
+    /// Hands the events no pane has seen yet to every pane, drawn or not.
+    fn deliver_machine_events(&mut self) {
+        let events = self.state.machine.take_pending();
+        if !events.is_empty() {
+            self.workspace
+                .machine_events(&events, &self.state.translator);
+        }
+    }
+
+    /// Ends every press-and-hold input (a hold-to-jog) while the window does not have the
+    /// keyboard focus or is minimized: its button release would never arrive.
+    fn cancel_holds_without_focus(&mut self, ctx: &egui::Context) {
+        let (focused, minimized) =
+            ctx.input(|i| (i.focused, i.viewport().minimized.unwrap_or(false)));
+        if !focused || minimized {
+            self.workspace.cancel_holds();
+        }
+    }
+
+    /// Hands a machine command to the pane that runs it (Machine Control).
+    fn route_machine_command(&mut self, cmd: Command) {
+        let mut requested = Vec::new();
+        let mut ctx = PaneContext::new(&self.state.translator, &mut requested)
+            .with_machine(&self.state.machine);
+        if !self.workspace.route(cmd, &mut ctx) {
+            tracing::warn!(?cmd, "no pane runs this machine command");
+        }
+        self.queue.extend(requested);
     }
 
     /// Draws the window frame and the in-window menu bar (unless the native menu is up): in
@@ -489,7 +631,8 @@ impl GcodeKitApp {
         }
     }
 
-    /// Runs `cmd`. Commands whose features land in later milestones are logged, one arm per
+    /// Runs `cmd`. Machine commands go to the Machine Control pane. Commands whose features
+    /// land in later milestones are logged, one arm per
     /// group, and recorded in [`GcodeKitApp::last_dispatched`] like every other command.
     ///
     /// # Arguments
@@ -540,7 +683,7 @@ impl GcodeKitApp {
             | Command::JogYPos
             | Command::JogYNeg
             | Command::JogZPos
-            | Command::JogZNeg => tracing::debug!(?cmd, "machine command not available yet"),
+            | Command::JogZNeg => self.route_machine_command(cmd),
             Command::ZoomFit
             | Command::ZoomIn
             | Command::ZoomOut
@@ -562,11 +705,15 @@ impl GcodeKitApp {
             self.settings_window
                 .show(ctx, &mut self.state.settings, &self.state.translator);
         match outcome {
-            SettingsOutcome::Applied { restart: true } => self.request_restart(),
+            SettingsOutcome::Applied { restart } => {
+                self.workspace.configure(self.state.config());
+                if restart {
+                    self.request_restart();
+                }
+            }
             SettingsOutcome::Closed
             | SettingsOutcome::Open
             | SettingsOutcome::Cancelled
-            | SettingsOutcome::Applied { restart: false }
             | SettingsOutcome::Failed(_) => {}
         }
         self.about_window.show(ctx, &self.state.translator);
@@ -636,6 +783,34 @@ impl GcodeKitApp {
         &mut self.state
     }
 
+    /// The docking workspace, for layout changes and tests.
+    pub fn workspace_mut(&mut self) -> &mut Workspace {
+        &mut self.workspace
+    }
+
+    /// The keymap, for the user's shortcut overrides and for tests.
+    pub fn keymap_mut(&mut self) -> &mut Keymap {
+        &mut self.keymap
+    }
+
+    /// What runs when the app exits: a hold-to-jog is cancelled (0x85), the machine
+    /// connection is closed (writing 0x85 itself while a jog is outstanding) and the serial
+    /// port released, and then, when the user asked to restart, `relaunch` starts the app
+    /// again.
+    ///
+    /// # Arguments
+    /// * `relaunch` - Starts the new process (`relaunch_command().spawn()` in the app).
+    #[doc(hidden)]
+    pub fn on_exit_with(&mut self, relaunch: impl FnOnce() -> std::io::Result<()>) {
+        self.workspace.cancel_holds();
+        self.state.machine.disconnect();
+        if self.state.restart.swap(false, Ordering::SeqCst)
+            && let Err(error) = relaunch()
+        {
+            tracing::error!(%error, "could not restart GCodeKit5");
+        }
+    }
+
     /// The last command [`GcodeKitApp::dispatch`] ran.
     pub fn last_dispatched(&self) -> Option<Command> {
         self.last_dispatched
@@ -655,6 +830,20 @@ impl GcodeKitApp {
     }
 }
 
+/// The Machine Control pane over `state`'s controller, with the configured connection and jog
+/// settings.
+fn machine_control_pane(state: &AppState) -> MachineControlPane {
+    let config = state.config();
+    let m = &config.machine;
+    MachineControlPane::new(Arc::clone(state.machine.controller()))
+        .with_connection(config.connection.clone())
+        .with_jog(
+            m.jog_increment as f32,
+            m.jog_feed_rate as f32,
+            [m.x_limit as f32, m.y_limit as f32, m.z_limit as f32],
+        )
+}
+
 impl eframe::App for GcodeKitApp {
     /// Runs the quit and dialog logic, then lets craft-quit take a close request the app did
     /// not cancel over (macOS quits through `-[NSApplication terminate:]`).
@@ -669,7 +858,8 @@ impl eframe::App for GcodeKitApp {
         self.dialogs.end_frame(Some(&*frame));
     }
 
-    /// Relaunches the app when the user asked to restart. Runs here, not after
+    /// Closes the machine connection, then relaunches the app when the user asked to restart
+    /// (the relaunched process must find the serial port free). Runs here, not after
     /// `eframe::run_native` returns, because on macOS the process ends inside
     /// `-[NSApplication terminate:]` once eframe's exit handling has run.
     ///
@@ -678,11 +868,11 @@ impl eframe::App for GcodeKitApp {
     /// until the window closes), the app is still relaunched. A panic or a kill skips this
     /// and nothing is relaunched.
     fn on_exit(&mut self) {
-        if self.state.restart.swap(false, Ordering::SeqCst)
-            && let Err(error) = crate::relaunch_command().and_then(|mut command| command.spawn())
-        {
-            tracing::error!(%error, "could not restart GCodeKit5");
-        }
+        self.on_exit_with(|| {
+            crate::relaunch_command()
+                .and_then(|mut command| command.spawn())
+                .map(drop)
+        });
     }
 
     /// Feeds the native menu's key equivalents to egui before it reads the input.

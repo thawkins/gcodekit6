@@ -2,9 +2,12 @@
 //! `GcodeKitApp::request_quit`. A running job asks "Stop job and quit?" first, then unsaved
 //! work asks Save / Discard / Cancel; a clean app quits at once. Nothing here closes the
 //! process: the tests read the viewport commands each frame emits and the restart flag.
+//! "Stop job and quit?" Yes stops the stream before the window closes, and the machine is
+//! disconnected before a restart relaunches the app.
 
 use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 
 use craft_dialogs::{Answer, MessageResult, Request};
 use egui::{ViewportCommand, ViewportEvent, ViewportId};
@@ -42,13 +45,19 @@ type Shown = Arc<Mutex<Vec<String>>>;
 
 /// The app in a harness that runs a frame the way eframe does (`logic`, then `ui`, then the
 /// dialogs at the end of the frame), with `work` open and every message box answered with
-/// `reply`.
+/// `reply`. A streaming job is a real stream on the loopback transport with its acks held.
 fn harness(work: Work, reply: MessageResult) -> (Harness<'static, GcodeKitApp>, Shown) {
-    let mut app = GcodeKitApp::from_state(AppState::new(
+    let mut state = AppState::new(
         SettingsManager::detached(Config::default()),
         crate::test_smoke::native_decision(),
-    ));
-    set_work(app.state_mut(), work);
+    );
+    if matches!(work, Work::Streaming) {
+        let (streaming, shared) = crate::machine_support::loopback_state(Duration::from_millis(1));
+        state = streaming;
+        crate::machine_support::start_held_stream(&mut state, &shared, 100);
+    }
+    set_work(&mut state, work);
+    let mut app = GcodeKitApp::from_state(state);
     let shown: Shown = Arc::default();
     answer_with(&mut app, &shown, reply);
     let harness = Harness::builder()
@@ -68,7 +77,6 @@ fn set_work(state: &mut AppState, work: Work) {
         editor: matches!(work, Work::EditorDirty),
         designer: matches!(work, Work::DesignerDirty),
     };
-    state.job_running = matches!(work, Work::Streaming);
 }
 
 /// Answers every message box with `reply`, recording its title in `shown`.
@@ -403,4 +411,51 @@ fn test_confirm_choice_maps_to_unsaved_choice() {
         ConfirmChoice::Cancel.as_unsaved(),
         UnsavedChangesChoice::Cancel
     );
+}
+
+/// "Stop job and quit?" Yes soft-resets the controller and waits for the stream to end
+/// before the window closes.
+#[test]
+fn test_quit_stop_job_yes_stops_stream_before_close() {
+    use gcodekit5_app::test_support::Wrote;
+    let (mut state, shared) = crate::machine_support::loopback_state(Duration::from_millis(1));
+    crate::machine_support::start_held_stream(&mut state, &shared, 100);
+    let mut app = GcodeKitApp::from_state(state);
+    let shown: Shown = Arc::default();
+    answer_with(&mut app, &shown, MessageResult::Yes);
+    let mut harness = crate::machine_support::app_harness(app);
+    let commands = quit_from(&mut harness, QuitSource::MenuQuit);
+    assert!(!commands.contains(&ViewportCommand::Close), "{commands:?}");
+    assert!(!shared.log().contains(&Wrote::Realtime(0x18)));
+    let commands = frame(&mut harness, false);
+    assert!(commands.contains(&ViewportCommand::Close), "{commands:?}");
+    assert!(
+        shared.log().contains(&Wrote::Realtime(0x18)),
+        "no soft reset before closing: {:?}",
+        shared.log()
+    );
+    assert!(!harness.state().state().job_running(), "job still running");
+}
+
+/// On exit the machine is disconnected (the serial port released) before a restart starts
+/// the new process; without a restart nothing is relaunched.
+#[test]
+fn test_exit_disconnects_before_relaunch() {
+    for restart in [true, false] {
+        let (mut state, shared) = crate::machine_support::loopback_state(Duration::from_millis(1));
+        crate::machine_support::connect(&mut state);
+        state.restart.store(restart, Ordering::SeqCst);
+        let mut app = GcodeKitApp::from_state(state);
+        let connected_at_relaunch = std::cell::Cell::new(None);
+        app.on_exit_with(|| {
+            connected_at_relaunch.set(Some(shared.connected.load(Ordering::SeqCst)));
+            Ok(())
+        });
+        let expected = restart.then_some(false);
+        assert_eq!(connected_at_relaunch.get(), expected, "restart {restart}");
+        assert!(
+            !shared.connected.load(Ordering::SeqCst),
+            "restart {restart}"
+        );
+    }
 }

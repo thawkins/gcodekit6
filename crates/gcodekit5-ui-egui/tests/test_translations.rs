@@ -5,6 +5,8 @@ use gcodekit5_app::i18n::Translator;
 use gcodekit5_ui_egui::dialogs;
 use gcodekit5_ui_egui::frame::caption_msgid;
 use gcodekit5_ui_egui::menu;
+use gcodekit5_ui_egui::panes::{console, machine_control};
+use gcodekit5_ui_egui::status_bar;
 use gcodekit5_ui_egui::windows::{about, settings};
 use gcodekit5_ui_egui::workspace::PaneId;
 
@@ -12,7 +14,7 @@ const LANGUAGES: [&str; 5] = ["de", "es", "fr", "it", "pt"];
 
 /// Translations that are spelled like the English msgid; the Translator cannot tell them
 /// from a missing entry, so the po file is checked for them instead.
-const IDENTICAL: [(&str, &str); 22] = [
+const IDENTICAL: [(&str, &str); 61] = [
     ("de", "G-Code Editor"),
     ("de", "Designer"),
     ("it", "Designer"),
@@ -35,6 +37,46 @@ const IDENTICAL: [(&str, &str); 22] = [
     ("de", "Version"),
     ("es", "General"),
     ("fr", "Version"),
+    // Machine Control: technical terms kept as in English.
+    ("de", "Port:"),
+    ("de", "Host:"),
+    ("de", "Baud:"),
+    ("de", "Pause"),
+    ("es", "Host:"),
+    ("fr", "Pause"),
+    ("it", "Host:"),
+    ("it", "Baud:"),
+    ("it", "Stop"),
+    ("pt", "Baud:"),
+    ("es", "Jog"),
+    ("es", "Jog X+"),
+    ("es", "Jog X-"),
+    ("es", "Jog Y+"),
+    ("es", "Jog Y-"),
+    ("es", "Jog Z+"),
+    ("es", "Jog Z-"),
+    ("fr", "Jog"),
+    ("fr", "Jog X+"),
+    ("fr", "Jog X-"),
+    ("fr", "Jog Y+"),
+    ("fr", "Jog Y-"),
+    ("fr", "Jog Z+"),
+    ("fr", "Jog Z-"),
+    ("es", "Error"),
+    ("it", "Jog"),
+    ("it", "Jog X+"),
+    ("it", "Jog X-"),
+    ("it", "Jog Y+"),
+    ("it", "Jog Y-"),
+    ("it", "Jog Z+"),
+    ("it", "Jog Z-"),
+    ("pt", "Jog"),
+    ("pt", "Jog X+"),
+    ("pt", "Jog X-"),
+    ("pt", "Jog Y+"),
+    ("pt", "Jog Y-"),
+    ("pt", "Jog Z+"),
+    ("pt", "Jog Z-"),
 ];
 
 fn msgids() -> Vec<&'static str> {
@@ -46,6 +88,9 @@ fn msgids() -> Vec<&'static str> {
         .chain(settings::msgids())
         .chain(about::msgids())
         .chain(dialogs::msgids())
+        .chain(machine_control::msgids())
+        .chain(console::msgids())
+        .chain(status_bar::MSGIDS.iter().copied())
         .collect()
 }
 

@@ -1,201 +1,23 @@
 //! Tests for the non-blocking `MachineController`.
 //!
-//! The controller runs against an in-memory loopback transport defined here: it
-//! records every write in order and answers each complete line with `ok` after a
-//! fixed delay, like a GRBL controller executing a short move.
+//! The controller runs against the in-memory loopback transport of
+//! `gcodekit5_app::test_support`: it records every write in order and answers each complete
+//! line with `ok` after a fixed delay, like a GRBL controller executing a short move.
 
-use std::collections::VecDeque;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
+use std::sync::atomic::Ordering;
 use std::time::{Duration, Instant};
 
-use gcodekit5_app::machine::{MachineController, MachineEvent, RealtimeCommand};
-use gcodekit5_communication::{
-    Communicator, CommunicatorListenerHandle, ConnectionParams, SerialCommunicator,
+use gcodekit5_app::machine::grbl_stream::GRBL_RX_BUFFER_BYTES;
+use gcodekit5_app::machine::{MachineController, MachineError, MachineEvent, RealtimeCommand};
+use gcodekit5_app::test_support::{
+    Loopback, LoopbackShared, Wrote, loopback_controller, tcp_settings,
 };
-use gcodekit5_settings::{ConnectionSettings, ConnectionType};
+use gcodekit5_communication::{Communicator, SerialCommunicator};
+use gcodekit5_settings::ConnectionSettings;
 
 /// Upper bound for "eventually" waits; generous so a loaded machine is not flaky.
 const EVENTUALLY: Duration = Duration::from_secs(10);
-
-/// One write observed by the loopback transport.
-#[derive(Debug, Clone, PartialEq)]
-enum Wrote {
-    /// A complete newline-terminated line (without the newline).
-    Line(String),
-    /// A single real-time byte written on its own.
-    Realtime(u8),
-}
-
-/// State shared between the test and the loopback transport.
-#[derive(Default)]
-struct LoopbackShared {
-    log: Mutex<Vec<Wrote>>,
-    /// While set, no `ok` is released (the controller is "holding").
-    hold_acks: AtomicBool,
-    connected: AtomicBool,
-    /// How long `connect` takes (a slow TCP connect).
-    connect_delay: Duration,
-    /// When set, `connect` fails after `connect_delay`.
-    fail_connect: bool,
-    /// Response bytes handed out by `receive` before any `ok`.
-    inject: Mutex<VecDeque<Vec<u8>>>,
-    /// Lines written but not yet answered with `ok`.
-    outstanding: std::sync::atomic::AtomicUsize,
-}
-
-impl LoopbackShared {
-    fn log(&self) -> Vec<Wrote> {
-        self.log
-            .lock()
-            .expect("loopback log mutex poisoned")
-            .clone()
-    }
-
-    fn inject(&self, response: &str) {
-        self.inject
-            .lock()
-            .expect("loopback inject mutex poisoned")
-            .push_back(response.as_bytes().to_vec());
-    }
-
-    fn lines_written(&self) -> usize {
-        self.log()
-            .iter()
-            .filter(|w| matches!(w, Wrote::Line(_)))
-            .count()
-    }
-}
-
-/// In-memory GRBL stand-in: acks each line `ok_delay` after the previous ack.
-struct Loopback {
-    shared: Arc<LoopbackShared>,
-    ok_delay: Duration,
-    carry: Vec<u8>,
-    pending_acks: VecDeque<Instant>,
-    last_due: Instant,
-    params: Option<ConnectionParams>,
-}
-
-impl Loopback {
-    fn new(shared: Arc<LoopbackShared>, ok_delay: Duration) -> Self {
-        Self {
-            shared,
-            ok_delay,
-            carry: Vec::new(),
-            pending_acks: VecDeque::new(),
-            last_due: Instant::now(),
-            params: None,
-        }
-    }
-}
-
-fn is_realtime_byte(b: u8) -> bool {
-    matches!(b, b'?' | b'!' | b'~' | 0x18) || b >= 0x80
-}
-
-impl Communicator for Loopback {
-    fn connect(&mut self, params: &ConnectionParams) -> gcodekit5_core::Result<()> {
-        std::thread::sleep(self.shared.connect_delay);
-        if self.shared.fail_connect {
-            return Err(gcodekit5_core::Error::other("loopback refused"));
-        }
-        self.params = Some(params.clone());
-        self.shared.connected.store(true, Ordering::SeqCst);
-        Ok(())
-    }
-
-    fn disconnect(&mut self) -> gcodekit5_core::Result<()> {
-        self.shared.connected.store(false, Ordering::SeqCst);
-        Ok(())
-    }
-
-    fn is_connected(&self) -> bool {
-        self.shared.connected.load(Ordering::SeqCst)
-    }
-
-    fn send(&mut self, data: &[u8]) -> gcodekit5_core::Result<usize> {
-        if data.len() == 1 && self.carry.is_empty() && is_realtime_byte(data[0]) {
-            self.shared
-                .log
-                .lock()
-                .expect("loopback log mutex poisoned")
-                .push(Wrote::Realtime(data[0]));
-            return Ok(1);
-        }
-        for &b in data {
-            if b == b'\n' {
-                let line = String::from_utf8_lossy(&self.carry).to_string();
-                self.carry.clear();
-                self.shared
-                    .log
-                    .lock()
-                    .expect("loopback log mutex poisoned")
-                    .push(Wrote::Line(line));
-                let due = self.last_due.max(Instant::now()) + self.ok_delay;
-                self.last_due = due;
-                self.pending_acks.push_back(due);
-                self.shared.outstanding.fetch_add(1, Ordering::SeqCst);
-            } else {
-                self.carry.push(b);
-            }
-        }
-        Ok(data.len())
-    }
-
-    fn receive(&mut self) -> gcodekit5_core::Result<Vec<u8>> {
-        if let Some(data) = self
-            .shared
-            .inject
-            .lock()
-            .expect("loopback inject mutex poisoned")
-            .pop_front()
-        {
-            return Ok(data);
-        }
-        if !self.shared.hold_acks.load(Ordering::SeqCst)
-            && let Some(&due) = self.pending_acks.front()
-            && due <= Instant::now()
-        {
-            self.pending_acks.pop_front();
-            self.shared.outstanding.fetch_sub(1, Ordering::SeqCst);
-            return Ok(b"ok\n".to_vec());
-        }
-        // Behave like a serial read with a short timeout.
-        std::thread::sleep(Duration::from_millis(1));
-        Ok(Vec::new())
-    }
-
-    fn add_listener(&mut self, _listener: CommunicatorListenerHandle) {}
-
-    fn remove_listener(&mut self, _listener: &CommunicatorListenerHandle) {}
-
-    fn connection_params(&self) -> Option<&ConnectionParams> {
-        self.params.as_ref()
-    }
-
-    fn set_connection_params(&mut self, params: ConnectionParams) -> gcodekit5_core::Result<()> {
-        self.params = Some(params);
-        Ok(())
-    }
-}
-
-/// A controller whose transport is a loopback sharing `shared`.
-fn loopback_controller(shared: &Arc<LoopbackShared>, ok_delay: Duration) -> MachineController {
-    let shared = shared.clone();
-    MachineController::with_transport(Box::new(move || {
-        Box::new(Loopback::new(shared.clone(), ok_delay)) as Box<dyn Communicator>
-    }))
-}
-
-fn tcp_settings() -> ConnectionSettings {
-    ConnectionSettings {
-        connection_type: ConnectionType::Tcp,
-        port: "loopback".to_string(),
-        tcp_port: 23,
-        ..ConnectionSettings::default()
-    }
-}
 
 fn program(lines: usize) -> Arc<[String]> {
     (0..lines)
@@ -703,5 +525,440 @@ fn test_stale_worker_cannot_clear_new_session_streaming() {
             .iter()
             .any(|e| matches!(e, MachineEvent::Error(m) if m.contains("streaming"))),
         "{events:?}"
+    );
+}
+
+#[test]
+fn test_send_line_writes_line() {
+    let shared = Arc::new(LoopbackShared::default());
+    let mut controller = loopback_controller(&shared, Duration::from_millis(1));
+    connect(&mut controller);
+    assert_eq!(controller.send_line("  $H  "), Ok(()));
+    assert!(
+        wait_until(|| shared.log().contains(&Wrote::Line("$H".to_string()))),
+        "line not written: {:?}",
+        shared.log()
+    );
+}
+
+#[test]
+fn test_send_line_rejects_unsafe_lines() {
+    let shared = Arc::new(LoopbackShared::default());
+    let mut controller = loopback_controller(&shared, Duration::from_millis(1));
+    assert_eq!(
+        controller.send_line("G0 X1"),
+        Err(MachineError::NotConnected)
+    );
+    connect(&mut controller);
+    let too_long = format!("G0 X{}", "1".repeat(GRBL_RX_BUFFER_BYTES));
+    let cases: [(&str, MachineError); 9] = [
+        ("   ", MachineError::EmptyLine),
+        ("G0 X1\nG0 X2", MachineError::NonPrintable(b'\n')),
+        ("G0 X1\rG0", MachineError::NonPrintable(b'\r')),
+        ("G0\u{18}X1", MachineError::NonPrintable(0x18)),
+        ("G0 X1 \u{e9}", MachineError::NonPrintable(0xc3)),
+        ("G0 X1!", MachineError::RealtimeCharacter('!')),
+        ("~", MachineError::RealtimeCharacter('~')),
+        ("G0?", MachineError::RealtimeCharacter('?')),
+        (
+            too_long.as_str(),
+            MachineError::LineTooLong {
+                length: too_long.len(),
+                max: GRBL_RX_BUFFER_BYTES - 1,
+            },
+        ),
+    ];
+    for (line, expected) in cases {
+        assert_eq!(controller.send_line(line), Err(expected), "{line:?}");
+    }
+    std::thread::sleep(Duration::from_millis(50));
+    assert!(
+        !shared
+            .log()
+            .iter()
+            .any(|w| matches!(w, Wrote::Line(l) if l.starts_with("G0") || l == "~")),
+        "refused line written: {:?}",
+        shared.log()
+    );
+}
+
+#[test]
+fn test_send_line_refused_while_streaming() {
+    let (shared, mut controller) = held_stream(100);
+    assert_eq!(
+        controller.send_line("G0 X5"),
+        Err(MachineError::StreamInProgress)
+    );
+    std::thread::sleep(Duration::from_millis(50));
+    assert!(!shared.log().contains(&Wrote::Line("G0 X5".to_string())));
+}
+
+#[test]
+fn test_is_streaming_from_start_stream() {
+    let (_shared, mut controller) = held_stream(100);
+    assert!(controller.is_streaming());
+    controller.stop();
+    assert!(wait_until(|| !controller.is_streaming()));
+}
+
+/// Index of the first jog cancel byte in `log`, and the log length when the transport closed.
+fn cancel_and_close(shared: &LoopbackShared) -> (Option<usize>, Option<usize>) {
+    let log = shared.log();
+    let cancel = log.iter().position(|w| *w == Wrote::Realtime(0x85));
+    let closed = *shared.closed_at.lock().expect("closed_at");
+    (cancel, closed)
+}
+
+/// Connects and starts a jog that the loopback never reports finished.
+fn jogging() -> (Arc<LoopbackShared>, MachineController) {
+    let shared = Arc::new(LoopbackShared::default());
+    let mut controller = loopback_controller(&shared, Duration::from_millis(1));
+    connect(&mut controller);
+    controller.jog(gcodekit5_app::machine::Axis::X, 200.0, 1000.0);
+    assert!(
+        wait_until(|| shared
+            .log()
+            .iter()
+            .any(|w| matches!(w, Wrote::Line(l) if l.starts_with("$J=")))),
+        "jog not written"
+    );
+    (shared, controller)
+}
+
+#[test]
+fn test_disconnect_during_jog_writes_jog_cancel_first() {
+    let (shared, mut controller) = jogging();
+    controller.disconnect();
+    let (cancel, closed) = cancel_and_close(&shared);
+    let cancel = cancel.expect("no jog cancel on disconnect");
+    let closed = closed.expect("transport not closed");
+    assert!(
+        cancel < closed,
+        "jog cancel after the close: {:?}",
+        shared.log()
+    );
+}
+
+#[test]
+fn test_drop_during_jog_writes_jog_cancel_first() {
+    let (shared, controller) = jogging();
+    drop(controller);
+    let (cancel, closed) = cancel_and_close(&shared);
+    let cancel = cancel.expect("no jog cancel on drop");
+    let closed = closed.expect("transport not closed");
+    assert!(
+        cancel < closed,
+        "jog cancel after the close: {:?}",
+        shared.log()
+    );
+}
+
+#[test]
+fn test_jog_cancel_or_idle_clears_outstanding_jog() {
+    // Cancelled by the caller: no second cancel on disconnect.
+    let (shared, mut controller) = jogging();
+    controller.realtime(RealtimeCommand::JogCancel);
+    assert!(wait_until(|| shared.log().contains(&Wrote::Realtime(0x85))));
+    controller.disconnect();
+    let cancels = shared
+        .log()
+        .iter()
+        .filter(|w| **w == Wrote::Realtime(0x85))
+        .count();
+    assert_eq!(cancels, 1, "{:?}", shared.log());
+
+    // Finished: GRBL reported Jog, then Idle.
+    let (shared, mut controller) = jogging();
+    shared.inject("<Jog|MPos:1.000,0.000,0.000|FS:1000,0>\n");
+    shared.inject("<Idle|MPos:200.000,0.000,0.000|FS:0,0>\n");
+    assert!(
+        wait_for(&mut controller, |e| matches!(
+            e,
+            MachineEvent::StatusReport(s) if s.machine_state.as_deref() == Some("Idle")
+        ))
+        .is_some(),
+        "no Idle report"
+    );
+    controller.disconnect();
+    assert!(
+        !shared.log().contains(&Wrote::Realtime(0x85)),
+        "cancel after a finished jog: {:?}",
+        shared.log()
+    );
+}
+
+/// Connects with acks held and fills the controller's RX window with manual lines, so the
+/// next manual line (a jog) waits in the queue.
+fn full_window() -> (Arc<LoopbackShared>, MachineController) {
+    let shared = Arc::new(LoopbackShared::default());
+    shared.hold_acks.store(true, Ordering::SeqCst);
+    let mut controller = loopback_controller(&shared, Duration::from_millis(1));
+    connect(&mut controller);
+    // Lines of 33 bytes with the newline: three fill the 127-byte window and the fourth
+    // waits in the queue, with any jog queued behind it.
+    for i in 0..4 {
+        controller
+            .send_line(&format!("G4 P0.{i:026}"))
+            .expect("filler line");
+    }
+    assert!(
+        wait_until(|| shared.lines_written() == 3),
+        "{:?}",
+        shared.log()
+    );
+    std::thread::sleep(Duration::from_millis(20));
+    assert_eq!(shared.lines_written(), 3, "{:?}", shared.log());
+    (shared, controller)
+}
+
+/// A queued jog must not start after a jog cancel: the cancel drops it from the queue.
+#[test]
+fn test_jog_cancel_drops_queued_jog() {
+    let (shared, mut controller) = full_window();
+    controller.jog(gcodekit5_app::machine::Axis::X, 100.0, 1000.0);
+    std::thread::sleep(Duration::from_millis(20));
+    assert!(
+        !shared
+            .log()
+            .iter()
+            .any(|w| matches!(w, Wrote::Line(l) if l.starts_with("$J="))),
+        "jog not held back: {:?}",
+        shared.log()
+    );
+    controller.realtime(RealtimeCommand::JogCancel);
+    assert!(wait_until(|| shared.log().contains(&Wrote::Realtime(0x85))));
+    shared.hold_acks.store(false, Ordering::SeqCst);
+    assert!(
+        wait_until(|| shared.lines_written() == 4),
+        "{:?}",
+        shared.log()
+    );
+    std::thread::sleep(Duration::from_millis(50));
+    assert!(
+        !shared
+            .log()
+            .iter()
+            .any(|w| matches!(w, Wrote::Line(l) if l.starts_with("$J="))),
+        "cancelled jog started: {:?}",
+        shared.log()
+    );
+}
+
+/// A Jog then Idle report that arrives while the jog still waits in the queue (left from an
+/// earlier jog) does not count as this jog finishing: once it is written, a disconnect
+/// still cancels it.
+#[test]
+fn test_stale_idle_before_jog_written_keeps_jog_outstanding() {
+    let (shared, mut controller) = full_window();
+    controller.jog(gcodekit5_app::machine::Axis::X, 100.0, 1000.0);
+    shared.inject("<Jog|MPos:1.000,0.000,0.000|FS:1000,0>\n");
+    shared.inject("<Idle|MPos:2.000,0.000,0.000|FS:0,0>\n");
+    assert!(
+        wait_for(&mut controller, |e| matches!(
+            e,
+            MachineEvent::StatusReport(s) if s.machine_state.as_deref() == Some("Idle")
+        ))
+        .is_some(),
+        "no Idle report"
+    );
+    shared.hold_acks.store(false, Ordering::SeqCst);
+    assert!(
+        wait_until(|| shared
+            .log()
+            .iter()
+            .any(|w| matches!(w, Wrote::Line(l) if l.starts_with("$J=")))),
+        "jog never written: {:?}",
+        shared.log()
+    );
+    controller.disconnect();
+    let (cancel, closed) = cancel_and_close(&shared);
+    let cancel = cancel.expect("no jog cancel for the written jog");
+    assert!(cancel < closed.expect("closed"), "{:?}", shared.log());
+}
+
+/// Waits until a status report is polled.
+fn wait_report(controller: &mut MachineController) {
+    assert!(
+        wait_for(controller, |e| matches!(e, MachineEvent::StatusReport(_))).is_some(),
+        "no status report"
+    );
+}
+
+/// Polls until the report is fresh or [`EVENTUALLY`] passes. Queries written before the
+/// first injected report go unanswered, so the reply tags lag and freshness may take a few
+/// replies (it errs late, never early).
+fn wait_fresh(controller: &mut MachineController) -> bool {
+    let deadline = Instant::now() + EVENTUALLY;
+    while Instant::now() < deadline {
+        controller.poll();
+        if controller.report_fresh() {
+            return true;
+        }
+        std::thread::sleep(Duration::from_millis(2));
+    }
+    false
+}
+
+/// After a command line, the state is stale until a status report read after the line was
+/// written; a report read while the line still waits in the queue does not count.
+#[test]
+fn test_report_fresh_only_after_line_written() {
+    let shared = Arc::new(LoopbackShared::default());
+    let mut controller = loopback_controller(&shared, Duration::from_millis(1));
+    connect(&mut controller);
+    assert!(controller.report_fresh(), "fresh before any line");
+    controller.send_line("$H").expect("send");
+    assert!(!controller.report_fresh(), "fresh right after the send");
+    assert!(wait_until(|| shared
+        .log()
+        .contains(&Wrote::Line("$H".to_string()))));
+    shared.inject("<Home|MPos:0.000,0.000,0.000|FS:0,0>\n");
+    assert!(wait_fresh(&mut controller), "never fresh after the write");
+    drop(controller);
+
+    // The line held back by a full window: reports meanwhile do not count.
+    let (shared, mut controller) = full_window();
+    controller.send_line("$X").expect("send");
+    shared.inject("<Idle|MPos:0.000,0.000,0.000|FS:0,0>\n");
+    for _ in 0..3 {
+        wait_report(&mut controller);
+        assert!(
+            !controller.report_fresh(),
+            "fresh before the line was written"
+        );
+    }
+    shared.hold_acks.store(false, Ordering::SeqCst);
+    assert!(wait_until(|| shared
+        .log()
+        .contains(&Wrote::Line("$X".to_string()))));
+    assert!(wait_fresh(&mut controller), "never fresh after the write");
+}
+
+/// A soft reset written as a raw real-time byte drops a queued jog, like jog cancel.
+#[test]
+fn test_soft_reset_drops_queued_jog() {
+    let (shared, mut controller) = full_window();
+    controller.jog(gcodekit5_app::machine::Axis::X, 100.0, 1000.0);
+    std::thread::sleep(Duration::from_millis(20));
+    controller.realtime(RealtimeCommand::SoftReset);
+    assert!(wait_until(|| shared.log().contains(&Wrote::Realtime(0x18))));
+    shared.hold_acks.store(false, Ordering::SeqCst);
+    assert!(
+        wait_until(|| shared.lines_written() == 4),
+        "{:?}",
+        shared.log()
+    );
+    std::thread::sleep(Duration::from_millis(50));
+    assert!(
+        !shared
+            .log()
+            .iter()
+            .any(|w| matches!(w, Wrote::Line(l) if l.starts_with("$J="))),
+        "jog started after a soft reset: {:?}",
+        shared.log()
+    );
+}
+
+/// A line that cannot fit the controller's RX buffer with its newline is refused by
+/// `send_line`, so it never reaches the worker (and cannot mark a queued `$H` fresh).
+#[test]
+fn test_send_line_rejects_line_beyond_rx_buffer() {
+    let (shared, mut controller) = full_window();
+    controller.send_line("$H").expect("send $H");
+    let fits = format!("G0 X{}", "1".repeat(GRBL_RX_BUFFER_BYTES - 1 - 4));
+    let too_long = format!("{fits}1");
+    assert_eq!(too_long.len() + 1, GRBL_RX_BUFFER_BYTES + 1);
+    assert_eq!(
+        controller.send_line(&too_long),
+        Err(MachineError::LineTooLong {
+            length: GRBL_RX_BUFFER_BYTES,
+            max: GRBL_RX_BUFFER_BYTES - 1,
+        })
+    );
+    shared.inject("<Idle|MPos:0.000,0.000,0.000|FS:0,0>\n");
+    wait_report(&mut controller);
+    assert!(!controller.report_fresh(), "a refused line marked $H fresh");
+    assert_eq!(controller.send_line(&fits), Ok(()));
+}
+
+/// A status query written before `$H`, whose reply (Idle) arrives after `$H` is written,
+/// does not make the report fresh; the reply to a query written after `$H` does.
+#[test]
+fn test_reply_to_query_before_line_is_not_fresh() {
+    let shared = Arc::new(LoopbackShared::default());
+    // Answer every query from the first one, so replies match queries one to one.
+    shared.inject("<Idle|MPos:0.000,0.000,0.000|FS:0,0>\n");
+    let mut controller = loopback_controller(&shared, Duration::from_millis(1));
+    connect(&mut controller);
+    wait_report(&mut controller);
+    assert!(controller.report_fresh());
+
+    // Hold the replies; let a query go out, then $H after it.
+    *shared.reply_budget.lock().expect("budget") = Some(0);
+    let queries = shared.status_queries();
+    assert!(wait_until(|| shared.status_queries() > queries), "no query");
+    let before = shared.status_queries();
+    controller.send_line("$H").expect("send");
+    assert!(wait_until(|| shared
+        .log()
+        .contains(&Wrote::Line("$H".to_string()))));
+    let log = shared.log();
+    let h_at = log
+        .iter()
+        .position(|w| *w == Wrote::Line("$H".to_string()))
+        .expect("$H");
+    let queries_before_h = log[..h_at]
+        .iter()
+        .filter(|w| **w == Wrote::Realtime(b'?'))
+        .count();
+    assert!(queries_before_h >= before, "{log:?}");
+
+    // Release one reply: the oldest owed, to a query written before $H.
+    controller.poll();
+    *shared.reply_budget.lock().expect("budget") = Some(1);
+    wait_report(&mut controller);
+    assert!(
+        !controller.report_fresh(),
+        "a reply to a query written before $H counted as fresh"
+    );
+
+    // The next query written after $H: its reply is fresh.
+    *shared.reply_budget.lock().expect("budget") = None;
+    let deadline = Instant::now() + EVENTUALLY;
+    while !controller.report_fresh() && Instant::now() < deadline {
+        controller.poll();
+        std::thread::sleep(Duration::from_millis(2));
+    }
+    assert!(controller.report_fresh(), "never fresh after $H");
+}
+
+/// More unanswered queries than tracked (replies lag): the tags keep the oldest, lower
+/// value, so a late reply to a query written before `$H` still does not count as fresh.
+#[test]
+fn test_lagging_replies_err_stale() {
+    let shared = Arc::new(LoopbackShared::default());
+    shared.inject("<Idle|MPos:0.000,0.000,0.000|FS:0,0>\n");
+    let mut controller = loopback_controller(&shared, Duration::from_millis(1));
+    connect(&mut controller);
+    wait_report(&mut controller);
+    *shared.reply_budget.lock().expect("budget") = Some(0);
+    let queries = shared.status_queries();
+    assert!(wait_until(|| shared.status_queries() > queries), "no query");
+    controller.send_line("$H").expect("send");
+    assert!(wait_until(|| shared
+        .log()
+        .contains(&Wrote::Line("$H".to_string()))));
+    // Four more queries after $H overflow the three tracked tags.
+    let after = shared.status_queries();
+    assert!(
+        wait_until(|| shared.status_queries() >= after + 4),
+        "queries stopped"
+    );
+    controller.poll();
+    *shared.reply_budget.lock().expect("budget") = Some(1);
+    wait_report(&mut controller);
+    assert!(
+        !controller.report_fresh(),
+        "a lagging reply to a query before $H counted as fresh"
     );
 }

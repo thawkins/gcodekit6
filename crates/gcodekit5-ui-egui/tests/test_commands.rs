@@ -79,13 +79,18 @@ const GTK_ACCELERATORS: &[(&str, &str, Command, Where)] = &[
     ("F1", "F1", Command::OpenHelp, Where::App),
 ];
 
+/// Safety chords with no GTK accelerator: feed hold and soft reset each get a modifier chord
+/// that works anywhere, also while a text field has the keyboard. GTK's ESTOP "Escape" and
+/// MACHINE_RESET "<Ctrl>x" were accelerators.rs constants it never registered; bare Escape
+/// stays unbound (it would reset the controller when closing a dropdown) and Ctrl+X is Cut.
+const SAFETY_CHORDS: &[(&str, Command)] = &[
+    ("Cmd+Shift+H", Command::FeedHold),
+    ("Cmd+Shift+K", Command::SoftReset),
+];
+
 /// Documented safety deviations: GTK chords (or GTK key handling) that get NO default binding
 /// here, with the reason. Each command must have no default chord at all.
 const UNBOUND_FOR_SAFETY: &[(&str, Command)] = &[
-    // ESTOP "Escape" and MACHINE_RESET "<Ctrl>x" are accelerators.rs constants that GTK's
-    // set_keyboard_shortcuts never registers, and its Reset menu item has no accelerator. A
-    // bare Escape would reset the controller when closing a dropdown. Menu: Machine > Reset.
-    ("Escape / <Ctrl>x", Command::SoftReset),
     // JOG_* "Right"/"Left"/"Up"/"Down"/"Page_Up"/"Page_Down" are unused accelerators.rs
     // constants; arrows move between widgets. GTK jogs from the numeric keypad in
     // machine_control/mod.rs (8 Y+, 2 Y-, 4 X-, 6 X+, 9 Z+, 3 Z-), but craft_keymap folds
@@ -129,6 +134,93 @@ fn test_every_gtk_accelerator_bound() {
                 Lookup::None,
                 "GTK {gtk} ({text}) leaks out of its panel"
             );
+        }
+    }
+}
+
+#[test]
+fn test_safety_chords_bound_everywhere() {
+    let keymap = commands::keymap();
+    for (text, command) in SAFETY_CHORDS {
+        let chord = Chord::parse(text).expect("canonical chord");
+        assert_eq!(chord.to_string(), *text, "{text:?} is not canonical");
+        assert!(!keymap.is_reserved(&chord), "{text} is reserved");
+        for platform in [
+            craft_keymap::Platform::Linux,
+            craft_keymap::Platform::Windows,
+            craft_keymap::Platform::Mac,
+        ] {
+            assert!(
+                !craft_keymap::reserved::system(platform).contains(&chord),
+                "{text} is reserved by the OS on {platform:?}"
+            );
+            assert!(
+                !craft_keymap::text_editing_chords(platform).contains(&chord.effective(platform)),
+                "{text} edits text on {platform:?}"
+            );
+        }
+        for active in [
+            Active::NONE,
+            Active {
+                typing: true,
+                ..Active::NONE
+            },
+            Active {
+                typing: true,
+                ..Active::panel(commands::MACHINE_CONTROL_SCOPE)
+            },
+        ] {
+            assert_eq!(
+                keymap.lookup(&chord, false, &active),
+                Lookup::Run(command.command_ref()),
+                "{text} with {active:?}"
+            );
+        }
+    }
+}
+
+/// The safety chords are not one slip from starting motion: each chord without Shift, and
+/// without Cmd (Ctrl off macOS), runs no start, run, jog, cycle-start or motion command.
+#[test]
+fn test_safety_chords_not_near_motion() {
+    let keymap = commands::keymap();
+    let forbidden = |command: Command| {
+        command.is_jog()
+            || matches!(
+                command,
+                Command::FileRun | Command::StreamStart | Command::CycleStart | Command::Home
+            )
+    };
+    let chords: Vec<String> = [Command::FeedHold, Command::SoftReset]
+        .into_iter()
+        .flat_map(|c| keymap.default_bindings(&c.command_ref()))
+        .map(|b| b.text(&craft_keymap::Scope::app()))
+        .filter(|text| text.contains("Shift+"))
+        .collect();
+    assert_eq!(chords.len(), 2, "{chords:?}");
+    for text in &chords {
+        let key = text.rsplit('+').next().expect("key");
+        for near in [
+            format!("Cmd+{key}"),
+            format!("Shift+{key}"),
+            key.to_string(),
+        ] {
+            let chord = Chord::parse(&near).expect("chord");
+            for active in [
+                Active::NONE,
+                Active::panel(commands::MACHINE_CONTROL_SCOPE),
+                Active::panel(commands::VISUALIZER_SCOPE),
+            ] {
+                match keymap.lookup(&chord, false, &active) {
+                    Lookup::Run(command) => {
+                        let command = Command::from_ref(&command).expect("our command");
+                        assert!(!forbidden(command), "{near} (near {text}) runs {command:?}");
+                    }
+                    Lookup::Cycle(commands) => panic!("{near} cycles {commands:?}"),
+                    Lookup::None => {}
+                    other => panic!("{near}: {other:?}"),
+                }
+            }
         }
     }
 }
@@ -286,7 +378,10 @@ fn test_menu_click_dispatches() {
         harness.run();
         harness.get_by_label("Machine").click();
         harness.run();
-        harness.get_by_label("Connect").click();
+        // The menu item, not the Machine Control pane's Connect button.
+        harness
+            .get_by_role_and_label(egui::accesskit::Role::MenuItem, "Connect")
+            .click();
         harness.run();
     }
     assert_eq!(app.last_dispatched(), Some(Command::Connect));

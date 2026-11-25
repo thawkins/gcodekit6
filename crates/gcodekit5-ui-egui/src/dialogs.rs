@@ -145,9 +145,8 @@ impl ConfirmRequest {
             ),
             Self::Restart => (
                 n_!("Restart to apply settings?"),
-                n_!(
-                    "GCodeKit5 must restart to use the new settings. The machine connection will be closed. Restart now?"
-                ),
+                n_!("GCodeKit5 must restart to use the new settings. \
+                     The machine connection will be closed. Restart now?"),
             ),
             Self::StopJob => (
                 n_!("Stop job and quit?"),

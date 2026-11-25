@@ -29,6 +29,8 @@ mod test_job_preferences;
 mod test_machine_busy_guard;
 #[path = "test_machine_controller.rs"]
 mod test_machine_controller;
+#[path = "test_machine_sent_events.rs"]
+mod test_machine_sent_events;
 #[path = "test_materials_manager_backend.rs"]
 mod test_materials_manager_backend;
 #[path = "test_report_units.rs"]

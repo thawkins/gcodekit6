@@ -1,0 +1,360 @@
+//! The app's machine connection: the shared [`MachineController`], its events of the current
+//! frame and the state derived from them.
+//!
+//! [`Machine::poll`] runs once per frame (from `GcodeKitApp`), takes every event the
+//! controller reported, keeps only the latest [`MachineEvent::StreamProgress`] of the frame
+//! and folds the events into [`MachineStatus`]. Everything that shows machine state reads the
+//! same frame's events and status from here (the Machine Control pane now; the console and
+//! status bar later), so no consumer polls the controller a second time.
+//!
+//! The controller is shared as `Arc<Mutex<MachineController>>`; every call on it returns
+//! without waiting for I/O (its worker thread owns the transport), so the lock is held only
+//! for the length of one call.
+//!
+//! Dependencies: `gcodekit5-app` (controller, events, program preparation),
+//! `gcodekit5-communication` (status report types).
+
+use std::sync::{Arc, Mutex, PoisonError};
+
+use gcodekit5_app::machine::grbl_stream::{MAX_LINE_LENGTH, prepare_program};
+use gcodekit5_app::machine::{MachineController, MachineEvent};
+use gcodekit5_communication::firmware::grbl::status_parser::{FullStatus, WorkCoordinateOffset};
+
+/// Stream progress: program lines written and acknowledged out of `total`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Progress {
+    /// Lines written to the controller.
+    pub sent: usize,
+    /// Lines acknowledged (`ok` or `error:N`).
+    pub acked: usize,
+    /// Program length.
+    pub total: usize,
+}
+
+/// How the last stream ended.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum StreamEnd {
+    /// Every line was acknowledged.
+    Finished,
+    /// It ended early (stop, reset, alarm, disconnect).
+    Stopped,
+}
+
+/// Machine state derived from the controller's events.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct MachineStatus {
+    /// The transport is open.
+    pub connected: bool,
+    /// A program is streaming: from its first progress report until it finishes or stops.
+    pub streaming: bool,
+    /// The latest stream progress, kept after the stream ends.
+    pub progress: Option<Progress>,
+    /// How the last stream ended, if one did.
+    pub stream_end: Option<StreamEnd>,
+    /// The latest status report.
+    pub report: Option<FullStatus>,
+    /// The latest work coordinate offset (GRBL sends it only every few reports).
+    pub wco: Option<WorkCoordinateOffset>,
+    /// The latest error reported by the controller or transport.
+    pub last_error: Option<String>,
+    /// X, Y and Z max travel in mm (`$130`-`$132`), once the controller reported them.
+    pub grbl_travel: [Option<f32>; 3],
+    /// Whether the controller reports positions in inches (`$13=1`). Until a `$$` line says
+    /// so, reports are taken as mm, GRBL's default (as the GTK front end does).
+    pub report_inches: bool,
+}
+
+/// X, Y and Z in millimetres.
+pub type Xyz = [f32; 3];
+
+/// The `$13` report-inches setting a `$$` line reports.
+fn parse_report_inches(line: &str) -> Option<bool> {
+    let (key, value) = line.trim().split_once('=')?;
+    (key == "$13").then_some(())?;
+    let value: f32 = value.trim().parse().ok()?;
+    Some(value >= 1.0)
+}
+
+/// The `$130`-`$132` max-travel setting a `$$` line reports: axis index and value in mm.
+fn parse_travel(line: &str) -> Option<(usize, f32)> {
+    let (key, value) = line.trim().split_once('=')?;
+    let index = match key {
+        "$130" => 0,
+        "$131" => 1,
+        "$132" => 2,
+        _ => return None,
+    };
+    let value: f32 = value.trim().parse().ok()?;
+    (value.is_finite() && value > 0.0).then_some((index, value))
+}
+
+impl MachineStatus {
+    /// Whether the latest status report allows jogging: its state is `Idle` or `Jog`. Without
+    /// a report, or in any other state (Home, Alarm, Hold, Check, Run, Door, ...), a `$J`
+    /// would wait in the controller's buffer and run later from a stale position.
+    pub fn jog_allowed(&self) -> bool {
+        self.report
+            .as_ref()
+            .and_then(|r| r.machine_state.as_deref())
+            .is_some_and(|state| state.starts_with("Idle") || state.starts_with("Jog"))
+    }
+
+    /// The machine position (`MPos`) of the latest report, or `WPos + WCO` when the report
+    /// carries only the work position.
+    pub fn machine_position(&self) -> Option<Xyz> {
+        let report = self.report.as_ref()?;
+        let xyz = |x: f64, y: f64, z: f64| [x as f32, y as f32, z as f32];
+        report.mpos.map(|p| xyz(p.x, p.y, p.z)).or_else(|| {
+            let (w, o) = (report.wpos?, self.wco?);
+            Some(xyz(w.x + o.x, w.y + o.y, w.z + o.z))
+        })
+    }
+
+    /// The work position (`WPos`) of the latest report, or `MPos - WCO` when the report
+    /// carries only the machine position.
+    pub fn work_position(&self) -> Option<Xyz> {
+        let report = self.report.as_ref()?;
+        let xyz = |x: f64, y: f64, z: f64| [x as f32, y as f32, z as f32];
+        report.wpos.map(|p| xyz(p.x, p.y, p.z)).or_else(|| {
+            let (m, o) = (report.mpos?, self.wco?);
+            Some(xyz(m.x - o.x, m.y - o.y, m.z - o.z))
+        })
+    }
+
+    /// Folds `events` (oldest first) into the status.
+    ///
+    /// # Arguments
+    /// * `events` - Events of one frame.
+    pub fn apply(&mut self, events: &[MachineEvent]) {
+        for event in events {
+            match event {
+                MachineEvent::Connected => {
+                    self.connected = true;
+                    self.last_error = None;
+                }
+                MachineEvent::Disconnected => {
+                    if self.streaming {
+                        self.stream_end = Some(StreamEnd::Stopped);
+                    }
+                    self.connected = false;
+                    self.streaming = false;
+                    self.report = None;
+                    self.wco = None;
+                    self.grbl_travel = [None; 3];
+                    self.report_inches = false;
+                }
+                MachineEvent::StatusReport(report) => {
+                    // Positions, offsets and feed are kept in mm whatever `$13` says.
+                    let report = (**report).clone().into_mm(self.report_inches);
+                    if let Some(wco) = report.wco {
+                        self.wco = Some(wco);
+                    }
+                    self.report = Some(report);
+                }
+                MachineEvent::Received(line) => {
+                    if let Some((index, travel)) = parse_travel(line) {
+                        self.grbl_travel[index] = Some(travel);
+                    }
+                    if let Some(inches) = parse_report_inches(line)
+                        && inches != self.report_inches
+                    {
+                        // A cached offset (and report) in the old units would be wrong:
+                        // drop them and wait for the controller's next report, as GTK does.
+                        self.report_inches = inches;
+                        self.wco = None;
+                        self.report = None;
+                    }
+                }
+                MachineEvent::StreamProgress { sent, acked, total } => {
+                    if !self.streaming {
+                        self.stream_end = None;
+                    }
+                    self.streaming = true;
+                    self.progress = Some(Progress {
+                        sent: *sent,
+                        acked: *acked,
+                        total: *total,
+                    });
+                }
+                MachineEvent::StreamFinished { lines } => {
+                    self.streaming = false;
+                    self.stream_end = Some(StreamEnd::Finished);
+                    self.progress = Some(Progress {
+                        sent: *lines,
+                        acked: *lines,
+                        total: *lines,
+                    });
+                }
+                MachineEvent::StreamStopped { acked, total } => {
+                    self.streaming = false;
+                    self.stream_end = Some(StreamEnd::Stopped);
+                    let sent = self.progress.map_or(*acked, |p| p.sent.max(*acked));
+                    self.progress = Some(Progress {
+                        sent,
+                        acked: *acked,
+                        total: *total,
+                    });
+                }
+                MachineEvent::Sent(_) => {}
+                MachineEvent::Error(message) => self.last_error = Some(message.clone()),
+            }
+        }
+    }
+}
+
+/// Keeps only the last [`MachineEvent::StreamProgress`] of `events`, at its position; every
+/// other event is kept in order. Progress reports carry absolute counts, so the last one
+/// says everything the earlier ones did.
+///
+/// # Arguments
+/// * `events` - One frame's events, oldest first.
+pub fn coalesce_progress(events: Vec<MachineEvent>) -> Vec<MachineEvent> {
+    let last = events
+        .iter()
+        .rposition(|e| matches!(e, MachineEvent::StreamProgress { .. }));
+    events
+        .into_iter()
+        .enumerate()
+        .filter(|(i, e)| !matches!(e, MachineEvent::StreamProgress { .. }) || Some(*i) == last)
+        .map(|(_, e)| e)
+        .collect()
+}
+
+/// Locks `controller`, recovering it if a previous holder panicked (the controller's state
+/// lives on its worker thread, so a panic while locked leaves nothing half-updated).
+///
+/// # Arguments
+/// * `controller` - The shared controller.
+pub fn lock(controller: &Mutex<MachineController>) -> std::sync::MutexGuard<'_, MachineController> {
+    controller.lock().unwrap_or_else(PoisonError::into_inner)
+}
+
+/// The app's machine connection.
+#[derive(Debug)]
+pub struct Machine {
+    controller: Arc<Mutex<MachineController>>,
+    status: MachineStatus,
+    events: Vec<MachineEvent>,
+    /// Events not yet handed to the observers (panes that keep a log), see
+    /// [`Machine::take_pending`].
+    pending: Vec<MachineEvent>,
+    program: Option<Arc<[String]>>,
+    /// Whether the controller's latest report was fresh when this frame polled it.
+    report_fresh: bool,
+}
+
+impl Machine {
+    /// Wraps `controller`.
+    ///
+    /// # Arguments
+    /// * `controller` - The controller the app drives.
+    pub fn new(controller: MachineController) -> Self {
+        Self {
+            controller: Arc::new(Mutex::new(controller)),
+            status: MachineStatus::default(),
+            events: Vec::new(),
+            pending: Vec::new(),
+            program: None,
+            report_fresh: true,
+        }
+    }
+
+    /// The shared controller, for the panes that act on the machine.
+    pub fn controller(&self) -> &Arc<Mutex<MachineController>> {
+        &self.controller
+    }
+
+    /// State derived from every event so far.
+    pub fn status(&self) -> &MachineStatus {
+        &self.status
+    }
+
+    /// This frame's events, oldest first, with stream progress coalesced.
+    pub fn events(&self) -> &[MachineEvent] {
+        &self.events
+    }
+
+    /// Whether a program is streaming, also between a successful start and its first
+    /// progress report.
+    pub fn job_running(&self) -> bool {
+        self.status.streaming || lock(&self.controller).is_streaming()
+    }
+
+    /// Takes the controller's events, replacing the previous frame's, and updates the status.
+    /// Call once per frame. Never blocks on I/O.
+    pub fn poll(&mut self) {
+        let (fresh, events) = {
+            let mut controller = lock(&self.controller);
+            // Freshness first: the worker marks a report fresh after sending it, so a fresh
+            // report is already among the events polled next.
+            (controller.report_fresh(), controller.poll())
+        };
+        self.report_fresh = fresh;
+        self.events = coalesce_progress(events);
+        self.status.apply(&self.events);
+        self.pending.extend(self.events.iter().cloned());
+    }
+
+    /// Takes the events that no observer has taken yet: those of [`Machine::poll`] and
+    /// [`Machine::absorb`] since the last call. The app calls this at every point events may
+    /// have arrived and hands them to every pane, drawn or not, so a pane that keeps a log
+    /// (the console) misses nothing while its tab is hidden.
+    pub fn take_pending(&mut self) -> Vec<MachineEvent> {
+        std::mem::take(&mut self.pending)
+    }
+
+    /// Whether jogging is allowed now: the last status report says Idle or Jog
+    /// ([`MachineStatus::jog_allowed`]) and was read after every command line sent so far
+    /// (`$H`, `$X`, an MDI line), both as of this frame's poll and right now, so a line sent
+    /// since the poll blocks jogging at once. Until a fresh report arrives the last one may
+    /// describe the machine before the line (Idle before homing), and a `$J` would wait in
+    /// the controller's buffer and run afterwards from a stale position.
+    pub fn jog_allowed(&self) -> bool {
+        self.status.jog_allowed() && self.report_fresh && lock(&self.controller).report_fresh()
+    }
+
+    /// Adds `events` taken from the controller outside [`Machine::poll`] to this frame's
+    /// events and the status, so no consumer misses them.
+    ///
+    /// # Arguments
+    /// * `events` - Events polled from the controller directly.
+    pub fn absorb(&mut self, events: Vec<MachineEvent>) {
+        self.status.apply(&events);
+        self.pending.extend(events.iter().cloned());
+        self.events.extend(events);
+        self.events = coalesce_progress(std::mem::take(&mut self.events));
+    }
+
+    /// The program the Start command streams, if one is loaded.
+    pub fn program(&self) -> Option<&Arc<[String]>> {
+        self.program.as_ref()
+    }
+
+    /// Prepares `gcode` for streaming (comments removed, empty lines dropped, line length
+    /// checked) and keeps it as the program to stream. The editor loads its text here once it
+    /// exists (Task 9).
+    ///
+    /// # Arguments
+    /// * `gcode` - The program text.
+    ///
+    /// # Errors
+    /// Names the first line that is too long for the controller.
+    pub fn set_program(&mut self, gcode: &str) -> Result<usize, String> {
+        let prepared = prepare_program(gcode, false, MAX_LINE_LENGTH)?;
+        let lines: Arc<[String]> = prepared.lines().map(str::to_string).collect();
+        let count = lines.len();
+        self.program = Some(lines);
+        Ok(count)
+    }
+
+    /// Closes the connection, releasing the serial port, and folds the events this causes
+    /// into the status.
+    pub fn disconnect(&mut self) {
+        let events = {
+            let mut controller = lock(&self.controller);
+            controller.disconnect();
+            controller.poll()
+        };
+        self.absorb(events);
+    }
+}

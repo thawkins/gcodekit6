@@ -20,7 +20,10 @@ pub mod app;
 pub mod commands;
 pub mod dialogs;
 pub mod frame;
+pub mod machine;
 pub mod menu;
+pub mod panes;
+pub mod status_bar;
 pub mod theme;
 pub mod windows;
 pub mod workspace;
@@ -53,12 +56,8 @@ pub fn run(options: LaunchOptions) -> anyhow::Result<()> {
         frame::title_bar_pref(&settings.config().ui),
     );
     let state = AppState::new(settings, decision);
-    let viewport = egui::ViewportBuilder::default()
-        .with_title("GCodeKit")
-        .with_inner_size([1280.0, 800.0])
-        .with_min_inner_size([640.0, 400.0]);
     let native = eframe::NativeOptions {
-        viewport: craft_window::policy::apply(viewport, &state.decision.frame),
+        viewport: craft_window::policy::apply(main_viewport(), &state.decision.frame),
         ..eframe::NativeOptions::default()
     };
     eframe::run_native(
@@ -68,6 +67,19 @@ pub fn run(options: LaunchOptions) -> anyhow::Result<()> {
     )
     .map_err(|e| anyhow::anyhow!("eframe failed: {e}"))?;
     Ok(())
+}
+
+/// The main window's viewport before the frame policy is applied: it opens maximized, with
+/// 1280x800 as the size it restores to when the user un-maximizes it.
+///
+/// # Returns
+/// The viewport builder for the main window.
+pub fn main_viewport() -> egui::ViewportBuilder {
+    egui::ViewportBuilder::default()
+        .with_title("GCodeKit")
+        .with_inner_size([1280.0, 800.0])
+        .with_min_inner_size([640.0, 400.0])
+        .with_maximized(true)
 }
 
 /// The command that starts this executable again with the same arguments, for a restart the

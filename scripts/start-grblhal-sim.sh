@@ -2,7 +2,8 @@
 # Start grblHAL simulator with virtual TTY device
 # This creates a virtual serial port at /dev/ttyGRBL
 
-WORK_DIR="${HOME}/Projects/gcodekit5/target/temp"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+WORK_DIR="${REPO_ROOT}/target/temp"
 STEP_FILE="${WORK_DIR}/grblhal-step.out"
 BLOCK_FILE="${WORK_DIR}/grblhal-block.out"
 TTY_DEVICE="/dev/ttyGRBL"
@@ -19,7 +20,16 @@ if [ -e "${TTY_DEVICE}" ]; then
 fi
 
 # Check if grblHAL_sim is available
-if ! command -v grblHAL_sim &> /dev/null; then
+SIM_BIN="$(command -v grblHAL_sim)"
+# Under sudo (needed to create the link in /dev) PATH is reset; use the invoking
+# user's ~/.local/bin instead.
+if [ -z "${SIM_BIN}" ] && [ -n "${SUDO_USER:-}" ]; then
+    SUDO_HOME="$(getent passwd "${SUDO_USER}" | cut -d: -f6)"
+    if [ -x "${SUDO_HOME}/.local/bin/grblHAL_sim" ]; then
+        SIM_BIN="${SUDO_HOME}/.local/bin/grblHAL_sim"
+    fi
+fi
+if [ -z "${SIM_BIN}" ]; then
     echo "Error: grblHAL_sim not found in PATH"
     echo "Please ensure grblHAL simulator is installed."
     exit 1
@@ -35,4 +45,4 @@ echo ""
 # Start socat to create virtual serial port connected to grblHAL simulator
 # The simulator will run with no comment prefixes (-n), and output steps/blocks to files
 socat PTY,raw,link=${TTY_DEVICE},echo=0,group-late=dialout,mode=660 \
-    "EXEC:'/home/thawkins/.local/bin/grblHAL_sim -n -s ${STEP_FILE} -b ${BLOCK_FILE}',pty,raw,echo=0"
+    "EXEC:'${SIM_BIN} -n -s ${STEP_FILE} -b ${BLOCK_FILE}',pty,raw,echo=0"

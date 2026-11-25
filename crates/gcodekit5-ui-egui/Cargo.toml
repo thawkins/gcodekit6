@@ -22,11 +22,14 @@ craft-dialogs = { workspace = true }
 craft-quit = { workspace = true, features = ["egui"] }
 raw-window-handle = { workspace = true }
 gcodekit5-app = { path = "../gcodekit5-app" }
+gcodekit5-communication = { path = "../gcodekit5-communication" }
+gcodekit5-core = { path = "../gcodekit5-core" }
 gcodekit5-settings = { path = "../gcodekit5-settings" }
 serde = { workspace = true }
 tracing = { workspace = true }
 
 [dev-dependencies]
+gcodekit5-app = { path = "../gcodekit5-app", features = ["test-support"] }
 egui_kittest = { workspace = true }
 serde_json = { workspace = true }
 

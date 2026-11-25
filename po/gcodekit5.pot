@@ -3085,3 +3085,36 @@ msgstr ""
 
 msgid "A job is running. Quitting stops it and closes the machine connection."
 msgstr ""
+
+msgid "Rapid:"
+msgstr ""
+
+msgid "No program loaded"
+msgstr ""
+
+msgid "Emergency stop (soft reset, {shortcut})"
+msgstr ""
+
+msgid "Jog refused: the machine position is unknown."
+msgstr ""
+
+msgid "Jog refused: no travel left in that direction."
+msgstr ""
+
+msgid "Jog refused: the machine is not idle."
+msgstr ""
+
+msgid "Clear"
+msgstr ""
+
+msgid "Type a command and press Enter..."
+msgstr ""
+
+msgid "Device connected"
+msgstr ""
+
+msgid "Device disconnected"
+msgstr ""
+
+msgid "Error"
+msgstr ""

@@ -7,11 +7,19 @@
 //! overrides under, so they must not change once released.
 //!
 //! Most bindings work anywhere in the window; the visualizer's view keys work only while the
-//! Visualizer has the keyboard. For machine safety, the soft reset and the jog commands have no
-//! default keys: GTK never registered Escape or the arrow keys for them (the accelerators.rs
-//! constants were unused), an Escape or arrow key meant for a widget must never move or reset
-//! the machine, and craft-keymap cannot tell GTK's numeric-keypad jog keys from the top-row
-//! digits. They stay reachable from the Machine menu (soft reset) and the Machine Control pane.
+//! Visualizer has the keyboard. For machine safety, the jog commands have no default keys and
+//! Escape is bound to nothing: GTK never registered Escape or the arrow keys (the
+//! accelerators.rs constants were unused), an Escape or arrow key meant for a widget must never
+//! move or reset the machine, and craft-keymap cannot tell GTK's numeric-keypad jog keys from
+//! the top-row digits. Jogging stays in the Machine Control pane.
+//!
+//! Feed hold and soft reset each have a modifier chord, `Cmd+Shift+H` and `Cmd+Shift+K` (Ctrl
+//! off macOS), that works anywhere in the window, also while a text field has the keyboard:
+//! craft-keymap's typing rule holds back only plain keys and the text-editing chords, so the
+//! chords reach the dispatcher while the bare `!` of feed hold goes to the text being typed.
+//! Neither chord is one modifier away from a start, run, jog or motion command: Cmd+H,
+//! Cmd+K, Shift+H and Shift+K are unbound (Cmd+R, run, is why soft reset is not
+//! Cmd+Shift+R).
 //!
 //! Dependencies: `craft-keymap` (chords, bindings, scopes, the keymap).
 
@@ -216,23 +224,27 @@ impl Command {
             Command::StreamStart => ("stream.start", n_!("Start Streaming"), App, &[]),
             Command::StreamPause => ("stream.pause", n_!("Pause Streaming"), App, &[]),
             Command::StreamStop => ("stream.stop", n_!("Stop Streaming"), App, &[]),
-            Command::FeedHold => ("machine.feed_hold", n_!("Feed Hold"), App, &["!"]),
+            Command::FeedHold => (
+                "machine.feed_hold",
+                n_!("Feed Hold"),
+                App,
+                &["!", "Cmd+Shift+H"],
+            ),
             // craft-keymap has no `~` key. Shift+` types `~` only on US-style layouts; on others
             // (German, French, ...) this chord is a different key from the one typing `~`.
             Command::CycleStart => ("machine.cycle_start", n_!("Cycle Start"), App, &["Shift+`"]),
-            // No default key: a bare Escape would reset the controller when closing a dropdown.
-            Command::SoftReset => ("machine.soft_reset", n_!("Reset"), MC, &[]),
+            // Never a bare Escape: it would reset the controller when closing a dropdown.
+            Command::SoftReset => ("machine.soft_reset", n_!("Reset"), App, &["Cmd+Shift+K"]),
             Command::Home => ("machine.home", n_!("Home"), App, &["Cmd+Home"]),
             Command::Unlock => ("machine.unlock", n_!("Unlock"), App, &["Cmd+U"]),
-            // Jog labels are not shown in any menu yet, so they are not marked for translation.
             // No default keys: GTK jogs from the numeric keypad (8/2/4/6/9/3), which
             // craft-keymap folds into the top-row digits, and arrows move between widgets.
-            Command::JogXPos => ("jog.x_pos", "Jog X+", MC, &[]),
-            Command::JogXNeg => ("jog.x_neg", "Jog X-", MC, &[]),
-            Command::JogYPos => ("jog.y_pos", "Jog Y+", MC, &[]),
-            Command::JogYNeg => ("jog.y_neg", "Jog Y-", MC, &[]),
-            Command::JogZPos => ("jog.z_pos", "Jog Z+", MC, &[]),
-            Command::JogZNeg => ("jog.z_neg", "Jog Z-", MC, &[]),
+            Command::JogXPos => ("jog.x_pos", n_!("Jog X+"), MC, &[]),
+            Command::JogXNeg => ("jog.x_neg", n_!("Jog X-"), MC, &[]),
+            Command::JogYPos => ("jog.y_pos", n_!("Jog Y+"), MC, &[]),
+            Command::JogYNeg => ("jog.y_neg", n_!("Jog Y-"), MC, &[]),
+            Command::JogZPos => ("jog.z_pos", n_!("Jog Z+"), MC, &[]),
+            Command::JogZNeg => ("jog.z_neg", n_!("Jog Z-"), MC, &[]),
             Command::ZoomFit => ("view.zoom_fit", n_!("Zoom to Fit"), VIS, &["F"]),
             Command::ZoomIn => ("view.zoom_in", n_!("Zoom In"), VIS, &["+"]),
             Command::ZoomOut => ("view.zoom_out", n_!("Zoom Out"), VIS, &["-"]),
