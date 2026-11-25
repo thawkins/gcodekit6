@@ -40,8 +40,8 @@ use grbl_stream::{
 
 /// How often the worker asks for a status report while it waits for a feed hold to complete.
 const HALT_QUERY_INTERVAL: Duration = Duration::from_millis(50);
-/// How long the worker waits for a feed hold to complete before it soft-resets anyway, when
-/// no fresh status report says the machine is still decelerating (`Hold:1`).
+/// How long the worker waits for a feed hold to complete before it soft-resets anyway, after
+/// the hold or the latest status report that did not complete it.
 const HALT_TIMEOUT: Duration = Duration::from_secs(1);
 /// The longest a halt waits for a feed hold to complete, however long fresh `Hold:1`
 /// reports say the machine is still decelerating; it soft-resets then.
@@ -50,11 +50,12 @@ pub const HALT_MAX_WAIT: Duration = Duration::from_secs(10);
 const STATUS_INTERVAL: Duration = Duration::from_millis(200);
 /// The most status queries whose replies are tracked; see [`WorkerState::query_tags`].
 const MAX_QUERY_TAGS: usize = 3;
-/// How long a `?` may stay unanswered before the worker presumes its reply lost (a reply
-/// dropped by a reset or the transport); see [`WorkerState::unanswered_queries`].
+/// The shortest time a `?` may stay unanswered before the worker presumes its reply lost (a
+/// reply dropped by a reset or the transport); on a slower link the time follows the
+/// observed reply latency, see [`WorkerState::lost_reply_timeout`].
 const QUERY_REPLY_TIMEOUT: Duration = Duration::from_secs(2);
 /// The most unanswered `?`s the worker remembers; see [`WorkerState::unanswered_queries`].
-const MAX_UNANSWERED_QUERIES: usize = 64;
+const MAX_UNANSWERED_QUERIES: usize = 256;
 /// How long an idle worker waits for a command before reading the transport again.
 const IDLE_WAIT: Duration = Duration::from_millis(2);
 
@@ -300,9 +301,11 @@ pub enum StreamMode {
     #[default]
     Normal,
     /// Stop at once (a probe routine, whose later lines are relative moves that must not run
-    /// after a refused probe line): stop feeding lines, feed hold (`!`), wait up to a second
-    /// for the hold to complete (`Hold:0` or `Idle`, polling `?`), then soft reset (0x18),
-    /// which keeps the machine position once the motion has stopped. Reported as
+    /// after a refused probe line): stop feeding lines, feed hold (`!`), wait for the hold to
+    /// complete (a `Hold:0` or `Alarm` report after the hold, polling `?`; each report that
+    /// does not complete it extends the wait by a second, up to [`HALT_MAX_WAIT`]; a second
+    /// without any report ends it), then soft reset (0x18), which keeps the machine position
+    /// once the motion has stopped. Reported as
     /// [`MachineEvent::StreamHalted`] then [`MachineEvent::StreamStopped`].
     StopOnError,
 }
@@ -765,12 +768,14 @@ struct Halt {
     /// When the feed hold was written.
     started: Instant,
     /// When to soft-reset without a completed hold: [`HALT_TIMEOUT`] after the hold or the
-    /// latest fresh `Hold:1` report, never later than [`HALT_MAX_WAIT`] after the hold.
+    /// latest status report that did not complete it (a stale one, `Hold:1`, `Idle`, ...),
+    /// never later than [`HALT_MAX_WAIT`] after the hold.
     deadline: Instant,
     /// When to ask for the next status report.
     next_query: Instant,
     /// Status reports still owed to `?`s written before the hold; they may describe the
-    /// machine before it, so they do not count as a completed hold.
+    /// machine before it (even a `Hold:0` of an earlier pause), so they do not count as a
+    /// completed hold.
     stale_reports: usize,
 }
 
@@ -803,11 +808,20 @@ struct WorkerState {
     /// skip as possibly describing the machine before the hold. A status report pops the
     /// oldest entry (nothing when none is left, so an unsolicited report cannot underflow
     /// it). The count corrects itself and stays bounded: an entry older than
-    /// [`QUERY_REPLY_TIMEOUT`] is presumed lost and dropped, at most
+    /// [`Self::lost_reply_timeout`] is presumed lost and dropped (logged), at most
     /// [`MAX_UNANSWERED_QUERIES`] are kept (the oldest goes first), and a reset clears them.
     /// An unsolicited report (auto-reporting firmware) can still answer for a `?` and make
     /// the count low until that `?`'s own reply arrives; the next `?`s set it right again.
+    /// A miscount cannot make a halt reset in motion: only a `Hold:0` or `Alarm` report
+    /// completes a halt, see [`Halt`].
     unanswered_queries: VecDeque<Instant>,
+    /// The slowest recent reply: the age of the `?` each status report answered, decaying by
+    /// 1/16 per report. A slow link (a Wi-Fi or telnet bridge) raises it, so its late replies
+    /// are not presumed lost.
+    reply_latency: Duration,
+    /// Whether lost replies were logged since the last status report, so a dead link logs
+    /// once rather than at every `?`.
+    lost_logged: bool,
     /// A `$J` jog was queued and is not known to be over: set when it is queued and again when
     /// it is written, cleared by jog cancel (0x85, which also drops queued jogs), soft reset
     /// (0x18), or an `Idle` report after a `Jog` one received since it was written.
@@ -849,6 +863,8 @@ impl WorkerState {
             fresh,
             query_tags: VecDeque::new(),
             unanswered_queries: VecDeque::new(),
+            reply_latency: Duration::ZERO,
+            lost_logged: false,
             jog_outstanding: false,
             jog_seen: false,
             halt: None,
@@ -1048,16 +1064,46 @@ impl WorkerState {
         Ok(())
     }
 
-    /// Drops the unanswered `?`s older than [`QUERY_REPLY_TIMEOUT`]: their replies are
-    /// presumed lost.
+    /// How long a `?` may stay unanswered before its reply is presumed lost: twice the
+    /// slowest recent reply, at least [`QUERY_REPLY_TIMEOUT`], at most [`HALT_MAX_WAIT`].
+    fn lost_reply_timeout(&self) -> Duration {
+        (self.reply_latency * 2).clamp(QUERY_REPLY_TIMEOUT, HALT_MAX_WAIT)
+    }
+
+    /// Drops the unanswered `?`s older than [`Self::lost_reply_timeout`]: their replies are
+    /// presumed lost. Logged, once per silence (or always while halting).
     fn forget_lost_queries(&mut self) {
         let now = Instant::now();
+        let timeout = self.lost_reply_timeout();
+        let before = self.unanswered_queries.len();
         while self
             .unanswered_queries
             .front()
-            .is_some_and(|at| now.duration_since(*at) >= QUERY_REPLY_TIMEOUT)
+            .is_some_and(|at| now.duration_since(*at) >= timeout)
         {
             self.unanswered_queries.pop_front();
+        }
+        let forgotten = before - self.unanswered_queries.len();
+        if forgotten > 0 && (self.halt.is_some() || !self.lost_logged) {
+            tracing::warn!(
+                forgotten,
+                ?timeout,
+                halting = self.halt.is_some(),
+                "status replies presumed lost"
+            );
+            self.lost_logged = true;
+        }
+    }
+
+    /// Takes the oldest unanswered `?` as answered by a status report, and learns the reply
+    /// latency from it.
+    fn answer_query(&mut self) {
+        self.lost_logged = false;
+        let decayed = self.reply_latency.saturating_sub(self.reply_latency / 16);
+        if let Some(at) = self.unanswered_queries.pop_front() {
+            self.reply_latency = decayed.max(at.elapsed());
+        } else {
+            self.reply_latency = decayed;
         }
     }
 
@@ -1164,19 +1210,25 @@ impl WorkerState {
             }
             GrblResponseLine::Status(report) => {
                 let status = StatusParser::parse_full(&report);
-                self.unanswered_queries.pop_front();
+                self.answer_query();
                 let state = status.machine_state.as_deref();
-                let held = state.is_some_and(|s| s.starts_with("Hold:0") || s.starts_with("Idle"));
-                let decelerating = state.is_some_and(|s| s.starts_with("Hold:1"));
+                // GRBL 1.1 and grblHAL enter Hold on `!` from any running or idle state (from
+                // Idle the hold is complete at once: `Hold:0`), so after the hold only
+                // `Hold:0` proves the machine stopped; an `Alarm` has stopped it too. `Idle`
+                // or `Run` can only be a report from before the hold (a late reply on a slow
+                // link, or a miscounted one), and `Hold:1` says it still decelerates.
+                let stopped =
+                    state.is_some_and(|s| s.starts_with("Hold:0") || s.starts_with("Alarm"));
                 if let Some(halt) = self.halt.as_mut() {
-                    if halt.stale_reports > 0 {
-                        halt.stale_reports -= 1;
-                    } else if held {
+                    if halt.stale_reports == 0 && stopped {
                         self.finish_halt();
-                    } else if decelerating {
-                        // Still slowing down: a reset now would come in motion.
+                    } else {
+                        // A report owed to a `?` from before the hold, or one that does not
+                        // say the machine stopped: replies are still coming, so wait for the
+                        // next one rather than reset in motion (never past the cap).
+                        halt.stale_reports = halt.stale_reports.saturating_sub(1);
                         let cap = halt.started + HALT_MAX_WAIT;
-                        halt.deadline = (Instant::now() + HALT_TIMEOUT).min(cap);
+                        halt.deadline = halt.deadline.max(Instant::now() + HALT_TIMEOUT).min(cap);
                     }
                 }
                 self.follow_jog(status.machine_state.as_deref());
@@ -1280,7 +1332,8 @@ impl WorkerState {
 
     /// While halting: asks for status every [`HALT_QUERY_INTERVAL`], and soft-resets once
     /// the halt's deadline passes without a completed hold ([`HALT_TIMEOUT`] after the hold
-    /// or the latest fresh `Hold:1`, at most [`HALT_MAX_WAIT`] after the hold).
+    /// or the latest report that did not complete it, at most [`HALT_MAX_WAIT`] after the
+    /// hold).
     fn drive_halt(&mut self) -> Result<(), String> {
         let Some(halt) = self.halt.as_mut() else {
             return Ok(());

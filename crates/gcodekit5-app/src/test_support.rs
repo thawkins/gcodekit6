@@ -8,7 +8,8 @@
 //! Status reports are answers to `?`, as on a real controller: an injected `<...>` report
 //! waits until a `?` is written and is then owed as that `?`'s reply. Once one report has
 //! been injected, every later `?` is answered with the latest injected report. Replies owed
-//! are handed out in order, at most [`LoopbackShared::reply_budget`] of them when it is set.
+//! are handed out in order, at most [`LoopbackShared::reply_budget`] of them when it is set,
+//! each no sooner than [`LoopbackShared::reply_delay`] after its `?` (a slow link).
 
 use std::collections::VecDeque;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
@@ -49,8 +50,10 @@ pub struct LoopbackShared {
     /// The latest status report used as a reply; it answers every `?` once no injected one
     /// waits.
     pub sticky_report: Mutex<Option<Vec<u8>>>,
-    /// Replies owed to written `?` bytes, oldest first.
-    pub owed_replies: Mutex<VecDeque<Vec<u8>>>,
+    /// Replies owed to written `?` bytes, oldest first, each with when it may be read.
+    pub owed_replies: Mutex<VecDeque<(Instant, Vec<u8>)>>,
+    /// How long after its `?` a status reply arrives (a slow link); zero by default.
+    pub reply_delay: Mutex<Duration>,
     /// When set, how many more owed replies `receive` may hand out (`None`: all).
     pub reply_budget: Mutex<Option<usize>>,
     /// Lines written but not yet answered with `ok`.
@@ -106,10 +109,14 @@ impl LoopbackShared {
             *sticky = Some(report);
         }
         if let Some(report) = sticky.clone() {
+            let delay = *self
+                .reply_delay
+                .lock()
+                .expect("loopback delay mutex poisoned");
             self.owed_replies
                 .lock()
                 .expect("loopback replies mutex poisoned")
-                .push_back(report);
+                .push_back((Instant::now() + delay, report));
         }
     }
 
@@ -122,11 +129,14 @@ impl LoopbackShared {
         if *budget == Some(0) {
             return None;
         }
-        let reply = self
+        let mut owed = self
             .owed_replies
             .lock()
-            .expect("loopback replies mutex poisoned")
-            .pop_front()?;
+            .expect("loopback replies mutex poisoned");
+        if owed.front().is_none_or(|(due, _)| *due > Instant::now()) {
+            return None;
+        }
+        let (_, reply) = owed.pop_front()?;
         if let Some(left) = budget.as_mut() {
             *left -= 1;
         }
