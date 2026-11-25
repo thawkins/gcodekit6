@@ -3790,3 +3790,6 @@ msgstr ""
 
 msgid "waiting for the controller to answer earlier commands"
 msgstr ""
+
+msgid "unknown EEPROM value type"
+msgstr ""

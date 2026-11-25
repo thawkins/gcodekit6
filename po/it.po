@@ -3869,3 +3869,6 @@ msgstr "Compilazione"
 
 msgid "waiting for the controller to answer earlier commands"
 msgstr "in attesa che il controller risponda ai comandi precedenti"
+
+msgid "unknown EEPROM value type"
+msgstr "tipo di valore EEPROM sconosciuto"

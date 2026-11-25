@@ -559,6 +559,7 @@ impl DeviceInfoView {
                 range: Some((0.0, 1.0)),
                 read_only: false,
                 unit: Some("bool".to_string()),
+                eeprom_type: None,
             };
             manager.set_setting(setting);
         }

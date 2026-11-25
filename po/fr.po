@@ -3873,3 +3873,6 @@ msgstr "Compilation"
 
 msgid "waiting for the controller to answer earlier commands"
 msgstr "en attente de la réponse du contrôleur aux commandes précédentes"
+
+msgid "unknown EEPROM value type"
+msgstr "type de valeur EEPROM inconnu"

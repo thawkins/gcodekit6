@@ -365,3 +365,40 @@ fn test_firmware_settings_earlier_error_is_not_the_writes_answer() {
         h.state().firmware_settings().notice()
     );
 }
+
+#[test]
+fn test_firmware_settings_repetier_float_slot_written_as_float() {
+    let (mut h, shared) = open_window(|_| {});
+    shared.inject("FIRMWARE_NAME:Repetier_1.0.6 MACHINE_TYPE:Mendel EXTRUDER_COUNT:1\n");
+    assert!(step_until(&mut h, |app| app
+        .device_info()
+        .identity()
+        .is_repetier()));
+    h.get_by_label("Retrieve").click();
+    h.run_steps(2);
+    assert!(wait_until(|| wrote(&shared, "M115")));
+    shared
+        .inject("EPR:3 11 80.0000 X-axis steps per mm [steps/mm]\nFIRMWARE_NAME:Repetier_1.0.6\n");
+    assert!(step_until(&mut h, |app| app
+        .firmware_settings()
+        .notice()
+        .is_some_and(|n| n.contains("Settings retrieved"))));
+    assert!(step_until(&mut h, |app| gcodekit5_ui_egui::machine::lock(
+        app.state().machine.controller()
+    )
+    .lines_answered()));
+
+    h.run_steps(3);
+    set_field(&mut h, "Filter:", "epr:11");
+    h.run_steps(2);
+    h.get_by_label("EPR:11").click();
+    h.run_steps(2);
+    set_field(&mut h, "Value:", "80");
+    h.get_by_label("Apply").click();
+    h.run_steps(2);
+    assert!(
+        wait_until(|| wrote(&shared, "M206 T3 P11 X80")),
+        "written: {:?}",
+        shared.log()
+    );
+}

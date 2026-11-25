@@ -195,6 +195,7 @@ pub fn load_definitions(manager: &mut SettingsManager, definitions: Vec<SettingD
             range: None,
             read_only,
             unit: (!unit.is_empty()).then(|| unit.to_string()),
+            eeprom_type: None,
         });
     }
 }
@@ -230,7 +231,7 @@ pub fn parse_repetier_epr_line(line: &str) -> Option<Setting> {
     let (_, rest) = line.split_once("EPR:")?;
     let mut parts = rest.trim().splitn(4, ' ');
 
-    let _data_type = parts.next()?;
+    let eeprom_type: u8 = parts.next()?.parse().ok()?;
     let pos: u16 = parts.next()?.parse().ok()?;
     let number = REPETIER_OFFSET.checked_add(pos)?;
     let value = parts.next()?.to_string();
@@ -253,25 +254,31 @@ pub fn parse_repetier_epr_line(line: &str) -> Option<Setting> {
         range: None,
         read_only: false,
         unit,
+        eeprom_type: Some(eeprom_type),
     })
 }
 
 /// The line that writes `value` to setting `number`: `$110=5000` for GRBL, or Repetier's
-/// `M206 T3 P<pos> X<value>` (a value with a decimal point) / `M206 T2 P<pos> S<value>`.
+/// `M206 T<type> P<pos> S<value>` (`X<value>` for a float, type 3). The type is the one the
+/// controller reported for the position (`EPR:<type> ...`), never guessed from the value:
+/// `M206` stores the value's bytes as that type, so a wrong type corrupts the position.
 ///
 /// # Arguments
 /// * `number` - Setting number (Repetier positions offset by [`REPETIER_OFFSET`]).
-/// * `value` - The new value, as typed.
-pub fn write_command(number: u16, value: &str) -> String {
-    if number >= REPETIER_OFFSET {
-        let pos = number - REPETIER_OFFSET;
-        if value.contains('.') {
-            format!("M206 T3 P{pos} X{value}")
-        } else {
-            format!("M206 T2 P{pos} S{value}")
-        }
-    } else {
-        format!("${number}={value}")
+/// * `eeprom_type` - The Repetier position's reported type ([`Setting::eeprom_type`]).
+/// * `value` - The new value, already checked.
+///
+/// # Returns
+/// The line, or `None` for a Repetier position whose type is unknown or not 0-3.
+pub fn write_command(number: u16, eeprom_type: Option<u8>, value: &str) -> Option<String> {
+    if number < REPETIER_OFFSET {
+        return Some(format!("${number}={value}"));
+    }
+    let pos = number - REPETIER_OFFSET;
+    match eeprom_type? {
+        3 => Some(format!("M206 T3 P{pos} X{value}")),
+        t @ 0..=2 => Some(format!("M206 T{t} P{pos} S{value}")),
+        _ => None,
     }
 }
 

@@ -303,7 +303,16 @@ impl FirmwareSettingsWindow {
             return;
         };
         let value = edit.value.trim().to_string();
-        let line = write_command(edit.number, &value);
+        // A Repetier position is written as the type the controller reported for it.
+        let eeprom_type = self
+            .table
+            .get_setting(edit.number)
+            .and_then(|s| s.eeprom_type);
+        let Some(line) = write_command(edit.number, eeprom_type, &value) else {
+            let reason = tr.tr(n_!("unknown EEPROM value type"));
+            self.refuse_write(&setting_id(edit.number), &reason, tr);
+            return;
+        };
         if let Some(blocked) = setting_write::blocked(machine) {
             let reason = setting_write::blocked_text(&blocked, tr);
             self.refuse_write(&line, &reason, tr);
@@ -603,6 +612,7 @@ pub fn msgids() -> Vec<&'static str> {
         n_!("Value:"),
         n_!("Cancel"),
         n_!("Apply"),
+        n_!("unknown EEPROM value type"),
     ];
     ids.extend(SETTING_CATEGORIES);
     ids.extend(setting_write::msgids());

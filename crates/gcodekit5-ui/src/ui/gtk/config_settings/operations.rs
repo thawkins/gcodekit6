@@ -563,7 +563,26 @@ impl ConfigSettingsView {
 
         save_btn.connect_clicked(move |_| {
             let new_value = value_entry.text().to_string();
-            let command = firmware_settings::write_command(setting_number, &new_value);
+            // A Repetier position is written as the type the controller reported for it.
+            let eeprom_type = manager_clone
+                .borrow()
+                .get_setting(setting_number)
+                .and_then(|s| s.eeprom_type);
+            let Some(command) =
+                firmware_settings::write_command(setting_number, eeprom_type, &new_value)
+            else {
+                crate::ui::gtk::common::dialog::show_warning(
+                    &t!("Setting not changed"),
+                    &format!(
+                        "{}: {}",
+                        firmware_settings::setting_id(setting_number),
+                        t!("unknown EEPROM value type")
+                    ),
+                    None,
+                );
+                dialog_save.close();
+                return;
+            };
 
             // Send to the device first: the page must only show a value the
             // controller actually accepted.

@@ -3866,3 +3866,6 @@ msgstr "Build-Datum"
 
 msgid "waiting for the controller to answer earlier commands"
 msgstr "warte auf die Antwort der Steuerung auf frühere Befehle"
+
+msgid "unknown EEPROM value type"
+msgstr "unbekannter EEPROM-Werttyp"
