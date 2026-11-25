@@ -32,9 +32,7 @@ use gcodekit5_settings::SettingsManager;
 use gcodekit5_settings::config::Config;
 
 use crate::commands::{self, Command};
-use crate::dialogs::{
-    ConfirmChoice, ConfirmRequest, DialogAnswer, Dialogs, FileFilter, FilePurpose,
-};
+use crate::dialogs::{ConfirmChoice, ConfirmRequest, DialogAnswer, Dialogs, FilePurpose};
 use crate::menu::Menus;
 use crate::theme;
 use crate::windows::{AboutWindow, SettingsOutcome, SettingsWindow};
@@ -294,11 +292,11 @@ impl GcodeKitApp {
         match cmd {
             Command::FileOpen => self
                 .dialogs
-                .open_file(FilePurpose::OpenGcode, &[FileFilter::GCODE]),
+                .open_file(FilePurpose::OpenGcode, &FilePurpose::OpenGcode.filters()),
             // No document has a path of its own yet, so Save asks where to save too.
             Command::FileSave | Command::FileSaveAs => self
                 .dialogs
-                .save_file(FilePurpose::SaveGcode, &[FileFilter::GCODE]),
+                .save_file(FilePurpose::SaveGcode, &FilePurpose::SaveGcode.filters()),
             Command::OpenSettings => self.settings_window.open(&self.state.settings),
             Command::About => self.about_window.open(),
             Command::Quit => self.viewport_commands.push(egui::ViewportCommand::Close),

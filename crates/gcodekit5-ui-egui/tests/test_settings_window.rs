@@ -9,7 +9,7 @@ use egui_kittest::Harness;
 use egui_kittest::kittest::Queryable;
 use gcodekit5_app::i18n::{Translator, needs_restart};
 use gcodekit5_settings::SettingsManager;
-use gcodekit5_settings::config::MeasurementSystem;
+use gcodekit5_settings::config::{FeedRateUnits, MeasurementSystem, Theme};
 use gcodekit5_settings::migrate::ConfigDirs;
 use gcodekit5_ui_egui::windows::settings::{SettingsOutcome, SettingsWindow};
 
@@ -227,5 +227,98 @@ fn test_clearing_default_directory_saves_none() {
     assert_eq!(
         reloaded.config().file_processing.output_directory,
         PathBuf::new()
+    );
+}
+
+/// Every field the window edits survives Apply and a reload. A widget added without a
+/// matching line in `copy_edited` fails here once its field is added below.
+#[test]
+fn test_every_edited_field_persists() {
+    let dirs = scratch("test_every_edited_field_persists");
+    let mut harness = harness(dirs.clone(), true);
+    {
+        let draft = harness
+            .state_mut()
+            .window
+            .draft_mut()
+            .expect("window is open");
+        let ui = &mut draft.config.ui;
+        ui.measurement_system = MeasurementSystem::Imperial;
+        ui.feed_rate_units = FeedRateUnits::InPerSec;
+        ui.theme = Theme::Dark;
+        ui.language = "it".to_string();
+        ui.show_about_on_startup = !ui.show_about_on_startup;
+        ui.grid_major_line_width = 3.25;
+        ui.grid_minor_line_width = 0.75;
+        ui.enable_stock_removal_3d = !ui.enable_stock_removal_3d;
+        ui.enable_stl_import = !ui.enable_stl_import;
+        ui.use_system_title_bar = !ui.use_system_title_bar;
+        let machine = &mut draft.config.machine;
+        machine.jog_increment = 2.5;
+        machine.jog_feed_rate = 1234.0;
+        machine.x_limit = 111.0;
+        machine.y_limit = 222.0;
+        machine.z_limit = 33.0;
+        let file = &mut draft.config.file_processing;
+        file.preserve_comments = !file.preserve_comments;
+        file.arc_segment_length = 0.25;
+        file.max_line_length = 77;
+        draft.directory = "/work/gcode".to_string();
+    }
+    let expected = {
+        let draft = harness.state_mut().window.draft_mut().expect("open");
+        (draft.config.clone(), draft.directory.clone())
+    };
+    click(&mut harness, "Apply");
+    assert_eq!(
+        harness.state().outcomes,
+        [SettingsOutcome::Applied { restart: true }]
+    );
+
+    let (reloaded, problem) = SettingsManager::open(dirs);
+    assert!(problem.is_none(), "{problem:?}");
+    let (config, (want, directory)) = (reloaded.config(), expected);
+    assert_eq!(config.ui.measurement_system, want.ui.measurement_system);
+    assert_eq!(config.ui.feed_rate_units, want.ui.feed_rate_units);
+    assert_eq!(config.ui.theme, want.ui.theme);
+    assert_eq!(config.ui.language, want.ui.language);
+    assert_eq!(
+        config.ui.show_about_on_startup,
+        want.ui.show_about_on_startup
+    );
+    assert_eq!(
+        config.ui.grid_major_line_width,
+        want.ui.grid_major_line_width
+    );
+    assert_eq!(
+        config.ui.grid_minor_line_width,
+        want.ui.grid_minor_line_width
+    );
+    assert_eq!(
+        config.ui.enable_stock_removal_3d,
+        want.ui.enable_stock_removal_3d
+    );
+    assert_eq!(config.ui.enable_stl_import, want.ui.enable_stl_import);
+    assert_eq!(config.ui.use_system_title_bar, want.ui.use_system_title_bar);
+    assert_eq!(config.machine.jog_increment, want.machine.jog_increment);
+    assert_eq!(config.machine.jog_feed_rate, want.machine.jog_feed_rate);
+    assert_eq!(config.machine.x_limit, want.machine.x_limit);
+    assert_eq!(config.machine.y_limit, want.machine.y_limit);
+    assert_eq!(config.machine.z_limit, want.machine.z_limit);
+    assert_eq!(
+        config.file_processing.preserve_comments,
+        want.file_processing.preserve_comments
+    );
+    assert_eq!(
+        config.file_processing.arc_segment_length,
+        want.file_processing.arc_segment_length
+    );
+    assert_eq!(
+        config.file_processing.max_line_length,
+        want.file_processing.max_line_length
+    );
+    assert_eq!(
+        config.file_processing.output_directory,
+        PathBuf::from(directory)
     );
 }

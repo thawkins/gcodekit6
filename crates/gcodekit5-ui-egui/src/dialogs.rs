@@ -45,13 +45,26 @@ impl FilePurpose {
             Self::SaveDesign => n_!("Save Design File"),
         }
     }
+
+    /// The file types the dialog offers, the first one selected: an Open dialog offers its
+    /// type and All Files, or nothing (every file) where All Files cannot be a filter
+    /// ([`FileFilter::all_files`]); a Save dialog offers its own type.
+    pub fn filters(self) -> Vec<FileFilter> {
+        let open = |own: FileFilter| {
+            FileFilter::all_files()
+                .map(|all| vec![own, all])
+                .unwrap_or_default()
+        };
+        match self {
+            Self::OpenGcode => open(FileFilter::GCODE),
+            Self::OpenDesign => open(FileFilter::DESIGN),
+            Self::SaveGcode => vec![FileFilter::GCODE],
+            Self::SaveDesign => vec![FileFilter::DESIGN],
+        }
+    }
 }
 
 /// A file type a dialog offers: the English msgid of its name and its extensions.
-///
-/// There is no "All Files" filter: neither rfd nor craft-dialogs has a portable form for one.
-/// rfd's zenity backend and Windows turn `*` into `*.*`, which zenity matches only against
-/// names with a dot, and craft-dialogs' macOS panel would take `*` for an extension.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct FileFilter {
     /// The English msgid of the name the dialog lists.
@@ -71,6 +84,37 @@ impl FileFilter {
         name_msgid: n_!("GCodeKit Design Files"),
         extensions: &["gckd", "gck5"],
     };
+
+    /// The "All Files" choice in a form that matches every file, names without a dot
+    /// included, on the dialog backends of this platform; `None` where no filter can, and an
+    /// Open dialog then has no filters at all. This is the one place that knows the backends
+    /// (rfd 0.17.2 through craft-dialogs):
+    ///
+    /// - Windows: rfd writes `*.{ext}`, so `*` becomes `*.*`, which the Windows file dialog
+    ///   matches against every file, extensionless ones included.
+    /// - Linux and the BSDs: the desktop portal keeps `*` as the glob `*`. Its zenity fallback
+    ///   writes `*.{ext}` for each extension into one space-separated pattern list, which
+    ///   zenity splits on spaces; `*` alone would give only `*.*` (names with a dot), so `" *"`
+    ///   is added, which zenity reads as `*.` and `*`. The portal reads `" *"` as the glob
+    ///   `*. *`, which matches nothing extra and is harmless.
+    /// - macOS: craft-dialogs' panel merges every filter's extensions into one allowed-types
+    ///   list with no filter menu, and would take `*` for an extension, so no filter can offer
+    ///   a choice: `None`.
+    pub fn all_files() -> Option<Self> {
+        #[cfg(target_os = "macos")]
+        let all = None;
+        #[cfg(target_os = "windows")]
+        let all = Some(Self {
+            name_msgid: n_!("All Files"),
+            extensions: &["*"],
+        });
+        #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+        let all = Some(Self {
+            name_msgid: n_!("All Files"),
+            extensions: &["*", " *"],
+        });
+        all
+    }
 }
 
 /// A question with a fixed set of answers.
@@ -334,7 +378,10 @@ pub fn msgids() -> Vec<&'static str> {
         FilePurpose::SaveDesign,
     ]
     .map(FilePurpose::title_msgid);
-    let filters = [FileFilter::GCODE, FileFilter::DESIGN].map(|f| f.name_msgid);
+    let filters = [FileFilter::GCODE, FileFilter::DESIGN]
+        .map(|f| f.name_msgid)
+        .into_iter()
+        .chain([n_!("All Files")]);
     let confirms = [
         ConfirmRequest::UnsavedGcode,
         ConfirmRequest::UnsavedDesign,

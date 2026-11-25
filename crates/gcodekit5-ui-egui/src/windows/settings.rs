@@ -79,11 +79,13 @@ impl Page {
 }
 
 /// The copy being edited.
+#[doc(hidden)]
 #[derive(Debug)]
-struct Draft {
-    config: Config,
+pub struct Draft {
+    /// The settings as edited.
+    pub config: Config,
     /// The default folder as typed.
-    directory: String,
+    pub directory: String,
     /// Why the last Apply failed.
     error: Option<String>,
 }
@@ -141,6 +143,13 @@ impl SettingsWindow {
     /// Whether the window is open.
     pub fn is_open(&self) -> bool {
         self.draft.is_some()
+    }
+
+    /// The copy being edited while the window is open (tests: set every edited field at
+    /// once).
+    #[doc(hidden)]
+    pub fn draft_mut(&mut self) -> Option<&mut Draft> {
+        self.draft.as_mut()
     }
 
     /// Draws the window when it is open.

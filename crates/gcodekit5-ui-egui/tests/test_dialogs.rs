@@ -29,7 +29,7 @@ fn test_request_waits_and_answer_is_delivered_once() {
     let path = PathBuf::from("/work/part.gcode");
 
     // Frame 1: the request is queued, nothing is answered.
-    dialogs.open_file(FilePurpose::OpenGcode, &[FileFilter::GCODE]);
+    dialogs.open_file(FilePurpose::OpenGcode, &FilePurpose::OpenGcode.filters());
     assert_eq!(dialogs.poll(), None);
     assert_eq!(dialogs.waiting(), 1);
 
@@ -46,7 +46,12 @@ fn test_request_waits_and_answer_is_delivered_once() {
                 assert_eq!(file.kind, Kind::Open { multiple: false });
                 assert_eq!(file.title.as_deref(), Some("Open G-Code File"));
                 let names: Vec<&str> = file.filters.iter().map(|f| f.name.as_str()).collect();
-                assert_eq!(names, ["G-Code Files"]);
+                let expected: Vec<&str> = FilePurpose::OpenGcode
+                    .filters()
+                    .iter()
+                    .map(|f| f.name_msgid)
+                    .collect();
+                assert_eq!(names, expected);
             }
             Request::Message(message) => panic!("unexpected message box {message:?}"),
         }
@@ -92,4 +97,57 @@ fn test_cancel_and_confirm_answers() {
         })
     );
     assert_eq!(dialogs.poll(), None);
+}
+
+/// Open dialogs offer G-Code (or design) files first and an All Files choice that matches
+/// every file on this platform's backends; Save dialogs offer only their own type.
+#[test]
+fn test_filters_per_purpose_on_this_platform() {
+    assert_eq!(FilePurpose::SaveGcode.filters(), [FileFilter::GCODE]);
+    assert_eq!(FilePurpose::SaveDesign.filters(), [FileFilter::DESIGN]);
+    let open_gcode = FilePurpose::OpenGcode.filters();
+    let open_design = FilePurpose::OpenDesign.filters();
+    match FileFilter::all_files() {
+        Some(all) => {
+            assert_eq!(open_gcode, [FileFilter::GCODE, all]);
+            assert_eq!(open_design, [FileFilter::DESIGN, all]);
+            assert_eq!(all.name_msgid, "All Files");
+        }
+        // No filter form matches every file here: the Open dialogs are unfiltered.
+        None => {
+            assert!(open_gcode.is_empty());
+            assert!(open_design.is_empty());
+        }
+    }
+}
+
+/// On Linux and the BSDs rfd shows the desktop portal, or zenity when there is none. The
+/// portal turns the extension `*` into the glob `*`; zenity writes `*.{ext}` for every
+/// extension and splits the joined list on spaces, so `" *"` gives it a bare `*`. Both must
+/// end up with a glob that also matches names without a dot.
+#[cfg(all(unix, not(target_vendor = "apple")))]
+#[test]
+fn test_all_files_matches_extensionless_on_portal_and_zenity() {
+    let all = FileFilter::all_files().expect("an All Files filter on this platform");
+    // rfd 0.17.2 xdg_desktop_portal.rs: `*` (or empty) stays `*`, else `*.{ext}`.
+    let portal: Vec<String> = all
+        .extensions
+        .iter()
+        .map(|ext| match *ext {
+            "*" | "" => "*".to_string(),
+            ext => format!("*.{ext}"),
+        })
+        .collect();
+    assert!(portal.iter().any(|glob| glob == "*"), "portal: {portal:?}");
+    // rfd 0.17.2 linux/zenity.rs: `NAME | *.{ext} *.{ext} ...`, split on spaces by zenity.
+    let zenity = all
+        .extensions
+        .iter()
+        .map(|ext| format!("*.{ext}"))
+        .collect::<Vec<_>>()
+        .join(" ");
+    assert!(
+        zenity.split_whitespace().any(|glob| glob == "*"),
+        "zenity: {zenity:?}"
+    );
 }
