@@ -20,8 +20,13 @@ serde_json = "1.0"
 tracing = "0.1"
 dirs = "7.0"
 
+[features]
+# The loopback transport of `test_support`, for tests only (enabled from dev-dependencies).
+test-support = []
+
 [dev-dependencies]
 tempfile = "3.8"
+gcodekit5-app = { path = ".", features = ["test-support"] }
 
 [[test]]
 name = "all"

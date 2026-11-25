@@ -15,6 +15,9 @@ pub mod device_status;
 pub mod i18n;
 pub mod machine;
 pub mod materials_manager_backend;
+#[cfg(feature = "test-support")]
+#[doc(hidden)]
+pub mod test_support;
 pub mod tools_manager_backend;
 pub mod types;
 pub mod unsaved_changes;
