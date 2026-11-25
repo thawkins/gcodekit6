@@ -4,7 +4,9 @@
 //! configuration settings. Handles communication with the
 //! connected CNC device.
 
-use gcodekit5_communication::firmware::grbl::settings::{Setting, SettingsManager};
+use gcodekit5_app::device_identity::DeviceIdentity;
+use gcodekit5_app::firmware_settings;
+use gcodekit5_communication::firmware::grbl::settings::SettingsManager;
 use gcodekit5_communication::{Communicator, SerialCommunicator};
 use gcodekit5_core::{Shared, SharedOption, ThreadSafe, shared};
 use gtk4::glib;
@@ -75,36 +77,6 @@ impl ConfigSettingsView {
                 }
             }
         }
-    }
-
-    pub(crate) fn parse_repetier_epr_line(line: &str) -> Option<Setting> {
-        let (_, rest) = line.split_once("EPR:")?;
-        let mut parts = rest.trim().splitn(4, ' ');
-
-        let _data_type = parts.next()?;
-        let pos: u16 = parts.next()?.parse().ok()?;
-        let value = parts.next()?.to_string();
-        let raw_desc = parts.next().unwrap_or("Repetier Parameter").trim();
-
-        let (name, unit) = if let Some((n, u)) = raw_desc.rsplit_once('[') {
-            (
-                n.trim().to_string(),
-                Some(u.trim_end_matches(']').to_string()),
-            )
-        } else {
-            (raw_desc.to_string(), None)
-        };
-
-        Some(Setting {
-            number: 1000 + pos,
-            name,
-            value: value.clone(),
-            numeric_value: value.parse::<f64>().ok(),
-            description: format!("EEPROM Pos {}: {}", pos, raw_desc),
-            range: None,
-            read_only: false,
-            unit,
-        })
     }
 
     pub(crate) fn retrieve_settings(&self) {
@@ -258,9 +230,14 @@ impl ConfigSettingsView {
                 if complete || timed_out {
                     let mut count = 0;
 
-                    let mut detected_machine = device_info_view_clone.get_device_name();
-                    let mut detected_firmware = device_info_view_clone.get_firmware();
-                    let mut detected_version = device_info_view_clone.get_version();
+                    // What the panel shows now; "-" means not reported.
+                    let known = |text: String| (!text.is_empty() && text != "-").then_some(text);
+                    let mut identity = DeviceIdentity {
+                        name: known(device_info_view_clone.get_device_name()),
+                        firmware: known(device_info_view_clone.get_firmware()),
+                        version: known(device_info_view_clone.get_version()),
+                        ..DeviceIdentity::default()
+                    };
                     let mut info_updated = false;
 
                     for line in new_console_text.lines() {
@@ -269,7 +246,8 @@ impl ConfigSettingsView {
                         if is_repetier {
                             // Repetier EEPROM lines (EPR: anywhere in the line)
                             if line.contains("EPR:")
-                                && let Some(setting) = Self::parse_repetier_epr_line(line)
+                                && let Some(setting) =
+                                    firmware_settings::parse_repetier_epr_line(line)
                             {
                                 let mut manager = manager_clone.borrow_mut();
                                 manager.set_setting(setting);
@@ -278,28 +256,7 @@ impl ConfigSettingsView {
 
                             // Repetier M115 reply (FIRMWARE_NAME:Repetier_1.0.6 ...)
                             if line.contains("FIRMWARE_NAME:") {
-                                if let Some(fw_part) = line.split("FIRMWARE_NAME:").nth(1) {
-                                    let fw_token =
-                                        fw_part.split_whitespace().next().unwrap_or("Repetier");
-                                    if let Some((name, ver)) = fw_token.split_once('_') {
-                                        detected_firmware = name.to_string();
-                                        detected_version = ver.to_string();
-                                    } else {
-                                        detected_firmware = fw_token.to_string();
-                                    }
-                                    info_updated = true;
-                                }
-                                if let Some(machine_part) = line.split("MACHINE_TYPE:").nth(1) {
-                                    let m_name = machine_part
-                                        .split("EXTRUDER_COUNT:")
-                                        .next()
-                                        .unwrap_or("")
-                                        .trim();
-                                    if !m_name.is_empty() {
-                                        detected_machine = m_name.to_string();
-                                        info_updated = true;
-                                    }
-                                }
+                                info_updated |= identity.apply_line(line);
                             }
                         } else {
                             // GRBL settings lines ($0=...)
@@ -319,44 +276,9 @@ impl ConfigSettingsView {
                                     count += 1;
                                 }
                             }
-                            // GRBL $I blocks ([Machine:...])
-                            if line.starts_with('[') && line.ends_with(']') {
-                                let content = &line[1..line.len() - 1];
-                                if let Some((key, val)) = content.split_once(':') {
-                                    match key {
-                                        "Machine" => {
-                                            detected_machine = val.to_string();
-                                            info_updated = true;
-                                        }
-                                        "VER" => {
-                                            detected_version = val
-                                                .split_once('.')
-                                                .map(|(v, _)| v)
-                                                .unwrap_or(val)
-                                                .to_string();
-                                            if detected_firmware == "-"
-                                                || detected_firmware.is_empty()
-                                            {
-                                                detected_firmware = "Grbl".to_string();
-                                            }
-                                            info_updated = true;
-                                        }
-                                        "Software" => {
-                                            detected_firmware = format!("Grbl Ext ({})", val);
-                                            info_updated = true;
-                                        }
-                                        _ => {}
-                                    }
-                                }
-                            }
-                            if line.starts_with("Grbl ")
-                                && let Some(ver) = line.split_whitespace().nth(1)
-                            {
-                                detected_version = ver.to_string();
-                                if detected_firmware == "-" || detected_firmware.is_empty() {
-                                    detected_firmware = "Grbl".to_string();
-                                }
-                                info_updated = true;
+                            // GRBL $I blocks ([VER:...], [Machine:...]) and the banner.
+                            if line.starts_with('[') || line.starts_with("Grbl ") {
+                                info_updated |= identity.apply_line(line);
                             }
                         }
                     }
@@ -382,11 +304,12 @@ impl ConfigSettingsView {
                     }
 
                     if info_updated {
+                        let shown = |value: Option<&str>| value.unwrap_or("-").to_string();
                         device_info_view_clone.set_connected(
                             true,
-                            &detected_machine,
-                            &detected_firmware,
-                            &detected_version,
+                            &shown(identity.name.as_deref()),
+                            &shown(identity.firmware.as_deref()),
+                            &shown(identity.version.as_deref()),
                         );
                     }
                     if !is_repetier {
@@ -640,16 +563,7 @@ impl ConfigSettingsView {
 
         save_btn.connect_clicked(move |_| {
             let new_value = value_entry.text().to_string();
-            let command = if setting_number >= 1000 {
-                let epr_pos = setting_number - 1000;
-                if new_value.contains('.') {
-                    format!("M206 T3 P{} X{}", epr_pos, new_value)
-                } else {
-                    format!("M206 T2 P{} S{}", epr_pos, new_value)
-                }
-            } else {
-                format!("${}={}", setting_number, new_value)
-            };
+            let command = firmware_settings::write_command(setting_number, &new_value);
 
             // Send to the device first: the page must only show a value the
             // controller actually accepted.
@@ -800,11 +714,5 @@ impl ConfigSettingsView {
 /// * `number` - Setting number (Repetier EEPROM positions are offset by 1000).
 /// * `value` - The value the controller now holds.
 fn apply_setting_value(manager: &Shared<SettingsManager>, number: u16, value: &str) {
-    let mut manager = manager.borrow_mut();
-    if let Some(setting) = manager.get_setting(number) {
-        let mut updated = setting.clone();
-        updated.value = value.to_string();
-        updated.numeric_value = value.parse::<f64>().ok();
-        manager.set_setting(updated);
-    }
+    firmware_settings::apply_value(&mut manager.borrow_mut(), number, value);
 }

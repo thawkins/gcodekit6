@@ -10,7 +10,7 @@ mod repetier_settings;
 
 use crate::ui::gtk::common::text_dropdown::{TextDropDownExt, new_text_dropdown};
 use gcodekit5_communication::SerialCommunicator;
-use gcodekit5_communication::firmware::grbl::settings::{Setting, SettingsManager};
+use gcodekit5_communication::firmware::grbl::settings::SettingsManager;
 use gcodekit5_settings::controller::SettingsController;
 use gtk4::prelude::*;
 use gtk4::{
@@ -21,89 +21,13 @@ use gtk4::{
 use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
-#[derive(Clone)]
-pub struct ConfigSettingRow {
-    pub number: u16,
-    pub name: String,
-    pub value: String,
-    pub unit: String,
-    pub description: String,
-    pub category: String,
-    pub read_only: bool,
-}
+pub use gcodekit5_app::firmware_settings::{ConfigSettingRow, SETTING_CATEGORIES};
 
-impl ConfigSettingRow {
-    /// Whether the row is shown for the given search text and category filter.
-    ///
-    /// The display list and row activation must use this same test, so that an
-    /// activated row index refers to the setting the user clicked.
-    ///
-    /// # Arguments
-    /// * `search_text` - Lower-cased search text; empty matches everything.
-    /// * `category` - Selected category id; "All" matches every category.
-    pub fn matches_filter(&self, search_text: &str, category: &str) -> bool {
-        if !search_text.is_empty() {
-            // Repetier EEPROM settings are numbered from 1000 and shown as `EPR:<pos>`.
-            let id = if self.number >= 1000 {
-                format!("epr:{}", self.number - 1000)
-            } else {
-                format!("${}", self.number)
-            };
-            let matches = self.name.to_lowercase().contains(search_text)
-                || self.description.to_lowercase().contains(search_text)
-                || id.contains(search_text);
-            if !matches {
-                return false;
-            }
-        }
-        category == "All" || self.category == category
-    }
-}
-
-impl From<&Setting> for ConfigSettingRow {
-    fn from(s: &Setting) -> Self {
-        let category = match s.number {
-            0..=20 => "System",
-            21..=32 => "Homing",
-            33..=39 => "Spindle",
-            40..=65 => "System",
-            70..=75 => "Network",
-            100..=105 => "Steps Per Unit",
-            110..=115 => "Max Rate",
-            120..=125 => "Acceleration",
-            130..=135 => "Max Travel",
-            200..=210 => "Drivers",
-            300..=321 => "Network",
-            340..=344 => "Tool",
-            370..=372 => "I/O",
-            384..=385 => "Motion",
-            395..=397 => "Startup",
-            481 => "System",
-            550..=560 => "Plasma",
-            600..=603 => "Encoder",
-            650..=651 => "Modbus",
-            680 => "RS485",
-            1000..=1999 => "Repetier EEPROM",
-            _ => "Other",
-        };
-
-        Self {
-            number: s.number,
-            name: s.name.clone(),
-            value: s.value.clone(),
-            unit: s.unit.clone().unwrap_or_default(),
-            description: s.description.clone(),
-            category: category.to_string(),
-            read_only: s.read_only,
-        }
-    }
-}
-
+use crate::t;
 use crate::ui::gtk::common::spacing;
 use crate::ui::gtk::device_console::DeviceConsoleView;
 use crate::ui::gtk::device_info::DeviceInfoView;
 use crate::ui::gtk::help_browser;
-use crate::{n_, t};
 use gcodekit5_core::{Shared, SharedOption, ThreadSafe, shared, shared_none};
 
 /// How the controller answered a tracked `$n=v` setting assignment.
@@ -148,34 +72,6 @@ pub(crate) fn await_setting_reply(id: u64, on_outcome: impl FnOnce(SettingOutcom
         gtk4::glib::ControlFlow::Break
     });
 }
-
-/// Setting categories offered by the category filter (also the filter ids).
-///
-/// Each is marked with `n_!` so it is extracted for translation: the labels
-/// are translated through a variable (`t!(*category)`), which `xgettext`
-/// cannot follow.
-pub const SETTING_CATEGORIES: &[&str] = &[
-    n_!("All"),
-    n_!("System"),
-    n_!("Motion"),
-    n_!("Steps Per Unit"),
-    n_!("Max Rate"),
-    n_!("Acceleration"),
-    n_!("Max Travel"),
-    n_!("Homing"),
-    n_!("Spindle"),
-    n_!("Network"),
-    n_!("Drivers"),
-    n_!("Tool"),
-    n_!("I/O"),
-    n_!("Startup"),
-    n_!("Plasma"),
-    n_!("Encoder"),
-    n_!("Modbus"),
-    n_!("RS485"),
-    n_!("Repetier EEPROM"),
-    n_!("Other"),
-];
 
 pub struct ConfigSettingsView {
     pub container: Box,
