@@ -6,10 +6,12 @@
 //! soon as it exists. Ids are `group.action` (`file.open`), the form craft-keymap stores user
 //! overrides under, so they must not change once released.
 //!
-//! Most bindings work anywhere in the window. Jogging and the soft reset on Escape work only
-//! while the Machine Control pane has the keyboard (the GTK accelerators are "when in jog mode",
-//! and an app-wide Escape would no longer close popups); the visualizer's view keys only while
-//! the Visualizer has it.
+//! Most bindings work anywhere in the window; the visualizer's view keys work only while the
+//! Visualizer has the keyboard. For machine safety, the soft reset and the jog commands have no
+//! default keys: GTK never registered Escape or the arrow keys for them (the accelerators.rs
+//! constants were unused), an Escape or arrow key meant for a widget must never move or reset
+//! the machine, and craft-keymap cannot tell GTK's numeric-keypad jog keys from the top-row
+//! digits. They stay reachable from the Machine menu (soft reset) and the Machine Control pane.
 //!
 //! Dependencies: `craft-keymap` (chords, bindings, scopes, the keymap).
 
@@ -215,18 +217,22 @@ impl Command {
             Command::StreamPause => ("stream.pause", n_!("Pause Streaming"), App, &[]),
             Command::StreamStop => ("stream.stop", n_!("Stop Streaming"), App, &[]),
             Command::FeedHold => ("machine.feed_hold", n_!("Feed Hold"), App, &["!"]),
-            // craft-keymap has no `~` key; on the US layout `~` is Shift+`.
+            // craft-keymap has no `~` key. Shift+` types `~` only on US-style layouts; on others
+            // (German, French, ...) this chord is a different key from the one typing `~`.
             Command::CycleStart => ("machine.cycle_start", n_!("Cycle Start"), App, &["Shift+`"]),
-            Command::SoftReset => ("machine.soft_reset", n_!("Reset"), MC, &["Escape"]),
+            // No default key: a bare Escape would reset the controller when closing a dropdown.
+            Command::SoftReset => ("machine.soft_reset", n_!("Reset"), MC, &[]),
             Command::Home => ("machine.home", n_!("Home"), App, &["Cmd+Home"]),
             Command::Unlock => ("machine.unlock", n_!("Unlock"), App, &["Cmd+U"]),
             // Jog labels are not shown in any menu yet, so they are not marked for translation.
-            Command::JogXPos => ("jog.x_pos", "Jog X+", MC, &["Right"]),
-            Command::JogXNeg => ("jog.x_neg", "Jog X-", MC, &["Left"]),
-            Command::JogYPos => ("jog.y_pos", "Jog Y+", MC, &["Up"]),
-            Command::JogYNeg => ("jog.y_neg", "Jog Y-", MC, &["Down"]),
-            Command::JogZPos => ("jog.z_pos", "Jog Z+", MC, &["PageUp"]),
-            Command::JogZNeg => ("jog.z_neg", "Jog Z-", MC, &["PageDown"]),
+            // No default keys: GTK jogs from the numeric keypad (8/2/4/6/9/3), which
+            // craft-keymap folds into the top-row digits, and arrows move between widgets.
+            Command::JogXPos => ("jog.x_pos", "Jog X+", MC, &[]),
+            Command::JogXNeg => ("jog.x_neg", "Jog X-", MC, &[]),
+            Command::JogYPos => ("jog.y_pos", "Jog Y+", MC, &[]),
+            Command::JogYNeg => ("jog.y_neg", "Jog Y-", MC, &[]),
+            Command::JogZPos => ("jog.z_pos", "Jog Z+", MC, &[]),
+            Command::JogZNeg => ("jog.z_neg", "Jog Z-", MC, &[]),
             Command::ZoomFit => ("view.zoom_fit", n_!("Zoom to Fit"), VIS, &["F"]),
             Command::ZoomIn => ("view.zoom_in", n_!("Zoom In"), VIS, &["+"]),
             Command::ZoomOut => ("view.zoom_out", n_!("Zoom Out"), VIS, &["-"]),

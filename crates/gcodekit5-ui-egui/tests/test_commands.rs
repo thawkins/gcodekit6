@@ -58,51 +58,11 @@ const GTK_ACCELERATORS: &[(&str, &str, Command, Where)] = &[
     // Machine
     ("<Ctrl>Home", "Cmd+Home", Command::Home, Where::App),
     ("<Ctrl>U", "Cmd+U", Command::Unlock, Where::App),
-    // MACHINE_RESET ("<Ctrl>x") was never registered in GTK: Ctrl+X is EDIT_CUT there. The
-    // reset keeps ESTOP's Escape, scoped to Machine Control so Escape still closes popups.
-    (
-        "Escape",
-        "Escape",
-        Command::SoftReset,
-        Where::Panel("MachineControl"),
-    ),
     // Real-time commands
     ("!", "!", Command::FeedHold, Where::App),
     // craft_keymap has no `~` key: on the US layout `~` is Shift+`, which is how the chord
-    // is stored and matched.
+    // is stored and matched. On other layouts Shift+` is a different key from `~`.
     ("~", "Shift+`", Command::CycleStart, Where::App),
-    // Jogging, "when in jog mode": only while Machine Control has the keyboard.
-    (
-        "Right",
-        "Right",
-        Command::JogXPos,
-        Where::Panel("MachineControl"),
-    ),
-    (
-        "Left",
-        "Left",
-        Command::JogXNeg,
-        Where::Panel("MachineControl"),
-    ),
-    ("Up", "Up", Command::JogYPos, Where::Panel("MachineControl")),
-    (
-        "Down",
-        "Down",
-        Command::JogYNeg,
-        Where::Panel("MachineControl"),
-    ),
-    (
-        "Page_Up",
-        "PageUp",
-        Command::JogZPos,
-        Where::Panel("MachineControl"),
-    ),
-    (
-        "Page_Down",
-        "PageDown",
-        Command::JogZNeg,
-        Where::Panel("MachineControl"),
-    ),
     // View: the visualizer's keys.
     ("f", "F", Command::ZoomFit, Where::Panel("Visualizer")),
     ("plus", "+", Command::ZoomIn, Where::Panel("Visualizer")),
@@ -117,9 +77,38 @@ const GTK_ACCELERATORS: &[(&str, &str, Command, Where)] = &[
     ("F1", "F1", Command::OpenHelp, Where::App),
 ];
 
+/// Documented safety deviations: GTK chords (or GTK key handling) that get NO default binding
+/// here, with the reason. Each command must have no default chord at all.
+const UNBOUND_FOR_SAFETY: &[(&str, Command)] = &[
+    // ESTOP "Escape" and MACHINE_RESET "<Ctrl>x" are accelerators.rs constants that GTK's
+    // set_keyboard_shortcuts never registers, and its Reset menu item has no accelerator. A
+    // bare Escape would reset the controller when closing a dropdown. Menu: Machine > Reset.
+    ("Escape / <Ctrl>x", Command::SoftReset),
+    // JOG_* "Right"/"Left"/"Up"/"Down"/"Page_Up"/"Page_Down" are unused accelerators.rs
+    // constants; arrows move between widgets. GTK jogs from the numeric keypad in
+    // machine_control/mod.rs (8 Y+, 2 Y-, 4 X-, 6 X+, 9 Z+, 3 Z-), but craft_keymap folds
+    // keypad digits into the top-row digits, which must not jog, so jog has no default keys.
+    ("Right / KP_6", Command::JogXPos),
+    ("Left / KP_4", Command::JogXNeg),
+    ("Up / KP_8", Command::JogYPos),
+    ("Down / KP_2", Command::JogYNeg),
+    ("Page_Up / KP_9", Command::JogZPos),
+    ("Page_Down / KP_3", Command::JogZNeg),
+];
+
 #[test]
 fn test_every_gtk_accelerator_bound() {
+    // "Bound" means `Keymap::lookup` resolves the chord to the command. Panel-scoped keys
+    // also need the pane to report keyboard focus (M2) before they fire from the keyboard,
+    // and Cut/Copy/Paste reach egui as clipboard events rather than through the dispatcher.
     let keymap = commands::keymap();
+    for (gtk, command) in UNBOUND_FOR_SAFETY {
+        assert_eq!(
+            keymap.default_bindings(&command.command_ref()),
+            Vec::new(),
+            "GTK {gtk}: {command:?} must have no default key"
+        );
+    }
     for (gtk, text, command, place) in GTK_ACCELERATORS {
         let chord = Chord::parse(text).expect("canonical chord");
         assert_eq!(chord.to_string(), *text, "{gtk}: {text:?} is not canonical");
