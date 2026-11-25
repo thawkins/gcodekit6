@@ -191,13 +191,28 @@ fn paint_grid(painter: &Painter, view: &CanvasView, spacing: f64, fg: Color32, w
 
 /// Strokes `shape`'s outline (a raster image as its box, text as its glyph outlines).
 fn paint_shape(painter: &Painter, view: &CanvasView, shape: &Shape, stroke: Stroke) {
+    for (outline, closed) in outlines(view, shape) {
+        if closed {
+            painter.add(EguiShape::closed_line(outline, stroke));
+        } else {
+            painter.add(EguiShape::line(outline, stroke));
+        }
+    }
+}
+
+/// `shape`'s outlines in screen points, each with whether it is closed: a raster image is
+/// its box, text its glyph outlines, anything else the model's path flattened.
+fn outlines(view: &CanvasView, shape: &Shape) -> Vec<(Vec<Pos2>, bool)> {
     if let Shape::RasterImage(raster) = shape {
         let (x0, y0, x1, y1) = raster.bounds();
-        let rect = egui::Rect::from_two_pos(view.to_screen(x0, y0), view.to_screen(x1, y1));
-        painter.rect_stroke(rect, 0.0, stroke, StrokeKind::Middle);
-        return;
+        let corners = [(x0, y0), (x1, y0), (x1, y1), (x0, y1)];
+        return vec![(
+            corners.iter().map(|&(x, y)| view.to_screen(x, y)).collect(),
+            true,
+        )];
     }
     let tolerance = FLATTEN_PT / view.zoom().max(1e-6);
+    let mut out = Vec::new();
     let mut points: Vec<Pos2> = Vec::new();
     let to_screen = |p: lyon::math::Point| view.to_screen(f64::from(p.x), f64::from(p.y));
     let path = match shape {
@@ -211,19 +226,33 @@ fn paint_shape(painter: &Painter, view: &CanvasView, shape: &Shape, stroke: Stro
                 points.push(to_screen(at));
             }
             lyon::path::Event::Line { to, .. } => points.push(to_screen(to)),
-            lyon::path::Event::End { close, .. } => {
-                let outline = std::mem::take(&mut points);
-                if close {
-                    painter.add(EguiShape::closed_line(outline, stroke));
-                } else {
-                    painter.add(EguiShape::line(outline, stroke));
-                }
-            }
+            lyon::path::Event::End { close, .. } => out.push((std::mem::take(&mut points), close)),
             // Flattening leaves only lines.
             lyon::path::Event::Quadratic { to, .. } | lyon::path::Event::Cubic { to, .. } => {
                 points.push(to_screen(to));
             }
         }
+    }
+    out
+}
+
+/// The gallery shape waiting to be placed: dashed, in the accent colour at 65%, as GTK.
+///
+/// # Arguments
+/// * `painter` - Painter clipped to the canvas.
+/// * `view` - The view to paint with.
+/// * `ghost` - The shape at the pointer, if the pointer is over the canvas.
+/// * `accent` - The theme's accent colour.
+pub fn paint_ghost(painter: &Painter, view: &CanvasView, ghost: Option<&Shape>, accent: Color32) {
+    let Some(shape) = ghost else {
+        return;
+    };
+    let stroke = Stroke::new(2.0, accent.gamma_multiply(0.65));
+    for (mut outline, closed) in outlines(view, shape) {
+        if closed && let Some(first) = outline.first().copied() {
+            outline.push(first);
+        }
+        painter.extend(EguiShape::dashed_line(&outline, stroke, 4.0, 4.0));
     }
 }
 

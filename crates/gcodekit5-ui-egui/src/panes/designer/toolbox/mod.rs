@@ -6,10 +6,10 @@
 //! the machine mode and settings write straight to the design's `DesignerState`, as in GTK.
 //! The settings follow the display units of the Settings window ([`settings`]).
 //!
-//! Not ported: the icons on the tool buttons (names only), the Text tool (with the
-//! properties pane), the Shape Gallery button, Generate G-Code and Frame (the toolpath
-//! preview and file operations), and the stock dialog's second Step Down field (it is the
-//! tool settings' Step Down). GTK's tooltips named shortcut keys (S, R, C ...) that no GTK
+//! The "Shape Gallery…" button is reported in [`ToolboxOutput`]; the pane acts on it.
+//!
+//! Not ported: the icons on the tool buttons (names only) and the stock dialog's second Step
+//! Down field (it is the tool settings' Step Down). GTK's tooltips named shortcut keys (S, R, C ...) that no GTK
 //! code handled, so none are shown.
 //!
 //! Dependencies: `egui`, `gcodekit5-designer` (design state), `gcodekit5-core` (units),
@@ -48,7 +48,16 @@ pub fn msgids() -> Vec<&'static str> {
     ids
 }
 
-/// The toolbox, top to bottom: tools, switches, machine mode, settings.
+/// What the user asked for in the toolbox this frame.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct ToolboxOutput {
+    /// The tool the user picked, if any.
+    pub tool: Option<DesignerTool>,
+    /// "Shape Gallery…" was clicked.
+    pub gallery: bool,
+}
+
+/// The toolbox, top to bottom: tools, the shape gallery, switches, machine mode, settings.
 ///
 /// # Arguments
 /// * `ui` - The toolbox panel's `Ui`.
@@ -58,19 +67,19 @@ pub fn msgids() -> Vec<&'static str> {
 /// * `tr` - Translator for the current UI language.
 ///
 /// # Returns
-/// The tool the user picked this frame, if any.
+/// What the user asked for this frame.
 pub fn show(
     ui: &mut egui::Ui,
     state: &mut DesignerState,
     tool: DesignerTool,
     units: MeasurementSystem,
     tr: &Translator,
-) -> Option<DesignerTool> {
-    let mut picked = None;
+) -> ToolboxOutput {
+    let mut out = ToolboxOutput::default();
     egui::ScrollArea::vertical()
         .auto_shrink([false, false])
         .show(ui, |ui| {
-            picked = tool_buttons(ui, tool, tr);
+            out.tool = tool_buttons(ui, tool, tr);
             ui.label(format!(
                 "{} {}",
                 tr.tr("Active tool:"),
@@ -79,6 +88,8 @@ pub fn show(
             if tool == DesignerTool::Polyline {
                 ui.add(egui::Label::new(egui::RichText::new(tr.tr(POLYLINE_HINT)).weak()).wrap());
             }
+            ui.label(egui::RichText::new(tr.tr("Fast Shapes")).small());
+            out.gallery = ui.button(tr.tr("Shape Gallery…")).clicked();
             ui.separator();
             ui.checkbox(&mut state.show_grid, tr.tr("Show Grid"));
             ui.checkbox(&mut state.snap_enabled, tr.tr("Snap to grid"));
@@ -86,7 +97,7 @@ pub fn show(
             machine_mode(ui, state, tr);
             settings::show(ui, state, units, tr);
         });
-    picked
+    out
 }
 
 /// One button per tool, in tool order; the current tool is shown selected.

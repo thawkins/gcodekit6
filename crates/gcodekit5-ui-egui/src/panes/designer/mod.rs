@@ -9,9 +9,10 @@
 //!
 //! Ported from the GTK `ui/gtk/designer_canvas/*` and `designer_toolbox.rs` ([`toolbox`]);
 //! [`layers`] is the Layers pane and [`properties`] the Properties pane. The Text tool opens
-//! the Add Text dialog ([`canvas::text_tool`]). Not ported here: shape gallery placement,
-//! the array dialog, the toolpath preview, file operations, scrollbars, the device's work
-//! area (the default 250 x 250 mm is shown), and the context menu's other entries.
+//! the Add Text dialog ([`canvas::text_tool`]). The toolbox's "Shape Gallery…" opens
+//! [`shape_gallery`]; the shape it arms is placed by the next canvas click. Not ported here:
+//! scrollbars, the device's work area (the default 250 x 250 mm is shown), and the context
+//! menu's other entries.
 //!
 //! Dependencies: `egui`, `gcodekit5-designer` (model), `gcodekit5-app` (translations),
 //! `gcodekit5-settings` (grid line widths, display units), `gcodekit5-core` (units).
@@ -19,6 +20,7 @@
 pub mod canvas;
 pub mod layers;
 pub mod properties;
+pub mod shape_gallery;
 pub mod toolbox;
 
 use std::cell::RefCell;
@@ -34,6 +36,7 @@ use gcodekit5_settings::config::Config;
 use canvas::rendering::{self, LineWidths};
 use canvas::text_tool::{self, TextTool};
 use canvas::{CanvasInput, CanvasView, DesignerTool, ShapeFlags, editing};
+use shape_gallery::ShapeGallery;
 
 use crate::commands::Command;
 use crate::workspace::{Pane, PaneContext, PaneId};
@@ -45,6 +48,7 @@ pub fn msgids() -> Vec<&'static str> {
     ids.extend(layers::msgids());
     ids.extend(properties::msgids());
     ids.extend(text_tool::msgids());
+    ids.extend(shape_gallery::msgids());
     ids
 }
 
@@ -66,6 +70,8 @@ pub struct DesignerPane {
     text_tool: TextTool,
     /// The properties panel's live offset or chamfer preview.
     preview: Vec<Shape>,
+    /// The Fast Shape Gallery and the shape it armed.
+    gallery: ShapeGallery,
 }
 
 impl std::fmt::Debug for DesignerPane {
@@ -98,7 +104,18 @@ impl DesignerPane {
             units: MeasurementSystem::default(),
             text_tool: TextTool::default(),
             preview: Vec::new(),
+            gallery: ShapeGallery::default(),
         }
+    }
+
+    /// Whether the Fast Shape Gallery is open.
+    pub fn gallery_open(&self) -> bool {
+        self.gallery.is_open()
+    }
+
+    /// The gallery shape waiting for a canvas click, if any.
+    pub fn pending_shape(&self) -> Option<&Shape> {
+        self.gallery.pending()
     }
 
     /// The display units (the Settings window's measurement system).
@@ -294,23 +311,28 @@ impl DesignerPane {
             self.fitted = true;
         }
         let view = CanvasView::new(rect, self.state.canvas.viewport());
-        self.input.handle(
-            ui,
-            &response,
-            &view,
-            &mut self.state,
-            &self.flags,
-            self.tool,
-            tr,
-        );
+        if self.gallery.pending().is_some() {
+            self.place_gallery_shape(ui, &response, &view);
+        } else {
+            self.input.handle(
+                ui,
+                &response,
+                &view,
+                &mut self.state,
+                &self.flags,
+                self.tool,
+                tr,
+            );
+        }
         if let Some(at) = self.input.take_text_click() {
             self.text_tool.open(at);
         }
         self.text_tool.show(ui.ctx(), &mut self.state, tr);
         self.view = CanvasView::new(rect, self.state.canvas.viewport());
         let palette = crate::theme::palette(ui.ctx().theme());
+        let painter = ui.painter_at(rect);
         rendering::paint(
-            &ui.painter_at(rect),
+            &painter,
             &self.view,
             &self.state,
             &self.flags,
@@ -319,7 +341,60 @@ impl DesignerPane {
             self.widths,
             &self.preview,
         );
+        if self.gallery.pending().is_some() {
+            let ghost = self.input.hover.and_then(|at| self.gallery.ghost(at));
+            rendering::paint_ghost(&painter, &self.view, ghost.as_ref(), palette.accent);
+            hint(ui, rect, &tr.tr("Click to position shape"));
+        }
+        self.gallery.show(ui.ctx(), tr);
     }
+
+    /// The canvas while a gallery shape is armed: the pointer moves its ghost, a primary
+    /// click places it (snapped unless the Select tool is active, as GTK), Escape drops it.
+    /// Other input waits, so the click selects nothing.
+    fn place_gallery_shape(&mut self, ui: &egui::Ui, response: &egui::Response, view: &CanvasView) {
+        let world = |p: egui::Pos2| {
+            let w = view.screen_to_world(p);
+            (f64::from(w.x), f64::from(w.y))
+        };
+        self.input.hover = response.hover_pos().map(world);
+        if response.clicked()
+            && let Some(p) = response.interact_pointer_pos()
+        {
+            let (x, y) = world(p);
+            let at = if self.tool == DesignerTool::Select {
+                (x, y)
+            } else {
+                editing::snap(&self.state, x, y)
+            };
+            self.gallery.place(&mut self.state, at);
+            response.request_focus();
+        }
+        let escape =
+            !ui.ctx().egui_wants_keyboard_input() && ui.input(|i| i.key_pressed(egui::Key::Escape));
+        if escape {
+            self.gallery.cancel();
+        }
+    }
+}
+
+/// A hint at the top centre of the canvas `rect` (GTK's "Click to position shape"); it does
+/// not take the pointer.
+fn hint(ui: &mut egui::Ui, rect: egui::Rect, text: &str) {
+    let strip = egui::Rect::from_min_size(
+        rect.min + egui::vec2(0.0, 12.0),
+        egui::vec2(rect.width(), 40.0),
+    );
+    ui.scope_builder(
+        egui::UiBuilder::new()
+            .max_rect(strip)
+            .layout(egui::Layout::top_down(egui::Align::Center)),
+        |ui| {
+            egui::Frame::popup(ui.style()).show(ui, |ui| {
+                ui.add(egui::Label::new(text).selectable(false));
+            });
+        },
+    );
 }
 
 impl Pane for DesignerPane {
@@ -333,14 +408,17 @@ impl Pane for DesignerPane {
 
     fn ui(&mut self, ui: &mut egui::Ui, ctx: &mut PaneContext) {
         let tr = ctx.tr;
-        let picked = egui::Panel::left("gcodekit5-designer-toolbox")
+        let out = egui::Panel::left("gcodekit5-designer-toolbox")
             .default_size(190.0)
             .show(ui, |ui| {
                 toolbox::show(ui, &mut self.state, self.tool, self.units, tr)
             })
             .inner;
-        if let Some(tool) = picked {
+        if let Some(tool) = out.tool {
             self.set_tool(tool);
+        }
+        if out.gallery {
+            self.gallery.open();
         }
         self.show_canvas(ui, tr);
     }

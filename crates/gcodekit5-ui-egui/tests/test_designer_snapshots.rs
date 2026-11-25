@@ -1,5 +1,5 @@
 //! Designer canvas snapshots through wgpu: one per drawing tool, and a selection with its
-//! handles.
+//! handles, the toolbox, the Text tool and the shape gallery.
 
 use egui_kittest::{Harness, SnapshotOptions};
 use gcodekit5_app::i18n::Translator;
@@ -152,4 +152,29 @@ fn test_snapshot_text_tool() {
     if let Err(error) = h.try_snapshot_options("designer_text", &snapshot_options()) {
         panic!("designer_text: {error}");
     }
+}
+
+/// The Fast Shape Gallery, and a gallery gear armed: its dashed ghost under the pointer and
+/// the placing hint.
+#[test]
+fn test_snapshot_shape_gallery() {
+    use egui_kittest::kittest::Queryable;
+    let mut h = gpu_harness();
+    h.get_by_label("Shape Gallery…").click();
+    h.run();
+    h.event(egui::Event::PointerGone);
+    h.run();
+    let mut failures = Vec::new();
+    if let Err(error) = h.try_snapshot_options("designer_gallery", &snapshot_options()) {
+        failures.push(format!("designer_gallery: {error}"));
+    }
+    h.get_by_label("Spur Gear").click();
+    h.run();
+    let p = screen(&h, 120.0, 100.0);
+    h.event(egui::Event::PointerMoved(p));
+    h.run();
+    if let Err(error) = h.try_snapshot_options("designer_gallery_ghost", &snapshot_options()) {
+        failures.push(format!("designer_gallery_ghost: {error}"));
+    }
+    assert!(failures.is_empty(), "{failures:#?}");
 }
