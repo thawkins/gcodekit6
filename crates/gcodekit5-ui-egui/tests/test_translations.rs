@@ -8,7 +8,7 @@ use gcodekit5_ui_egui::menu;
 use gcodekit5_ui_egui::panes::{cam_tools, console, designer, editor, machine_control, visualizer};
 use gcodekit5_ui_egui::status_bar;
 use gcodekit5_ui_egui::windows::{
-    about, device_info, device_manager, firmware_settings, materials_manager, settings,
+    about, device_info, device_manager, firmware_settings, help, materials_manager, settings,
     tools_manager,
 };
 use gcodekit5_ui_egui::workspace::PaneId;
@@ -17,7 +17,7 @@ const LANGUAGES: [&str; 5] = ["de", "es", "fr", "it", "pt"];
 
 /// Translations that are spelled like the English msgid; the Translator cannot tell them
 /// from a missing entry, so the po file is checked for them instead.
-const IDENTICAL: [(&str, &str); 229] = [
+const IDENTICAL: [(&str, &str); 231] = [
     ("de", "G-Code Editor"),
     ("de", "Designer"),
     ("it", "Designer"),
@@ -258,6 +258,9 @@ const IDENTICAL: [(&str, &str); 229] = [
     ("pt", "Plasma"),
     ("pt", "Modbus"),
     ("pt", "RS485"),
+    // Help: the index page's title.
+    ("de", "Index"),
+    ("fr", "Index"),
 ];
 
 fn msgids() -> Vec<&'static str> {
@@ -273,6 +276,7 @@ fn msgids() -> Vec<&'static str> {
         .chain(device_manager::msgids())
         .chain(tools_manager::msgids())
         .chain(materials_manager::msgids())
+        .chain(help::msgids())
         .chain(dialogs::msgids())
         .chain(machine_control::msgids())
         .chain(console::msgids())
