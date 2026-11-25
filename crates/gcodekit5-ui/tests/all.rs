@@ -52,6 +52,8 @@ pub fn gtk_available(test: &str) -> bool {
 mod machine_control_streaming;
 #[path = "test_array_dialog.rs"]
 mod test_array_dialog;
+#[path = "test_cam_fixture_capture.rs"]
+mod test_cam_fixture_capture;
 #[path = "test_config_setting_filter.rs"]
 mod test_config_setting_filter;
 #[path = "test_dialog_window.rs"]

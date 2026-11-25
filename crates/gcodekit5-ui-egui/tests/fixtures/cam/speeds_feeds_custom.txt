@@ -1,0 +1,7 @@
+spindle_speed=6000
+feed_rate=272.3
+surface_speed=179.5
+chip_load=0.0151
+mrr=1037.4
+power=1
+deflection=0.0018

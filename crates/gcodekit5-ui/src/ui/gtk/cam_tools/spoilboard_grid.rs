@@ -24,6 +24,78 @@ use gcodekit5_camtools::spoilboard_grid::{SpoilboardGridGenerator, SpoilboardGri
 use gcodekit5_core::units;
 use gcodekit5_settings::SettingsController;
 
+/// Initial spoilboard width (mm).
+pub const WIDTH_MM: f64 = 400.0;
+/// Initial spoilboard height (mm).
+pub const HEIGHT_MM: f64 = 300.0;
+/// Initial grid spacing (mm).
+pub const GRID_SPACING_MM: f64 = 10.0;
+/// Initial feed rate entry text (mm/min).
+pub const FEED_RATE: &str = "1000";
+/// Initial laser power entry text (S value).
+pub const LASER_POWER: &str = "1000";
+/// Initial laser mode (`M3` constant or `M4` dynamic power).
+pub const LASER_MODE: &str = "M4";
+
+/// The text of the grid page's fields, as the page reads them on Generate.
+#[derive(Debug, Clone, PartialEq)]
+pub struct SpoilboardGridEntries {
+    /// Width, a length in the measurement system.
+    pub width: String,
+    /// Height, a length.
+    pub height: String,
+    /// Grid spacing, a length.
+    pub grid_spacing: String,
+    /// Feed rate (mm/min).
+    pub feed_rate: String,
+    /// Laser power (S value).
+    pub laser_power: String,
+    /// Laser mode, `M3` or `M4`.
+    pub laser_mode: String,
+    /// Home Device Before Start.
+    pub home_before: bool,
+}
+
+impl SpoilboardGridEntries {
+    /// The page's initial entries in `system`.
+    ///
+    /// # Arguments
+    /// * `system` - The measurement system the lengths are shown in.
+    pub fn defaults(system: units::MeasurementSystem) -> Self {
+        let len = |mm: f64| units::format_length(mm as f32, system);
+        Self {
+            width: len(WIDTH_MM),
+            height: len(HEIGHT_MM),
+            grid_spacing: len(GRID_SPACING_MM),
+            feed_rate: FEED_RATE.to_string(),
+            laser_power: LASER_POWER.to_string(),
+            laser_mode: LASER_MODE.to_string(),
+            home_before: false,
+        }
+    }
+}
+
+/// Reads the page's entries into generator parameters; a field that does not
+/// parse takes its default value (the page's behaviour).
+///
+/// # Arguments
+/// * `e` - The entries' text.
+/// * `system` - The measurement system the lengths are written in.
+pub fn spoilboard_grid_parameters(
+    e: &SpoilboardGridEntries,
+    system: units::MeasurementSystem,
+) -> SpoilboardGridParameters {
+    SpoilboardGridParameters {
+        width: units::parse_length(&e.width, system).unwrap_or(400.0) as f64,
+        height: units::parse_length(&e.height, system).unwrap_or(300.0) as f64,
+        grid_spacing: units::parse_length(&e.grid_spacing, system).unwrap_or(10.0) as f64,
+        feed_rate: e.feed_rate.parse().unwrap_or(1000.0),
+        laser_power: e.laser_power.parse().unwrap_or(1000.0),
+        laser_mode: e.laser_mode.clone(),
+        home_before_job: e.home_before,
+    }
+}
+
 struct SpoilboardGridWidgets {
     width: Entry,
     height: Entry,
@@ -108,17 +180,24 @@ impl SpoilboardGridTool {
             .build();
 
         // Create widgets
-        let (width_row, width, width_unit) = create_dimension_row("Width:", 400.0, &settings);
-        let (height_row, height, height_unit) = create_dimension_row("Height:", 300.0, &settings);
+        let (width_row, width, width_unit) = create_dimension_row("Width:", WIDTH_MM, &settings);
+        let (height_row, height, height_unit) =
+            create_dimension_row("Height:", HEIGHT_MM, &settings);
         let (grid_spacing_row, grid_spacing, grid_spacing_unit) =
-            create_dimension_row("Grid Spacing:", 10.0, &settings);
-        let feed_rate = Entry::builder().text("1000").valign(Align::Center).build();
-        let laser_power = Entry::builder().text("1000").valign(Align::Center).build();
+            create_dimension_row("Grid Spacing:", GRID_SPACING_MM, &settings);
+        let feed_rate = Entry::builder()
+            .text(FEED_RATE)
+            .valign(Align::Center)
+            .build();
+        let laser_power = Entry::builder()
+            .text(LASER_POWER)
+            .valign(Align::Center)
+            .build();
 
         let laser_mode = new_text_dropdown();
         laser_mode.append(Some("M3"), "M3 (Constant Power)");
         laser_mode.append(Some("M4"), "M4 (Dynamic Power)");
-        laser_mode.set_active_id(Some("M4"));
+        laser_mode.set_active_id(Some(LASER_MODE));
         laser_mode.set_valign(Align::Center);
 
         let home_before = CheckButton::builder()
@@ -243,16 +322,16 @@ impl SpoilboardGridTool {
                 .ui
                 .measurement_system;
 
-            let params = SpoilboardGridParameters {
-                width: units::parse_length(&w_gen.width.text(), system).unwrap_or(400.0) as f64,
-                height: units::parse_length(&w_gen.height.text(), system).unwrap_or(300.0) as f64,
-                grid_spacing: units::parse_length(&w_gen.grid_spacing.text(), system)
-                    .unwrap_or(10.0) as f64,
-                feed_rate: w_gen.feed_rate.text().parse().unwrap_or(1000.0),
-                laser_power: w_gen.laser_power.text().parse().unwrap_or(1000.0),
+            let entries = SpoilboardGridEntries {
+                width: w_gen.width.text().to_string(),
+                height: w_gen.height.text().to_string(),
+                grid_spacing: w_gen.grid_spacing.text().to_string(),
+                feed_rate: w_gen.feed_rate.text().to_string(),
+                laser_power: w_gen.laser_power.text().to_string(),
                 laser_mode: laser_mode_str,
-                home_before_job: home_before,
+                home_before,
             };
+            let params = spoilboard_grid_parameters(&entries, system);
 
             let generator = SpoilboardGridGenerator::new(params);
             match generator.generate() {

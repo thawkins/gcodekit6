@@ -25,6 +25,90 @@ use gcodekit5_camtools::spoilboard_surfacing::{
 use gcodekit5_core::units;
 use gcodekit5_settings::SettingsController;
 
+/// Initial spoilboard width (mm).
+pub const WIDTH_MM: f64 = 400.0;
+/// Initial spoilboard height (mm).
+pub const HEIGHT_MM: f64 = 300.0;
+/// Initial tool diameter (mm).
+pub const TOOL_DIAMETER_MM: f64 = 25.0;
+/// Initial cut depth (mm).
+pub const CUT_DEPTH_MM: f64 = 0.5;
+/// Initial safe Z height (mm).
+pub const SAFE_Z_MM: f64 = 5.0;
+/// Initial feed rate entry text (mm/min).
+pub const FEED_RATE: &str = "1000";
+/// Initial spindle speed entry text (RPM).
+pub const SPINDLE_SPEED: &str = "18000";
+/// Initial stepover entry text (percent of the tool diameter).
+pub const STEPOVER_PERCENT: &str = "40";
+
+/// The text of the surfacing page's fields, as the page reads them on Generate.
+#[derive(Debug, Clone, PartialEq)]
+pub struct SpoilboardSurfacingEntries {
+    /// Width, a length in the measurement system.
+    pub width: String,
+    /// Height, a length.
+    pub height: String,
+    /// Tool diameter, a length.
+    pub tool_diameter: String,
+    /// Feed rate (mm/min).
+    pub feed_rate: String,
+    /// Spindle speed (RPM).
+    pub spindle_speed: String,
+    /// Cut depth, a length.
+    pub cut_depth: String,
+    /// Stepover (percent).
+    pub stepover_percent: String,
+    /// Safe Z height, a length.
+    pub safe_z: String,
+    /// Home Device Before Start.
+    pub home_before: bool,
+}
+
+impl SpoilboardSurfacingEntries {
+    /// The page's initial entries in `system`.
+    ///
+    /// # Arguments
+    /// * `system` - The measurement system the lengths are shown in.
+    pub fn defaults(system: units::MeasurementSystem) -> Self {
+        let len = |mm: f64| units::format_length(mm as f32, system);
+        Self {
+            width: len(WIDTH_MM),
+            height: len(HEIGHT_MM),
+            tool_diameter: len(TOOL_DIAMETER_MM),
+            feed_rate: FEED_RATE.to_string(),
+            spindle_speed: SPINDLE_SPEED.to_string(),
+            cut_depth: len(CUT_DEPTH_MM),
+            stepover_percent: STEPOVER_PERCENT.to_string(),
+            safe_z: len(SAFE_Z_MM),
+            home_before: false,
+        }
+    }
+}
+
+/// Reads the page's entries into generator parameters; a field that does not
+/// parse takes its default value (the page's behaviour).
+///
+/// # Arguments
+/// * `e` - The entries' text.
+/// * `system` - The measurement system the lengths are written in.
+pub fn spoilboard_surfacing_parameters(
+    e: &SpoilboardSurfacingEntries,
+    system: units::MeasurementSystem,
+) -> SpoilboardSurfacingParameters {
+    SpoilboardSurfacingParameters {
+        width: units::parse_length(&e.width, system).unwrap_or(400.0) as f64,
+        height: units::parse_length(&e.height, system).unwrap_or(300.0) as f64,
+        tool_diameter: units::parse_length(&e.tool_diameter, system).unwrap_or(25.0) as f64,
+        feed_rate: e.feed_rate.parse().unwrap_or(1000.0),
+        spindle_speed: e.spindle_speed.parse().unwrap_or(18000.0),
+        cut_depth: units::parse_length(&e.cut_depth, system).unwrap_or(0.5) as f64,
+        stepover_percent: e.stepover_percent.parse().unwrap_or(40.0),
+        safe_z: units::parse_length(&e.safe_z, system).unwrap_or(5.0) as f64,
+        home_before_job: e.home_before,
+    }
+}
+
 struct SpoilboardSurfacingWidgets {
     width: Entry,
     height: Entry,
@@ -111,17 +195,27 @@ impl SpoilboardSurfacingTool {
             .build();
 
         // Create widgets
-        let (width_row, width, width_unit) = create_dimension_row("Width:", 400.0, &settings);
-        let (height_row, height, height_unit) = create_dimension_row("Height:", 300.0, &settings);
+        let (width_row, width, width_unit) = create_dimension_row("Width:", WIDTH_MM, &settings);
+        let (height_row, height, height_unit) =
+            create_dimension_row("Height:", HEIGHT_MM, &settings);
         let (tool_diameter_row, tool_diameter, tool_diameter_unit) =
-            create_dimension_row("Tool Diameter:", 25.0, &settings);
-        let feed_rate = Entry::builder().text("1000").valign(Align::Center).build();
-        let spindle_speed = Entry::builder().text("18000").valign(Align::Center).build();
+            create_dimension_row("Tool Diameter:", TOOL_DIAMETER_MM, &settings);
+        let feed_rate = Entry::builder()
+            .text(FEED_RATE)
+            .valign(Align::Center)
+            .build();
+        let spindle_speed = Entry::builder()
+            .text(SPINDLE_SPEED)
+            .valign(Align::Center)
+            .build();
         let (cut_depth_row, cut_depth, cut_depth_unit) =
-            create_dimension_row("Cut Depth:", 0.5, &settings);
-        let stepover_percent = Entry::builder().text("40").valign(Align::Center).build();
+            create_dimension_row("Cut Depth:", CUT_DEPTH_MM, &settings);
+        let stepover_percent = Entry::builder()
+            .text(STEPOVER_PERCENT)
+            .valign(Align::Center)
+            .build();
         let (safe_z_row, safe_z, safe_z_unit) =
-            create_dimension_row("Safe Z Height:", 5.0, &settings);
+            create_dimension_row("Safe Z Height:", SAFE_Z_MM, &settings);
         let home_before = CheckButton::builder()
             .active(false)
             .valign(Align::Center)
@@ -260,19 +354,18 @@ impl SpoilboardSurfacingTool {
                 return;
             }
 
-            let params = SpoilboardSurfacingParameters {
-                width: units::parse_length(&w_gen.width.text(), system).unwrap_or(400.0) as f64,
-                height: units::parse_length(&w_gen.height.text(), system).unwrap_or(300.0) as f64,
-                tool_diameter: units::parse_length(&w_gen.tool_diameter.text(), system)
-                    .unwrap_or(25.0) as f64,
-                feed_rate: w_gen.feed_rate.text().parse().unwrap_or(1000.0),
-                spindle_speed: w_gen.spindle_speed.text().parse().unwrap_or(18000.0),
-                cut_depth: units::parse_length(&w_gen.cut_depth.text(), system).unwrap_or(0.5)
-                    as f64,
-                stepover_percent: w_gen.stepover_percent.text().parse().unwrap_or(40.0),
-                safe_z: units::parse_length(&w_gen.safe_z.text(), system).unwrap_or(5.0) as f64,
-                home_before_job: home_before,
+            let entries = SpoilboardSurfacingEntries {
+                width: w_gen.width.text().to_string(),
+                height: w_gen.height.text().to_string(),
+                tool_diameter: w_gen.tool_diameter.text().to_string(),
+                feed_rate: w_gen.feed_rate.text().to_string(),
+                spindle_speed: w_gen.spindle_speed.text().to_string(),
+                cut_depth: w_gen.cut_depth.text().to_string(),
+                stepover_percent: w_gen.stepover_percent.text().to_string(),
+                safe_z: w_gen.safe_z.text().to_string(),
+                home_before,
             };
+            let params = spoilboard_surfacing_parameters(&entries, system);
 
             let generator = SpoilboardSurfacingGenerator::new(params);
             match generator.generate() {

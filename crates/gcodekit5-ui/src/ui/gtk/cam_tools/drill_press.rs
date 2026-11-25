@@ -24,6 +24,148 @@ use gcodekit5_camtools::drill_press::{DrillPressGenerator, DrillPressParameters}
 use gcodekit5_core::units;
 use gcodekit5_settings::SettingsController;
 
+/// Initial hole diameter (mm).
+pub const HOLE_DIAMETER_MM: f64 = 10.0;
+/// Initial tool diameter (mm).
+pub const TOOL_DIAMETER_MM: f64 = 6.0;
+/// Initial top Z, the material surface (mm).
+pub const TOP_Z_MM: f64 = 0.0;
+/// Initial bottom Z, the hole's depth (mm).
+pub const BOTTOM_Z_MM: f64 = -10.0;
+/// Initial peck depth (mm).
+pub const PECK_DEPTH_MM: f64 = 2.0;
+/// Initial safe Z (mm).
+pub const SAFE_Z_MM: f64 = 5.0;
+/// Initial plunge rate entry text (mm/min).
+pub const PLUNGE_RATE: &str = "100";
+/// Initial feed rate entry text (mm/min).
+pub const FEED_RATE: &str = "500";
+/// Initial spindle speed entry text (RPM).
+pub const SPINDLE_SPEED: &str = "10000";
+
+/// The page's initial hole centre (mm): the middle of the machine's travel
+/// (GRBL `$130` / `$131`), taking 200 mm for an axis whose travel is unknown.
+pub fn default_center() -> (f64, f64) {
+    let x_max = device_status::get_grbl_setting_numeric(130).unwrap_or(200.0);
+    let y_max = device_status::get_grbl_setting_numeric(131).unwrap_or(200.0);
+    (x_max / 2.0, y_max / 2.0)
+}
+
+/// The text of the drill press page's fields, as the page reads them on Drill.
+#[derive(Debug, Clone, PartialEq)]
+pub struct DrillPressEntries {
+    /// Hole diameter, a length in the measurement system.
+    pub hole_diameter: String,
+    /// Tool diameter, a length.
+    pub tool_diameter: String,
+    /// Top Z, a length.
+    pub top_z: String,
+    /// Bottom Z, a length.
+    pub bottom_z: String,
+    /// Peck depth, a length.
+    pub peck_depth: String,
+    /// Safe Z, a length.
+    pub safe_z: String,
+    /// Centre X, a length.
+    pub x: String,
+    /// Centre Y, a length.
+    pub y: String,
+    /// Plunge rate (mm/min).
+    pub plunge_rate: String,
+    /// Feed rate (mm/min).
+    pub feed_rate: String,
+    /// Spindle speed (RPM).
+    pub spindle_speed: String,
+    /// Home Device Before Start.
+    pub home_before: bool,
+}
+
+impl DrillPressEntries {
+    /// The page's initial entries in `system`, with the hole centred at `center` (mm).
+    ///
+    /// # Arguments
+    /// * `system` - The measurement system the lengths are shown in.
+    /// * `center` - The hole centre (mm), see [`default_center`].
+    pub fn defaults(system: units::MeasurementSystem, center: (f64, f64)) -> Self {
+        let len = |mm: f64| units::format_length(mm as f32, system);
+        Self {
+            hole_diameter: len(HOLE_DIAMETER_MM),
+            tool_diameter: len(TOOL_DIAMETER_MM),
+            top_z: len(TOP_Z_MM),
+            bottom_z: len(BOTTOM_Z_MM),
+            peck_depth: len(PECK_DEPTH_MM),
+            safe_z: len(SAFE_Z_MM),
+            x: len(center.0),
+            y: len(center.1),
+            plunge_rate: PLUNGE_RATE.to_string(),
+            feed_rate: FEED_RATE.to_string(),
+            spindle_speed: SPINDLE_SPEED.to_string(),
+            home_before: false,
+        }
+    }
+}
+
+/// Reads the page's entries into generator parameters.
+///
+/// # Arguments
+/// * `e` - The entries' text.
+/// * `system` - The measurement system the lengths are written in.
+///
+/// # Errors
+/// The names of the fields whose text is not a length or a number.
+pub fn drill_press_parameters(
+    e: &DrillPressEntries,
+    system: units::MeasurementSystem,
+) -> Result<DrillPressParameters, Vec<&'static str>> {
+    let mut invalid: Vec<&'static str> = Vec::new();
+    let mut len = |text: &str, name: &'static str| -> f64 {
+        match units::parse_length(text, system) {
+            Ok(v) => v as f64,
+            Err(_) => {
+                invalid.push(name);
+                0.0
+            }
+        }
+    };
+    let hole_diameter = len(&e.hole_diameter, "Hole Diameter");
+    let tool_diameter = len(&e.tool_diameter, "Tool Diameter");
+    let top_z = len(&e.top_z, "Top Z");
+    let bottom_z = len(&e.bottom_z, "Bottom Z");
+    let peck_depth = len(&e.peck_depth, "Peck Depth");
+    let safe_z = len(&e.safe_z, "Safe Z");
+    let x = len(&e.x, "Center X");
+    let y = len(&e.y, "Center Y");
+    let mut num = |text: &str, name: &'static str| -> f64 {
+        match text.trim().parse::<f64>() {
+            Ok(v) => v,
+            Err(_) => {
+                invalid.push(name);
+                0.0
+            }
+        }
+    };
+    let plunge_rate = num(&e.plunge_rate, "Plunge Rate");
+    let feed_rate = num(&e.feed_rate, "Feed Rate");
+    let spindle_speed = num(&e.spindle_speed, "Spindle Speed");
+    if !invalid.is_empty() {
+        return Err(invalid);
+    }
+    Ok(DrillPressParameters {
+        hole_diameter,
+        tool_diameter,
+        top_z,
+        bottom_z,
+        peck_depth,
+        plunge_rate,
+        feed_rate,
+        spindle_speed,
+        safe_z,
+        x,
+        y,
+        home_before_job: e.home_before,
+    })
+}
+
 struct DrillPressWidgets {
     hole_diameter: Entry,
     tool_diameter: Entry,
@@ -174,30 +316,36 @@ impl DrillPressTool {
 
         // Create widgets
         let (hole_dia_row, hole_diameter, hole_dia_unit) =
-            create_dimension_row("Hole Diameter:", 10.0, &settings);
+            create_dimension_row("Hole Diameter:", HOLE_DIAMETER_MM, &settings);
         let (tool_dia_row, tool_diameter, tool_dia_unit) =
-            create_dimension_row("Tool Diameter:", 6.0, &settings);
+            create_dimension_row("Tool Diameter:", TOOL_DIAMETER_MM, &settings);
         let (top_z_row, top_z, top_z_unit) =
-            create_dimension_row("Top Z (Surface):", 0.0, &settings);
+            create_dimension_row("Top Z (Surface):", TOP_Z_MM, &settings);
         let (bottom_z_row, bottom_z, bottom_z_unit) =
-            create_dimension_row("Bottom Z (Depth):", -10.0, &settings);
+            create_dimension_row("Bottom Z (Depth):", BOTTOM_Z_MM, &settings);
         let (peck_row, peck_depth, peck_unit) =
-            create_dimension_row("Peck Depth (0 for none):", 2.0, &settings);
-        let (safe_z_row, safe_z, safe_z_unit) = create_dimension_row("Safe Z:", 5.0, &settings);
+            create_dimension_row("Peck Depth (0 for none):", PECK_DEPTH_MM, &settings);
+        let (safe_z_row, safe_z, safe_z_unit) =
+            create_dimension_row("Safe Z:", SAFE_Z_MM, &settings);
 
         // Default X/Y to device center if available
-        let (center_x, center_y) = {
-            let x_max = device_status::get_grbl_setting_numeric(130).unwrap_or(200.0);
-            let y_max = device_status::get_grbl_setting_numeric(131).unwrap_or(200.0);
-            (x_max / 2.0, y_max / 2.0)
-        };
+        let (center_x, center_y) = default_center();
 
         let (x_row, x, x_unit) = create_dimension_row("Center X:", center_x, &settings);
         let (y_row, y, y_unit) = create_dimension_row("Center Y:", center_y, &settings);
 
-        let plunge_rate = Entry::builder().text("100").valign(Align::Center).build();
-        let feed_rate = Entry::builder().text("500").valign(Align::Center).build();
-        let spindle_speed = Entry::builder().text("10000").valign(Align::Center).build();
+        let plunge_rate = Entry::builder()
+            .text(PLUNGE_RATE)
+            .valign(Align::Center)
+            .build();
+        let feed_rate = Entry::builder()
+            .text(FEED_RATE)
+            .valign(Align::Center)
+            .build();
+        let spindle_speed = Entry::builder()
+            .text(SPINDLE_SPEED)
+            .valign(Align::Center)
+            .build();
 
         let home_before = CheckButton::builder()
             .active(false)
@@ -366,57 +514,29 @@ impl DrillPressTool {
 
             // This tool sends G-code straight to the machine, so invalid input must
             // abort instead of silently falling back to a default value.
-            let mut invalid: Vec<&str> = Vec::new();
-            let mut len = |entry: &Entry, name: &'static str| -> f64 {
-                match units::parse_length(&entry.text(), system) {
-                    Ok(v) => v as f64,
-                    Err(_) => {
-                        invalid.push(name);
-                        0.0
-                    }
-                }
+            let entries = DrillPressEntries {
+                hole_diameter: w_run.hole_diameter.text().to_string(),
+                tool_diameter: w_run.tool_diameter.text().to_string(),
+                top_z: w_run.top_z.text().to_string(),
+                bottom_z: w_run.bottom_z.text().to_string(),
+                peck_depth: w_run.peck_depth.text().to_string(),
+                safe_z: w_run.safe_z.text().to_string(),
+                x: w_run.x.text().to_string(),
+                y: w_run.y.text().to_string(),
+                plunge_rate: w_run.plunge_rate.text().to_string(),
+                feed_rate: w_run.feed_rate.text().to_string(),
+                spindle_speed: w_run.spindle_speed.text().to_string(),
+                home_before,
             };
-            let hole_diameter = len(&w_run.hole_diameter, "Hole Diameter");
-            let tool_diameter = len(&w_run.tool_diameter, "Tool Diameter");
-            let top_z = len(&w_run.top_z, "Top Z");
-            let bottom_z = len(&w_run.bottom_z, "Bottom Z");
-            let peck_depth = len(&w_run.peck_depth, "Peck Depth");
-            let safe_z = len(&w_run.safe_z, "Safe Z");
-            let x = len(&w_run.x, "Center X");
-            let y = len(&w_run.y, "Center Y");
-            let mut num = |entry: &Entry, name: &'static str| -> f64 {
-                match entry.text().trim().parse::<f64>() {
-                    Ok(v) => v,
-                    Err(_) => {
-                        invalid.push(name);
-                        0.0
-                    }
+            let params = match drill_press_parameters(&entries, system) {
+                Ok(params) => params,
+                Err(invalid) => {
+                    CamToolsView::show_error_dialog(
+                        "Invalid Parameters",
+                        &format!("Please correct: {}", invalid.join(", ")),
+                    );
+                    return;
                 }
-            };
-            let plunge_rate = num(&w_run.plunge_rate, "Plunge Rate");
-            let feed_rate = num(&w_run.feed_rate, "Feed Rate");
-            let spindle_speed = num(&w_run.spindle_speed, "Spindle Speed");
-            if !invalid.is_empty() {
-                CamToolsView::show_error_dialog(
-                    "Invalid Parameters",
-                    &format!("Please correct: {}", invalid.join(", ")),
-                );
-                return;
-            }
-
-            let params = DrillPressParameters {
-                hole_diameter,
-                tool_diameter,
-                top_z,
-                bottom_z,
-                peck_depth,
-                plunge_rate,
-                feed_rate,
-                spindle_speed,
-                safe_z,
-                x,
-                y,
-                home_before_job: home_before,
             };
 
             let generator = DrillPressGenerator::new(params);

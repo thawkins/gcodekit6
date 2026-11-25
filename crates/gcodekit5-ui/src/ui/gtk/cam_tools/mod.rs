@@ -5,13 +5,13 @@
 
 mod bitmap_engraving;
 pub mod common;
-mod drill_press;
+pub mod drill_press;
 mod gerber;
 mod jigsaw;
 mod probe_routines;
-mod speeds_feeds_page;
-mod spoilboard_grid;
-mod spoilboard_surfacing;
+pub mod speeds_feeds_page;
+pub mod spoilboard_grid;
+pub mod spoilboard_surfacing;
 mod tabbed_box;
 // mod vector_engraving;
 
