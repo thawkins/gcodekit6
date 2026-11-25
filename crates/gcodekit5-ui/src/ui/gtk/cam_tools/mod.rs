@@ -3,12 +3,12 @@
 //! This module contains UI components for various Computer-Aided Manufacturing tools
 //! including box makers, engravers, spoilboard tools, and more.
 
-mod bitmap_engraving;
+pub mod bitmap_engraving;
 pub mod common;
 pub mod drill_press;
 pub mod gerber;
 pub mod jigsaw;
-mod probe_routines;
+pub mod probe_routines;
 pub mod speeds_feeds_page;
 pub mod spoilboard_grid;
 pub mod spoilboard_surfacing;

@@ -10,6 +10,12 @@
 //! Shapes": its fixture lists the panel outlines. The Gerber pages read the files under
 //! `fixtures/cam/gerber/` (a small top copper layer and a board outline).
 //!
+//! The bitmap engraving cases engrave `fixtures/cam/bitmap/gradient.png` (24 x 16 pixels).
+//! The engraver writes the time of generation into its header; that line is replaced by
+//! [`GENERATED_MASK`] in the fixtures, and the egui tests mask it the same way. The probe
+//! cases are the programs Generate G-code makes from a fixed start position (the routines
+//! move relative to the probe; the position is only written into the header).
+//!
 //! `capture_cam_fixtures` is ignored; run it explicitly to (re)write the fixtures under
 //! `crates/gcodekit5-ui-egui/tests/fixtures/cam/`:
 //! `cargo nextest run -p gcodekit5-ui --run-ignored only -E 'test(capture_cam_fixtures)'`.
@@ -21,18 +27,27 @@ use std::path::PathBuf;
 use gcodekit5_camtools::drill_press::DrillPressGenerator;
 use gcodekit5_camtools::gerber::GerberConverter;
 use gcodekit5_camtools::jigsaw_puzzle::JigsawPuzzleMaker;
+use gcodekit5_camtools::laser_engraver::BitmapImageEngraver;
+use gcodekit5_camtools::probe_routines::ProbeRoutineEngine;
 use gcodekit5_camtools::speeds_feeds::OperationType;
 use gcodekit5_camtools::spoilboard_grid::SpoilboardGridGenerator;
 use gcodekit5_camtools::spoilboard_surfacing::SpoilboardSurfacingGenerator;
 use gcodekit5_camtools::tabbed_box::TabbedBoxMaker;
+use gcodekit5_core::Position;
 use gcodekit5_core::data::materials::{MaterialId, init_standard_library as materials};
 use gcodekit5_core::data::tools::{ToolId, init_standard_library as tools};
 use gcodekit5_core::units::MeasurementSystem;
 use gcodekit5_devicedb::model::DeviceProfile;
+use gcodekit5_ui::ui::gtk::cam_tools::bitmap_engraving::{
+    BitmapEngravingEntries, bitmap_engraving_parameters, bitmap_engraving_preset,
+};
 use gcodekit5_ui::ui::gtk::cam_tools::drill_press::{DrillPressEntries, drill_press_parameters};
 use gcodekit5_ui::ui::gtk::cam_tools::gerber::{GerberEntries, gerber_parameters};
 use gcodekit5_ui::ui::gtk::cam_tools::jigsaw::{
     JigsawEntries, jigsaw_parameters, jigsaw_path_closed,
+};
+use gcodekit5_ui::ui::gtk::cam_tools::probe_routines::{
+    ProbeEntries, probe_options, probe_preset, probe_routine,
 };
 use gcodekit5_ui::ui::gtk::cam_tools::speeds_feeds_page::{
     CONSERVATIVE, DEPTH_OF_CUT_MM, STEPOVER_MM, SpeedsFeedsSelection, TOOL_STICK_OUT_MM,
@@ -494,6 +509,178 @@ fn preset_cases() -> Vec<(&'static str, String)> {
     ]
 }
 
+/// The engraver's generation-time header line, as the fixtures hold it.
+const GENERATED_MASK: &str = "; Generated: <time>";
+
+/// `gcode` with the engraver's generation-time line replaced by [`GENERATED_MASK`].
+fn mask_generated(gcode: &str) -> String {
+    gcode
+        .lines()
+        .map(|line| {
+            if line.starts_with("; Generated: ") {
+                GENERATED_MASK
+            } else {
+                line
+            }
+        })
+        .map(|line| format!("{line}\n"))
+        .collect()
+}
+
+/// The bitmap the engraving cases read.
+fn bitmap_image() -> PathBuf {
+    fixture_dir().join("bitmap/gradient.png")
+}
+
+/// The bitmap engraving page with a small output (20 mm at 2 pixels per mm, the rest
+/// GTK's defaults), and a case with every transformation: imperial, vertical one-way scans,
+/// inverted, mirrored, rotated 90 degrees, Floyd-Steinberg, homing.
+fn bitmap_entries() -> Vec<(&'static str, BitmapEngravingEntries, MeasurementSystem)> {
+    let image = bitmap_image().to_string_lossy().to_string();
+    let basic = BitmapEngravingEntries {
+        image_path: image.clone(),
+        width: "20".into(),
+        pixels_per_mm: "2".into(),
+        ..BitmapEngravingEntries::defaults(MeasurementSystem::Metric)
+    };
+    let custom = BitmapEngravingEntries {
+        image_path: image,
+        width: "1".into(),
+        feed_rate: "1500".into(),
+        travel_rate: "4000".into(),
+        min_power: "5".into(),
+        max_power: "80".into(),
+        pixels_per_mm: "1.5".into(),
+        line_spacing: "1.5".into(),
+        power_scale: "255".into(),
+        offset_x: "0.25".into(),
+        offset_y: "0.5".into(),
+        scan_direction: "1".into(),
+        bidirectional: false,
+        invert: true,
+        mirror_x: true,
+        mirror_y: true,
+        rotation: "90".into(),
+        halftone: "floyd".into(),
+        halftone_dot_size: "3".into(),
+        halftone_threshold: "100".into(),
+        home_before: true,
+    };
+    vec![
+        ("basic", basic, MeasurementSystem::Metric),
+        ("custom", custom, MeasurementSystem::Imperial),
+    ]
+}
+
+/// The bitmap engraving programs (generation time masked).
+fn bitmap_cases() -> Vec<(&'static str, String)> {
+    bitmap_entries()
+        .into_iter()
+        .map(|(name, entries, system)| {
+            let params = bitmap_engraving_parameters(&entries, system, AXES);
+            let gcode = BitmapImageEngraver::from_file(&entries.image_path, params)
+                .and_then(|engraver| engraver.generate_gcode())
+                .expect("the bitmap engraves");
+            (name, mask_generated(&gcode))
+        })
+        .collect()
+}
+
+/// The probe page's start position for the cases (machine coordinates, mm).
+fn probe_start() -> Position {
+    Position::new(12.5, -30.25, -4.0)
+}
+
+/// The probe page's entries for each case: every routine at GTK's defaults, then Z-touch,
+/// edge and corner with Auto-Update WCS and compensation.
+fn probe_entries() -> Vec<(&'static str, ProbeEntries)> {
+    let routine = |id: &str| ProbeEntries {
+        routine: Some(id.to_string()),
+        ..ProbeEntries::default()
+    };
+    vec![
+        ("z_touch", routine("z_touch")),
+        ("edge_find", routine("edge_find")),
+        ("corner_find", routine("corner_find")),
+        ("bore_center", routine("bore_center")),
+        ("boss_center", routine("boss_center")),
+        ("tool_length", routine("tool_length")),
+        (
+            "z_touch_wcs",
+            ProbeEntries {
+                wcs: Some("G55".into()),
+                auto_update: true,
+                plate_thickness: "1.5".into(),
+                backoff: "1.25".into(),
+                ..routine("z_touch")
+            },
+        ),
+        (
+            "edge_find_wcs",
+            ProbeEntries {
+                wcs: Some("G56".into()),
+                auto_update: true,
+                edge_axis: Some("Y".into()),
+                edge_dir: Some("positive".into()),
+                edge_dist: "15".into(),
+                tip_radius: "1".into(),
+                probe_depth: "4".into(),
+                ..routine("edge_find")
+            },
+        ),
+        (
+            "corner_find_wcs",
+            ProbeEntries {
+                auto_update: true,
+                corner: Some("xmax_ymax".into()),
+                tip_radius: "0.5".into(),
+                ..routine("corner_find")
+            },
+        ),
+    ]
+}
+
+/// The probe page's Generate G-code programs.
+fn probe_cases() -> Vec<(&'static str, String)> {
+    probe_entries()
+        .into_iter()
+        .map(|(name, entries)| {
+            let routine = probe_routine(&entries).expect("a routine");
+            let options = probe_options(&entries).expect("options");
+            let output = ProbeRoutineEngine::with_options(routine, options)
+                .generate(probe_start())
+                .expect("the routine generates");
+            (name, output.gcode)
+        })
+        .collect()
+}
+
+/// The bitmap engraving and probe presets as the GTK pages' Save writes them
+/// (`collect_preset` then `to_json`).
+fn bitmap_and_probe_preset_cases() -> Vec<(&'static str, String)> {
+    let bitmap = BitmapEngravingEntries {
+        image_path: "gradient.png".into(),
+        ..bitmap_entries()
+            .into_iter()
+            .map(|(_, entries, _)| entries)
+            .next()
+            .expect("a bitmap case")
+    };
+    let bitmap = bitmap_engraving_preset(&bitmap, MeasurementSystem::Metric)
+        .expect("entries parse")
+        .to_json()
+        .expect("serialises");
+    let probe = probe_entries()
+        .into_iter()
+        .map(|(_, entries)| entries)
+        .nth(7)
+        .expect("the edge case");
+    let probe = probe_preset(&probe)
+        .and_then(|p| p.to_json())
+        .expect("serialises");
+    vec![("bitmap_engraving", bitmap), ("probe", probe)]
+}
+
 /// Every fixture: file name and content.
 fn fixtures() -> Vec<(String, String)> {
     let named = |tool: &str, ext: &str, cases: Vec<(&'static str, String)>| {
@@ -512,6 +699,9 @@ fn fixtures() -> Vec<(String, String)> {
         named("tabbed_box_shapes", "txt", tabbed_box_shapes_cases()),
         named("gerber", "gcode", gerber_cases()),
         named("preset", "json", preset_cases()),
+        named("bitmap_engraving", "gcode", bitmap_cases()),
+        named("probe", "gcode", probe_cases()),
+        named("preset", "json", bitmap_and_probe_preset_cases()),
     ]
     .concat()
 }

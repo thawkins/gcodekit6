@@ -1,0 +1,23 @@
+{
+  "format_version": 2,
+  "units": "mm",
+  "routine": "edge_find",
+  "safe_height": 5.0,
+  "fast_feed": 100.0,
+  "slow_feed": 25.0,
+  "backoff": 2.0,
+  "max_depth": 20.0,
+  "edge_axis": "Y",
+  "edge_direction": "positive",
+  "edge_distance": 15.0,
+  "corner": null,
+  "diameter": 20.0,
+  "setter_x": 100.0,
+  "setter_y": 100.0,
+  "setter_z": -50.0,
+  "probe_depth": 4.0,
+  "tip_radius": 1.0,
+  "plate_thickness": 0.0,
+  "target_wcs": "G56",
+  "auto_update_wcs": true
+}
