@@ -3455,3 +3455,6 @@ msgstr "M4 (dynamische Leistung)"
 
 msgid "Create a grid pattern on your spoilboard for easy workpiece alignment and fixturing."
 msgstr "Erstellt ein Rastermuster auf Ihrer Opferplatte zum einfachen Ausrichten und Spannen von Werkstücken."
+
+msgid "Set the spindle's maximum RPM and power in the Device Manager."
+msgstr "Legen Sie die maximale Drehzahl und die Leistung der Spindel im Geräte-Manager fest."

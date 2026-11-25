@@ -3450,3 +3450,6 @@ msgstr "M4 (potência dinâmica)"
 
 msgid "Create a grid pattern on your spoilboard for easy workpiece alignment and fixturing."
 msgstr "Cria um padrão de grade na mesa de sacrifício para alinhar e fixar peças com facilidade."
+
+msgid "Set the spindle's maximum RPM and power in the Device Manager."
+msgstr "Defina as RPM máximas e a potência do fuso no Gerenciador de dispositivos."

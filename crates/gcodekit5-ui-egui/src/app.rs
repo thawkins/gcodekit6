@@ -73,6 +73,8 @@ use crate::theme;
 use crate::windows::{AboutWindow, SettingsOutcome, SettingsWindow};
 use crate::workspace::{PaneContext, PaneId, Workspace};
 use designer_files::{DesignFlow, DesignNext};
+use gcodekit5_app::materials_manager_backend::MaterialsManagerBackend;
+use gcodekit5_app::tools_manager_backend::ToolsManagerBackend;
 
 /// How long quitting waits for a stopped job to be confirmed by the controller.
 const STOP_JOB_TIMEOUT: Duration = Duration::from_secs(2);
@@ -203,6 +205,30 @@ struct QuitFlow {
     discarded: DirtyState,
     /// Quitting was decided: the app sent `Close` and lets the close request through.
     confirmed: bool,
+}
+
+/// Gives the CAM tools the user's tool and material libraries and the active device, from
+/// the files the GTK build keeps in `legacy` (`custom_tools.json`, `custom_materials.json`,
+/// `devices.json`). Nothing is written: without `devices.json` there is no device.
+fn load_cam_libraries(cam: &mut CamToolsPane, legacy: &Path) {
+    let tools = ToolsManagerBackend::with_storage_path(legacy.join("custom_tools.json"));
+    let materials =
+        MaterialsManagerBackend::with_storage_path(legacy.join("custom_materials.json"));
+    let devices = legacy.join("devices.json");
+    let device = if devices.exists() {
+        let manager = gcodekit5_devicedb::DeviceManager::new(devices);
+        if let Err(error) = manager.load() {
+            tracing::warn!(%error, "device profiles not loaded; no active device");
+        }
+        manager.get_active_profile()
+    } else {
+        None
+    };
+    cam.set_libraries(
+        tools.get_all_tools().into_iter().cloned().collect(),
+        materials.get_all_materials().into_iter().cloned().collect(),
+        device,
+    );
 }
 
 /// What to do once the editor's G-code is saved.
@@ -346,6 +372,9 @@ impl GcodeKitApp {
         workspace.set_pane(Box::new(LayersPane::new(Rc::clone(&designer))));
         workspace.set_pane(Box::new(PropertiesPane::new(Rc::clone(&designer))));
         let cam_tools = Rc::new(RefCell::new(CamToolsPane::new()));
+        if let Some(dirs) = state.settings.dirs() {
+            load_cam_libraries(&mut cam_tools.borrow_mut(), &dirs.legacy);
+        }
         workspace.set_pane(Box::new(SharedCamTools(Rc::clone(&cam_tools))));
         workspace.configure(state.config());
         {

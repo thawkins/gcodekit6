@@ -2366,6 +2366,7 @@ dependencies = [
  "gcodekit5-communication",
  "gcodekit5-core",
  "gcodekit5-designer",
+ "gcodekit5-devicedb",
  "gcodekit5-settings",
  "gcodekit5-ui-egui",
  "gcodekit5-visualizer",

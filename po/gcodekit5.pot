@@ -3379,3 +3379,6 @@ msgstr ""
 
 msgid "Create a grid pattern on your spoilboard for easy workpiece alignment and fixturing."
 msgstr ""
+
+msgid "Set the spindle's maximum RPM and power in the Device Manager."
+msgstr ""

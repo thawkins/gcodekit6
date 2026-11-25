@@ -15,6 +15,7 @@
 
 pub mod common;
 pub mod drill_press;
+pub mod speeds_feeds;
 pub mod spoilboard_grid;
 pub mod spoilboard_surfacing;
 
@@ -28,6 +29,10 @@ use gcodekit5_settings::config::Config;
 
 pub use common::{CamAction, CamError, FieldError};
 use drill_press::DrillPressParams;
+use gcodekit5_core::data::materials::{Material, init_standard_library as material_library};
+use gcodekit5_core::data::tools::{Tool, init_standard_library as tool_library};
+use gcodekit5_devicedb::model::DeviceProfile;
+use speeds_feeds::SpeedsFeedsParams;
 use spoilboard_grid::SpoilboardGridParams;
 use spoilboard_surfacing::SpoilboardSurfacingParams;
 
@@ -36,6 +41,8 @@ use crate::workspace::{Pane, PaneContext, PaneId};
 /// One CAM tool of the picker.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum CamTool {
+    /// Speeds and Feeds Calculator.
+    SpeedsFeeds,
     /// Create Spoilboard Grid.
     SpoilboardGrid,
     /// Spoilboard Surfacing.
@@ -46,7 +53,8 @@ pub enum CamTool {
 
 impl CamTool {
     /// Every tool, in GTK's list order.
-    pub const ALL: [CamTool; 3] = [
+    pub const ALL: [CamTool; 4] = [
+        CamTool::SpeedsFeeds,
         CamTool::SpoilboardSurfacing,
         CamTool::SpoilboardGrid,
         CamTool::DrillPress,
@@ -55,6 +63,7 @@ impl CamTool {
     /// The msgid of the tool's title.
     pub fn title_msgid(self) -> &'static str {
         match self {
+            CamTool::SpeedsFeeds => n_!("Speeds and Feeds Calculator"),
             CamTool::SpoilboardGrid => n_!("Create Spoilboard Grid"),
             CamTool::SpoilboardSurfacing => n_!("Spoilboard Surfacing"),
             CamTool::DrillPress => n_!("Drill Press"),
@@ -64,6 +73,7 @@ impl CamTool {
     /// The msgid of the tool's description.
     pub fn description_msgid(self) -> &'static str {
         match self {
+            CamTool::SpeedsFeeds => n_!("Calculate cutting speeds and feeds for your materials"),
             CamTool::SpoilboardGrid => n_!("Generate grid patterns for spoilboard alignment"),
             CamTool::SpoilboardSurfacing => {
                 n_!("Generate surfacing toolpaths to flatten your spoilboard")
@@ -77,6 +87,7 @@ impl CamTool {
     /// The picker category the tool is listed under.
     pub fn category(self) -> Category {
         match self {
+            CamTool::SpeedsFeeds => Category::Calculators,
             CamTool::SpoilboardGrid => Category::Maintenance,
             CamTool::SpoilboardSurfacing => Category::Maintenance,
             CamTool::DrillPress => Category::Generators,
@@ -148,6 +159,7 @@ pub fn msgids() -> Vec<&'static str> {
         ids.push(tool.description_msgid());
     }
     ids.extend(common::msgids());
+    ids.extend(speeds_feeds::msgids());
     ids.extend(spoilboard_grid::msgids());
     ids.extend(spoilboard_surfacing::msgids());
     ids.extend(drill_press::msgids());
@@ -177,6 +189,8 @@ pub struct CamToolsPane {
     spoilboard_surfacing: SpoilboardSurfacingParams,
     /// The Create Spoilboard Grid page.
     spoilboard_grid: SpoilboardGridParams,
+    /// The Speeds and Feeds page.
+    speeds_feeds: SpeedsFeedsParams,
     /// Send to Editor / Preview, waiting for the app.
     editor_request: Option<CamDelivery>,
     /// The program the request hands to the editor.
@@ -202,6 +216,19 @@ impl CamToolsPane {
             drill_press: DrillPressParams::new(units),
             spoilboard_surfacing: SpoilboardSurfacingParams::new(units),
             spoilboard_grid: SpoilboardGridParams::new(units),
+            speeds_feeds: SpeedsFeedsParams::new(
+                tool_library()
+                    .get_all_tools()
+                    .into_iter()
+                    .cloned()
+                    .collect(),
+                material_library()
+                    .get_all_materials()
+                    .into_iter()
+                    .cloned()
+                    .collect(),
+                None,
+            ),
             output: None,
             notice: None,
             editor_request: None,
@@ -329,8 +356,39 @@ impl CamToolsPane {
         &mut self.spoilboard_grid
     }
 
+    /// The Speeds and Feeds page's input and results.
+    pub fn speeds_feeds_mut(&mut self) -> &mut SpeedsFeedsParams {
+        &mut self.speeds_feeds
+    }
+
+    /// Gives the speeds and feeds calculator the user's libraries and active device (the
+    /// page's choices start over).
+    ///
+    /// # Arguments
+    /// * `tools` - The tool library.
+    /// * `materials` - The material library.
+    /// * `device` - The active device profile, if any.
+    pub fn set_libraries(
+        &mut self,
+        tools: Vec<Tool>,
+        materials: Vec<Material>,
+        device: Option<DeviceProfile>,
+    ) {
+        self.speeds_feeds = SpeedsFeedsParams::new(tools, materials, device);
+    }
+
     /// Runs a page's action.
     fn act(&mut self, tool: CamTool, action: CamAction, tr: &Translator) {
+        if tool == CamTool::SpeedsFeeds {
+            // Calculate: the results show on the page; there is no program.
+            if action == CamAction::Generate {
+                match self.speeds_feeds.calculate() {
+                    Ok(results) => self.speeds_feeds.results = Some(results),
+                    Err(_) => self.notice = Some(CamError::Invalid.message(tr)),
+                }
+            }
+            return;
+        }
         let delivery = match action {
             CamAction::None => return,
             CamAction::Generate => None,
@@ -352,6 +410,8 @@ impl CamToolsPane {
     /// Generates `tool`'s program from its page.
     fn generate(&mut self, tool: CamTool) -> Result<String, CamError> {
         match tool {
+            // The calculator makes numbers, not a program (see `act`).
+            CamTool::SpeedsFeeds => Err(CamError::Invalid),
             CamTool::SpoilboardGrid => self.spoilboard_grid.generate(),
             CamTool::SpoilboardSurfacing => self.spoilboard_surfacing.generate(),
             CamTool::DrillPress => self.drill_press.generate(),
@@ -361,6 +421,7 @@ impl CamToolsPane {
     /// Draws `tool`'s page.
     fn show_page(&mut self, ui: &mut egui::Ui, tool: CamTool, tr: &Translator) -> CamAction {
         match tool {
+            CamTool::SpeedsFeeds => speeds_feeds::show(ui, &mut self.speeds_feeds, tr),
             CamTool::SpoilboardGrid => spoilboard_grid::show(ui, &mut self.spoilboard_grid, tr),
             CamTool::SpoilboardSurfacing => {
                 spoilboard_surfacing::show(ui, &mut self.spoilboard_surfacing, tr)

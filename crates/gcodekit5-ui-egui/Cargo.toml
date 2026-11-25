@@ -31,6 +31,7 @@ gcodekit5-camtools = { path = "../gcodekit5-camtools" }
 gcodekit5-communication = { path = "../gcodekit5-communication" }
 gcodekit5-core = { path = "../gcodekit5-core" }
 gcodekit5-designer = { path = "../gcodekit5-designer" }
+gcodekit5-devicedb = { path = "../gcodekit5-devicedb" }
 gcodekit5-settings = { path = "../gcodekit5-settings" }
 gcodekit5-visualizer = { path = "../gcodekit5-visualizer" }
 serde = { workspace = true }
