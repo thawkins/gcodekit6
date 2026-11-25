@@ -3156,3 +3156,9 @@ msgstr "Parar o trabalho e sair?"
 
 msgid "A job is running. Quitting stops it and closes the machine connection."
 msgstr "Um trabalho está em execução. Sair irá pará-lo e fechar a ligação à máquina."
+
+msgid "Rapid:"
+msgstr "Rápido:"
+
+msgid "No program loaded"
+msgstr "Nenhum programa carregado"

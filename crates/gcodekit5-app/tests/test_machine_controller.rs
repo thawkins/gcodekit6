@@ -526,3 +526,39 @@ fn test_stale_worker_cannot_clear_new_session_streaming() {
         "{events:?}"
     );
 }
+
+#[test]
+fn test_send_line_writes_line() {
+    let shared = Arc::new(LoopbackShared::default());
+    let mut controller = loopback_controller(&shared, Duration::from_millis(1));
+    connect(&mut controller);
+    controller.send_line("  $H  ");
+    assert!(
+        wait_until(|| shared.log().contains(&Wrote::Line("$H".to_string()))),
+        "line not written: {:?}",
+        shared.log()
+    );
+}
+
+#[test]
+fn test_send_line_refuses_empty_multiline_and_streaming() {
+    let (shared, mut controller) = held_stream(100);
+    controller.send_line("G0 X5");
+    controller.send_line("   ");
+    controller.send_line("G0 X1\nG0 X2");
+    let errors = controller
+        .poll()
+        .into_iter()
+        .filter(|e| matches!(e, MachineEvent::Error(_)))
+        .count();
+    assert_eq!(errors, 3);
+    std::thread::sleep(Duration::from_millis(50));
+    assert!(
+        !shared
+            .log()
+            .iter()
+            .any(|w| matches!(w, Wrote::Line(l) if l.starts_with("G0"))),
+        "refused line written: {:?}",
+        shared.log()
+    );
+}

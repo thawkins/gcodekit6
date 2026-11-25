@@ -3085,3 +3085,9 @@ msgstr ""
 
 msgid "A job is running. Quitting stops it and closes the machine connection."
 msgstr ""
+
+msgid "Rapid:"
+msgstr ""
+
+msgid "No program loaded"
+msgstr ""

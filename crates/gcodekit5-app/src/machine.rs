@@ -427,6 +427,28 @@ impl MachineController {
         self.send_or_report(Command::Line(line));
     }
 
+    /// Queues one command line (`$H`, `$X`, an MDI line), trimmed, behind any manual line
+    /// still waiting.
+    ///
+    /// Refused (reported as [`MachineEvent::Error`]) for an empty line, a line holding a
+    /// line break, or while a program streams.
+    pub fn send_line(&mut self, line: &str) {
+        let line = line.trim();
+        if line.is_empty() || line.contains(['\n', '\r']) {
+            self.pending.push(MachineEvent::Error(format!(
+                "line ignored: must be one non-empty line: {line:?}"
+            )));
+            return;
+        }
+        if self.streaming.load(Ordering::SeqCst) {
+            self.pending.push(MachineEvent::Error(
+                "line ignored: a program is streaming".to_string(),
+            ));
+            return;
+        }
+        self.send_or_report(Command::Line(line.to_string()));
+    }
+
     /// Writes a real-time byte ahead of any queued program line.
     pub fn realtime(&mut self, cmd: RealtimeCommand) {
         self.send_or_report(Command::Realtime(cmd.byte()));

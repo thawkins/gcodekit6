@@ -3168,3 +3168,9 @@ msgstr "Arrêter la tâche et quitter ?"
 
 msgid "A job is running. Quitting stops it and closes the machine connection."
 msgstr "Une tâche est en cours. Quitter l'arrête et ferme la connexion à la machine."
+
+msgid "Rapid:"
+msgstr "Rapide :"
+
+msgid "No program loaded"
+msgstr "Aucun programme chargé"

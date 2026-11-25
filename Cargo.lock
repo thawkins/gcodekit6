@@ -2329,6 +2329,8 @@ dependencies = [
  "egui",
  "egui_kittest",
  "gcodekit5-app",
+ "gcodekit5-communication",
+ "gcodekit5-core",
  "gcodekit5-settings",
  "raw-window-handle",
  "serde",
