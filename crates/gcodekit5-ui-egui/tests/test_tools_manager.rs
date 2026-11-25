@@ -404,3 +404,44 @@ fn test_tools_manager_showing_a_stored_tool_is_not_an_edit() {
         "file untouched"
     );
 }
+
+#[test]
+fn test_tools_manager_filters_are_stored_when_they_change() {
+    let dir = scratch("filters");
+    let dirs = gcodekit5_settings::migrate::ConfigDirs::new(dir.join("legacy"), dir.join("config"));
+    let (settings, _problem) = SettingsManager::open(dirs.clone());
+    let state = AppState::new(settings, crate::test_smoke::native_decision())
+        .with_tools_file(dir.join("custom_tools.json"));
+    let mut h = app_harness(GcodeKitApp::from_state(state));
+    h.state_mut().dispatch(Command::OpenToolsManager);
+    h.run_steps(3);
+    h.state_mut().tools_manager_mut().filter_mut().tool_type = Some(ToolType::VBit);
+    search(&mut h, "bit");
+    // Stored while the window is still open, and so in the settings file.
+    let ui = &h.state().state().config().ui;
+    assert_eq!(ui.tools_manager_type_filter, "vbit");
+    assert_eq!(ui.tools_manager_search, "bit");
+    let (reloaded, _problem) = SettingsManager::open(dirs);
+    assert_eq!(reloaded.config().ui.tools_manager_type_filter, "vbit");
+    assert!(h.state().tools_manager().is_open());
+}
+
+#[test]
+fn test_tools_manager_untouched_filters_are_not_written() {
+    let dir = scratch("filters_untouched");
+    let dirs = gcodekit5_settings::migrate::ConfigDirs::new(dir.join("legacy"), dir.join("config"));
+    let (settings, _problem) = SettingsManager::open(dirs);
+    let state = AppState::new(settings, crate::test_smoke::native_decision())
+        .with_tools_file(dir.join("custom_tools.json"));
+    let mut h = app_harness(GcodeKitApp::from_state(state));
+    h.run_steps(3);
+    assert!(
+        h.state()
+            .state()
+            .config()
+            .ui
+            .tools_manager_type_filter
+            .is_empty(),
+        "settings rewritten without a change"
+    );
+}

@@ -101,6 +101,34 @@ pub enum ToolsFileRequest {
     Export,
 }
 
+/// The CNC Tools settings GTK remembered (`config.ui.tools_manager_*`).
+#[derive(Debug, Clone, PartialEq)]
+struct UiState {
+    search: String,
+    type_filter: String,
+    material_filter: String,
+    dia_min: Option<f32>,
+    dia_max: Option<f32>,
+    selected: Option<String>,
+}
+
+impl UiState {
+    /// The values in `config`; an empty filter is GTK's "all", so untouched settings are
+    /// not rewritten at startup.
+    fn of(config: &Config) -> Self {
+        let ui = &config.ui;
+        let or_all = |id: &str| if id.is_empty() { "all" } else { id }.to_string();
+        Self {
+            search: ui.tools_manager_search.clone(),
+            type_filter: or_all(&ui.tools_manager_type_filter),
+            material_filter: or_all(&ui.tools_manager_material_filter),
+            dia_min: ui.tools_manager_dia_min,
+            dia_max: ui.tools_manager_dia_max,
+            selected: ui.tools_manager_selected_tool.clone(),
+        }
+    }
+}
+
 /// The CNC Tools window.
 pub struct ToolsManagerWindow {
     open: bool,
@@ -120,6 +148,8 @@ pub struct ToolsManagerWindow {
     /// The library changed since [`Self::take_changed`].
     changed: bool,
     file_request: Option<ToolsFileRequest>,
+    /// The settings' values as last read or stored, to store only changes.
+    stored_ui: UiState,
 }
 
 impl std::fmt::Debug for ToolsManagerWindow {
@@ -170,6 +200,7 @@ impl ToolsManagerWindow {
             notice: None,
             changed: false,
             file_request: None,
+            stored_ui: UiState::of(config),
         }
     }
 
@@ -232,46 +263,49 @@ impl ToolsManagerWindow {
         self.file_request.take()
     }
 
+    /// The search, filters and last opened tool as the settings hold them.
+    fn ui_state(&self) -> UiState {
+        UiState {
+            search: self.filter.search.clone(),
+            type_filter: self
+                .filter
+                .tool_type
+                .map(tool_type_filter_id)
+                .unwrap_or("all")
+                .to_string(),
+            material_filter: self
+                .filter
+                .material
+                .map(tool_material_filter_id)
+                .unwrap_or("all")
+                .to_string(),
+            dia_min: self.filter.dia_min.trim().parse().ok(),
+            dia_max: self.filter.dia_max.trim().parse().ok(),
+            selected: self.last_selected.clone(),
+        }
+    }
+
+    /// Whether the search, filters or last opened tool changed since they were last
+    /// stored ([`Self::store_ui_state`]) or read from the settings.
+    pub fn ui_state_changed(&self) -> bool {
+        self.stored_ui != self.ui_state()
+    }
+
     /// Writes the search, filters and last opened tool into `config` (GTK keeps them in
-    /// the settings).
+    /// the settings and stored them on every change).
     ///
-    /// # Returns
-    /// Whether anything in `config` changed.
-    pub fn store_ui_state(&self, config: &mut Config) -> bool {
+    /// # Arguments
+    /// * `config` - The settings to write into.
+    pub fn store_ui_state(&mut self, config: &mut Config) {
+        let state = self.ui_state();
         let ui = &mut config.ui;
-        let before = (
-            ui.tools_manager_search.clone(),
-            ui.tools_manager_type_filter.clone(),
-            ui.tools_manager_material_filter.clone(),
-            ui.tools_manager_dia_min,
-            ui.tools_manager_dia_max,
-            ui.tools_manager_selected_tool.clone(),
-        );
-        ui.tools_manager_search = self.filter.search.clone();
-        ui.tools_manager_type_filter = self
-            .filter
-            .tool_type
-            .map(tool_type_filter_id)
-            .unwrap_or("all")
-            .to_string();
-        ui.tools_manager_material_filter = self
-            .filter
-            .material
-            .map(tool_material_filter_id)
-            .unwrap_or("all")
-            .to_string();
-        ui.tools_manager_dia_min = self.filter.dia_min.trim().parse().ok();
-        ui.tools_manager_dia_max = self.filter.dia_max.trim().parse().ok();
-        ui.tools_manager_selected_tool = self.last_selected.clone();
-        before
-            != (
-                ui.tools_manager_search.clone(),
-                ui.tools_manager_type_filter.clone(),
-                ui.tools_manager_material_filter.clone(),
-                ui.tools_manager_dia_min,
-                ui.tools_manager_dia_max,
-                ui.tools_manager_selected_tool.clone(),
-            )
+        ui.tools_manager_search = state.search.clone();
+        ui.tools_manager_type_filter = state.type_filter.clone();
+        ui.tools_manager_material_filter = state.material_filter.clone();
+        ui.tools_manager_dia_min = state.dia_min;
+        ui.tools_manager_dia_max = state.dia_max;
+        ui.tools_manager_selected_tool = state.selected.clone();
+        self.stored_ui = state;
     }
 
     fn say(&mut self, text: String, error: bool) {

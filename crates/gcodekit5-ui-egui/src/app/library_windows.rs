@@ -1,7 +1,7 @@
 //! The app's side of the CNC Tools and Materials windows: drawing them, the GTC import and
 //! export file dialogs CNC Tools asks for, handing a changed library to the speeds and
-//! feeds calculator at once, and keeping CNC Tools' search and filters in the settings when
-//! it closes (GTK remembered them).
+//! feeds calculator at once, and keeping CNC Tools' search and filters in the settings
+//! whenever they change (GTK remembered them).
 //!
 //! Dependencies: the app's dialogs, settings and windows.
 
@@ -35,12 +35,9 @@ impl GcodeKitApp {
     /// changed library to the speeds and feeds calculator.
     pub(super) fn show_library_windows(&mut self, ctx: &egui::Context) {
         let tr = &self.state.translator;
-        let tools_open = self.tools_manager.is_open();
         self.tools_manager.show(ctx, tr);
         self.materials_manager.show(ctx, tr);
-        if tools_open && !self.tools_manager.is_open() {
-            self.store_tools_ui_state();
-        }
+        self.store_tools_ui_state();
         match self.tools_manager.take_file_request() {
             Some(ToolsFileRequest::Import(GtcFile::Package)) => self.dialogs.open_file(
                 FilePurpose::ImportGtcPackage,
@@ -75,12 +72,15 @@ impl GcodeKitApp {
         }
     }
 
-    /// Keeps CNC Tools' search, filters and last opened tool in the settings.
+    /// Keeps CNC Tools' search, filters and last opened tool in the settings whenever they
+    /// change, as GTK did (a failed write is not retried until they change again).
     fn store_tools_ui_state(&mut self) {
+        if !self.tools_manager.ui_state_changed() {
+            return;
+        }
         let mut config = self.state.settings.config().clone();
-        if self.tools_manager.store_ui_state(&mut config)
-            && let Err(error) = self.state.settings.apply(config)
-        {
+        self.tools_manager.store_ui_state(&mut config);
+        if let Err(error) = self.state.settings.apply(config) {
             tracing::debug!(%error, "CNC Tools filters not kept");
         }
     }
