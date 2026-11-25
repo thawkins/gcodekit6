@@ -3492,3 +3492,21 @@ msgstr "Aleatório"
 
 msgid "Not a whole number"
 msgstr "Não é um número inteiro"
+
+msgid "Surrounding Spaces:"
+msgstr "Espaços circundantes:"
+
+msgid "Must be at least 20 mm"
+msgstr "Deve ser de pelo menos 20 mm"
+
+msgid "Must be between 1 and 20 mm"
+msgstr "Deve estar entre 1 e 20 mm"
+
+msgid "Must be more than twice the thickness"
+msgstr "Deve ser mais do dobro da espessura"
+
+msgid "Finger plus space must be at least 0.1"
+msgstr "Dedo mais espaço deve ser de pelo menos 0.1"
+
+msgid "Must be at least 1"
+msgstr "Deve ser pelo menos 1"

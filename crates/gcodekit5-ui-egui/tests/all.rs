@@ -30,6 +30,8 @@ mod test_cam_speeds_feeds;
 mod test_cam_spoilboard_grid;
 #[path = "test_cam_spoilboard_surfacing.rs"]
 mod test_cam_spoilboard_surfacing;
+#[path = "test_cam_tabbed_box.rs"]
+mod test_cam_tabbed_box;
 #[path = "test_cam_tools.rs"]
 mod test_cam_tools;
 #[path = "test_commands.rs"]

@@ -37,6 +37,15 @@ pub fn open_tool(tool: CamTool) -> Harness<'static, GcodeKitApp> {
     h
 }
 
+/// [`open_tool`] in a window tall enough to show a long page whole, so every button can be
+/// clicked where it is drawn.
+pub fn open_tool_tall(tool: CamTool) -> Harness<'static, GcodeKitApp> {
+    let mut h = open_tool(tool);
+    h.set_size(egui::vec2(1280.0, 2400.0));
+    frames(&mut h, 3);
+    h
+}
+
 /// Clicks the button `label`, scrolling the page to it first (a tall page leaves its buttons
 /// below the fold), then lets the app handle the request.
 pub fn click(h: &mut Harness<'static, GcodeKitApp>, label: &str) {

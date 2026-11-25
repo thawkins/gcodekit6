@@ -345,6 +345,40 @@ pub fn field_row(
     ui.end_row();
 }
 
+/// One labelled drop-down of a two-column grid.
+///
+/// # Arguments
+/// * `ui` - The grid's `Ui`.
+/// * `tr` - Translator for the current UI language.
+/// * `id` - The drop-down's id salt.
+/// * `label` - The msgid of the label.
+/// * `value` - The chosen option.
+/// * `options` - The options and the msgids of their names.
+pub fn combo_row<T: Copy + PartialEq>(
+    ui: &mut egui::Ui,
+    tr: &Translator,
+    id: &str,
+    label: &'static str,
+    value: &mut T,
+    options: &[(T, &'static str)],
+) {
+    let name = ui.label(tr.tr(label));
+    let shown = options
+        .iter()
+        .find(|(option, _)| option == value)
+        .map_or("", |(_, msgid)| msgid);
+    egui::ComboBox::from_id_salt(id)
+        .selected_text(tr.tr(shown))
+        .show_ui(ui, |ui| {
+            for (option, msgid) in options {
+                ui.selectable_value(value, *option, tr.tr(msgid));
+            }
+        })
+        .response
+        .labelled_by(name.id);
+    ui.end_row();
+}
+
 /// One labelled checkbox of a two-column grid.
 ///
 /// # Arguments

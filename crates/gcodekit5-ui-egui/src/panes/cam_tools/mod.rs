@@ -24,6 +24,7 @@ pub mod requests;
 pub mod speeds_feeds;
 pub mod spoilboard_grid;
 pub mod spoilboard_surfacing;
+pub mod tabbed_box;
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -44,6 +45,7 @@ use requests::{DesignerPaths, PendingPreset};
 use speeds_feeds::SpeedsFeedsParams;
 use spoilboard_grid::SpoilboardGridParams;
 use spoilboard_surfacing::SpoilboardSurfacingParams;
+use tabbed_box::TabbedBoxParams;
 
 use crate::workspace::{Pane, PaneContext, PaneId};
 
@@ -52,6 +54,8 @@ use crate::workspace::{Pane, PaneContext, PaneId};
 pub enum CamTool {
     /// Jigsaw Puzzle Generator.
     Jigsaw,
+    /// Tabbed Box Maker.
+    TabbedBox,
     /// Speeds and Feeds Calculator.
     SpeedsFeeds,
     /// Create Spoilboard Grid.
@@ -64,8 +68,9 @@ pub enum CamTool {
 
 impl CamTool {
     /// Every tool, in GTK's list order.
-    pub const ALL: [CamTool; 5] = [
+    pub const ALL: [CamTool; 6] = [
         CamTool::Jigsaw,
+        CamTool::TabbedBox,
         CamTool::SpeedsFeeds,
         CamTool::SpoilboardSurfacing,
         CamTool::SpoilboardGrid,
@@ -76,6 +81,7 @@ impl CamTool {
     pub fn title_msgid(self) -> &'static str {
         match self {
             CamTool::Jigsaw => n_!("Jigsaw Puzzle Generator"),
+            CamTool::TabbedBox => n_!("Tabbed Box Maker"),
             CamTool::SpeedsFeeds => n_!("Speeds and Feeds Calculator"),
             CamTool::SpoilboardGrid => n_!("Create Spoilboard Grid"),
             CamTool::SpoilboardSurfacing => n_!("Spoilboard Surfacing"),
@@ -87,6 +93,7 @@ impl CamTool {
     pub fn description_msgid(self) -> &'static str {
         match self {
             CamTool::Jigsaw => n_!("Create custom jigsaw puzzle patterns from images"),
+            CamTool::TabbedBox => n_!("Generate G-code for laser/CNC cut boxes with finger joints"),
             CamTool::SpeedsFeeds => n_!("Calculate cutting speeds and feeds for your materials"),
             CamTool::SpoilboardGrid => n_!("Generate grid patterns for spoilboard alignment"),
             CamTool::SpoilboardSurfacing => {
@@ -101,7 +108,7 @@ impl CamTool {
     /// The picker category the tool is listed under.
     pub fn category(self) -> Category {
         match self {
-            CamTool::Jigsaw => Category::Generators,
+            CamTool::Jigsaw | CamTool::TabbedBox => Category::Generators,
             CamTool::SpeedsFeeds => Category::Calculators,
             CamTool::SpoilboardGrid => Category::Maintenance,
             CamTool::SpoilboardSurfacing => Category::Maintenance,
@@ -181,6 +188,7 @@ pub fn msgids() -> Vec<&'static str> {
     ids.extend(spoilboard_surfacing::msgids());
     ids.extend(drill_press::msgids());
     ids.extend(jigsaw::msgids());
+    ids.extend(tabbed_box::msgids());
     ids
 }
 
@@ -222,6 +230,8 @@ pub struct CamToolsPane {
     speeds_feeds: SpeedsFeedsParams,
     /// The Jigsaw Puzzle Generator page.
     jigsaw: JigsawParams,
+    /// The Tabbed Box Maker page.
+    tabbed_box: TabbedBoxParams,
     /// Send to Editor / Preview, waiting for the app.
     editor_request: Option<CamDelivery>,
     /// The program the request hands to the editor.
@@ -269,6 +279,7 @@ impl CamToolsPane {
                 None,
             ),
             jigsaw: JigsawParams::new(units),
+            tabbed_box: TabbedBoxParams::new(units),
             output: None,
             notice: None,
             designer_request: None,
@@ -355,6 +366,7 @@ impl CamToolsPane {
     fn input_key(&self, tool: CamTool) -> String {
         match tool {
             CamTool::SpeedsFeeds | CamTool::Jigsaw => String::new(),
+            CamTool::TabbedBox => format!("{:?}", self.tabbed_box),
             CamTool::SpoilboardSurfacing => format!("{:?}", self.spoilboard_surfacing),
             CamTool::SpoilboardGrid => format!("{:?}", self.spoilboard_grid),
             CamTool::DrillPress => format!("{:?}", self.drill_press),
@@ -395,6 +407,7 @@ impl CamToolsPane {
         self.spoilboard_surfacing.set_units(units);
         self.drill_press.set_units(units);
         self.jigsaw.set_units(units);
+        self.tabbed_box.set_units(units);
     }
 
     /// The Drill Press page's input.
@@ -415,6 +428,11 @@ impl CamToolsPane {
     /// The Jigsaw Puzzle Generator page's input.
     pub fn jigsaw_mut(&mut self) -> &mut JigsawParams {
         &mut self.jigsaw
+    }
+
+    /// The Tabbed Box Maker page's input.
+    pub fn tabbed_box_mut(&mut self) -> &mut TabbedBoxParams {
+        &mut self.tabbed_box
     }
 
     /// The Speeds and Feeds page's input and results.
@@ -490,6 +508,7 @@ impl CamToolsPane {
             CamTool::SpeedsFeeds | CamTool::Jigsaw => Err(CamError::Invalid),
             CamTool::SpoilboardGrid => self.spoilboard_grid.generate(),
             CamTool::SpoilboardSurfacing => self.spoilboard_surfacing.generate(),
+            CamTool::TabbedBox => self.tabbed_box.generate(),
             CamTool::DrillPress => self.drill_press.generate(),
         }
     }
@@ -498,6 +517,7 @@ impl CamToolsPane {
     fn show_page(&mut self, ui: &mut egui::Ui, tool: CamTool, tr: &Translator) -> CamAction {
         match tool {
             CamTool::Jigsaw => jigsaw::show(ui, &mut self.jigsaw, tr),
+            CamTool::TabbedBox => tabbed_box::show(ui, &mut self.tabbed_box, tr),
             CamTool::SpeedsFeeds => speeds_feeds::show(ui, &mut self.speeds_feeds, tr),
             CamTool::SpoilboardGrid => spoilboard_grid::show(ui, &mut self.spoilboard_grid, tr),
             CamTool::SpoilboardSurfacing => {
@@ -513,6 +533,7 @@ impl CamToolsPane {
         let axes = device_status::get_active_num_axes();
         self.drill_press.num_axes = axes;
         self.spoilboard_surfacing.num_axes = axes;
+        self.tabbed_box.num_axes = axes;
         self.drill_press.laser_mode = drill_press::device_in_laser_mode();
         if let Some(notice) = self.notice.clone() {
             ui.horizontal(|ui| {

@@ -82,6 +82,7 @@ impl CamToolsPane {
                 CamTool::SpoilboardSurfacing => self.spoilboard_surfacing.apply_preset(&json),
                 CamTool::SpoilboardGrid => self.spoilboard_grid.apply_preset(&json),
                 CamTool::Jigsaw => self.jigsaw.apply_preset(&json),
+                CamTool::TabbedBox => self.tabbed_box.apply_preset(&json),
                 // The calculator has no presets (GTK's had none).
                 CamTool::SpeedsFeeds => Ok(()),
             });
@@ -130,6 +131,7 @@ impl CamToolsPane {
             ),
             CamTool::SpoilboardGrid => (self.spoilboard_grid.preset_json(tr), "grid_params.json"),
             CamTool::Jigsaw => (self.jigsaw.preset_json(tr), "puzzle_params.json"),
+            CamTool::TabbedBox => (self.tabbed_box.preset_json(tr), "box_params.json"),
             CamTool::SpeedsFeeds => return,
         };
         match saved {
@@ -159,6 +161,7 @@ impl CamToolsPane {
     pub(super) fn send_to_designer(&mut self, tool: CamTool, tr: &Translator) {
         let made = match tool {
             CamTool::Jigsaw => self.jigsaw.generate(),
+            CamTool::TabbedBox => self.tabbed_box.generate_shapes(),
             CamTool::DrillPress
             | CamTool::SpoilboardSurfacing
             | CamTool::SpoilboardGrid

@@ -3421,3 +3421,21 @@ msgstr ""
 
 msgid "Not a whole number"
 msgstr ""
+
+msgid "Surrounding Spaces:"
+msgstr ""
+
+msgid "Must be at least 20 mm"
+msgstr ""
+
+msgid "Must be between 1 and 20 mm"
+msgstr ""
+
+msgid "Must be more than twice the thickness"
+msgstr ""
+
+msgid "Finger plus space must be at least 0.1"
+msgstr ""
+
+msgid "Must be at least 1"
+msgstr ""

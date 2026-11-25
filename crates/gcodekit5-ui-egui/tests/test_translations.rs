@@ -14,7 +14,7 @@ const LANGUAGES: [&str; 5] = ["de", "es", "fr", "it", "pt"];
 
 /// Translations that are spelled like the English msgid; the Translator cannot tell them
 /// from a missing entry, so the po file is checked for them instead.
-const IDENTICAL: [(&str, &str); 156] = [
+const IDENTICAL: [(&str, &str); 165] = [
     ("de", "G-Code Editor"),
     ("de", "Designer"),
     ("it", "Designer"),
@@ -176,6 +176,17 @@ const IDENTICAL: [(&str, &str); 156] = [
     ("es", "Material:"),
     ("pt", "Material:"),
     ("fr", "Options"),
+    // Tabbed box: the name of the boxes.py project.
+    ("de", "Boxes"),
+    ("es", "Boxes"),
+    ("fr", "Boxes"),
+    ("it", "Boxes"),
+    ("pt", "Boxes"),
+    // Tabbed box: offsets spelled as in English.
+    ("es", "Offset X:"),
+    ("it", "Offset X:"),
+    ("es", "Offset Y:"),
+    ("it", "Offset Y:"),
 ];
 
 fn msgids() -> Vec<&'static str> {

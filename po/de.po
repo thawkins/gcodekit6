@@ -3497,3 +3497,21 @@ msgstr "Zufällig"
 
 msgid "Not a whole number"
 msgstr "Keine ganze Zahl"
+
+msgid "Surrounding Spaces:"
+msgstr "Randabstände:"
+
+msgid "Must be at least 20 mm"
+msgstr "Muss mindestens 20 mm betragen"
+
+msgid "Must be between 1 and 20 mm"
+msgstr "Muss zwischen 1 und 20 mm liegen"
+
+msgid "Must be more than twice the thickness"
+msgstr "Muss mehr als die doppelte Materialstärke betragen"
+
+msgid "Finger plus space must be at least 0.1"
+msgstr "Finger plus Abstand muss mindestens 0.1 betragen"
+
+msgid "Must be at least 1"
+msgstr "Muss mindestens 1 betragen"

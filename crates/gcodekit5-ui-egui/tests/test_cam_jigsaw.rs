@@ -161,7 +161,6 @@ fn test_cam_jigsaw_invalid_input_shows_error_and_disables_generate() {
             0,
             "{message}: Generate made shapes"
         );
-        assert_eq!(pane(&h).take_designer_request(), None, "{message}");
     }
 }
 

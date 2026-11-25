@@ -3500,3 +3500,21 @@ msgstr "Casuale"
 
 msgid "Not a whole number"
 msgstr "Non è un numero intero"
+
+msgid "Surrounding Spaces:"
+msgstr "Spazi circostanti:"
+
+msgid "Must be at least 20 mm"
+msgstr "Deve essere almeno 20 mm"
+
+msgid "Must be between 1 and 20 mm"
+msgstr "Deve essere compreso tra 1 e 20 mm"
+
+msgid "Must be more than twice the thickness"
+msgstr "Deve essere più del doppio dello spessore"
+
+msgid "Finger plus space must be at least 0.1"
+msgstr "Dito più spazio deve essere almeno 0.1"
+
+msgid "Must be at least 1"
+msgstr "Deve essere almeno 1"
