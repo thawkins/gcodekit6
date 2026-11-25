@@ -3288,3 +3288,9 @@ msgstr "Afficher"
 
 msgid "Lock"
 msgstr "Verrouiller"
+
+msgid "Rotated object: Dimensions locked"
+msgstr "Objet pivoté : dimensions verrouillées"
+
+msgid "0 = no raster, 100 = full length"
+msgstr "0 = pas de trame, 100 = longueur totale"

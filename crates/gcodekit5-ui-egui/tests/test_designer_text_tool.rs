@@ -1,6 +1,7 @@
 //! Designer Text tool: a click opens the Add Text dialog for the snapped point; Add or Enter
 //! places the text (one undo step, selected), Cancel, Escape or empty text place nothing;
-//! the dialog remembers the size; text is painted as glyph outlines.
+//! the dialog remembers the size; the placed text is edited in the properties panel; text
+//! is painted as glyph outlines.
 
 use egui_kittest::Harness;
 use egui_kittest::kittest::Queryable;
@@ -13,6 +14,7 @@ use gcodekit5_ui_egui::panes::designer::canvas::text_tool::{
 };
 
 use crate::test_designer_canvas::{click, close, harness, ids, press, screen, selected};
+use crate::test_designer_properties::{both, field_text, set_field};
 
 /// Clicks world `(x, y)` with the Text tool.
 fn click_text_tool(h: &mut Harness<'_, DesignerPane>, x: f32, y: f32) {
@@ -113,6 +115,26 @@ fn test_text_tool_remembers_size_and_style() {
     h.run();
     let t = &texts(h.state())[1];
     assert!(close(t.font_size, 12.0 * MM_PER_PT) && t.bold, "remembered");
+}
+
+#[test]
+fn test_placed_text_is_edited_in_the_properties_panel() {
+    let designer = std::rc::Rc::new(std::cell::RefCell::new(DesignerPane::new()));
+    let mut h = both(std::rc::Rc::clone(&designer));
+    designer.borrow_mut().set_tool(DesignerTool::Text);
+    let pos = designer
+        .borrow()
+        .view()
+        .world_to_screen(glam::Vec2::new(50.0, 50.0));
+    click(&mut h, pos);
+    h.event(egui::Event::Text("Hi".to_string()));
+    h.run();
+    h.get_by_label("Add").click();
+    h.run();
+    assert_eq!(field_text(&h, "Content:"), "Hi");
+    assert_eq!(field_text(&h, "Size:"), "20.00");
+    set_field(&mut h, "Content:", "Hello");
+    assert_eq!(texts(&designer.borrow())[0].text, "Hello");
 }
 
 #[test]

@@ -283,3 +283,29 @@ fn test_designer_toolbox_button_click_picks_same_tool_at_every_scale() -> TestRe
     }
     Ok(())
 }
+
+#[test]
+fn test_designer_properties_field_edit_applies_at_every_scale() -> TestResult {
+    use crate::test_designer_properties::{both_at, first, set_field, two_rects};
+    use gcodekit5_designer::model::Shape;
+    let _guard = crate::global_env_lock();
+    for ppp in SCALES {
+        let mut harness = both_at(two_rects(), ppp);
+        set_field(&mut harness, "Width:", "42.5");
+        set_field(&mut harness, "X:", "60");
+        let Shape::Rectangle(r) = first(&harness) else {
+            panic!("rectangle at ppp {ppp}");
+        };
+        assert!(
+            (r.width - 42.5).abs() < 1e-6,
+            "width {} at ppp {ppp}",
+            r.width
+        );
+        assert!(
+            (r.center.x - 60.0).abs() < 1e-6,
+            "x {} at ppp {ppp}",
+            r.center.x
+        );
+    }
+    Ok(())
+}

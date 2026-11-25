@@ -3276,3 +3276,9 @@ msgstr "Mostrar"
 
 msgid "Lock"
 msgstr "Bloquear"
+
+msgid "Rotated object: Dimensions locked"
+msgstr "Objeto girado: dimensões bloqueadas"
+
+msgid "0 = no raster, 100 = full length"
+msgstr "0 = sem raster, 100 = comprimento total"

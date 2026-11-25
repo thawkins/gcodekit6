@@ -3205,3 +3205,9 @@ msgstr ""
 
 msgid "Lock"
 msgstr ""
+
+msgid "Rotated object: Dimensions locked"
+msgstr ""
+
+msgid "0 = no raster, 100 = full length"
+msgstr ""

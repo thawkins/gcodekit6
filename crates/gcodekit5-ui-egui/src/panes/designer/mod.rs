@@ -8,7 +8,7 @@
 //! [`DesignerPane::is_modified`] into `AppState::dirty.designer` for the quit prompt.
 //!
 //! Ported from the GTK `ui/gtk/designer_canvas/*` and `designer_toolbox.rs` ([`toolbox`]);
-//! [`layers`] is the Layers pane. The Text tool opens
+//! [`layers`] is the Layers pane and [`properties`] the Properties pane. The Text tool opens
 //! the Add Text dialog ([`canvas::text_tool`]). Not ported here: shape gallery placement,
 //! the array dialog, the toolpath preview, file operations, scrollbars, the device's work
 //! area (the default 250 x 250 mm is shown), and the context menu's other entries.
@@ -18,6 +18,7 @@
 
 pub mod canvas;
 pub mod layers;
+pub mod properties;
 pub mod toolbox;
 
 use std::cell::RefCell;
@@ -42,6 +43,7 @@ pub fn msgids() -> Vec<&'static str> {
     let mut ids = toolbox::msgids();
     ids.extend(canvas::input::msgids());
     ids.extend(layers::msgids());
+    ids.extend(properties::msgids());
     ids.extend(text_tool::msgids());
     ids
 }

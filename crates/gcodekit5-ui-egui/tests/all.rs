@@ -30,6 +30,12 @@ mod test_designer_canvas;
 mod test_designer_editing;
 #[path = "test_designer_layers.rs"]
 mod test_designer_layers;
+#[path = "test_designer_properties.rs"]
+mod test_designer_properties;
+#[path = "test_designer_properties_cam.rs"]
+mod test_designer_properties_cam;
+#[path = "test_designer_properties_shapes.rs"]
+mod test_designer_properties_shapes;
 #[path = "test_designer_snapshots.rs"]
 mod test_designer_snapshots;
 #[path = "test_designer_text_tool.rs"]
