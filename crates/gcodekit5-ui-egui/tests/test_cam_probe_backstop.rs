@@ -22,7 +22,7 @@ use crate::machine_support::{EVENTUALLY, connect, loopback_state, wait_machine, 
 use crate::test_cam_probe_run::{IDLE, reply, reset_written};
 
 /// A probe run started on a connected, Idle loopback whose acks are held.
-fn started_run() -> (ProbeRun, AppState, Arc<LoopbackShared>) {
+pub fn started_run() -> (ProbeRun, AppState, Arc<LoopbackShared>) {
     let (mut state, shared) = loopback_state(Duration::from_millis(1));
     shared.hold_acks.store(true, Ordering::SeqCst);
     reply(&shared, IDLE);

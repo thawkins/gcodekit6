@@ -65,3 +65,31 @@ fn test_engraving_worker_refusals_are_translated() {
     let shown = refusal_text("The engraving worker stopped", &tr);
     assert_ne!(shown, "The engraving worker stopped");
 }
+
+#[test]
+fn test_probe_failure_text_translates_the_controller_message() {
+    use gcodekit5_ui_egui::panes::cam_tools::probe_routines::run::Outcome;
+    let (mut run, _state, _shared) = crate::test_cam_probe_backstop::started_run();
+    let tr = Translator::new("de");
+    let outcomes = run.handle(
+        &[
+            MachineEvent::StreamHalted {
+                reason: "error:9 on program line 41".to_string(),
+            },
+            MachineEvent::StreamStopped {
+                acked: 41,
+                total: 60,
+            },
+        ],
+        &tr,
+    );
+    let text = outcomes
+        .iter()
+        .find_map(|o| match o {
+            Outcome::Failed(text) => Some(text.clone()),
+            _ => None,
+        })
+        .expect("the run failed");
+    assert!(text.contains("error:9 "), "{text}");
+    assert!(!text.contains("on program line"), "{text}");
+}

@@ -366,7 +366,7 @@ impl ProbeRun {
                 let reason = self
                     .failure
                     .clone()
-                    .map(|line| format!("{}: {line}", tr.tr(CONTROLLER_REPORTED)))
+                    .map(|line| controller_reported(&line, tr))
                     .unwrap_or_else(|| tr.tr(STOPPED).into_owned());
                 Some(self.fail(reason, tr))
             }
@@ -411,7 +411,7 @@ impl ProbeRun {
     /// The stream finished: the result, or why there is none.
     fn finish(&mut self, tr: &Translator) -> Outcome {
         if let Some(line) = self.failure.clone() {
-            return self.fail(format!("{}: {line}", tr.tr(CONTROLLER_REPORTED)), tr);
+            return self.fail(controller_reported(&line, tr), tr);
         }
         let mut report = ProbeReport::new(self.routine.clone());
         for r in &self.reports {
@@ -435,6 +435,16 @@ impl ProbeRun {
             tr.tr(RESTORE_HINT)
         ))
     }
+}
+
+/// "Controller reported: <message>", the controller's message as the console shows it
+/// (its own texts translated, its replies kept).
+fn controller_reported(message: &str, tr: &Translator) -> String {
+    format!(
+        "{}: {}",
+        tr.tr(CONTROLLER_REPORTED),
+        crate::machine::worker_message(message, tr)
+    )
 }
 
 /// The text shown for a successful run (GTK's wording).
