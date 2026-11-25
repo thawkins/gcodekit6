@@ -2321,6 +2321,7 @@ dependencies = [
  "craft-keymap",
  "craft-menu",
  "craft-platform",
+ "craft-quit",
  "craft-ui",
  "craft-window",
  "eframe",

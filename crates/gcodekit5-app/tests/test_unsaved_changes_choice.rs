@@ -1,7 +1,7 @@
 //! Tests for the unsaved-changes prompt's button mapping: Cancel, Discard and
 //! Save buttons, with a dismissed dialog treated as Cancel.
 
-use gcodekit5_ui::ui::gtk::common::dialog::UnsavedChangesChoice;
+use gcodekit5_app::UnsavedChangesChoice;
 
 #[test]
 fn test_unsaved_changes_buttons_map_to_choices() {

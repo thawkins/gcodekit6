@@ -3150,3 +3150,9 @@ msgstr "Reiniciar para aplicar as configurações?"
 
 msgid "GCodeKit5 must restart to use the new settings. The machine connection will be closed. Restart now?"
 msgstr "O GCodeKit5 precisa reiniciar para usar as novas configurações. A conexão com a máquina será fechada. Reiniciar agora?"
+
+msgid "Stop job and quit?"
+msgstr "Parar o trabalho e sair?"
+
+msgid "A job is running. Quitting stops it and closes the machine connection."
+msgstr "Um trabalho está em execução. Sair irá pará-lo e fechar a ligação à máquina."

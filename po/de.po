@@ -3155,3 +3155,9 @@ msgstr "Neu starten, um die Einstellungen zu übernehmen?"
 
 msgid "GCodeKit5 must restart to use the new settings. The machine connection will be closed. Restart now?"
 msgstr "GCodeKit5 muss neu starten, um die neuen Einstellungen zu verwenden. Die Maschinenverbindung wird getrennt. Jetzt neu starten?"
+
+msgid "Stop job and quit?"
+msgstr "Auftrag stoppen und beenden?"
+
+msgid "A job is running. Quitting stops it and closes the machine connection."
+msgstr "Ein Auftrag läuft. Beenden stoppt ihn und schließt die Maschinenverbindung."

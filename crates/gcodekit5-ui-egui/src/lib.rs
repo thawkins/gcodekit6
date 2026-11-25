@@ -25,7 +25,7 @@ pub mod theme;
 pub mod windows;
 pub mod workspace;
 
-pub use app::{AppState, GcodeKitApp};
+pub use app::{AppState, DirtyState, GcodeKitApp, QuitSource};
 
 /// Options controlling how the front end starts.
 #[derive(Debug, Clone, Default)]
@@ -34,7 +34,8 @@ pub struct LaunchOptions {
     pub files: Vec<std::path::PathBuf>,
 }
 
-/// Runs the egui front end until the window is closed.
+/// Runs the egui front end until the window is closed. A restart the user asked for is
+/// started from `eframe::App::on_exit` (see [`GcodeKitApp`]).
 ///
 /// # Arguments
 /// * `options` - Startup options such as files to open.
@@ -52,7 +53,6 @@ pub fn run(options: LaunchOptions) -> anyhow::Result<()> {
         frame::title_bar_pref(&settings.config().ui),
     );
     let state = AppState::new(settings, decision);
-    let restart = std::sync::Arc::clone(&state.restart);
     let viewport = egui::ViewportBuilder::default()
         .with_title("GCodeKit")
         .with_inner_size([1280.0, 800.0])
@@ -67,9 +67,6 @@ pub fn run(options: LaunchOptions) -> anyhow::Result<()> {
         Box::new(move |cc| Ok(Box::new(GcodeKitApp::new(cc, state)))),
     )
     .map_err(|e| anyhow::anyhow!("eframe failed: {e}"))?;
-    if restart.load(std::sync::atomic::Ordering::SeqCst) {
-        relaunch_command()?.spawn()?;
-    }
     Ok(())
 }
 

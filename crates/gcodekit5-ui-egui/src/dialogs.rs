@@ -8,7 +8,7 @@
 //!
 //! Ported from the GTK crate's `ui/gtk/file_dialog.rs` (open and save dialogs with file-type
 //! filters) and `ui/gtk/common/dialog.rs` (the Save / Discard / Cancel prompt and Yes / No
-//! confirmations).
+//! confirmations, whose answer is `gcodekit5_app::UnsavedChangesChoice`).
 //!
 //! Dependencies: `craft-dialogs` (the queue and the native dialogs), `gcodekit5-app`
 //! (translations).
@@ -19,6 +19,7 @@ use std::path::PathBuf;
 use craft_dialogs::{
     Answer, FileDialog, Message, MessageButtons, MessageLevel, MessageResult, Override, Wake,
 };
+use gcodekit5_app::UnsavedChangesChoice;
 use gcodekit5_app::i18n::Translator;
 use raw_window_handle::{HasDisplayHandle, HasWindowHandle};
 
@@ -126,6 +127,8 @@ pub enum ConfirmRequest {
     UnsavedDesign,
     /// Changed settings take effect after a restart: restart now (Yes) or later (No).
     Restart,
+    /// A job is running while the user quits: stop it and quit (Yes) or keep running (No).
+    StopJob,
 }
 
 impl ConfirmRequest {
@@ -146,6 +149,10 @@ impl ConfirmRequest {
                     "GCodeKit5 must restart to use the new settings. The machine connection will be closed. Restart now?"
                 ),
             ),
+            Self::StopJob => (
+                n_!("Stop job and quit?"),
+                n_!("A job is running. Quitting stops it and closes the machine connection."),
+            ),
         }
     }
 }
@@ -159,6 +166,18 @@ pub enum ConfirmChoice {
     No,
     /// Do nothing (unsaved changes; also a dismissed dialog).
     Cancel,
+}
+
+impl ConfirmChoice {
+    /// The answer to an unsaved-changes prompt ([`ConfirmRequest::UnsavedGcode`],
+    /// [`ConfirmRequest::UnsavedDesign`]): Yes is Save, No is Discard.
+    pub fn as_unsaved(self) -> UnsavedChangesChoice {
+        match self {
+            Self::Yes => UnsavedChangesChoice::Save,
+            Self::No => UnsavedChangesChoice::Discard,
+            Self::Cancel => UnsavedChangesChoice::Cancel,
+        }
+    }
 }
 
 /// A dialog's answer, with what it was asked for.
@@ -279,6 +298,7 @@ impl Dialogs {
                 ),
             ),
             ConfirmRequest::Restart => (MessageLevel::Info, MessageButtons::YesNo),
+            ConfirmRequest::StopJob => (MessageLevel::Warning, MessageButtons::YesNo),
         };
         let message = Message {
             level,
@@ -386,6 +406,7 @@ pub fn msgids() -> Vec<&'static str> {
         ConfirmRequest::UnsavedGcode,
         ConfirmRequest::UnsavedDesign,
         ConfirmRequest::Restart,
+        ConfirmRequest::StopJob,
     ]
     .into_iter()
     .flat_map(|request| {

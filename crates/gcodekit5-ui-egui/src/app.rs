@@ -15,9 +15,16 @@
 //! end of the frame and answered on a later one, so the event loop never blocks. The
 //! Preferences and About windows are drawn over the workspace while open.
 //!
+//! Quitting goes through [`GcodeKitApp::request_quit`] whatever asked for it (the window's
+//! close button, the Quit command, the OS, a confirmed restart). A running job is asked about
+//! first, then unsaved work; while a prompt is up the window is held open with
+//! `ViewportCommand::CancelClose`. Once quitting is decided the app sends
+//! `ViewportCommand::Close`, and `craft_quit::on_close_request` (in `eframe::App::logic`)
+//! turns that close into `-[NSApplication terminate:]` on macOS.
+//!
 //! Dependencies: `egui`, `eframe`, `craft-window`, `craft-platform`, `craft-keymap`,
-//! `craft-menu`, `craft-dialogs`, `gcodekit5-app` (translations), `gcodekit5-settings`
-//! (configuration).
+//! `craft-menu`, `craft-dialogs`, `craft-quit`, `gcodekit5-app` (translations, the
+//! unsaved-changes answer), `gcodekit5-settings` (configuration).
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, OnceLock};
@@ -27,6 +34,7 @@ use craft_keymap::{Active, Keymap};
 use craft_menu::Gate;
 use craft_platform::appearance::SystemThemeFn;
 use craft_window::policy::{Decision, Frame};
+use gcodekit5_app::UnsavedChangesChoice;
 use gcodekit5_app::i18n::Translator;
 use gcodekit5_settings::SettingsManager;
 use gcodekit5_settings::config::Config;
@@ -38,6 +46,28 @@ use crate::theme;
 use crate::windows::{AboutWindow, SettingsOutcome, SettingsWindow};
 use crate::workspace::{PaneContext, Workspace};
 
+/// What asked the app to quit. Every source goes through [`GcodeKitApp::request_quit`] and is
+/// treated the same; the source is logged.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum QuitSource {
+    /// The window's close button (a close request from the window system).
+    WindowClose,
+    /// The Quit command (menu, keyboard shortcut) or a confirmed restart.
+    MenuQuit,
+    /// The operating system, through a hook of its own (session end, a signal). On the
+    /// platforms supported today the OS reaches the app as a window close request instead.
+    Os,
+}
+
+/// Which documents have unsaved changes.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct DirtyState {
+    /// The G-code editor has unsaved changes.
+    pub editor: bool,
+    /// The design has unsaved changes.
+    pub designer: bool,
+}
+
 /// State held by the egui front end.
 #[derive(Debug)]
 pub struct AppState {
@@ -48,8 +78,15 @@ pub struct AppState {
     /// craft-window's frame decision: who draws the title bar, the caption buttons' layout
     /// and look, and the desktop it was made for (whether "Use system title bar" matters).
     pub decision: Decision,
-    /// Set when the user asked to restart; [`crate::run`] relaunches after the window closes.
+    /// Set when the user asked to restart; the app relaunches itself when it exits
+    /// (`eframe::App::on_exit`). Cleared when the quit is cancelled.
     pub restart: Arc<AtomicBool>,
+    /// Which documents have unsaved changes; asked about on quit. The editor and designer
+    /// panes set it once they exist (Tasks 9 and 12); until then only tests do.
+    pub dirty: DirtyState,
+    /// Whether a job is streaming to the machine; asked about on quit. Set from the machine
+    /// controller once the app holds it (Task 8); until then only tests do.
+    pub job_running: bool,
 }
 
 impl AppState {
@@ -65,6 +102,8 @@ impl AppState {
             translator,
             decision,
             restart: Arc::new(AtomicBool::new(false)),
+            dirty: DirtyState::default(),
+            job_running: false,
         }
     }
 
@@ -90,6 +129,19 @@ impl AppState {
             }
         }
     }
+}
+
+/// Where the quit decision stands.
+#[derive(Debug, Default)]
+struct QuitFlow {
+    /// The quit prompt queued or on screen, while a quit is being decided.
+    asking: Option<ConfirmRequest>,
+    /// The user agreed to stop the running job for this quit.
+    stop_job: bool,
+    /// The documents whose changes the user chose to discard for this quit.
+    discarded: DirtyState,
+    /// Quitting was decided: the app sent `Close` and lets the close request through.
+    confirmed: bool,
 }
 
 /// Root application of the egui front end.
@@ -119,6 +171,8 @@ pub struct GcodeKitApp {
     about_window: AboutWindow,
     /// The last command dispatched.
     last_dispatched: Option<Command>,
+    /// The quit being decided, if any.
+    quit: QuitFlow,
     /// The `movable` flag last set on the macOS window (`title_bar::sync_movable`).
     #[cfg(target_os = "macos")]
     movable: Option<bool>,
@@ -135,6 +189,7 @@ impl std::fmt::Debug for GcodeKitApp {
             .field("settings_window", &self.settings_window)
             .field("about_window", &self.about_window)
             .field("last_dispatched", &self.last_dispatched)
+            .field("quit", &self.quit)
             .finish_non_exhaustive()
     }
 }
@@ -198,9 +253,139 @@ impl GcodeKitApp {
             settings_window,
             about_window,
             last_dispatched: None,
+            quit: QuitFlow::default(),
             #[cfg(target_os = "macos")]
             movable: None,
         }
+    }
+
+    /// The frame's quit and dialog logic, run before [`GcodeKitApp::ui`] and also while the
+    /// window is minimized or hidden (eframe calls `logic` then, not `ui`): takes the dialog
+    /// answers, turns a close request into [`GcodeKitApp::request_quit`] and sends the window
+    /// commands that asked for.
+    ///
+    /// # Arguments
+    /// * `ctx` - The egui context of the root window.
+    pub fn logic(&mut self, ctx: &egui::Context) {
+        let _ = self.wake_ctx.set(ctx.clone());
+        while let Some(answer) = self.dialogs.poll() {
+            self.handle_answer(answer);
+        }
+        if ctx.input(|i| i.viewport().close_requested()) {
+            self.request_quit(QuitSource::WindowClose);
+        }
+        for command in self.viewport_commands.drain(..) {
+            ctx.send_viewport_cmd(command);
+        }
+    }
+
+    /// Quits, after asking: a running job first ("Stop job and quit?"), then unsaved changes
+    /// in the editor and in the design (Save / Discard / Cancel). While a prompt is up the
+    /// window is held open (`ViewportCommand::CancelClose`); with nothing to ask, or once
+    /// every prompt is answered to go on, the window is closed (`ViewportCommand::Close`).
+    /// A cancelled quit forgets a pending restart.
+    ///
+    /// # Arguments
+    /// * `source` - What asked to quit.
+    pub fn request_quit(&mut self, source: QuitSource) {
+        tracing::debug!(?source, "quit requested");
+        if self.quit.confirmed {
+            // Our own Close comes back as a close request: let it through.
+            if source != QuitSource::WindowClose {
+                self.viewport_commands.push(egui::ViewportCommand::Close);
+            }
+            return;
+        }
+        if self.quit.asking.is_none() {
+            self.continue_quit();
+        }
+        if self.quit.asking.is_some() {
+            self.viewport_commands
+                .push(egui::ViewportCommand::CancelClose);
+        }
+    }
+
+    /// Asks the next quit question, or closes the window when none is left.
+    fn continue_quit(&mut self) {
+        let (state, quit) = (&self.state, &self.quit);
+        let next = if state.job_running && !quit.stop_job {
+            Some(ConfirmRequest::StopJob)
+        } else if state.dirty.editor && !quit.discarded.editor {
+            Some(ConfirmRequest::UnsavedGcode)
+        } else if state.dirty.designer && !quit.discarded.designer {
+            Some(ConfirmRequest::UnsavedDesign)
+        } else {
+            None
+        };
+        match next {
+            Some(request) => {
+                self.quit.asking = Some(request);
+                self.dialogs.confirm(request);
+            }
+            None => {
+                self.quit = QuitFlow {
+                    confirmed: true,
+                    ..QuitFlow::default()
+                };
+                self.viewport_commands.push(egui::ViewportCommand::Close);
+            }
+        }
+    }
+
+    /// Acts on the answer to the quit prompt `request`.
+    fn quit_answer(&mut self, request: ConfirmRequest, choice: ConfirmChoice) {
+        self.quit.asking = None;
+        match (request, choice) {
+            // Quitting ends the process and with it the stream; stopping the job cleanly
+            // before that is wired with the machine controller (Task 8).
+            (ConfirmRequest::StopJob, ConfirmChoice::Yes) => {
+                self.quit.stop_job = true;
+                self.continue_quit();
+            }
+            (ConfirmRequest::StopJob, ConfirmChoice::No | ConfirmChoice::Cancel) => {
+                self.cancel_quit();
+            }
+            (ConfirmRequest::UnsavedGcode | ConfirmRequest::UnsavedDesign, choice) => {
+                match choice.as_unsaved() {
+                    UnsavedChangesChoice::Discard => {
+                        if request == ConfirmRequest::UnsavedGcode {
+                            self.quit.discarded.editor = true;
+                        } else {
+                            self.quit.discarded.designer = true;
+                        }
+                        self.continue_quit();
+                    }
+                    UnsavedChangesChoice::Save => {
+                        // No editor or designer can save in this front end yet (Tasks 9 and
+                        // 12), so nothing is saved and the app stays open.
+                        tracing::warn!(?request, "cannot save before quitting yet; quit cancelled");
+                        self.cancel_quit();
+                    }
+                    UnsavedChangesChoice::Cancel => self.cancel_quit(),
+                }
+            }
+            // The quit flow never asks this; forget the quit rather than act on it.
+            (ConfirmRequest::Restart, _) => self.cancel_quit(),
+        }
+    }
+
+    /// Abandons the quit: the app stays open and a pending restart is forgotten, so a later
+    /// quit does not relaunch the app.
+    fn cancel_quit(&mut self) {
+        tracing::debug!("quit cancelled");
+        self.quit = QuitFlow::default();
+        self.state.restart.store(false, Ordering::SeqCst);
+    }
+
+    /// Asks whether to restart now to apply changed settings; Yes quits through
+    /// [`GcodeKitApp::request_quit`] and relaunches the app once it exits.
+    pub fn request_restart(&mut self) {
+        self.dialogs.confirm(ConfirmRequest::Restart);
+    }
+
+    /// Whether quitting was decided (the app sent `ViewportCommand::Close`).
+    pub fn quit_confirmed(&self) -> bool {
+        self.quit.confirmed
     }
 
     /// Draws the application UI into `ui`.
@@ -299,7 +484,7 @@ impl GcodeKitApp {
                 .save_file(FilePurpose::SaveGcode, &FilePurpose::SaveGcode.filters()),
             Command::OpenSettings => self.settings_window.open(&self.state.settings),
             Command::About => self.about_window.open(),
-            Command::Quit => self.viewport_commands.push(egui::ViewportCommand::Close),
+            Command::Quit => self.request_quit(QuitSource::MenuQuit),
             Command::Cut => self
                 .viewport_commands
                 .push(egui::ViewportCommand::RequestCut),
@@ -355,9 +540,7 @@ impl GcodeKitApp {
             self.settings_window
                 .show(ctx, &mut self.state.settings, &self.state.translator);
         match outcome {
-            SettingsOutcome::Applied { restart: true } => {
-                self.dialogs.confirm(ConfirmRequest::Restart);
-            }
+            SettingsOutcome::Applied { restart: true } => self.request_restart(),
             SettingsOutcome::Closed
             | SettingsOutcome::Open
             | SettingsOutcome::Cancelled
@@ -368,16 +551,19 @@ impl GcodeKitApp {
     }
 
     /// Acts on a dialog's answer. Answers for features that do not exist yet (opening and
-    /// saving files, Tasks 7 and 9) are kept in [`GcodeKitApp::last_dialog_answer`].
+    /// saving files, Task 9) are kept in [`GcodeKitApp::last_dialog_answer`].
     fn handle_answer(&mut self, answer: DialogAnswer) {
         match &answer {
+            DialogAnswer::Confirm { request, choice } if self.quit.asking == Some(*request) => {
+                self.quit_answer(*request, *choice);
+            }
             DialogAnswer::Confirm {
                 request: ConfirmRequest::Restart,
                 choice,
             } => {
                 if *choice == ConfirmChoice::Yes {
                     self.state.restart.store(true, Ordering::SeqCst);
-                    self.viewport_commands.push(egui::ViewportCommand::Close);
+                    self.request_quit(QuitSource::MenuQuit);
                 }
             }
             DialogAnswer::Unavailable { reason } => {
@@ -407,6 +593,17 @@ impl GcodeKitApp {
         self.last_dialog_answer.as_ref()
     }
 
+    /// The front end's state.
+    pub fn state(&self) -> &AppState {
+        &self.state
+    }
+
+    /// The front end's state, for the panes that report unsaved work and running jobs, and
+    /// for tests.
+    pub fn state_mut(&mut self) -> &mut AppState {
+        &mut self.state
+    }
+
     /// The last command [`GcodeKitApp::dispatch`] ran.
     pub fn last_dispatched(&self) -> Option<Command> {
         self.last_dispatched
@@ -427,10 +624,28 @@ impl GcodeKitApp {
 }
 
 impl eframe::App for GcodeKitApp {
+    /// Runs the quit and dialog logic, then lets craft-quit take a close request the app did
+    /// not cancel over (macOS quits through `-[NSApplication terminate:]`).
+    fn logic(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        self.logic(ctx);
+        craft_quit::on_close_request(ctx);
+    }
+
     /// Draws the whole window.
     fn ui(&mut self, ui: &mut egui::Ui, frame: &mut eframe::Frame) {
         self.ui(ui);
         self.dialogs.end_frame(Some(&*frame));
+    }
+
+    /// Relaunches the app when the user asked to restart. Runs here, not after
+    /// `eframe::run_native` returns, because on macOS the process ends inside
+    /// `-[NSApplication terminate:]` once eframe's exit handling has run.
+    fn on_exit(&mut self) {
+        if self.state.restart.swap(false, Ordering::SeqCst)
+            && let Err(error) = crate::relaunch_command().and_then(|mut command| command.spawn())
+        {
+            tracing::error!(%error, "could not restart GCodeKit5");
+        }
     }
 
     /// Feeds the native menu's key equivalents to egui before it reads the input.

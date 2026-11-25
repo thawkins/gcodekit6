@@ -3079,3 +3079,9 @@ msgstr ""
 
 msgid "GCodeKit5 must restart to use the new settings. The machine connection will be closed. Restart now?"
 msgstr ""
+
+msgid "Stop job and quit?"
+msgstr ""
+
+msgid "A job is running. Quitting stops it and closes the machine connection."
+msgstr ""

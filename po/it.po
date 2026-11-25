@@ -3158,3 +3158,9 @@ msgstr "Riavviare per applicare le impostazioni?"
 
 msgid "GCodeKit5 must restart to use the new settings. The machine connection will be closed. Restart now?"
 msgstr "GCodeKit5 deve riavviarsi per usare le nuove impostazioni. La connessione alla macchina verrà chiusa. Riavviare ora?"
+
+msgid "Stop job and quit?"
+msgstr "Interrompere il lavoro e uscire?"
+
+msgid "A job is running. Quitting stops it and closes the machine connection."
+msgstr "Un lavoro è in corso. Uscendo verrà interrotto e la connessione alla macchina verrà chiusa."

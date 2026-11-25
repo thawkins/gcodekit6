@@ -22,6 +22,8 @@ mod test_commands;
 mod test_dialogs;
 #[path = "test_frame.rs"]
 mod test_frame;
+#[path = "test_quit.rs"]
+mod test_quit;
 #[path = "test_settings_window.rs"]
 mod test_settings_window;
 #[path = "test_smoke.rs"]
