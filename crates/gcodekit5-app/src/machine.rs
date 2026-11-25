@@ -779,10 +779,12 @@ impl WorkerState {
                 self.sink.emit(MachineEvent::StatusReport(Box::new(status)));
             }
             GrblResponseLine::Reset(banner) => {
+                // Report the banner before the stream end it causes, so a consumer
+                // that stops at `StreamStopped` has already seen why.
+                self.sink.emit(MachineEvent::Received(banner));
                 // The controller restarted: nothing in flight will be acknowledged.
                 self.reset_buffers();
                 self.end_stream(false);
-                self.sink.emit(MachineEvent::Received(banner));
             }
             GrblResponseLine::Other(text) => self.sink.emit(MachineEvent::Received(text)),
         }
