@@ -24,6 +24,7 @@ pub mod device_console_manager;
 pub mod device_identity;
 pub mod device_profiles;
 pub mod device_status;
+pub mod files;
 pub mod firmware_settings;
 pub mod i18n;
 pub mod machine;

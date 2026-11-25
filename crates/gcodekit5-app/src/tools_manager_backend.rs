@@ -423,22 +423,11 @@ pub(crate) fn backup_path(path: &Path) -> PathBuf {
     ))
 }
 
-/// Writes `text` to a temporary file beside `path` and renames it over `path`, creating
-/// the folder first; the temporary file is removed when anything fails.
+/// Writes `text` to `path` with the shared atomic write ([`crate::files::write_atomic`]),
+/// creating the folder first.
 pub(crate) fn write_atomic(path: &Path, text: &str) -> std::io::Result<()> {
     if let Some(parent) = path.parent().filter(|p| !p.as_os_str().is_empty()) {
         std::fs::create_dir_all(parent)?;
     }
-    let name = path
-        .file_name()
-        .map(|n| n.to_string_lossy().into_owned())
-        .unwrap_or_default();
-    let temp = path.with_file_name(format!(".{name}.{}.tmp", std::process::id()));
-    let result = std::fs::write(&temp, text).and_then(|()| std::fs::rename(&temp, path));
-    if result.is_err()
-        && let Err(error) = std::fs::remove_file(&temp)
-    {
-        tracing::debug!(%error, "temporary file not removed");
-    }
-    result
+    crate::files::write_atomic(path, text)
 }

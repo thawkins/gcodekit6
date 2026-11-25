@@ -23,6 +23,8 @@ mod test_command_history;
 mod test_device_console_manager;
 #[path = "test_device_profiles_model.rs"]
 mod test_device_profiles_model;
+#[path = "test_files_atomic.rs"]
+mod test_files_atomic;
 #[path = "test_firmware_settings_model.rs"]
 mod test_firmware_settings_model;
 #[path = "test_i18n.rs"]
