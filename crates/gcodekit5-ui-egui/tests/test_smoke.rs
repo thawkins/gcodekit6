@@ -8,7 +8,7 @@ use gcodekit5_settings::config::Config;
 use gcodekit5_ui_egui::{AppState, GcodeKitApp};
 
 /// A decision with the desktop drawing the frame, built without probing the desktop.
-fn native_decision() -> craft_window::policy::Decision {
+pub(crate) fn native_decision() -> craft_window::policy::Decision {
     let desktop = Desktop {
         kind: DesktopKind::Gnome,
         ssd: Some(false),

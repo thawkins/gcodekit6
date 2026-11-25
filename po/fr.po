@@ -3018,3 +3018,90 @@ msgstr "Réduire"
 
 msgid "Maximize"
 msgstr "Agrandir"
+
+msgid "View"
+msgstr "Affichage"
+
+msgid "Tools"
+msgstr "Outils"
+
+msgid "Start Streaming"
+msgstr "Démarrer l'envoi"
+
+msgid "Pause Streaming"
+msgstr "Mettre l'envoi en pause"
+
+msgid "Stop Streaming"
+msgstr "Arrêter l'envoi"
+
+msgid "Feed Hold"
+msgstr "Suspension d'avance"
+
+msgid "Cycle Start"
+msgstr "Départ cycle"
+
+msgid "Zoom to Fit"
+msgstr "Ajuster à la vue"
+
+msgid "Reset View"
+msgstr "Réinitialiser la vue"
+
+msgid "Front"
+msgstr "Face"
+
+msgid "Isometric"
+msgstr "Isométrique"
+
+msgid "Materials Manager"
+msgstr "Gestionnaire de matériaux"
+
+msgid "About {app}"
+msgstr "À propos de {app}"
+
+msgid "Settings…"
+msgstr "Réglages…"
+
+msgid "Settings"
+msgstr "Réglages"
+
+msgid "Appearance"
+msgstr "Apparence"
+
+msgid "Hide {app}"
+msgstr "Masquer {app}"
+
+msgid "Hide Others"
+msgstr "Masquer les autres"
+
+msgid "Quit {app}"
+msgstr "Quitter {app}"
+
+msgid "Preferences…"
+msgstr "Préférences…"
+
+msgid "Exit"
+msgstr "Quitter"
+
+msgid "Window"
+msgstr "Fenêtre"
+
+msgid "Services"
+msgstr "Services"
+
+msgid "Show All"
+msgstr "Tout afficher"
+
+msgid "Bring All to Front"
+msgstr "Tout ramener au premier plan"
+
+msgid "Close Window"
+msgstr "Fermer la fenêtre"
+
+msgid "Menu"
+msgstr "Menu"
+
+msgid "Scroll menu up"
+msgstr "Faire défiler le menu vers le haut"
+
+msgid "Scroll menu down"
+msgstr "Faire défiler le menu vers le bas"

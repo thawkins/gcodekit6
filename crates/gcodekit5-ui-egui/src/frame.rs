@@ -4,7 +4,8 @@
 //! ([`craft_window::policy::Decision::frame`]), which caption buttons appear and on which
 //! side in which order ([`craft_window::Layout`]), which look they take
 //! ([`craft_window::policy::CaptionFamily`]), and the strip's drag-to-move and double-click
-//! behaviour ([`craft_window::title_bar::empty_area`]). Drawing the buttons stays with the
+//! behaviour ([`craft_window::title_bar::empty_area`]). The in-window menu bar sits in the
+//! strip when the app draws one. Drawing the buttons stays with the
 //! app, as craft-window documents; so does resizing an undecorated window from its edges,
 //! which craft-window does not offer.
 //!
@@ -91,34 +92,44 @@ fn caption_style(family: CaptionFamily) -> CaptionStyle {
     }
 }
 
+/// Draws the in-window menu bar into the `Ui` it is given, at most the given width wide.
+pub type MenuSlot<'a> = &'a mut dyn FnMut(&mut egui::Ui, f32);
+
 /// Draws the frame `frame` asks of the app: nothing for [`Frame::Native`], the strip with
 /// room for the traffic lights for [`Frame::Inset`], the strip with caption buttons and the
 /// resize edges for [`Frame::Integrated`]. Call it before the rest of the window's UI.
+///
+/// `menu` draws the in-window menu bar after the application name in the strip, between it and
+/// the trailing caption buttons. With [`Frame::Native`] there is no strip and `menu` is not
+/// called: the app puts the bar in a top panel of its own.
 ///
 /// # Arguments
 /// * `ui` - The window's root `Ui`.
 /// * `tr` - Translator for the button labels.
 /// * `frame` - The decided frame.
-pub fn show(ui: &mut egui::Ui, tr: &Translator, frame: &Frame) {
+/// * `menu` - The in-window menu bar, when the window shows one.
+pub fn show(ui: &mut egui::Ui, tr: &Translator, frame: &Frame, menu: Option<MenuSlot<'_>>) {
     match frame {
         Frame::Native => {}
-        Frame::Inset(inset) => title_bar(ui, tr, inset.leading, None, 0.0),
+        Frame::Inset(inset) => title_bar(ui, tr, inset.leading, None, 0.0, menu),
         Frame::Integrated(captions) => {
             resize_edges(ui);
-            title_bar(ui, tr, 0.0, Some(captions), RESIZE_BAND);
+            title_bar(ui, tr, 0.0, Some(captions), RESIZE_BAND, menu);
         }
     }
 }
 
-/// The title-bar strip: `leading` points left free, the application name, and the caption
-/// buttons in `captions`' layout, each side in the layout's (reading) order. The top
-/// `resize_band` points are left to the resize edge, so a drag there resizes rather than moves.
+/// The title-bar strip: `leading` points left free, the application name, the menu bar, and
+/// the caption buttons in `captions`' layout, each side in the layout's (reading) order. The
+/// top `resize_band` points are left to the resize edge, so a drag there resizes rather than
+/// moves.
 fn title_bar(
     ui: &mut egui::Ui,
     tr: &Translator,
     leading: f32,
     captions: Option<&Captions>,
     resize_band: f32,
+    menu: Option<MenuSlot<'_>>,
 ) {
     let fill = ui.visuals().faint_bg_color;
     egui::Panel::top("gcodekit5-title-bar")
@@ -138,6 +149,13 @@ fn title_bar(
                 }
                 ui.add_space(8.0);
                 ui.label("GCodeKit");
+                if let Some(menu) = menu {
+                    ui.add_space(8.0);
+                    let trailing = captions.map_or(0.0, |c| {
+                        c.layout.right.len() as f32 * caption_style(c.family).slot.x
+                    });
+                    menu(ui, (ui.available_width() - trailing).max(0.0));
+                }
                 if let Some(captions) = captions {
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         // Right to left, so the last button in reading order comes first.

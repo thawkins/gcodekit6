@@ -3011,3 +3011,90 @@ msgstr "Minimieren"
 
 msgid "Maximize"
 msgstr "Maximieren"
+
+msgid "View"
+msgstr "Ansicht"
+
+msgid "Tools"
+msgstr "Extras"
+
+msgid "Start Streaming"
+msgstr "Streaming starten"
+
+msgid "Pause Streaming"
+msgstr "Streaming anhalten"
+
+msgid "Stop Streaming"
+msgstr "Streaming beenden"
+
+msgid "Feed Hold"
+msgstr "Vorschub halten"
+
+msgid "Cycle Start"
+msgstr "Zyklusstart"
+
+msgid "Zoom to Fit"
+msgstr "Einpassen"
+
+msgid "Reset View"
+msgstr "Ansicht zurücksetzen"
+
+msgid "Front"
+msgstr "Vorne"
+
+msgid "Isometric"
+msgstr "Isometrisch"
+
+msgid "Materials Manager"
+msgstr "Materialverwaltung"
+
+msgid "About {app}"
+msgstr "Über {app}"
+
+msgid "Settings…"
+msgstr "Einstellungen…"
+
+msgid "Settings"
+msgstr "Einstellungen"
+
+msgid "Appearance"
+msgstr "Erscheinungsbild"
+
+msgid "Hide {app}"
+msgstr "{app} ausblenden"
+
+msgid "Hide Others"
+msgstr "Andere ausblenden"
+
+msgid "Quit {app}"
+msgstr "{app} beenden"
+
+msgid "Preferences…"
+msgstr "Einstellungen…"
+
+msgid "Exit"
+msgstr "Beenden"
+
+msgid "Window"
+msgstr "Fenster"
+
+msgid "Services"
+msgstr "Dienste"
+
+msgid "Show All"
+msgstr "Alle einblenden"
+
+msgid "Bring All to Front"
+msgstr "Alle nach vorne bringen"
+
+msgid "Close Window"
+msgstr "Fenster schließen"
+
+msgid "Menu"
+msgstr "Menü"
+
+msgid "Scroll menu up"
+msgstr "Menü nach oben scrollen"
+
+msgid "Scroll menu down"
+msgstr "Menü nach unten scrollen"

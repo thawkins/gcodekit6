@@ -2935,3 +2935,90 @@ msgstr ""
 
 msgid "Maximize"
 msgstr ""
+
+msgid "View"
+msgstr ""
+
+msgid "Tools"
+msgstr ""
+
+msgid "Start Streaming"
+msgstr ""
+
+msgid "Pause Streaming"
+msgstr ""
+
+msgid "Stop Streaming"
+msgstr ""
+
+msgid "Feed Hold"
+msgstr ""
+
+msgid "Cycle Start"
+msgstr ""
+
+msgid "Zoom to Fit"
+msgstr ""
+
+msgid "Reset View"
+msgstr ""
+
+msgid "Front"
+msgstr ""
+
+msgid "Isometric"
+msgstr ""
+
+msgid "Materials Manager"
+msgstr ""
+
+msgid "About {app}"
+msgstr ""
+
+msgid "Settings…"
+msgstr ""
+
+msgid "Settings"
+msgstr ""
+
+msgid "Appearance"
+msgstr ""
+
+msgid "Hide {app}"
+msgstr ""
+
+msgid "Hide Others"
+msgstr ""
+
+msgid "Quit {app}"
+msgstr ""
+
+msgid "Preferences…"
+msgstr ""
+
+msgid "Exit"
+msgstr ""
+
+msgid "Window"
+msgstr ""
+
+msgid "Services"
+msgstr ""
+
+msgid "Show All"
+msgstr ""
+
+msgid "Bring All to Front"
+msgstr ""
+
+msgid "Close Window"
+msgstr ""
+
+msgid "Menu"
+msgstr ""
+
+msgid "Scroll menu up"
+msgstr ""
+
+msgid "Scroll menu down"
+msgstr ""

@@ -4,6 +4,8 @@
 //! with serde so it can be saved and restored. Each pane implements [`Pane`]. Until the real
 //! panes land (milestones M2 to M5) every pane is a placeholder showing its title.
 //!
+//! Panes ask for commands through [`PaneContext::request`]; the app runs them after drawing.
+//!
 //! Dependencies: `egui`, `craft-ui` (docking, with the `serde` feature), `gcodekit5-app`
 //! (translations).
 
@@ -11,6 +13,8 @@ use craft_ui::docking::{self, DockArea, DockContent, DockStyle, Layout, Node, Pe
 use craft_ui::layout::{SplitAxis, SplitSize};
 use gcodekit5_app::i18n::Translator;
 use serde::{Deserialize, Serialize};
+
+use crate::commands::Command;
 
 /// Identifies one pane of the main window.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -66,6 +70,8 @@ impl PaneId {
 pub struct PaneContext<'a> {
     /// Translator for the current UI language.
     pub tr: &'a Translator,
+    /// Commands the panes asked for this frame; the app runs them after the panes are drawn.
+    commands: &'a mut Vec<Command>,
 }
 
 impl<'a> PaneContext<'a> {
@@ -73,8 +79,17 @@ impl<'a> PaneContext<'a> {
     ///
     /// # Arguments
     /// * `tr` - Translator for the current UI language.
-    pub fn new(tr: &'a Translator) -> Self {
-        Self { tr }
+    /// * `commands` - The queue that [`PaneContext::request`] adds to.
+    pub fn new(tr: &'a Translator, commands: &'a mut Vec<Command>) -> Self {
+        Self { tr, commands }
+    }
+
+    /// Asks the app to run `command` once this frame's panes are drawn.
+    ///
+    /// # Arguments
+    /// * `command` - The command to run.
+    pub fn request(&mut self, command: Command) {
+        self.commands.push(command);
     }
 }
 

@@ -1,7 +1,8 @@
 //! egui + craft-libs front end for GCodeKit5.
 //!
 //! Dependencies: `egui` and `eframe` for the UI and native window, `craft-ui` for widgets and
-//! docking, `craft-window` for the window frame policy, `craft-platform` for the desktop's
+//! docking, `craft-window` for the window frame policy, `craft-keymap` and `craft-menu` for
+//! key bindings and menus, `craft-platform` for the desktop's
 //! light/dark preference, `gcodekit5-app` and `gcodekit5-settings` for state and settings.
 
 #![deny(unsafe_code)]
@@ -16,7 +17,9 @@ macro_rules! n_ {
 }
 
 pub mod app;
+pub mod commands;
 pub mod frame;
+pub mod menu;
 pub mod theme;
 pub mod workspace;
 

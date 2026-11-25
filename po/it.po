@@ -3014,3 +3014,90 @@ msgstr "Riduci a icona"
 
 msgid "Maximize"
 msgstr "Ingrandisci"
+
+msgid "View"
+msgstr "Visualizza"
+
+msgid "Tools"
+msgstr "Strumenti"
+
+msgid "Start Streaming"
+msgstr "Avvia invio"
+
+msgid "Pause Streaming"
+msgstr "Sospendi invio"
+
+msgid "Stop Streaming"
+msgstr "Interrompi invio"
+
+msgid "Feed Hold"
+msgstr "Sospensione avanzamento"
+
+msgid "Cycle Start"
+msgstr "Avvio ciclo"
+
+msgid "Zoom to Fit"
+msgstr "Adatta alla vista"
+
+msgid "Reset View"
+msgstr "Ripristina vista"
+
+msgid "Front"
+msgstr "Fronte"
+
+msgid "Isometric"
+msgstr "Isometrica"
+
+msgid "Materials Manager"
+msgstr "Gestione materiali"
+
+msgid "About {app}"
+msgstr "Informazioni su {app}"
+
+msgid "Settings…"
+msgstr "Impostazioni…"
+
+msgid "Settings"
+msgstr "Impostazioni"
+
+msgid "Appearance"
+msgstr "Aspetto"
+
+msgid "Hide {app}"
+msgstr "Nascondi {app}"
+
+msgid "Hide Others"
+msgstr "Nascondi altre"
+
+msgid "Quit {app}"
+msgstr "Esci da {app}"
+
+msgid "Preferences…"
+msgstr "Preferenze…"
+
+msgid "Exit"
+msgstr "Esci"
+
+msgid "Window"
+msgstr "Finestra"
+
+msgid "Services"
+msgstr "Servizi"
+
+msgid "Show All"
+msgstr "Mostra tutte"
+
+msgid "Bring All to Front"
+msgstr "Porta tutto in primo piano"
+
+msgid "Close Window"
+msgstr "Chiudi finestra"
+
+msgid "Menu"
+msgstr "Menu"
+
+msgid "Scroll menu up"
+msgstr "Scorri menu in alto"
+
+msgid "Scroll menu down"
+msgstr "Scorri menu in basso"

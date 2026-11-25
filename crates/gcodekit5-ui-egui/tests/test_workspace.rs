@@ -11,7 +11,8 @@ fn panes_without_tab(size: egui::Vec2) -> Vec<PaneId> {
     let tr = Translator::new("en");
     let mut workspace = Workspace::default_layout();
     let mut harness = Harness::builder().with_size(size).build_ui(|ui| {
-        let mut ctx = PaneContext::new(&tr);
+        let mut queue = Vec::new();
+        let mut ctx = PaneContext::new(&tr, &mut queue);
         workspace.show(ui, &mut ctx);
     });
     harness.run();
@@ -44,7 +45,8 @@ fn test_tiny_window_keeps_panes_in_overflow_menu() {
     let mut harness = Harness::builder()
         .with_size(egui::vec2(320.0, 200.0))
         .build_ui(|ui| {
-            let mut ctx = PaneContext::new(&tr);
+            let mut queue = Vec::new();
+            let mut ctx = PaneContext::new(&tr, &mut queue);
             workspace.show(ui, &mut ctx);
         });
     harness.run();

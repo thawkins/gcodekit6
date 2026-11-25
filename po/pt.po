@@ -3006,3 +3006,90 @@ msgstr "Minimizar"
 
 msgid "Maximize"
 msgstr "Maximizar"
+
+msgid "View"
+msgstr "Exibir"
+
+msgid "Tools"
+msgstr "Ferramentas"
+
+msgid "Start Streaming"
+msgstr "Iniciar envio"
+
+msgid "Pause Streaming"
+msgstr "Pausar envio"
+
+msgid "Stop Streaming"
+msgstr "Parar envio"
+
+msgid "Feed Hold"
+msgstr "Pausa de avanço"
+
+msgid "Cycle Start"
+msgstr "Início de ciclo"
+
+msgid "Zoom to Fit"
+msgstr "Ajustar à vista"
+
+msgid "Reset View"
+msgstr "Repor vista"
+
+msgid "Front"
+msgstr "Frente"
+
+msgid "Isometric"
+msgstr "Isométrica"
+
+msgid "Materials Manager"
+msgstr "Gestor de materiais"
+
+msgid "About {app}"
+msgstr "Sobre o {app}"
+
+msgid "Settings…"
+msgstr "Definições…"
+
+msgid "Settings"
+msgstr "Definições"
+
+msgid "Appearance"
+msgstr "Aparência"
+
+msgid "Hide {app}"
+msgstr "Ocultar {app}"
+
+msgid "Hide Others"
+msgstr "Ocultar outros"
+
+msgid "Quit {app}"
+msgstr "Sair do {app}"
+
+msgid "Preferences…"
+msgstr "Preferências…"
+
+msgid "Exit"
+msgstr "Sair"
+
+msgid "Window"
+msgstr "Janela"
+
+msgid "Services"
+msgstr "Serviços"
+
+msgid "Show All"
+msgstr "Mostrar tudo"
+
+msgid "Bring All to Front"
+msgstr "Trazer tudo para a frente"
+
+msgid "Close Window"
+msgstr "Fechar janela"
+
+msgid "Menu"
+msgstr "Menu"
+
+msgid "Scroll menu up"
+msgstr "Deslocar menu para cima"
+
+msgid "Scroll menu down"
+msgstr "Deslocar menu para baixo"

@@ -3,17 +3,32 @@
 use craft_window::Button;
 use gcodekit5_app::i18n::Translator;
 use gcodekit5_ui_egui::frame::caption_msgid;
+use gcodekit5_ui_egui::menu;
 use gcodekit5_ui_egui::workspace::PaneId;
 
 const LANGUAGES: [&str; 5] = ["de", "es", "fr", "it", "pt"];
 
 /// Translations that are spelled like the English msgid; the Translator cannot tell them
 /// from a missing entry, so the po file is checked for them instead.
-const IDENTICAL: [(&str, &str); 4] = [
+const IDENTICAL: [(&str, &str); 18] = [
     ("de", "G-Code Editor"),
     ("de", "Designer"),
     ("it", "Designer"),
     ("pt", "Designer"),
+    ("de", "Zoom"),
+    ("es", "Zoom"),
+    ("fr", "Zoom"),
+    ("it", "Zoom"),
+    ("pt", "Zoom"),
+    ("fr", "Machine"),
+    ("fr", "Documentation"),
+    ("fr", "Services"),
+    ("fr", "Menu"),
+    ("it", "File"),
+    ("it", "Reset"),
+    ("it", "Home"),
+    ("it", "Menu"),
+    ("pt", "Menu"),
 ];
 
 fn msgids() -> Vec<&'static str> {
@@ -21,6 +36,7 @@ fn msgids() -> Vec<&'static str> {
         .into_iter()
         .map(PaneId::title_msgid)
         .chain([Button::Minimize, Button::Maximize, Button::Close].map(caption_msgid))
+        .chain(menu::msgids())
         .collect()
 }
 

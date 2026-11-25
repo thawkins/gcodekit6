@@ -16,6 +16,8 @@ eframe = { workspace = true }
 craft-ui = { workspace = true, features = ["serde"] }
 craft-window = { workspace = true, features = ["egui"] }
 craft-platform = { workspace = true, features = ["egui", "appearance"] }
+craft-keymap = { workspace = true, features = ["egui"] }
+craft-menu = { workspace = true }
 gcodekit5-app = { path = "../gcodekit5-app" }
 gcodekit5-settings = { path = "../gcodekit5-settings" }
 serde = { workspace = true }
