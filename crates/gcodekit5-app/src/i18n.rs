@@ -7,4 +7,6 @@
 //! [`set_language`] and translate with [`tr!`](crate::tr) /
 //! [`trn!`](crate::trn).
 
-pub use gcodekit5_settings::i18n::{Translator, current, set_language};
+pub use gcodekit5_settings::i18n::{
+    Translator, current, needs_restart, normalized_language, set_language,
+};

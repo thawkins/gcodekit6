@@ -146,6 +146,24 @@ pub fn set_language(lang: &str) {
     CURRENT.store(catalog_index(lang).unwrap_or(usize::MAX), Ordering::Relaxed);
 }
 
+/// The language preference with `""` read as `"system"` (the two are the same preference).
+///
+/// # Arguments
+/// * `lang` - a language preference
+pub fn normalized_language(lang: &str) -> &str {
+    if lang.is_empty() { "system" } else { lang }
+}
+
+/// True when switching from the `applied` language preference to `saved`
+/// needs a restart (`""` and `"system"` are the same preference).
+///
+/// # Arguments
+/// * `applied` - the preference in effect
+/// * `saved` - the preference just saved
+pub fn needs_restart(applied: &str, saved: &str) -> bool {
+    normalized_language(saved) != normalized_language(applied)
+}
+
 /// The translator for the language last given to [`set_language`] (msgids
 /// until it is called).
 pub fn current() -> Translator {

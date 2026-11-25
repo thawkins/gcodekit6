@@ -48,11 +48,15 @@ impl FilePurpose {
 }
 
 /// A file type a dialog offers: the English msgid of its name and its extensions.
+///
+/// There is no "All Files" filter: neither rfd nor craft-dialogs has a portable form for one.
+/// rfd's zenity backend and Windows turn `*` into `*.*`, which zenity matches only against
+/// names with a dot, and craft-dialogs' macOS panel would take `*` for an extension.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct FileFilter {
     /// The English msgid of the name the dialog lists.
     pub name_msgid: &'static str,
-    /// The extensions, without the dot; `*` matches every file.
+    /// The extensions, without the dot.
     pub extensions: &'static [&'static str],
 }
 
@@ -66,11 +70,6 @@ impl FileFilter {
     pub const DESIGN: Self = Self {
         name_msgid: n_!("GCodeKit Design Files"),
         extensions: &["gckd", "gck5"],
-    };
-    /// Every file.
-    pub const ALL: Self = Self {
-        name_msgid: n_!("All Files"),
-        extensions: &["*"],
     };
 }
 
@@ -335,7 +334,7 @@ pub fn msgids() -> Vec<&'static str> {
         FilePurpose::SaveDesign,
     ]
     .map(FilePurpose::title_msgid);
-    let filters = [FileFilter::GCODE, FileFilter::DESIGN, FileFilter::ALL].map(|f| f.name_msgid);
+    let filters = [FileFilter::GCODE, FileFilter::DESIGN].map(|f| f.name_msgid);
     let confirms = [
         ConfirmRequest::UnsavedGcode,
         ConfirmRequest::UnsavedDesign,

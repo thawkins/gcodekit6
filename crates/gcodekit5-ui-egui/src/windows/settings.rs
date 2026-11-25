@@ -14,7 +14,7 @@
 //! saving them), `gcodekit5-app` (translations).
 
 use craft_ui::combo::ComboBox;
-use gcodekit5_app::i18n::Translator;
+use gcodekit5_app::i18n::{Translator, needs_restart, normalized_language};
 use gcodekit5_settings::SettingsManager;
 use gcodekit5_settings::config::{Config, FeedRateUnits, MeasurementSystem, Theme, UiSettings};
 
@@ -28,23 +28,6 @@ const LANGUAGES: [(&str, &str); 6] = [
     ("it", "Italiano"),
     ("pt", "Portugu\u{ea}s"),
 ];
-
-/// True when switching from the `applied` language preference to `saved` needs a restart
-/// (`""` and `"system"` are the same preference).
-///
-/// # Arguments
-/// * `applied` - The preference in effect.
-/// * `saved` - The preference just saved.
-pub fn needs_restart(applied: &str, saved: &str) -> bool {
-    normalized(applied) != normalized(saved)
-}
-
-fn normalized(language: &str) -> &str {
-    match language {
-        "" => "system",
-        other => other,
-    }
-}
 
 /// What [`SettingsWindow::show`] did this frame.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -240,11 +223,12 @@ impl SettingsWindow {
         let Some(draft) = self.draft.as_mut() else {
             return SettingsOutcome::Closed;
         };
-        let mut config = draft.config.clone();
-        let directory = draft.directory.trim();
-        if !directory.is_empty() {
-            config.file_processing.output_directory = directory.into();
-        }
+        // Start from the settings as they are now, not as they were when the window opened:
+        // recent files, probe and connection settings may have changed meanwhile.
+        let mut config = settings.config().clone();
+        copy_edited(&draft.config, &mut config, self.title_bar_row);
+        // An empty field means no default directory.
+        config.file_processing.output_directory = draft.directory.trim().into();
         let restart = needs_restart(&self.launch_language, &config.ui.language)
             || (self.title_bar_row
                 && config.ui.use_system_title_bar != self.launch_system_title_bar);
@@ -261,6 +245,33 @@ impl SettingsWindow {
             }
         }
     }
+}
+
+/// Copies the fields the window edits from `draft` into `config`, and nothing else.
+fn copy_edited(draft: &Config, config: &mut Config, title_bar_row: bool) {
+    let (from, to) = (&draft.ui, &mut config.ui);
+    to.measurement_system = from.measurement_system;
+    to.feed_rate_units = from.feed_rate_units;
+    to.theme = from.theme;
+    to.language.clone_from(&from.language);
+    to.show_about_on_startup = from.show_about_on_startup;
+    to.grid_major_line_width = from.grid_major_line_width;
+    to.grid_minor_line_width = from.grid_minor_line_width;
+    to.enable_stock_removal_3d = from.enable_stock_removal_3d;
+    to.enable_stl_import = from.enable_stl_import;
+    if title_bar_row {
+        to.use_system_title_bar = from.use_system_title_bar;
+    }
+    let (from, to) = (&draft.machine, &mut config.machine);
+    to.jog_increment = from.jog_increment;
+    to.jog_feed_rate = from.jog_feed_rate;
+    to.x_limit = from.x_limit;
+    to.y_limit = from.y_limit;
+    to.z_limit = from.z_limit;
+    let (from, to) = (&draft.file_processing, &mut config.file_processing);
+    to.preserve_comments = from.preserve_comments;
+    to.arc_segment_length = from.arc_segment_length;
+    to.max_line_length = from.max_line_length;
 }
 
 /// A row label; the widget after it is named by it.
@@ -414,7 +425,7 @@ fn ui_rows(ui: &mut egui::Ui, tr: &Translator, settings: &mut UiSettings, title_
         ],
     );
     let label = row_label(ui, tr, n_!("Language"));
-    let current = normalized(&settings.language).to_string();
+    let current = normalized_language(&settings.language).to_string();
     let selected = LANGUAGES
         .iter()
         .find(|(code, _)| *code == current)

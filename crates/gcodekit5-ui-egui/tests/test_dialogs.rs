@@ -19,16 +19,17 @@ fn end_frame(dialogs: &mut Dialogs) {
     dialogs.end_frame(None::<&eframe::Frame>);
 }
 
+/// A queued request waits, unanswered, across frames that do not show it, is answered when
+/// the end of a frame shows it, and its answer is delivered once. craft-dialogs' only public
+/// hook (`set_override`) answers as soon as the request is shown, so this does not cover a
+/// native dialog staying on screen across frames; that is craft-dialogs' own guarantee.
 #[test]
-fn test_request_survives_frames() {
+fn test_request_waits_and_answer_is_delivered_once() {
     let mut dialogs = dialogs();
     let path = PathBuf::from("/work/part.gcode");
 
     // Frame 1: the request is queued, nothing is answered.
-    dialogs.open_file(
-        FilePurpose::OpenGcode,
-        &[FileFilter::GCODE, FileFilter::ALL],
-    );
+    dialogs.open_file(FilePurpose::OpenGcode, &[FileFilter::GCODE]);
     assert_eq!(dialogs.poll(), None);
     assert_eq!(dialogs.waiting(), 1);
 
@@ -36,7 +37,8 @@ fn test_request_survives_frames() {
     assert_eq!(dialogs.poll(), None);
     assert_eq!(dialogs.waiting(), 1);
 
-    // Frame 3: craft-dialogs' override answers the request in place of a native dialog.
+    // Frame 3: the end of the frame shows it; craft-dialogs' override answers in place of a
+    // native dialog.
     let answer = path.clone();
     dialogs.set_override(Some(Box::new(move |request: &Request| {
         match request {
@@ -44,7 +46,7 @@ fn test_request_survives_frames() {
                 assert_eq!(file.kind, Kind::Open { multiple: false });
                 assert_eq!(file.title.as_deref(), Some("Open G-Code File"));
                 let names: Vec<&str> = file.filters.iter().map(|f| f.name.as_str()).collect();
-                assert_eq!(names, ["G-Code Files", "All Files"]);
+                assert_eq!(names, ["G-Code Files"]);
             }
             Request::Message(message) => panic!("unexpected message box {message:?}"),
         }

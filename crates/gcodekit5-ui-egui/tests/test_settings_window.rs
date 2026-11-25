@@ -7,11 +7,11 @@ use std::path::PathBuf;
 
 use egui_kittest::Harness;
 use egui_kittest::kittest::Queryable;
-use gcodekit5_app::i18n::Translator;
+use gcodekit5_app::i18n::{Translator, needs_restart};
 use gcodekit5_settings::SettingsManager;
 use gcodekit5_settings::config::MeasurementSystem;
 use gcodekit5_settings::migrate::ConfigDirs;
-use gcodekit5_ui_egui::windows::settings::{SettingsOutcome, SettingsWindow, needs_restart};
+use gcodekit5_ui_egui::windows::settings::{SettingsOutcome, SettingsWindow};
 
 /// Fresh settings folders under `target/temp/egui_settings_window/<test>-<pid>`.
 fn scratch(test: &str) -> ConfigDirs {
@@ -165,4 +165,67 @@ fn test_title_bar_row_follows_decision() {
     );
     let (reloaded, _) = SettingsManager::open(dirs);
     assert!(reloaded.config().ui.use_system_title_bar);
+}
+
+#[test]
+fn test_apply_keeps_changes_made_while_open() {
+    let dirs = scratch("test_apply_keeps_changes_made_while_open");
+    let mut harness = harness(dirs.clone(), true);
+
+    // Settings the window does not edit change elsewhere while it is open.
+    let recent = PathBuf::from("/work/recent.nc");
+    let mut config = harness.state().settings.config().clone();
+    config.recent_files = vec![recent.clone()];
+    config.last_opened_path = Some("/work".to_string());
+    harness
+        .state_mut()
+        .settings
+        .apply(config)
+        .expect("save unedited fields");
+
+    choose(&mut harness, "Measurement System", "Imperial");
+    click(&mut harness, "Apply");
+    assert_eq!(
+        harness.state().outcomes,
+        [SettingsOutcome::Applied { restart: false }]
+    );
+
+    let (reloaded, problem) = SettingsManager::open(dirs);
+    assert!(problem.is_none(), "{problem:?}");
+    let config = reloaded.config();
+    assert_eq!(config.recent_files, [recent]);
+    assert_eq!(config.last_opened_path.as_deref(), Some("/work"));
+    assert_eq!(config.ui.measurement_system, MeasurementSystem::Imperial);
+}
+
+#[test]
+fn test_clearing_default_directory_saves_none() {
+    let dirs = scratch("test_clearing_default_directory_saves_none");
+    let mut harness = harness(dirs.clone(), true);
+    assert_ne!(
+        harness
+            .state()
+            .settings
+            .config()
+            .file_processing
+            .output_directory,
+        PathBuf::new(),
+        "starts with a default directory"
+    );
+    harness.get_by_label("Default Directory").focus();
+    harness.run();
+    harness.key_press_modifiers(egui::Modifiers::COMMAND, egui::Key::A);
+    harness.key_press(egui::Key::Backspace);
+    harness.run();
+    click(&mut harness, "Apply");
+    assert_eq!(
+        harness.state().outcomes,
+        [SettingsOutcome::Applied { restart: false }]
+    );
+
+    let (reloaded, _) = SettingsManager::open(dirs);
+    assert_eq!(
+        reloaded.config().file_processing.output_directory,
+        PathBuf::new()
+    );
 }

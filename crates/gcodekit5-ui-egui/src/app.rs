@@ -292,10 +292,9 @@ impl GcodeKitApp {
     pub fn dispatch(&mut self, cmd: Command) {
         self.last_dispatched = Some(cmd);
         match cmd {
-            Command::FileOpen => self.dialogs.open_file(
-                FilePurpose::OpenGcode,
-                &[FileFilter::GCODE, FileFilter::ALL],
-            ),
+            Command::FileOpen => self
+                .dialogs
+                .open_file(FilePurpose::OpenGcode, &[FileFilter::GCODE]),
             // No document has a path of its own yet, so Save asks where to save too.
             Command::FileSave | Command::FileSaveAs => self
                 .dialogs
