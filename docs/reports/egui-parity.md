@@ -8,7 +8,7 @@ then deleted (`26740e3`); its source is at `6841d84`. The Manual checks below ar
 pending before release.
 
 Counts (table rows above Gaps, recounted after the M6 final fixes): 145 Ported, 23 Not
-applicable, 13 Manual check needed, 0 Gap; 181 rows.
+applicable, 13 Manual check needed, 1 Gap (Repetier pen mode); 182 rows.
 
 G7 sweep: every user-visible string of `crates/gcodekit5-ui/src/ui/gtk/` and `gtk_app.rs`
 (`t!(...)`, 1066 strings) was looked up in the egui and app sources, and each one missing was
@@ -75,6 +75,7 @@ Status values:
 | Repetier streaming and E-STOP | *(GTK)* | Ported | `app/test_machine_repetier::repetier_stream_numbers_every_line_and_finishes`, `app/test_machine_repetier::repetier_resend_replays_the_requested_line`, `app/test_machine_repetier::repetier_endless_resend_stops_the_stream`, `app/test_machine_repetier::repetier_emergency_stop_writes_m112_and_drops_the_rest`, `app/test_machine_repetier::repetier_never_writes_grbl_bytes_or_dollar_commands`, `app/test_machine_repetier::repetier_restart_drops_the_stream_and_renumbers`, `test_machine_repetier_pane::test_repetier_profile_streams_repetier_and_disables_grbl_controls`, `test_machine_work_zero::repetier_work_zero_sends_g92_without_systems`. Ported by G8: `MachineController::connect_with` streams with `RepetierProcessor`'s numbering, checksums and `Resend:` replays (GTK's `RepetierSender`: one command in flight; the `ok` after `Resend:` is counted; a line asked for more than 5 times stops the stream), `M110`/`M115` at connect; E-STOP writes `M112`. As GTK: Home (`G28`), step jog, pause/resume (host side), and work zero: Zero, Zero All and Go to Work Zero, with `G10 L20` sent as `G92`. Disabled with a translated reason, as GTK had no Repetier equivalent: overrides, continuous jog (no jog cancel), probing, and the G54-G59 selector (Repetier has no work coordinate systems). Safer than GTK: no `0x18` at connect, `M112` unnumbered, lines sent before it never run, and after it (E-STOP or a typed `M112`) the controller refuses every line, jog and stream but `M112` until the firmware restarts or the connection is reopened, and the pane disables motion with a notice (GTK only logged it): `app/test_machine_repetier::repetier_controller_refuses_everything_after_m112_until_start`, `app/test_machine_repetier::repetier_typed_m112_is_the_emergency_stop`, `test_machine_repetier_pane::test_no_route_moves_a_repetier_board_after_estop`, `test_machine_repetier_pane::test_typed_m112_locks_out_every_route` |
 | Connection refused when the device's firmware differs from the profile | *(GTK)* | Ported | `app/test_machine_repetier::grbl_profile_rejects_a_repetier_controller`, `app/test_machine_repetier::repetier_profile_rejects_a_grbl_controller`, `app/test_machine_repetier::matching_identity_keeps_the_connection`, `test_machine_repetier_pane::test_grbl_profile_rejects_repetier_firmware`, `test_machine_repetier_pane::test_repetier_profile_rejects_grbl_firmware`. Ported by G8: the worker checks the controller's first identity against the profile's protocol (GTK's `protocol_mismatch`) and disconnects; the pane and console show GTK's "Connection rejected: ..." notice naming both |
 | Repetier settings | *(GTK)* | Ported | `test_device_manager::device_manager_repetier_profile_selects_repetier_retrieve`, `test_firmware_settings::firmware_settings_repetier_float_slot_written_as_float` |
+| Repetier pen mode (M3/M5 as pen down/up Z moves) | *(GTK)* | Gap | Found in the M6 final fixes: the Device Manager edits the profile's Pen Mode, but no streaming path applies it. GTK applied it in `RepetierSender` (`apply_pen_mode`: M3/M4 become `G0 Z0`, M5 `G0 Z5`, repeats dropped), which nothing in the egui build used and which was deleted with the `Sender` trait; its source is at `6841d84`, `crates/gcodekit5-communication/src/firmware/repetier/repetier_sender.rs` |
 
 ## Machine control
 
@@ -303,8 +304,13 @@ Ranked by user impact. Sizes are rough estimates for one developer who knows the
 The earlier list's last row, the Designer gallery icons, was ported by the visual restore
 (Fast shape gallery row). The two rows below were found by the G7 sweep of the GTK source.
 
-None. The two rows the G7 sweep found (Repetier streaming and E-STOP; connection refused on
-a firmware/profile mismatch) were ported by gap-closure Task G8.
+1. **Repetier pen mode** (found in the M6 final fixes): the profile's Pen Mode is edited and
+   saved but streaming ignores it, so a pen plotter on Repetier gets `M3`/`M5` instead of pen
+   down/up Z moves. Port GTK's `apply_pen_mode` into the Repetier stream path of
+   `MachineController` (about 2 hours with tests).
+
+The two rows the G7 sweep found (Repetier streaming and E-STOP; connection refused on a
+firmware/profile mismatch) were ported by gap-closure Task G8.
 
 ## Manual checks
 

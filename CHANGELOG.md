@@ -62,6 +62,7 @@ M6 completes the cut-over: the egui front end got GTK's look back (Tabler icons,
 - **Front-end feature flags**: the binary's `gtk` and `egui` features and the one-front-end guard; the egui front end is a plain dependency
 - **GTK dependencies**: `gtk4`, `libadwaita`, `sourceview5`, `glib` and `gettext-rs` (with `gettext-sys`) are no longer built or in `Cargo.lock`
 - **GTK CI step**: the GTK clippy step in `code-quality.yml`, and the four GTK rows of the approved `unsafe` table in `AGENTS-LANGUAGE.md`
+- **GTK-only streaming code in gcodekit5-communication**: the `Sender` trait and `RepetierSender` (the egui build streams Repetier through `MachineController` with `RepetierProcessor`), with the communicator's Repetier flow-control flags and event buffer only they read
 
 ### Fixed
 - **Work zero after a profile change while connected in egui**: activating or saving another device profile while connected no longer changes how Zero works on the controller already connected (a Repetier profile over a GRBL connection sent `G10 L20 P1`, which GRBL writes into G54 whatever system is active); while connected, work zero follows the connection's protocol
@@ -75,6 +76,7 @@ M6 completes the cut-over: the egui front end got GTK's look back (Tabler icons,
 
 ### Known gaps
 - The parity checklist's Manual checks (real controllers, TCP/WebSocket, Windows and macOS, native speakers) have not been run
+- **Repetier pen mode**: the device profile's Pen Mode is saved but not applied when streaming (GTK's `RepetierSender` turned `M3`/`M5` into pen Z moves); listed as a Gap in the parity checklist
 
 ## [Unreleased] - 2026-11-26 (egui + craft-libs migration, milestone M5: managers and help)
 
