@@ -322,6 +322,14 @@ pub struct GcodeKitApp {
     queue: Vec<Command>,
     /// Window commands the dispatched commands asked for, sent at the end of the frame.
     viewport_commands: Vec<egui::ViewportCommand>,
+    /// The text field the user was typing in, kept while a menu is up (a click on the menu
+    /// bar takes the focus from it) so Edit > Cut / Copy / Paste act on its text.
+    text_field: Option<egui::Id>,
+    /// Frames [`GcodeKitApp::text_field`] is kept after its field lost the focus with no menu
+    /// up: the press and release that open a menu.
+    text_field_grace: u8,
+    /// The text field to give the focus back to at the start of the next frame.
+    refocus: Option<egui::Id>,
     /// File dialogs and confirmations, answered on a later frame.
     dialogs: Dialogs,
     /// The context [`GcodeKitApp::dialogs`] wakes when an answer comes in, once known.
@@ -488,6 +496,9 @@ impl GcodeKitApp {
             menus,
             queue: Vec::new(),
             viewport_commands: Vec::new(),
+            text_field: None,
+            text_field_grace: 0,
+            refocus: None,
             dialogs,
             wake_ctx,
             last_dialog_answer: None,
@@ -711,6 +722,10 @@ impl GcodeKitApp {
             self.handle_answer(answer);
         }
         self.workspace.begin_frame(&ctx);
+        if let Some(field) = self.refocus.take() {
+            ctx.memory_mut(|m| m.request_focus(field));
+        }
+        self.track_text_field(&ctx);
         self.dispatch_keys(&ctx);
         self.update_firmware_settings(&ctx);
         self.workspace.frame(&self.state.machine);
@@ -719,8 +734,13 @@ impl GcodeKitApp {
             ..Gate::default()
         };
         let mut queue = std::mem::take(&mut self.queue);
-        queue.extend(self.menus.take_native(&ctx, gate));
-        self.show_frame_and_menu(ui, gate, &mut queue);
+        let mut from_menu = self.menus.take_native(&ctx, gate);
+        self.show_frame_and_menu(ui, gate, &mut from_menu);
+        for command in from_menu {
+            if !self.edit_text_from_menu(command) {
+                queue.push(command);
+            }
+        }
         let tab = egui::Panel::top("gcodekit5-page-tabs")
             .show(ui, |ui| {
                 self.workspace.show_tabs(ui, &self.state.translator)
@@ -904,6 +924,63 @@ impl GcodeKitApp {
         self.queue.extend(requested);
     }
 
+    /// Keeps [`GcodeKitApp::text_field`]: the text field with the keyboard, kept while a menu
+    /// of the bar is up and for the frames that open one.
+    fn track_text_field(&mut self, ctx: &egui::Context) {
+        let menu_up = craft_menu::bar::is_open(ctx) || craft_menu::bar::is_focused(ctx);
+        if ctx.text_edit_focused() {
+            self.text_field = ctx.memory(|m| m.focused());
+            self.text_field_grace = 2;
+        } else if menu_up {
+            self.text_field_grace = 2;
+        } else if self.text_field_grace > 0 {
+            self.text_field_grace -= 1;
+        } else {
+            self.text_field = None;
+        }
+    }
+
+    /// Edit > Cut / Copy / Paste chosen while a text field had the keyboard: gives the field
+    /// its focus back and asks egui for the clipboard event, so the text is cut, copied or
+    /// pasted, never the designer's shapes. (The keys never get here while typing: the
+    /// keymap leaves them to the field.)
+    ///
+    /// # Returns
+    /// Whether `command` was such an edit and was handled.
+    fn edit_text_from_menu(&mut self, command: Command) -> bool {
+        let request = match command {
+            Command::Cut => egui::ViewportCommand::RequestCut,
+            Command::Copy => egui::ViewportCommand::RequestCopy,
+            Command::Paste => egui::ViewportCommand::RequestPaste,
+            _ => return false,
+        };
+        let Some(field) = self.text_field else {
+            return false;
+        };
+        // The press on the menu is still being handled this frame: the field takes the focus
+        // back at the start of the next one, when egui delivers the clipboard event.
+        self.refocus = Some(field);
+        self.viewport_commands.push(request);
+        true
+    }
+
+    /// Hands `cmd` to the designer when the Designer page is shown, as GTK routed its Edit
+    /// actions by page.
+    ///
+    /// # Returns
+    /// Whether the designer ran it.
+    fn route_to_designer_page(&mut self, cmd: Command) -> bool {
+        if self.workspace.page() != Page::Designer {
+            return false;
+        }
+        let mut requested = Vec::new();
+        let mut ctx = PaneContext::new(&self.state.translator, &mut requested)
+            .with_machine(&self.state.machine);
+        let ran = self.workspace.route_to(PaneId::Designer, cmd, &mut ctx);
+        self.queue.extend(requested);
+        ran
+    }
+
     /// Hands `cmd` to the designer when it is the pane the user works in
     /// ([`Workspace::active_pane`]).
     ///
@@ -982,9 +1059,10 @@ impl GcodeKitApp {
             Command::OpenDeviceManager => self.show_page(Page::DeviceManager),
             Command::Quit => self.request_quit(QuitSource::MenuQuit),
             // GTK's Edit actions: shapes on the Designer page (the design's own clipboard),
-            // text elsewhere.
+            // text elsewhere. A text field's own edits are handled before this
+            // (`edit_text_from_menu`, the keymap's typing rule).
             Command::Cut | Command::Copy | Command::Paste => {
-                if !self.route_to_active_designer(cmd) {
+                if !self.route_to_designer_page(cmd) {
                     self.viewport_commands.push(match cmd {
                         Command::Cut => egui::ViewportCommand::RequestCut,
                         Command::Copy => egui::ViewportCommand::RequestCopy,

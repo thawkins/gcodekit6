@@ -523,3 +523,62 @@ fn test_convert_to_path_and_rectangle_replace_the_selection_in_one_undo_step() {
         assert_eq!(ids(h.state()), originals, "{item}");
     }
 }
+
+/// Chooses `item` from the in-window Edit menu.
+fn edit_menu(h: &mut Harness<'static, gcodekit5_ui_egui::GcodeKitApp>, item: &str) {
+    h.get_by_role_and_label(egui::accesskit::Role::MenuItem, "Edit")
+        .click();
+    h.run();
+    h.get_by_role_and_label(egui::accesskit::Role::MenuItem, item)
+        .click();
+    h.run();
+}
+
+#[test]
+fn test_edit_menu_acts_on_a_focused_text_field_not_on_shapes() {
+    let (mut h, designer) = app_with_two_selected();
+    let before = ids(&designer.borrow());
+    let field = h.get_by_role_and_label(egui::accesskit::Role::TextInput, "X:");
+    field.focus();
+    h.run();
+    let focused = h.ctx.memory(|m| m.focused());
+    assert!(focused.is_some());
+    // The menu click takes the focus from the field; the Edit command gives it back and
+    // goes to the text (egui's clipboard request), not to the shapes.
+    for item in ["Copy", "Cut", "Paste"] {
+        edit_menu(&mut h, item);
+        assert_eq!(
+            h.ctx.memory(|m| m.focused()),
+            focused,
+            "{item}: field refocused"
+        );
+    }
+    assert!(
+        designer.borrow().state().clipboard.is_empty(),
+        "no shapes copied"
+    );
+    assert_eq!(ids(&designer.borrow()), before, "no shapes cut or pasted");
+    // The paste event egui-winit sends for the request reaches the refocused field.
+    h.event(egui::Event::Paste("7".to_string()));
+    h.run();
+    let value = h
+        .get_by_role_and_label(egui::accesskit::Role::TextInput, "X:")
+        .accesskit_node()
+        .value()
+        .unwrap_or_default();
+    assert!(value.contains('7'), "{value:?}");
+}
+
+#[test]
+fn test_edit_menu_and_keys_act_on_shapes_anywhere_on_the_designer_page() {
+    let (mut h, designer) = app_with_two_selected();
+    // GTK routed Edit by page: after a press in the Layers pane (not the canvas), Edit > Copy
+    // and Ctrl+V still act on the shapes.
+    h.get_by_label("Objects").click();
+    h.run();
+    edit_menu(&mut h, "Copy");
+    assert_eq!(designer.borrow().state().clipboard.len(), 2);
+    h.key_press_modifiers(Modifiers::COMMAND, egui::Key::V);
+    h.run();
+    assert_eq!(ids(&designer.borrow()).len(), 4);
+}
