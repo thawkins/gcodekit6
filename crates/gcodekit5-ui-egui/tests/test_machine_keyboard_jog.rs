@@ -18,7 +18,7 @@ use crate::machine_support::wait_until;
 use crate::test_machine_pane::{entry, pane_app, report_state};
 
 /// The `$J` lines written so far.
-fn jogs(shared: &LoopbackShared) -> Vec<String> {
+pub(crate) fn jogs(shared: &LoopbackShared) -> Vec<String> {
     shared
         .log()
         .into_iter()
@@ -30,7 +30,7 @@ fn jogs(shared: &LoopbackShared) -> Vec<String> {
 }
 
 /// How many jog cancels were written.
-fn cancels(shared: &LoopbackShared) -> usize {
+pub(crate) fn cancels(shared: &LoopbackShared) -> usize {
     shared
         .log()
         .iter()
@@ -39,7 +39,7 @@ fn cancels(shared: &LoopbackShared) -> usize {
 }
 
 /// Lets the worker write what it was given, then returns the jog lines.
-fn settled_jogs(shared: &LoopbackShared) -> Vec<String> {
+pub(crate) fn settled_jogs(shared: &LoopbackShared) -> Vec<String> {
     std::thread::sleep(Duration::from_millis(30));
     jogs(shared)
 }
@@ -51,7 +51,7 @@ fn settled_cancels(shared: &LoopbackShared) -> usize {
 }
 
 /// A key event: `key` pressed or released.
-fn key(harness: &Harness<'_, GcodeKitApp>, key: egui::Key, pressed: bool) {
+pub(crate) fn key(harness: &Harness<'_, GcodeKitApp>, key: egui::Key, pressed: bool) {
     harness.event(egui::Event::Key {
         key,
         physical_key: Some(key),
@@ -62,7 +62,7 @@ fn key(harness: &Harness<'_, GcodeKitApp>, key: egui::Key, pressed: bool) {
 }
 
 /// Presses and releases `k`, as a tap.
-fn tap(harness: &mut Harness<'_, GcodeKitApp>, k: egui::Key) {
+pub(crate) fn tap(harness: &mut Harness<'_, GcodeKitApp>, k: egui::Key) {
     key(harness, k, true);
     harness.step();
     key(harness, k, false);

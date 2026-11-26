@@ -786,7 +786,12 @@ impl GcodeKitApp {
         if widget_has_keys {
             return None;
         }
-        self.workspace.focused_pane().and_then(PaneId::keymap_scope)
+        // Only a pane on the page shown, drawn last frame: a page change by any path (a tab,
+        // a command, a quit prompt's Cancel) leaves the keys with no hidden pane.
+        self.workspace
+            .focused_pane()
+            .filter(|id| self.workspace.has_keyboard(*id))
+            .and_then(PaneId::keymap_scope)
     }
 
     /// Takes the machine controller's events once per egui frame and fans them out

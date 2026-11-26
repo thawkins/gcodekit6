@@ -653,3 +653,51 @@ fn test_device_manager_unchanged_form_is_not_asked_about() {
     assert!(shown.is_empty(), "{shown:?}");
     assert!(h.state().quit_confirmed());
 }
+
+/// Review Focus 1: a quit asked from Machine Control whose unsaved device profile prompt is
+/// cancelled shows the Device Manager page with no pointer press. That page change ends a
+/// held keyboard jog at once, and the jog keys no longer reach the hidden pane.
+#[test]
+fn test_device_manager_quit_cancel_ends_keyboard_jog() {
+    use crate::test_machine_keyboard_jog::{cancels, jogs, key, settled_jogs, tap};
+    let file = devices_file("quit_cancel_jog", Some(GTK_DEVICES));
+    let (state, shared) = crate::machine_support::loopback_state(Duration::from_millis(1));
+    let mut state = state.with_device_file(file.clone());
+    crate::machine_support::connect(&mut state);
+    let mut h = open_manager(GcodeKitApp::from_state(state));
+    click(&mut h, "Router 4040");
+    set_field(&mut h, "Name:", "Unsaved Router");
+    h.get_by_role_and_label(Role::Tab, "Machine Control")
+        .click();
+    h.run_steps(2);
+    crate::test_machine_pane::report_state(
+        &mut h,
+        &shared,
+        "<Idle|MPos:-100.000,-100.000,-50.000|FS:0,0>",
+        "Idle",
+    );
+    h.get_by_label("Continuous").click();
+    h.step();
+    h.get_by_label("Machine State").click();
+    h.run_steps(2);
+    key(&h, egui::Key::Num6, true);
+    h.run_steps(2);
+    assert!(
+        wait_until(|| jogs(&shared).len() == 1),
+        "{:?}",
+        shared.log()
+    );
+
+    let shown =
+        crate::test_tools_manager::quit_answering(&mut h, craft_dialogs::MessageResult::Cancel);
+    assert_eq!(shown, ["Unsaved changes"]);
+    assert_eq!(h.state().page(), Page::DeviceManager);
+    assert!(wait_until(|| cancels(&shared) == 1), "{:?}", shared.log());
+
+    key(&h, egui::Key::Num6, false);
+    h.step();
+    tap(&mut h, egui::Key::Num6);
+    tap(&mut h, egui::Key::Num8);
+    assert_eq!(settled_jogs(&shared).len(), 1, "{:?}", shared.log());
+    assert_eq!(cancels(&shared), 1);
+}

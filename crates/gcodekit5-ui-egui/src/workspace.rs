@@ -531,6 +531,12 @@ impl Workspace {
     /// # Arguments
     /// * `page` - The page to show.
     pub fn set_page(&mut self, page: Page) {
+        if page != self.page {
+            // Leaving a page ends its keyboard and pointer holds at once, and its panes lose
+            // the keyboard: a key pressed on the new page never reaches them.
+            self.cancel_holds();
+            self.focused = None;
+        }
         self.page = page;
     }
 
@@ -539,7 +545,7 @@ impl Workspace {
     /// # Arguments
     /// * `pane` - The pane to bring to the front.
     pub fn show_pane(&mut self, pane: PaneId) {
-        self.page = Page::of_pane(pane);
+        self.set_page(Page::of_pane(pane));
     }
 
     /// Puts `pane` in place of the pane with the same id.
@@ -675,6 +681,12 @@ impl Workspace {
     /// every pane, such as on a menu, keeps it), while the last frame drew it.
     pub fn active_pane(&self) -> Option<PaneId> {
         self.active.filter(|id| self.drawn.contains(id))
+    }
+
+    /// Whether the pane `id` has the keyboard: the user last pressed in it, its page is the
+    /// one shown and the last frame drew it.
+    pub fn has_keyboard(&self, id: PaneId) -> bool {
+        self.focused == Some(id) && self.page.panes().contains(&id) && self.drawn.contains(&id)
     }
 
     /// Whether the last frame drew the pane `id`'s body (its page is the one shown).
