@@ -100,6 +100,8 @@ fn test_snapshot_each_drawing_tool() {
 fn test_snapshot_toolbox_cnc() {
     use egui_kittest::kittest::Queryable;
     let mut h = gpu_harness();
+    // The theme's taller rows no longer fit the stock settings in 400 px.
+    h.set_size(egui::vec2(640.0, 560.0));
     h.state_mut()
         .state_mut()
         .set_machine_mode(gcodekit5_designer::designer_state::MachineMode::Cnc3D);

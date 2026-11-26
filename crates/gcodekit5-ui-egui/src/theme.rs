@@ -251,11 +251,20 @@ pub fn destructive_fill(mode: egui::Theme) -> Color32 {
 /// # Arguments
 /// * `mode` - Light or dark.
 pub fn style(mode: egui::Theme) -> egui::Style {
+    let mut style = egui::Style::default();
+    apply_style(&mut style, mode);
+    style
+}
+
+/// Applies the theme of `mode` to `style`, keeping the settings it does not own (such as
+/// the animation time a test harness zeroes).
+///
+/// # Arguments
+/// * `style` - The style to change.
+/// * `mode` - Light or dark.
+pub fn apply_style(style: &mut egui::Style, mode: egui::Theme) {
     let p = palette(mode);
-    let mut style = egui::Style {
-        visuals: visuals(mode),
-        ..egui::Style::default()
-    };
+    style.visuals = visuals(mode);
     let spacing = &mut style.spacing;
     spacing.item_spacing = egui::vec2(8.0, 6.0);
     spacing.button_padding = egui::vec2(10.0, 5.0);
@@ -279,7 +288,6 @@ pub fn style(mode: egui::Theme) -> egui::Style {
         }
     }
     style.visuals.widgets.noninteractive.fg_stroke = Stroke::new(1.0, p.window_fg);
-    style
 }
 
 /// A bold-looking section heading (Adwaita `heading` labels: "Connection", "Size").
@@ -353,6 +361,7 @@ pub fn destructive_button(text: impl Into<String>) -> egui::Button<'static> {
 /// # Arguments
 /// * `ctx` - The egui context.
 pub fn install(ctx: &egui::Context) {
-    ctx.set_style_of(egui::Theme::Light, style(egui::Theme::Light));
-    ctx.set_style_of(egui::Theme::Dark, style(egui::Theme::Dark));
+    for mode in [egui::Theme::Light, egui::Theme::Dark] {
+        ctx.style_mut_of(mode, |style| apply_style(style, mode));
+    }
 }
