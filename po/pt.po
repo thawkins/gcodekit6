@@ -4743,3 +4743,6 @@ msgstr "Paragem de emergência (M112): reinicie o controlador ou volte a ligar p
 
 msgid "the controller is emergency-stopped (M112): reset it or reconnect"
 msgstr "o controlador está em paragem de emergência (M112): reinicie-o ou volte a ligar"
+
+msgid "Select the active work coordinate system: the program may have changed it."
+msgstr "Selecione o sistema de coordenadas de trabalho ativo: o programa pode tê-lo alterado."

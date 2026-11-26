@@ -733,3 +733,71 @@ fn test_rotary_zero_refused_when_not_idle_or_job_running() {
         shared.log()
     );
 }
+
+#[test]
+fn test_smoothieware_program_selecting_a_wcs_needs_a_new_selection() {
+    let (mut harness, shared) = connect_profile(gcodekit5_devicedb::ControllerType::Smoothieware);
+    report_idle(&mut harness, &shared);
+    assert!(step_enabled(&mut harness, "Zero X"), "Zero X never enabled");
+    harness
+        .state_mut()
+        .state_mut()
+        .machine
+        .set_program("G55\nG1 X1 F100\n")
+        .expect("program");
+    harness
+        .state_mut()
+        .dispatch(gcodekit5_ui_egui::commands::Command::StreamStart);
+    assert!(
+        step_until(&mut harness, |app| app
+            .state()
+            .machine
+            .status()
+            .stream_end
+            .is_some()),
+        "the program did not end"
+    );
+    for _ in 0..4 {
+        harness.step();
+    }
+    // The program may have left G55 active: no zero until the user says which system.
+    for label in ["Zero X", "Zero All Axes", "Go to Work Zero"] {
+        assert!(
+            !enabled(&harness, label),
+            "{label} enabled after the program"
+        );
+    }
+    assert!(
+        shows_notice(
+            &mut harness,
+            "Select the active work coordinate system: the program may have changed it."
+        ) || harness
+            .get_by_label("Zero X")
+            .accesskit_node()
+            .is_disabled(),
+    );
+    click(&mut harness, "Zero X");
+    assert!(
+        !wrote_prefix(&shared, "G10"),
+        "zeroed with an unknown system"
+    );
+    click(&mut harness, "G55");
+    assert!(step_until(&mut harness, |_| shared
+        .log()
+        .iter()
+        .filter(|w| **w == Wrote::Line("G55".to_string()))
+        .count()
+        == 2));
+    assert!(step_until(&mut harness, |app| app
+        .state()
+        .machine
+        .jog_allowed()));
+    assert!(step_enabled(&mut harness, "Zero X"));
+    click(&mut harness, "Zero X");
+    assert!(
+        step_until(&mut harness, |_| wrote(&shared, "G10 L20 P2 X0")),
+        "{:?}",
+        shared.log()
+    );
+    assert!(!wrote(&shared, "$G"), "$G sent to Smoothieware");
+}

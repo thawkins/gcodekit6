@@ -4755,3 +4755,6 @@ msgstr "Arrêt d'urgence (M112) : réinitialisez le contrôleur ou reconnectez-v
 
 msgid "the controller is emergency-stopped (M112): reset it or reconnect"
 msgstr "le contrôleur est en arrêt d'urgence (M112) : réinitialisez-le ou reconnectez-vous"
+
+msgid "Select the active work coordinate system: the program may have changed it."
+msgstr "Sélectionnez le système de coordonnées pièce actif : le programme l'a peut-être changé."

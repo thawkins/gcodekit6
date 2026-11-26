@@ -45,6 +45,7 @@ pub(super) const MSGIDS: &[&str] = &[
     NO_WORK_ZERO,
     NO_WCS_SYSTEMS,
     ESTOPPED_RESET,
+    SELECT_WCS,
 ];
 
 /// Shown on the zero buttons while the active system is not known.
@@ -60,6 +61,10 @@ pub(super) const NO_WORK_ZERO: &str =
 /// work zero commands (and the pane's motion controls) wait.
 pub(super) const ESTOPPED_RESET: &str =
     n_!("Emergency stop (M112): reset the controller or reconnect to continue.");
+/// Shown on the zero commands of a controller that cannot report its system (Smoothieware)
+/// after a program that may have selected one.
+pub(super) const SELECT_WCS: &str =
+    n_!("Select the active work coordinate system: the program may have changed it.");
 /// Shown on the G54-G59 selector for Repetier, which zeroes with `G92`.
 pub(super) const NO_WCS_SYSTEMS: &str =
     n_!("Repetier firmware has no work coordinate systems; Zero sets the position with G92.");
@@ -107,6 +112,10 @@ pub(super) struct WcsPanel {
     /// Whether Go to Work Zero moves Z too; off by default, a Z0 rapid can crash a tool.
     include_z: bool,
     query: Query,
+    /// A controller that cannot report its system ([`WorkZeroSupport::Selected`]) ran a
+    /// program that may have selected one: the active system is unknown until the user
+    /// selects one.
+    selection_unknown: bool,
     /// For the stream in progress: whether its program may select a system (`None` when no
     /// stream was seen starting).
     stream_selects_wcs: Option<bool>,
@@ -119,7 +128,7 @@ impl WcsPanel {
             self.support,
             WorkZeroSupport::Reported | WorkZeroSupport::Selected
         );
-        if !systems || status.wcs_outside {
+        if !systems || status.wcs_outside || self.selection_unknown {
             return None;
         }
         match status.active_wcs {
@@ -152,6 +161,9 @@ impl WcsPanel {
             WorkZeroSupport::Unavailable => return Some(NO_WORK_ZERO),
             WorkZeroSupport::PositionOnly => return None,
             WorkZeroSupport::Reported | WorkZeroSupport::Selected => {}
+        }
+        if self.selection_unknown {
+            return Some(SELECT_WCS);
         }
         if status.wcs_outside {
             Some(WCS_OUTSIDE)
@@ -203,16 +215,20 @@ impl WcsPanel {
                     // A stream not seen starting may have selected one: ask.
                     if self.stream_selects_wcs.take() != Some(false) {
                         self.query = Query::Wanted;
+                        // Without `$G` nothing can say which system the program left.
+                        self.selection_unknown = self.support == WorkZeroSupport::Selected;
                     }
                 }
                 MachineEvent::Disconnected => {
                     self.query = Query::Settled;
                     self.stream_selects_wcs = None;
                     self.selected = Wcs::default();
+                    self.selection_unknown = false;
                 }
                 MachineEvent::Sent(line) => match wcs_in_line(line) {
                     Some(WcsWord::Known(wcs)) => {
                         self.selected = wcs;
+                        self.selection_unknown = false;
                         self.query = Query::Wanted;
                     }
                     // Unknown to the zero commands until the controller reports again; a

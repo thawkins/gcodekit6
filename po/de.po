@@ -4748,3 +4748,6 @@ msgstr "Not-Aus (M112): Controller zurücksetzen oder neu verbinden, um fortzufa
 
 msgid "the controller is emergency-stopped (M112): reset it or reconnect"
 msgstr "der Controller ist im Not-Aus (M112): zurücksetzen oder neu verbinden"
+
+msgid "Select the active work coordinate system: the program may have changed it."
+msgstr "Wählen Sie das aktive Werkstückkoordinatensystem: Das Programm hat es möglicherweise geändert."
