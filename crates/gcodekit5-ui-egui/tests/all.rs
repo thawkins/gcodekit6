@@ -116,6 +116,8 @@ mod test_machine_control_layout;
 mod test_machine_jog;
 #[path = "test_machine_limits_buffer.rs"]
 mod test_machine_limits_buffer;
+#[path = "test_machine_override_target.rs"]
+mod test_machine_override_target;
 #[path = "test_machine_pane.rs"]
 mod test_machine_pane;
 #[path = "test_machine_probe_report.rs"]

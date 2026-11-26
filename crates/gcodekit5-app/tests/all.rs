@@ -43,6 +43,8 @@ mod test_machine_probe_stream;
 mod test_machine_sent_events;
 #[path = "test_materials_manager_backend.rs"]
 mod test_materials_manager_backend;
+#[path = "test_override_target.rs"]
+mod test_override_target;
 #[path = "test_report_units.rs"]
 mod test_report_units;
 #[path = "test_tool_material_library.rs"]

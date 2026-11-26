@@ -4622,3 +4622,6 @@ msgstr "Simulazione della rimozione del materiale non riuscita."
 
 msgid "Stock removal too large to display on this GPU."
 msgstr "Rimozione del materiale troppo grande per essere visualizzata su questa GPU."
+
+msgid "The controller did not confirm the override change."
+msgstr "Il controller non ha confermato la modifica dell'override."

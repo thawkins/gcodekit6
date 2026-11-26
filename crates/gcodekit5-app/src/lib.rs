@@ -31,6 +31,7 @@ pub mod i18n;
 pub mod machine;
 pub mod material_form;
 pub mod materials_manager_backend;
+pub mod override_target;
 #[cfg(feature = "test-support")]
 #[doc(hidden)]
 pub mod test_support;

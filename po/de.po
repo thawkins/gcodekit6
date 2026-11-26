@@ -4619,3 +4619,6 @@ msgstr "Die Simulation des Materialabtrags ist fehlgeschlagen."
 
 msgid "Stock removal too large to display on this GPU."
 msgstr "Materialabtrag zu groß für die Anzeige auf dieser GPU."
+
+msgid "The controller did not confirm the override change."
+msgstr "Die Steuerung hat die Override-Änderung nicht bestätigt."

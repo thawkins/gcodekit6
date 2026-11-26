@@ -1,10 +1,14 @@
 //! The override section: feed, rapid and spindle override buttons with the percentages the
-//! controller last reported. Each button sends its GRBL real-time override byte.
+//! controller last reported. Each button sends its GRBL real-time override byte. Under them,
+//! GTK's "Set %" fields move the feed or spindle override to an exact percentage, one
+//! confirmed step at a time (`gcodekit5_app::override_target`, driven by the pane).
 //!
-//! Dependencies: `egui`, `gcodekit5-app` (real-time commands, translations).
+//! Dependencies: `egui`, `gcodekit5-app` (real-time commands, override targets,
+//! translations).
 
 use gcodekit5_app::i18n::Translator;
 use gcodekit5_app::machine::RealtimeCommand;
+use gcodekit5_app::override_target::OverrideKind;
 
 use crate::icons::Icon;
 use crate::machine::MachineStatus;
@@ -26,7 +30,42 @@ pub(super) const MSGIDS: &[&str] = &[
     n_!("Increase spindle speed by 1%"),
     n_!("Increase spindle speed by 10%"),
     n_!("Stop spindle"),
+    n_!("Set %"),
+    n_!("Target feed override (%)"),
+    n_!("Set the feed override to exactly the target percentage"),
+    n_!("Target spindle override (%)"),
+    n_!("Set the spindle override to exactly the target percentage"),
 ];
+
+/// What the section asks for.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum Action {
+    /// Send this override byte.
+    Realtime(RealtimeCommand),
+    /// Move `kind` to `percent` (Set %).
+    SetTarget(OverrideKind, u16),
+}
+
+/// The Set % fields' values and whether a target is being reached.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) struct Targets {
+    /// The feed override target, in percent.
+    pub feed: u16,
+    /// The spindle override target, in percent.
+    pub spindle: u16,
+    /// A target is being reached: the Set buttons wait (GTK disabled them too).
+    pub busy: bool,
+}
+
+impl Default for Targets {
+    fn default() -> Self {
+        Self {
+            feed: 100,
+            spindle: 100,
+            busy: false,
+        }
+    }
+}
 
 /// What an override button shows.
 #[derive(Debug, Clone, Copy)]
@@ -147,29 +186,104 @@ fn row(
     clicked
 }
 
-/// The override percentage of the latest report, as text.
+/// The override percentage last reported, as text.
 fn percent(status: &MachineStatus, pick: impl Fn(u16, u16, u16) -> u16) -> String {
-    status
-        .report
-        .as_ref()
-        .and_then(|r| r.overrides)
-        .map_or_else(
-            || "-".to_string(),
-            |o| format!("{}%", pick(o.feed, o.rapid, o.spindle)),
-        )
+    status.overrides.map_or_else(
+        || "-".to_string(),
+        |o| format!("{}%", pick(o.feed, o.rapid, o.spindle)),
+    )
 }
 
-/// Draws the section, one row per override (label, percentage, buttons); returns the
-/// override byte to send, if a button was clicked. When `stacked` (a narrow column) each
-/// row's buttons go under its label and percentage.
+/// Draws one Set % field and its button; returns the target when Set was clicked.
+fn target_field(
+    ui: &mut egui::Ui,
+    tr: &Translator,
+    value: &mut u16,
+    enabled: bool,
+    (field_tip, set_tip): (&str, &str),
+) -> Option<u16> {
+    let field_tip = tr.tr(field_tip);
+    ui.add_enabled(
+        enabled,
+        egui::DragValue::new(value)
+            .range(10..=200)
+            .speed(1.0)
+            .suffix("%"),
+    )
+    .on_hover_text(field_tip.as_ref());
+    let set = ui
+        .add_enabled(enabled, egui::Button::new(tr.tr("Set %")))
+        .on_hover_text(tr.tr(set_tip));
+    set.clicked().then_some(*value)
+}
+
+/// The Set % field and button of `kind`; returns the action when Set was clicked.
+fn kind_target(
+    ui: &mut egui::Ui,
+    tr: &Translator,
+    kind: OverrideKind,
+    enabled: bool,
+    targets: &mut Targets,
+) -> Option<Action> {
+    let enabled = enabled && !targets.busy;
+    // No taller than a label, so the field adds no height to the line it sits on.
+    let row = ui.text_style_height(&egui::TextStyle::Body);
+    ui.spacing_mut().interact_size.y = row;
+    ui.spacing_mut().button_padding.y = 0.0;
+    let (value, tips) = match kind {
+        OverrideKind::Feed => (
+            &mut targets.feed,
+            (
+                "Target feed override (%)",
+                "Set the feed override to exactly the target percentage",
+            ),
+        ),
+        OverrideKind::Spindle => (
+            &mut targets.spindle,
+            (
+                "Target spindle override (%)",
+                "Set the spindle override to exactly the target percentage",
+            ),
+        ),
+    };
+    target_field(ui, tr, value, enabled, tips).map(|percent| Action::SetTarget(kind, percent))
+}
+
+/// Draws the section, one row per override (label, percentage, buttons); returns what was
+/// asked for. The Set % fields (feed, then spindle) sit on the heading's line in a wide
+/// column; when `stacked` (a narrow column) each row's buttons go under its label and
+/// percentage, and its Set % field beside them, so neither adds a line.
 pub(super) fn show(
     ui: &mut egui::Ui,
     tr: &Translator,
     status: &MachineStatus,
     stacked: bool,
-) -> Option<RealtimeCommand> {
+    targets: &mut Targets,
+) -> Option<Action> {
     let enabled = status.connected;
-    crate::theme::section_heading(ui, &tr.tr("Current Feed & Spindle"));
+    let mut target = None;
+    let heading = tr.tr("Current Feed & Spindle");
+    let title = crate::theme::section_heading(ui, &heading).rect;
+    if !stacked {
+        // Over the heading's line, right of its text: the line keeps the heading's height.
+        let line = egui::Rect::from_min_max(
+            egui::pos2(title.right() + 24.0, title.top()),
+            egui::pos2(ui.max_rect().right(), title.bottom()),
+        );
+        let mut line = ui.new_child(
+            egui::UiBuilder::new()
+                .max_rect(line)
+                .layout(egui::Layout::left_to_right(egui::Align::Center)),
+        );
+        for (kind, label) in [
+            (OverrideKind::Feed, tr.tr("Feed:")),
+            (OverrideKind::Spindle, tr.tr("Spindle:")),
+        ] {
+            line.weak(label);
+            target = target.or(kind_target(&mut line, tr, kind, enabled, targets));
+            line.add_space(12.0);
+        }
+    }
     let named = |buttons: &[OverrideButton]| {
         buttons
             .iter()
@@ -188,35 +302,50 @@ pub(super) fn show(
         })
         .collect::<Vec<_>>();
     let rows = [
-        (tr.tr("Feed:"), percent(status, |f, _, _| f), named(&FEED)),
+        (
+            tr.tr("Feed:"),
+            percent(status, |f, _, _| f),
+            named(&FEED),
+            Some(OverrideKind::Feed),
+        ),
         (
             tr.tr("Spindle:"),
             percent(status, |_, _, s| s),
             named(&SPINDLE),
+            Some(OverrideKind::Spindle),
         ),
-        (rapid.clone(), percent(status, |_, r, _| r), rapid_buttons),
+        (
+            rapid.clone(),
+            percent(status, |_, r, _| r),
+            rapid_buttons,
+            None,
+        ),
     ];
     let mut clicked = None;
     if stacked {
-        for (label, value, buttons) in rows {
+        for (label, value, buttons, kind) in rows {
             ui.horizontal(|ui| {
                 ui.weak(label);
                 ui.label(value);
+                if let Some(kind) = kind {
+                    ui.add_space(8.0);
+                    target = target.or(kind_target(ui, tr, kind, enabled, targets));
+                }
             });
             clicked = clicked.or(row(ui, enabled, buttons));
         }
-        return clicked;
+    } else {
+        egui::Grid::new("machine-control-overrides")
+            .num_columns(3)
+            .spacing([12.0, 6.0])
+            .show(ui, |ui| {
+                for (label, value, buttons, _) in rows {
+                    ui.weak(label);
+                    ui.add_sized([56.0, BUTTON_SIZE.y], egui::Label::new(value));
+                    clicked = clicked.or(row(ui, enabled, buttons));
+                    ui.end_row();
+                }
+            });
     }
-    egui::Grid::new("machine-control-overrides")
-        .num_columns(3)
-        .spacing([12.0, 6.0])
-        .show(ui, |ui| {
-            for (label, value, buttons) in rows {
-                ui.weak(label);
-                ui.add_sized([56.0, BUTTON_SIZE.y], egui::Label::new(value));
-                clicked = clicked.or(row(ui, enabled, buttons));
-                ui.end_row();
-            }
-        });
-    clicked
+    clicked.map(Action::Realtime).or(target)
 }

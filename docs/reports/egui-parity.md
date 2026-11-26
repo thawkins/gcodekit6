@@ -88,7 +88,7 @@ Status values:
 | Feed override +/-1 %, +/-10 %, reset | 12-overrides | Ported | `test_machine_pane::feed_override_plus_10` |
 | Spindle override +/-1 %, +/-10 %, reset | 12-overrides | Manual check needed | Same button row as feed; no spindle-specific test |
 | Rapid override presets | 12-overrides | Manual check needed | Buttons exist (`overrides.rs` `RAPID`); no test |
-| Set an exact override percentage | *(GTK)* | Gap | GTK "Set %" target field; not in egui |
+| Set an exact override percentage | *(GTK)* | Ported | `test_machine_override_target::feed_set_percent_steps_with_confirmation`, `test_machine_override_target::spindle_set_percent_sends_spindle_bytes`, `app/test_override_target::next_step_waits_for_the_report_then_fails_after_timeout` (feed and spindle, as GTK; one step per `Ov:` confirmation) |
 
 ## Console
 

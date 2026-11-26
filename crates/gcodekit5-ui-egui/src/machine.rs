@@ -23,7 +23,7 @@ use gcodekit5_app::machine::grbl_stream::{
 use gcodekit5_app::machine::{MachineController, MachineEvent, worker_text};
 use gcodekit5_app::work_zero::{Wcs, WcsWord, parser_state_wcs, wcs_in_line};
 use gcodekit5_communication::firmware::grbl::status_parser::{
-    FullStatus, WorkCoordinateOffset, parse_probe_report_in,
+    FullStatus, OverrideState, WorkCoordinateOffset, parse_probe_report_in,
 };
 use gcodekit5_core::ProbeResult;
 
@@ -62,6 +62,9 @@ pub struct MachineStatus {
     pub report: Option<FullStatus>,
     /// The latest work coordinate offset (GRBL sends it only every few reports).
     pub wco: Option<WorkCoordinateOffset>,
+    /// The latest override percentages (GRBL sends `Ov:` only every few reports and on a
+    /// change).
+    pub overrides: Option<OverrideState>,
     /// The latest error reported by the controller or transport.
     pub last_error: Option<String>,
     /// X, Y and Z max travel in mm (`$130`-`$132`), once the controller reported them.
@@ -240,6 +243,7 @@ impl MachineStatus {
                     self.streaming = false;
                     self.report = None;
                     self.wco = None;
+                    self.overrides = None;
                     self.grbl_travel = [None; 3];
                     self.report_inches = false;
                     self.active_wcs = None;
@@ -251,6 +255,9 @@ impl MachineStatus {
                     let report = (**report).clone().into_mm(self.report_inches);
                     if let Some(wco) = report.wco {
                         self.wco = Some(wco);
+                    }
+                    if let Some(overrides) = report.overrides {
+                        self.overrides = Some(overrides);
                     }
                     self.report = Some(report);
                 }

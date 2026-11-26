@@ -4626,3 +4626,6 @@ msgstr "La simulation d'enlèvement de matière a échoué."
 
 msgid "Stock removal too large to display on this GPU."
 msgstr "Enlèvement de matière trop volumineux pour être affiché sur ce GPU."
+
+msgid "The controller did not confirm the override change."
+msgstr "Le contrôleur n'a pas confirmé la modification de la correction."

@@ -37,12 +37,14 @@ mod stream;
 mod wcs;
 
 use std::sync::{Arc, Mutex};
+use std::time::Instant;
 
 use gcodekit5_app::device_status::{jog_direction, set_jog_inverted};
 use gcodekit5_app::i18n::Translator;
 use gcodekit5_app::machine::{
     Axis, MachineController, MachineError, MachineEvent, RealtimeCommand,
 };
+use gcodekit5_app::override_target::{OverrideTarget, TargetStep};
 use gcodekit5_app::work_zero::{
     Wcs, go_to_work_zero_command, reports_grbl_parser_state, zero_axes_command, zero_rotary_command,
 };
@@ -94,6 +96,7 @@ const MSGIDS: &[&str] = &[
     GO_TO_ZERO_NOT_IDLE,
     ZERO_NOT_IDLE,
     WCS_CHANGED,
+    OVERRIDE_NOT_CONFIRMED,
 ];
 
 /// A work zero command refused while a job runs.
@@ -106,6 +109,8 @@ const GO_TO_ZERO_NOT_IDLE: &str = n_!("Go to Work Zero refused: the machine is n
 const ZERO_NOT_IDLE: &str = n_!("Zero refused: the machine is not idle.");
 /// Zero All Axes refused at Yes: the active system is no longer the one the question named.
 const WCS_CHANGED: &str = n_!("Zero All refused: the work coordinate system changed.");
+/// A Set % target ended without the controller confirming a step.
+const OVERRIDE_NOT_CONFIRMED: &str = n_!("The controller did not confirm the override change.");
 
 /// The Machine Control pane.
 pub struct MachineControlPane {
@@ -127,6 +132,12 @@ pub struct MachineControlPane {
     rotary_calibration: [f64; 3],
     /// A refusal of the pane's own (not the controller's), shown until the next action.
     notice: Option<String>,
+    /// A refusal found outside drawing (no translator there), shown on the next frame.
+    pending_refusal: Option<&'static str>,
+    /// The Set % fields.
+    targets: overrides::Targets,
+    /// The override being moved to a Set % target, one confirmed step at a time.
+    override_target: Option<OverrideTarget>,
     /// The emergency stop picture (`images/eStop2.png`): `None` until first drawn, then the
     /// texture, or `None` inside when it could not be decoded (the button shows its text).
     estop_image: Option<Option<egui::TextureHandle>>,
@@ -191,6 +202,9 @@ impl MachineControlPane {
             limits: [200.0, 200.0, 100.0, 360.0, 360.0, 360.0],
             rotary_calibration: [0.0; 3],
             notice: None,
+            pending_refusal: None,
+            targets: overrides::Targets::default(),
+            override_target: None,
             estop_image: None,
         }
     }
@@ -513,6 +527,30 @@ impl MachineControlPane {
         true
     }
 
+    /// Takes the Set % target one step further: sends the next override byte once the
+    /// controller reported the last one; ends it at the target, on a disconnect, or (with a
+    /// notice) when a step is not confirmed.
+    fn drive_override_target(&mut self, machine: &Machine) {
+        let Some(target) = self.override_target.as_mut() else {
+            return;
+        };
+        let status = machine.status();
+        if !status.connected {
+            self.override_target = None;
+            return;
+        }
+        match target.step(status.overrides.as_ref(), Instant::now()) {
+            TargetStep::Send(command) => self.with_controller(|c| c.realtime(command)),
+            TargetStep::Wait => {}
+            TargetStep::Done(_) => self.override_target = None,
+            TargetStep::Failed => {
+                tracing::warn!(kind = ?target.kind(), goal = target.goal(), "override target not confirmed");
+                self.override_target = None;
+                self.pending_refusal = Some(OVERRIDE_NOT_CONFIRMED);
+            }
+        }
+    }
+
     /// Clears the connecting state once the controller reported how the connect went (a
     /// failed connect reports its error, then `Disconnected`).
     fn follow_events(&mut self, events: &[MachineEvent]) {
@@ -655,8 +693,16 @@ impl MachineControlPane {
                 .clicked();
             ui.add_space(SECTION_GAP);
         }
-        if let Some(command) = overrides::show(ui, tr, status, stacked) {
-            self.with_controller(|c| c.realtime(command));
+        self.targets.busy = self.override_target.is_some();
+        match overrides::show(ui, tr, status, stacked, &mut self.targets) {
+            Some(overrides::Action::Realtime(command)) => {
+                self.with_controller(|c| c.realtime(command));
+            }
+            Some(overrides::Action::SetTarget(kind, percent)) => {
+                self.notice = None;
+                self.override_target = Some(OverrideTarget::new(kind, percent, Instant::now()));
+            }
+            None => {}
         }
         ui.add_space(SECTION_GAP);
         crate::theme::section_heading(ui, &dro::work_title(tr, self.units));
@@ -823,6 +869,9 @@ impl Pane for MachineControlPane {
 
     fn ui(&mut self, ui: &mut egui::Ui, ctx: &mut PaneContext) {
         let tr = ctx.tr;
+        if let Some(msgid) = self.pending_refusal.take() {
+            self.notice = Some(tr.tr(msgid).into_owned());
+        }
         let default_status = MachineStatus::default();
         let machine = ctx.machine();
         let status = machine.map_or(&default_status, |m| m.status());
@@ -897,6 +946,7 @@ impl Pane for MachineControlPane {
         // Asks `$G` when the active system may have changed; zeroing waits for it.
         self.wcs.watch_stream(machine);
         self.wcs.drive(machine);
+        self.drive_override_target(machine);
     }
 
     fn set_controller(&mut self, controller: Option<&gcodekit5_devicedb::ControllerType>) {
