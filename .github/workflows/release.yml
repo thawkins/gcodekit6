@@ -244,7 +244,7 @@ jobs:
           *.deb
           *.rpm
           *.flatpak
-          *.AppImage
+          gcodekit5-*.AppImage
         if-no-files-found: error
 
     - name: Upload Artifact (macOS)
@@ -265,31 +265,51 @@ jobs:
           *-portable.zip
         if-no-files-found: error
 
-    - name: Build Changelog
-      id: build_changelog
-      if: matrix.platform.os_name == 'Linux-x86_64' && github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
-      uses: mikepenz/release-changelog-builder-action@v6
+    - name: Build Release Notes
+      # The notes are every CHANGELOG.md section for this version, plus older
+      # versions that never had a published release (scripts/release_notes.py).
+      # A tag push fails here when CHANGELOG.md has no section for its version;
+      # a dry run only checks the Cargo.toml version and never fails.
+      if: matrix.platform.os_name == 'Linux-x86_64'
+      shell: bash
       env:
-        GITHUB_TOKEN: ${{ secrets.RELEASE || github.token }}
+        GH_TOKEN: ${{ secrets.RELEASE || github.token }}
+      run: |
+        if [[ "${{ github.event_name }}" == "push" && "$GITHUB_REF" == refs/tags/* ]]; then
+          version="${GITHUB_REF_NAME#v}"
+          published=$(gh release list --repo "$GITHUB_REPOSITORY" --exclude-drafts \
+            --limit 100 --json tagName -q '[.[].tagName] | join(",")')
+          python3 -I scripts/release_notes.py "$version" --out release_notes.md \
+            --published "$published" --repo "$GITHUB_REPOSITORY"
+        else
+          python3 -I scripts/release_notes.py "$PKG_VERSION" --out release_notes.md \
+            --repo "$GITHUB_REPOSITORY" \
+            || echo "::warning::CHANGELOG.md has no section for $PKG_VERSION yet"
+        fi
+        if [[ -f release_notes.md ]]; then cat release_notes.md >> "$GITHUB_STEP_SUMMARY"; fi
 
     - name: Release (Linux)
       if: matrix.platform.os_name == 'Linux-x86_64' && github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
       uses: softprops/action-gh-release@v3
       with:
         token: ${{ secrets.RELEASE || github.token }}
-        body: ${{ steps.build_changelog.outputs.changelog }}
+        # A version with a suffix (v2.0.0-alpha.2) is published as a pre-release
+        prerelease: ${{ contains(github.ref_name, '-') }}
+        body_path: release_notes.md
         files: |
           ${{ env.ASSET_NAME }}
           *.flatpak
           *.deb
           *.rpm
-          *.AppImage
+          gcodekit5-*.AppImage
 
     - name: Release (macOS)
       if: startsWith(matrix.platform.os_name, 'macOS') && github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
       uses: softprops/action-gh-release@v3
       with:
         token: ${{ secrets.RELEASE || github.token }}
+        # A version with a suffix (v2.0.0-alpha.2) is published as a pre-release
+        prerelease: ${{ contains(github.ref_name, '-') }}
         files: |
           *.dmg
 
@@ -298,6 +318,8 @@ jobs:
       uses: softprops/action-gh-release@v3
       with:
         token: ${{ secrets.RELEASE || github.token }}
+        # A version with a suffix (v2.0.0-alpha.2) is published as a pre-release
+        prerelease: ${{ contains(github.ref_name, '-') }}
         files: |
           *.msi
           *-portable.zip

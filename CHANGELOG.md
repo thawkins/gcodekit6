@@ -1,3 +1,9 @@
+## [Unreleased] - 2026-11-27 (release page fixes)
+
+### Fixed
+- **Release notes**: each GitHub release now carries the full CHANGELOG.md notes for its version (all of its sections, plus older versions with no published release), a downloads table and a link to the full history, built by `scripts/release_notes.py`; it replaces the short pull-request list. A tag whose version has no CHANGELOG section fails before publishing
+- **Release page**: a tag with a version suffix (`v2.0.0-alpha.2`) is published as a pre-release, and the Linux upload takes only the app's AppImage, no longer the `linuxdeploy` build tool
+
 ## [2.0.0-alpha.2] - 2026-11-27
 
 Republishes 2.0.0-alpha.1 with a working release workflow. The application is unchanged from 2.0.0-alpha.1; the v2.0.0-alpha.1 tag has no published release.
