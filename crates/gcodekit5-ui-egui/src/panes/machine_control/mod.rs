@@ -698,7 +698,8 @@ impl MachineControlPane {
             TargetStep::Wait => {}
             TargetStep::Done(_) => self.override_target = None,
             TargetStep::Failed => {
-                tracing::warn!(kind = ?target.kind(), goal = target.goal(), "override target not confirmed");
+                let (kind, goal) = (target.kind(), target.goal());
+                tracing::warn!(?kind, goal, "override target not confirmed");
                 self.override_target = None;
                 self.pending_refusal = Some(OVERRIDE_NOT_CONFIRMED);
             }

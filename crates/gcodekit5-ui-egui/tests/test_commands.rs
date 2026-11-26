@@ -126,8 +126,9 @@ const SAFETY_CHORDS: &[(&str, Command)] = &[
     ("Cmd+Shift+K", Command::SoftReset),
 ];
 
-/// Documented safety deviation: keys that run nothing, anywhere. GTK's JOG_* "Right"/"Left"/"Up"/"Down"/"Page_Up"/"Page_Down" were unused accelerators.rs
-/// constants; arrows move between widgets, so they jog nothing, anywhere.
+/// Documented safety deviation: keys that run nothing, anywhere. GTK's JOG_* "Right",
+/// "Left", "Up", "Down", "Page_Up" and "Page_Down" were unused accelerators.rs constants;
+/// arrows move between widgets, so they jog nothing, anywhere.
 const UNBOUND_FOR_SAFETY: &[&str] = &["Right", "Left", "Up", "Down", "PageUp", "PageDown"];
 
 #[test]
