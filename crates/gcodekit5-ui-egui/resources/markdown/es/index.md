@@ -14,7 +14,7 @@
 -     ▪️ [Calculadora de velocidades y avances](help:speeds_feeds_calculator)
 -     ▪️ [Planeado de Sufridera](help:spoilboard_surfacing)
 -     ▪️ [Rejilla en la Sufridera](help:spoilboard_grid)
--     ▪️ [Taladro de Columna](help:dirll_press)
+-     ▪️ [Taladro de Columna](help:drill_press)
 - [Configuración de dispositivos](help:device_config): recupera/guarda la configuración y las capacidades de GRBL.
 - [Administrador de dispositivos](help:device_manager): administra los perfiles y las conexiones de los dispositivos.
 - [Herramientas CNC](help:tools_manager): administra las definiciones de herramientas.

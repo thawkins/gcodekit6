@@ -1150,6 +1150,9 @@ msgstr "não ligado"
 msgid "Setting not changed"
 msgstr "Definição não alterada"
 
+msgid "Setting stored with another value"
+msgstr "Definição guardada com outro valor"
+
 msgid "Export Settings"
 msgstr "Exportar definições"
 
@@ -3795,3 +3798,786 @@ msgstr "Pare o trabalho em execução antes de gerar."
 
 msgid "Must be at most 2000 mm"
 msgstr "Deve ser no máximo 2000 mm"
+
+msgid "connect failed"
+msgstr "falha na conexão"
+
+msgid "write failed"
+msgstr "falha na escrita"
+
+msgid "read failed"
+msgstr "falha na leitura"
+
+msgid "machine worker thread panicked"
+msgstr "a thread de trabalho da máquina falhou"
+
+msgid "cycle start ignored: probe stream halting"
+msgstr "início de ciclo ignorado: o programa de sondagem está parando"
+
+msgid "line too long for the controller buffer"
+msgstr "linha longa demais para o buffer do controlador"
+
+msgid "program line too long for the controller buffer"
+msgstr "linha de programa longa demais para o buffer do controlador"
+
+msgid "on program line"
+msgstr "na linha de programa"
+
+msgid "dropped: controller reset after probe error"
+msgstr "descartado: controlador reiniciado após erro de sondagem"
+
+msgid "jog ignored: invalid distance or feed"
+msgstr "jog ignorado: distância ou avanço inválidos"
+
+msgid "jog ignored: a program is streaming"
+msgstr "jog ignorado: um programa está sendo enviado"
+
+msgid "Failed to load image file"
+msgstr "Falha ao carregar o arquivo de imagem"
+
+msgid "The engraving worker stopped"
+msgstr "O processo de gravação parou"
+
+msgid "already connected"
+msgstr "já conectado"
+
+msgid "a program is already streaming"
+msgstr "um programa já está sendo enviado"
+
+msgid "Firmware Settings"
+msgstr "Configurações do firmware"
+
+msgid "Device Info"
+msgstr "Informações do dispositivo"
+
+msgid "Protocol mismatch: No valid parameters received from device"
+msgstr "Protocolo incompatível: nenhum parâmetro válido recebido do dispositivo"
+
+msgid "Setting written:"
+msgstr "Configuração gravada:"
+
+msgid "a job is running"
+msgstr "um trabalho está em execução"
+
+msgid "Build"
+msgstr "Compilação"
+
+msgid "waiting for the controller to answer earlier commands"
+msgstr "aguardando o controlador responder a comandos anteriores"
+
+msgid "unknown EEPROM value type"
+msgstr "tipo de valor EEPROM desconhecido"
+
+msgid "Enter a value"
+msgstr "Introduza um valor"
+
+msgid "Enter a whole number"
+msgstr "Introduza um número inteiro"
+
+msgid "The value is out of range"
+msgstr "O valor está fora do intervalo"
+
+msgid "Dimensions"
+msgstr "Dimensões"
+
+msgid "Device profiles could not be read:"
+msgstr "Não foi possível ler os perfis de dispositivo:"
+
+msgid "No settings folder: device profiles cannot be loaded or saved."
+msgstr "Sem pasta de configurações: os perfis de dispositivo não podem ser carregados nem guardados."
+
+msgid "Failed to save device"
+msgstr "Falha ao guardar o dispositivo"
+
+msgid "Device not changed"
+msgstr "Dispositivo não alterado"
+
+msgid "Device saved:"
+msgstr "Dispositivo guardado:"
+
+msgid "Device deleted:"
+msgstr "Dispositivo eliminado:"
+
+msgid "Active device:"
+msgstr "Dispositivo ativo:"
+
+msgid "Please connect to a device first."
+msgstr "Ligue-se primeiro a um dispositivo."
+
+msgid "No settings reported yet: Retrieve them in Firmware Settings first."
+msgstr "Ainda não foram recebidas definições: obtenha-as primeiro em Definições do firmware."
+
+msgid "Device dimensions, spindle speed, and capabilities have been updated from the connected device. Click Save to apply changes."
+msgstr "As dimensões, a velocidade do fuso e as capacidades foram atualizadas a partir do dispositivo ligado. Clique em Guardar para aplicar."
+
+msgid "Devices"
+msgstr "Dispositivos"
+
+msgid "Search devices..."
+msgstr "Procurar dispositivos..."
+
+msgid "Add Device"
+msgstr "Adicionar dispositivo"
+
+msgid "Active"
+msgstr "Ativo"
+
+msgid "Sync from Device"
+msgstr "Sincronizar a partir do dispositivo"
+
+msgid "Update device information from connected device"
+msgstr "Atualizar as informações a partir do dispositivo ligado"
+
+msgid "Set Active"
+msgstr "Definir como ativo"
+
+msgid "Please select or create a device entry to edit"
+msgstr "Selecione ou crie um dispositivo para editar"
+
+msgid "Delete device?"
+msgstr "Eliminar dispositivo?"
+
+msgid "Delete '{}'? This cannot be undone."
+msgstr "Eliminar '{}'? Esta ação não pode ser anulada."
+
+msgid "Device Type:"
+msgstr "Tipo de dispositivo:"
+
+msgid "Controller:"
+msgstr "Controlador:"
+
+msgid "Connection Type:"
+msgstr "Tipo de ligação:"
+
+msgid "Baud Rate:"
+msgstr "Taxa de baud:"
+
+msgid "TCP Host:"
+msgstr "Anfitrião TCP:"
+
+msgid "TCP Port:"
+msgstr "Porta TCP:"
+
+msgid "Timeout (ms):"
+msgstr "Tempo limite (ms):"
+
+msgid "Auto Reconnect"
+msgstr "Religar automaticamente"
+
+msgid "X Axis:"
+msgstr "Eixo X:"
+
+msgid "Y Axis:"
+msgstr "Eixo Y:"
+
+msgid "Z Axis:"
+msgstr "Eixo Z:"
+
+msgid "Min:"
+msgstr "Mín.:"
+
+msgid "Max:"
+msgstr "Máx.:"
+
+msgid "Limits"
+msgstr "Limites de operação"
+
+msgid "Max S-Value:"
+msgstr "Valor S máx.:"
+
+msgid "No of Axes:"
+msgstr "N.º de eixos:"
+
+msgid "Has Spindle"
+msgstr "Tem fuso"
+
+msgid "Spindle Power (W):"
+msgstr "Potência do fuso (W):"
+
+msgid "Max Spindle Speed (RPM):"
+msgstr "Velocidade máx. do fuso (RPM):"
+
+msgid "Has Laser"
+msgstr "Tem laser"
+
+msgid "Laser Power (W):"
+msgstr "Potência do laser (W):"
+
+msgid "Has Coolant"
+msgstr "Tem refrigerante"
+
+msgid "Pen Mode (Repetier: M3/M5 become pen down/up Z moves)"
+msgstr "Modo caneta (Repetier: M3/M5 passam a movimentos Z de baixar/levantar a caneta)"
+
+msgid "FluidNC (supported via GRBL)"
+msgstr "FluidNC (suportado via GRBL)"
+
+msgid "grblHAL (supported via GRBL)"
+msgstr "grblHAL (suportado via GRBL)"
+
+msgid "TinyG (not supported)"
+msgstr "TinyG (não suportado)"
+
+msgid "g2core (not supported)"
+msgstr "g2core (não suportado)"
+
+msgid "Smoothieware (not supported)"
+msgstr "Smoothieware (não suportado)"
+
+msgid "Marlin (not supported)"
+msgstr "Marlin (não suportado)"
+
+msgid "Serial"
+msgstr "Série"
+
+msgid "CNC Mill"
+msgstr "Fresadora CNC"
+
+msgid "CNC Lathe"
+msgstr "Torno CNC"
+
+msgid "Laser Cutter"
+msgstr "Cortadora a laser"
+
+msgid "3D Printer"
+msgstr "Impressora 3D"
+
+msgid "Plotter"
+msgstr "Traçador"
+
+msgid "Invalid TCP Port"
+msgstr "Porta TCP inválida"
+
+msgid "TCP Port must be a number"
+msgstr "A porta TCP tem de ser um número"
+
+msgid "Invalid Timeout"
+msgstr "Tempo limite inválido"
+
+msgid "Timeout must be a number (ms)"
+msgstr "O tempo limite tem de ser um número (ms)"
+
+msgid "Invalid TCP Host"
+msgstr "Anfitrião TCP inválido"
+
+msgid "TCP Host must not contain spaces"
+msgstr "O anfitrião TCP não pode conter espaços"
+
+msgid "TCP Host must not be empty for network connections"
+msgstr "O anfitrião TCP não pode estar vazio em ligações de rede"
+
+msgid "Invalid X Min"
+msgstr "X mín. inválido"
+
+msgid "Invalid X Max"
+msgstr "X máx. inválido"
+
+msgid "Invalid Y Min"
+msgstr "Y mín. inválido"
+
+msgid "Invalid Y Max"
+msgstr "Y máx. inválido"
+
+msgid "Invalid Z Min"
+msgstr "Z mín. inválido"
+
+msgid "Invalid Z Max"
+msgstr "Z máx. inválido"
+
+msgid "Invalid No of Axes"
+msgstr "Número de eixos inválido"
+
+msgid "Number of axes must be an integer between 1 and 6"
+msgstr "O número de eixos tem de ser um inteiro entre 1 e 6"
+
+msgid "Invalid Max Feed Rate"
+msgstr "Avanço máximo inválido"
+
+msgid "Invalid Max S-Value"
+msgstr "Valor S máximo inválido"
+
+msgid "Max S-Value must be a number"
+msgstr "O valor S máximo tem de ser um número"
+
+msgid "Invalid Spindle Power"
+msgstr "Potência do fuso inválida"
+
+msgid "Spindle power must be a number (W)"
+msgstr "A potência do fuso tem de ser um número (W)"
+
+msgid "Invalid Max Spindle Speed"
+msgstr "Velocidade máx. do fuso inválida"
+
+msgid "Max spindle speed must be an integer (RPM)"
+msgstr "A velocidade máx. do fuso tem de ser um inteiro (RPM)"
+
+msgid "Invalid Laser Power"
+msgstr "Potência do laser inválida"
+
+msgid "Laser power must be a number (W)"
+msgstr "A potência do laser tem de ser um número (W)"
+
+msgid "Unsupported controller"
+msgstr "Controlador não suportado"
+
+msgid "The selected controller '{}' is not supported yet. Please choose a supported one and try again."
+msgstr "O controlador '{}' selecionado ainda não é suportado. Escolha um suportado e tente novamente."
+
+msgid "The active device cannot be deleted. Set another device active first."
+msgstr "O dispositivo ativo não pode ser eliminado. Defina primeiro outro dispositivo como ativo."
+
+msgid "The only device cannot be deleted."
+msgstr "O único dispositivo não pode ser eliminado."
+
+msgid "Check that the active device's controller in the Device Manager matches the machine."
+msgstr "Verifique se o controlador do dispositivo ativo no Gestor de dispositivos corresponde à máquina."
+
+msgid "A copy of the unreadable profiles file was kept in"
+msgstr "Foi guardada uma cópia do ficheiro de perfis ilegível em"
+
+msgid "Settings stored in device profile:"
+msgstr "Definições guardadas no perfil de dispositivo:"
+
+msgid "Settings not stored in a device profile: no profile matches the connected port."
+msgstr "Definições não guardadas num perfil de dispositivo: nenhum perfil corresponde à porta ligada."
+
+msgid "Basic Info"
+msgstr "Informações básicas"
+
+msgid "Geometry"
+msgstr "Geometria"
+
+msgid "Manufacturer"
+msgstr "Fabricante"
+
+msgid "Notes"
+msgstr "Notas"
+
+msgid "No settings folder: custom tools cannot be loaded or saved."
+msgstr "Sem pasta de configurações: as ferramentas personalizadas não podem ser carregadas nem guardadas."
+
+msgid "The custom tools file could not be read:"
+msgstr "Não foi possível ler o ficheiro de ferramentas personalizadas:"
+
+msgid "A copy of the unreadable custom tools file was kept in"
+msgstr "Uma cópia do ficheiro de ferramentas ilegível foi guardada em"
+
+msgid "Tool ID already exists. Please choose a unique ID."
+msgstr "O ID da ferramenta já existe. Escolha um ID único."
+
+msgid "Tool saved:"
+msgstr "Ferramenta guardada:"
+
+msgid "Tool deleted:"
+msgstr "Ferramenta eliminada:"
+
+msgid "Custom tools removed."
+msgstr "Ferramentas personalizadas removidas."
+
+msgid "Reset failed:"
+msgstr "Falha ao repor:"
+
+msgid "Import complete."
+msgstr "Importação concluída."
+
+msgid "Skipped:"
+msgstr "Ignoradas:"
+
+msgid "Errors:"
+msgstr "Erros:"
+
+msgid "Custom tools exported."
+msgstr "Ferramentas personalizadas exportadas."
+
+msgid "Search (name, id, type, diameter)..."
+msgstr "Pesquisar (nome, ID, tipo, diâmetro)..."
+
+msgid "All Types"
+msgstr "Todos os tipos"
+
+msgid "All Materials"
+msgstr "Todos os materiais"
+
+msgid "Filters"
+msgstr "Filtros"
+
+msgid "Min diameter (mm)"
+msgstr "Diâmetro mín. (mm)"
+
+msgid "Max diameter (mm)"
+msgstr "Diâmetro máx. (mm)"
+
+msgid "New Tool"
+msgstr "Nova ferramenta"
+
+msgid "Create a new custom tool"
+msgstr "Criar uma nova ferramenta personalizada"
+
+msgid "Library"
+msgstr "Biblioteca"
+
+msgid "Import GTC (.zip)..."
+msgstr "Importar GTC (.zip)..."
+
+msgid "Import tool catalog from a GTC zip package"
+msgstr "Importar catálogo de ferramentas de um pacote GTC zip"
+
+msgid "Import GTC (.json)..."
+msgstr "Importar GTC (.json)..."
+
+msgid "Import tool catalog from a GTC JSON file"
+msgstr "Importar catálogo de ferramentas de um ficheiro GTC JSON"
+
+msgid "Export Custom Tools..."
+msgstr "Exportar ferramentas personalizadas..."
+
+msgid "Export custom tools to a JSON file"
+msgstr "Exportar ferramentas personalizadas para um ficheiro JSON"
+
+msgid "Reset Custom Tools..."
+msgstr "Repor ferramentas personalizadas..."
+
+msgid "Remove all custom/imported tools and delete local storage"
+msgstr "Remover todas as ferramentas personalizadas/importadas e apagar o armazenamento local"
+
+msgid "Please select or create a tool to edit"
+msgstr "Selecione ou crie uma ferramenta para editar"
+
+msgid "Save changes"
+msgstr "Guardar alterações"
+
+msgid "Discard changes"
+msgstr "Descartar alterações"
+
+msgid "Delete this tool"
+msgstr "Eliminar esta ferramenta"
+
+msgid "Only custom tools can be deleted."
+msgstr "Só as ferramentas personalizadas podem ser eliminadas."
+
+msgid "Delete tool?"
+msgstr "Eliminar ferramenta?"
+
+msgid "Reset custom tools?"
+msgstr "Repor ferramentas personalizadas?"
+
+msgid "This will delete all custom/imported tools and remove local custom tools storage."
+msgstr "Isto eliminará todas as ferramentas personalizadas/importadas e o armazenamento local de ferramentas."
+
+msgid "ID:"
+msgstr "Identificador:"
+
+msgid "Tool Number:"
+msgstr "Número da ferramenta:"
+
+msgid "Tool Type:"
+msgstr "Tipo de ferramenta:"
+
+msgid "Tool Material:"
+msgstr "Material da ferramenta:"
+
+msgid "Coating:"
+msgstr "Revestimento:"
+
+msgid "Shank:"
+msgstr "Haste:"
+
+msgid "Diameter (mm):"
+msgstr "Diâmetro (mm):"
+
+msgid "Length (mm):"
+msgstr "Comprimento (mm):"
+
+msgid "Flute Length (mm):"
+msgstr "Comprimento de corte (mm):"
+
+msgid "Shaft Diameter (mm):"
+msgstr "Diâmetro da haste (mm):"
+
+msgid "Number of Flutes:"
+msgstr "Número de navalhas:"
+
+msgid "Corner Radius (mm):"
+msgstr "Raio de canto (mm):"
+
+msgid "Only for corner radius end mills"
+msgstr "Apenas para fresas com raio de canto"
+
+msgid "Tip Angle (deg):"
+msgstr "Ângulo da ponta (graus):"
+
+msgid "Used for drills / V-bits"
+msgstr "Para brocas / fresas em V"
+
+msgid "Manufacturer:"
+msgstr "Fabricante:"
+
+msgid "Part Number:"
+msgstr "Referência:"
+
+msgid "Additional Notes:"
+msgstr "Notas adicionais:"
+
+msgid "Flat End Mill"
+msgstr "Fresa plana"
+
+msgid "Ball End Mill"
+msgstr "Fresa esférica"
+
+msgid "Corner Radius End Mill"
+msgstr "Fresa com raio de canto"
+
+msgid "V-Bit"
+msgstr "Fresa em V"
+
+msgid "Drill Bit"
+msgstr "Broca"
+
+msgid "Spot Drill"
+msgstr "Broca de centrar"
+
+msgid "Engraving Bit"
+msgstr "Fresa de gravação"
+
+msgid "Chamfer Tool"
+msgstr "Fresa de chanfro"
+
+msgid "Specialty"
+msgstr "Especial"
+
+msgid "Carbide"
+msgstr "Metal duro"
+
+msgid "Coated Carbide"
+msgstr "Metal duro revestido"
+
+msgid "Diamond"
+msgstr "Diamante"
+
+msgid "Derived (Straight from shaft diameter)"
+msgstr "Derivado (reto, a partir do diâmetro da haste)"
+
+msgid "Collet"
+msgstr "Pinça"
+
+msgid "Tapered"
+msgstr "Cónico"
+
+msgid "Tool ID is required"
+msgstr "O ID da ferramenta é obrigatório"
+
+msgid "Tool name is required"
+msgstr "O nome da ferramenta é obrigatório"
+
+msgid "Invalid diameter"
+msgstr "Diâmetro inválido"
+
+msgid "Invalid length"
+msgstr "Comprimento inválido"
+
+msgid "Invalid flute length"
+msgstr "Comprimento de corte inválido"
+
+msgid "Invalid shaft diameter"
+msgstr "Diâmetro da haste inválido"
+
+msgid "Invalid corner radius"
+msgstr "Raio de canto inválido"
+
+msgid "Invalid tip angle"
+msgstr "Ângulo da ponta inválido"
+
+msgid "Import GTC Package"
+msgstr "Importar pacote GTC"
+
+msgid "Import GTC JSON"
+msgstr "Importar GTC JSON"
+
+msgid "Export Custom Tools"
+msgstr "Exportar ferramentas personalizadas"
+
+msgid "GTC Packages"
+msgstr "Pacotes GTC"
+
+msgid "Cannot Save Material"
+msgstr "Não é possível guardar o material"
+
+msgid "Could not save the material:"
+msgstr "Não foi possível guardar o material:"
+
+msgid "Could not delete the material:"
+msgstr "Não foi possível eliminar o material:"
+
+msgid "Machining"
+msgstr "Maquinagem"
+
+msgid "Safety"
+msgstr "Segurança"
+
+msgid "No settings folder: custom materials cannot be loaded or saved."
+msgstr "Sem pasta de configurações: os materiais personalizados não podem ser carregados nem guardados."
+
+msgid "The custom materials file could not be read:"
+msgstr "Não foi possível ler o ficheiro de materiais personalizados:"
+
+msgid "A copy of the unreadable custom materials file was kept in"
+msgstr "Uma cópia do ficheiro de materiais ilegível foi guardada em"
+
+msgid "A material with this ID already exists."
+msgstr "Já existe um material com este ID."
+
+msgid "Material saved:"
+msgstr "Material guardado:"
+
+msgid "Material deleted:"
+msgstr "Material eliminado:"
+
+msgid "No materials found"
+msgstr "Nenhum material encontrado"
+
+msgid "New Material"
+msgstr "Novo material"
+
+msgid "Please select or create a material to edit"
+msgstr "Selecione ou crie um material para editar"
+
+msgid "Machinability:"
+msgstr "Maquinabilidade:"
+
+msgid "Only custom materials can be deleted."
+msgstr "Só os materiais personalizados podem ser eliminados."
+
+msgid "Delete material?"
+msgstr "Eliminar material?"
+
+msgid "The material has unsaved changes. Save them before continuing?"
+msgstr "O material tem alterações não guardadas. Guardá-las antes de continuar?"
+
+msgid "Subcategory:"
+msgstr "Subcategoria:"
+
+msgid "e.g., Hardwood, Alloy"
+msgstr "p. ex., madeira dura, liga"
+
+msgid "Density (kg/m3):"
+msgstr "Densidade (kg/m3):"
+
+msgid "Machinability (1-10):"
+msgstr "Maquinabilidade (1-10):"
+
+msgid "Tensile Strength (MPa):"
+msgstr "Resistência à tração (MPa):"
+
+msgid "Melting Point (deg C):"
+msgstr "Ponto de fusão (graus C):"
+
+msgid "Optional"
+msgstr "Opcional"
+
+msgid "Chip Type:"
+msgstr "Tipo de apara:"
+
+msgid "Heat Sensitivity:"
+msgstr "Sensibilidade ao calor:"
+
+msgid "Abrasiveness:"
+msgstr "Abrasividade:"
+
+msgid "Surface Finish:"
+msgstr "Acabamento superficial:"
+
+msgid "Dust Hazard:"
+msgstr "Perigo de poeira:"
+
+msgid "Fume Hazard:"
+msgstr "Perigo de fumos:"
+
+msgid "Coolant Required"
+msgstr "Requer refrigerante"
+
+msgid "Additional Notes and Tips:"
+msgstr "Notas e dicas adicionais:"
+
+msgid "Engineered Wood"
+msgstr "Madeira processada"
+
+msgid "Plastic"
+msgstr "Plástico"
+
+msgid "Non-Ferrous Metal"
+msgstr "Metal não ferroso"
+
+msgid "Ferrous Metal"
+msgstr "Metal ferroso"
+
+msgid "Composite"
+msgstr "Compósito"
+
+msgid "Stone and Ceramic"
+msgstr "Pedra e cerâmica"
+
+msgid "Segmented"
+msgstr "Segmentada"
+
+msgid "Granular"
+msgstr "Granulada"
+
+msgid "Small"
+msgstr "Pequena"
+
+msgid "Low"
+msgstr "Baixa"
+
+msgid "Moderate"
+msgstr "Moderada"
+
+msgid "High"
+msgstr "Alta"
+
+msgid "Excellent"
+msgstr "Excelente"
+
+msgid "Good"
+msgstr "Bom"
+
+msgid "Fair"
+msgstr "Razoável"
+
+msgid "Rough"
+msgstr "Rugoso"
+
+msgid "Minimal"
+msgstr "Mínimo"
+
+msgid "Name is required"
+msgstr "O nome é obrigatório"
+
+msgid "Subcategory is required"
+msgstr "A subcategoria é obrigatória"
+
+msgid "Tensile strength must be a number"
+msgstr "A resistência à tração tem de ser um número"
+
+msgid "Melting point must be a number"
+msgstr "O ponto de fusão tem de ser um número"
+
+msgid "ID is required"
+msgstr "O ID é obrigatório"
+
+msgid "ID must not contain spaces"
+msgstr "O ID não pode conter espaços"
+
+msgid "Index"
+msgstr "Índice"
+
+msgid "the controller stored a different value:"
+msgstr "o controlador guardou um valor diferente:"
+
+msgid "written"
+msgstr "escrito"
+
+msgid "stored"
+msgstr "guardado"
+
+msgid "The device profile has unsaved changes. Save them before continuing?"
+msgstr "O perfil do dispositivo tem alterações não guardadas. Guardá-las antes de continuar?"

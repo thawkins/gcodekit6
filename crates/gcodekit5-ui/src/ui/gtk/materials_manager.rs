@@ -14,10 +14,12 @@ use gtk4::{
 use std::cell::Cell;
 use std::rc::Rc;
 
+use crate::t;
 use crate::ui::gtk::help_browser;
 use crate::ui::materials_manager_backend;
 use crate::ui::materials_manager_backend::MaterialsManagerBackend;
-use gcodekit5_core::data::materials::{Material, MaterialCategory, MaterialId};
+use gcodekit5_app::material_form::{MaterialFilter, MaterialForm};
+use gcodekit5_core::data::materials::{Material, MaterialId};
 use gcodekit5_core::{Shared, SharedOption, shared, shared_none};
 
 #[derive(Clone)]
@@ -697,18 +699,6 @@ impl MaterialsManagerView {
             .connect_changed(move |_| view.update_save_sensitivity());
     }
 
-    fn category_sort_key(category: MaterialCategory) -> u8 {
-        match category {
-            MaterialCategory::Wood => 0,
-            MaterialCategory::EngineeredWood => 1,
-            MaterialCategory::Plastic => 2,
-            MaterialCategory::NonFerrousMetal => 3,
-            MaterialCategory::FerrousMetal => 4,
-            MaterialCategory::Composite => 5,
-            MaterialCategory::StoneAndCeramic => 6,
-        }
-    }
-
     fn load_materials(&self) {
         // Clear list
         while let Some(child) = self.materials_list.first_child() {
@@ -722,25 +712,14 @@ impl MaterialsManagerView {
             .map(|m| m.id.0.clone());
 
         let backend = self.backend.borrow();
-        let search_query = self.search_entry.text().to_string();
-        let mut materials = backend.search_materials(&search_query);
-
-        // Category filter
-        if let Some(cat_id) = self.category_filter.active_id() {
-            let cat_id = cat_id.to_string();
-            if cat_id != "all"
-                && let Some(category) = materials_manager_backend::category_id_to_category(&cat_id)
-            {
-                materials.retain(|m| m.category == category);
-            }
-        }
-
-        // Sort
-        materials.sort_by(|a, b| {
-            Self::category_sort_key(a.category)
-                .cmp(&Self::category_sort_key(b.category))
-                .then(a.name.cmp(&b.name))
-        });
+        let filter = MaterialFilter {
+            search: self.search_entry.text().to_string(),
+            category: self
+                .category_filter
+                .active_id()
+                .and_then(|id| materials_manager_backend::category_id_to_category(&id)),
+        };
+        let materials = filter.apply(backend.get_all_materials());
 
         let mut row_to_select: Option<ListBoxRow> = None;
 
@@ -938,18 +917,12 @@ impl MaterialsManagerView {
     }
 
     fn read_form(&self) -> Result<Material, String> {
-        let is_creating = *self.is_creating.borrow();
-
-        let name = self.edit_name.text().trim().to_string();
-        if name.is_empty() {
-            return Err("Name is required".to_string());
-        }
-
-        let subcategory = self.edit_subcategory.text().trim().to_string();
-        if subcategory.is_empty() {
-            return Err("Subcategory is required".to_string());
-        }
-
+        let id_of = |dropdown: &DropDown, default: &str| {
+            dropdown
+                .active_id()
+                .map(|s| s.to_string())
+                .unwrap_or_else(|| default.to_string())
+        };
         let category_id = self
             .edit_category
             .active_id()
@@ -957,120 +930,54 @@ impl MaterialsManagerView {
             .ok_or_else(|| "Category is required".to_string())?;
         let category = materials_manager_backend::category_id_to_category(&category_id)
             .ok_or_else(|| "Invalid category".to_string())?;
-
-        let tensile_strength = {
-            let text = self.edit_tensile_strength.text().trim().to_string();
-            if text.is_empty() {
-                None
-            } else {
-                Some(
-                    text.parse::<f32>()
-                        .map_err(|_| "Tensile strength must be a number".to_string())?,
-                )
-            }
+        let form = MaterialForm {
+            id: self.edit_id.text().to_string(),
+            name: self.edit_name.text().to_string(),
+            category,
+            subcategory: self.edit_subcategory.text().to_string(),
+            description: Self::read_textview(&self.edit_description),
+            density: self.edit_density.value() as f32,
+            machinability: self.edit_machinability.value() as u8,
+            tensile_strength: self.edit_tensile_strength.text().to_string(),
+            melting_point: self.edit_melting_point.text().to_string(),
+            chip_type: materials_manager_backend::chip_type_id_to_chip_type(&id_of(
+                &self.edit_chip_type,
+                "continuous",
+            )),
+            heat_sensitivity: materials_manager_backend::heat_sensitivity_id_to_heat_sensitivity(
+                &id_of(&self.edit_heat_sensitivity, "low"),
+            ),
+            abrasiveness: materials_manager_backend::abrasiveness_id_to_abrasiveness(&id_of(
+                &self.edit_abrasiveness,
+                "low",
+            )),
+            surface_finish: materials_manager_backend::surface_finish_id_to_surface_finish(&id_of(
+                &self.edit_surface_finish,
+                "good",
+            )),
+            dust_hazard: materials_manager_backend::hazard_level_id_to_hazard_level(&id_of(
+                &self.edit_dust_hazard,
+                "minimal",
+            )),
+            fume_hazard: materials_manager_backend::hazard_level_id_to_hazard_level(&id_of(
+                &self.edit_fume_hazard,
+                "none",
+            )),
+            coolant_required: self.edit_coolant_required.is_active(),
+            notes: Self::read_textview(&self.edit_notes),
         };
-
-        let melting_point = {
-            let text = self.edit_melting_point.text().trim().to_string();
-            if text.is_empty() {
-                None
-            } else {
-                Some(
-                    text.parse::<f32>()
-                        .map_err(|_| "Melting point must be a number".to_string())?,
-                )
-            }
-        };
-
-        let chip_type = materials_manager_backend::chip_type_id_to_chip_type(
-            &self
-                .edit_chip_type
-                .active_id()
-                .map(|s| s.to_string())
-                .unwrap_or_else(|| "continuous".to_string()),
-        );
-        let heat_sensitivity = materials_manager_backend::heat_sensitivity_id_to_heat_sensitivity(
-            &self
-                .edit_heat_sensitivity
-                .active_id()
-                .map(|s| s.to_string())
-                .unwrap_or_else(|| "low".to_string()),
-        );
-        let abrasiveness = materials_manager_backend::abrasiveness_id_to_abrasiveness(
-            &self
-                .edit_abrasiveness
-                .active_id()
-                .map(|s| s.to_string())
-                .unwrap_or_else(|| "low".to_string()),
-        );
-        let surface_finish = materials_manager_backend::surface_finish_id_to_surface_finish(
-            &self
-                .edit_surface_finish
-                .active_id()
-                .map(|s| s.to_string())
-                .unwrap_or_else(|| "good".to_string()),
-        );
-        let dust_hazard = materials_manager_backend::hazard_level_id_to_hazard_level(
-            &self
-                .edit_dust_hazard
-                .active_id()
-                .map(|s| s.to_string())
-                .unwrap_or_else(|| "minimal".to_string()),
-        );
-        let fume_hazard = materials_manager_backend::hazard_level_id_to_hazard_level(
-            &self
-                .edit_fume_hazard
-                .active_id()
-                .map(|s| s.to_string())
-                .unwrap_or_else(|| "none".to_string()),
-        );
-
-        let description = Self::read_textview(&self.edit_description);
-        let notes = Self::read_textview(&self.edit_notes);
-
-        let density: f32 = self.edit_density.value() as f32;
-        let machinability_rating: u8 = self.edit_machinability.value() as u8;
-        let coolant_required = self.edit_coolant_required.is_active();
-
-        let mut material = if is_creating {
-            let id = self.edit_id.text().trim().to_string();
-            if id.is_empty() {
-                return Err("ID is required".to_string());
-            }
-            if id.contains(char::is_whitespace) {
-                return Err("ID must not contain spaces".to_string());
-            }
-            Material::new(MaterialId(id), name.clone(), category, subcategory.clone())
+        let base = if *self.is_creating.borrow() {
+            None
         } else {
-            self.selected_material
-                .borrow()
-                .as_ref()
-                .cloned()
-                .ok_or_else(|| "No material selected".to_string())?
+            Some(
+                self.selected_material
+                    .borrow()
+                    .as_ref()
+                    .cloned()
+                    .ok_or_else(|| "No material selected".to_string())?,
+            )
         };
-
-        // Update editable fields
-        material.name = name;
-        material.category = category;
-        material.subcategory = subcategory;
-        material.description = description;
-        material.density = density;
-        material.machinability_rating = machinability_rating;
-        material.tensile_strength = tensile_strength;
-        material.melting_point = melting_point;
-        material.chip_type = chip_type;
-        material.heat_sensitivity = heat_sensitivity;
-        material.abrasiveness = abrasiveness;
-        material.surface_finish = surface_finish;
-        material.dust_hazard = dust_hazard;
-        material.fume_hazard = fume_hazard;
-        material.coolant_required = coolant_required;
-        material.notes = notes;
-
-        // Any saved material becomes a custom override so it persists.
-        material.custom = true;
-
-        Ok(material)
+        form.build(base.as_ref()).map_err(|msgid| t!(msgid))
     }
 
     fn save_material(&self) {
@@ -1094,9 +1001,14 @@ impl MaterialsManagerView {
         }
 
         let id = material.id.0.clone();
-        {
-            let mut backend = self.backend.borrow_mut();
-            backend.add_material(material);
+        let saved = self.backend.borrow_mut().save_material(material);
+        if let Err(e) = saved {
+            tracing::warn!("Failed to save material: {e}");
+            Self::show_error_dialog(
+                &t!("Cannot Save Material"),
+                &format!("{} {e}", t!("Could not save the material:")),
+            );
+            return;
         }
 
         *self.is_creating.borrow_mut() = false;
@@ -1129,12 +1041,20 @@ impl MaterialsManagerView {
                     Some(&window),
                     move |response| {
                         if response == ResponseType::Yes {
-                            let mut backend_mut = backend.borrow_mut();
-                            backend_mut.remove_material(&mat_id);
-                            drop(backend_mut);
-
-                            view.load_materials();
-                            view.cancel_edit();
+                            let removed = backend.borrow_mut().remove_material(&mat_id);
+                            match removed {
+                                Ok(_) => {
+                                    view.load_materials();
+                                    view.cancel_edit();
+                                }
+                                Err(e) => {
+                                    tracing::warn!("Failed to delete material: {e}");
+                                    Self::show_error_dialog(
+                                        &t!("Delete Failed"),
+                                        &format!("{} {e}", t!("Could not delete the material:")),
+                                    );
+                                }
+                            }
                         }
                     },
                 );

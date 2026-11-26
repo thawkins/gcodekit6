@@ -50,7 +50,7 @@
     <file compressed="true" alias="en/spoilboard_surfacing.md">markdown/en/spoilboard_surfacing.md</file>
     <file compressed="true" alias="en/spoilboard_grid.md">markdown/en/spoilboard_grid.md</file>
     <file compressed="true" alias="en/gerber.md">markdown/en/gerber.md</file>
-    <file compressed="true" alias="en/drill_press.md">markdown/en/dirll_press.md</file>
+    <file compressed="true" alias="en/drill_press.md">markdown/en/drill_press.md</file>
     <!-- Archivos en español -->
     <file compressed="true" alias="es/index.md">markdown/es/index.md</file>
     <file compressed="true" alias="es/designer.md">markdown/es/designer.md</file>
@@ -71,7 +71,7 @@
     <file compressed="true" alias="es/spoilboard_surfacing.md">markdown/es/spoilboard_surfacing.md</file>
     <file compressed="true" alias="es/spoilboard_grid.md">markdown/es/spoilboard_grid.md</file>
     <file compressed="true" alias="es/gerber.md">markdown/es/gerber.md</file>
-    <file compressed="true" alias="es/drill_press.md">markdown/es/dirll_press.md</file>
+    <file compressed="true" alias="es/drill_press.md">markdown/es/drill_press.md</file>
      <!-- *********** Help images ************ -->
     <file compressed="true" alias="help_images/gcodekit5_1.png">help_images/gcodekit5_1.png</file>
     <file compressed="true" alias="help_images/designer.png">help_images/designer.png</file>

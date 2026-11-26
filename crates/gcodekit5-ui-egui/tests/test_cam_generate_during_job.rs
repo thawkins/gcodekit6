@@ -5,17 +5,19 @@
 
 use std::path::Path;
 use std::sync::Arc;
+use std::sync::atomic::Ordering;
 use std::time::Duration;
 
 use egui_kittest::Harness;
 use egui_kittest::kittest::Queryable;
-use gcodekit5_app::test_support::LoopbackShared;
+use gcodekit5_app::machine::StreamMode;
+use gcodekit5_app::test_support::{LoopbackShared, Wrote};
 use gcodekit5_core::units::MeasurementSystem;
 use gcodekit5_ui_egui::GcodeKitApp;
 use gcodekit5_ui_egui::panes::cam_tools::CamTool;
 use gcodekit5_ui_egui::panes::cam_tools::jigsaw::JigsawParams;
 
-use crate::machine_support::{loopback_state, start_held_stream};
+use crate::machine_support::{connect, loopback_state, start_held_stream, wait_until};
 use crate::test_cam_drill_press::{click, pane};
 use crate::test_cam_tools::cam_app;
 use crate::test_designer_files_app::{Shared, answer, frames, path};
@@ -43,6 +45,40 @@ fn open_during_job(tool: CamTool) -> (Harness<'static, GcodeKitApp>, Shared, Arc
     h.set_size(egui::vec2(1280.0, 2400.0));
     frames(&mut h, 3);
     (h, script, shared)
+}
+
+/// The app with the Jigsaw page open while a probe-style (stop-on-error) stream runs, its
+/// acks held; with `halting`, the controller has refused a line and is halting it.
+fn open_during_probe_stream(halting: bool) -> Harness<'static, GcodeKitApp> {
+    let (mut state, shared) = loopback_state(Duration::from_millis(1));
+    shared.hold_acks.store(true, Ordering::SeqCst);
+    connect(&mut state);
+    let program: Arc<[String]> = (0..20).map(|i| format!("G38.2 Z-{i} F100")).collect();
+    gcodekit5_ui_egui::machine::lock(state.machine.controller())
+        .start_stream_with(program, StreamMode::StopOnError)
+        .expect("start");
+    if halting {
+        shared.inject("error:9\n");
+        assert!(
+            wait_until(|| shared.log().contains(&Wrote::Realtime(b'!'))),
+            "no halt"
+        );
+    }
+    let (mut h, _script) = cam_app(state);
+    assert!(h.state().state().job_running());
+    let title = h
+        .state()
+        .state()
+        .translator
+        .tr(CamTool::Jigsaw.title_msgid())
+        .into_owned();
+    h.get_by_label(&title).click();
+    frames(&mut h, 1);
+    h.get_by_label("Open").click();
+    frames(&mut h, 2);
+    h.set_size(egui::vec2(1280.0, 2400.0));
+    frames(&mut h, 3);
+    h
 }
 
 fn shape_count(h: &Harness<'static, GcodeKitApp>) -> usize {
@@ -104,6 +140,14 @@ fn test_cam_gerber_actions_are_refused_while_a_job_runs() {
     );
     for label in ["Generate", "Send to Editor", "Preview"] {
         refused(&mut h, label);
+    }
+}
+
+#[test]
+fn test_cam_generate_is_refused_while_a_probe_stream_runs_or_halts() {
+    for halting in [false, true] {
+        let mut h = open_during_probe_stream(halting);
+        refused(&mut h, "Generate");
     }
 }
 

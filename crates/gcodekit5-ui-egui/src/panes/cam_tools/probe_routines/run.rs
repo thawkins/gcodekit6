@@ -12,8 +12,10 @@
 //!   controller's `StreamMode::StopOnError` (beyond GTK, which streamed on): on an
 //!   `error:` reply the worker stops feeding at once, feed-holds, then soft-resets, because
 //!   the routine's remaining lines are relative moves (and maybe a `G10 L20`) that must not
-//!   run after a refused probe line. If the stream is somehow still running
-//!   [`BACKSTOP_DELAY`] after the error, the run resets the controller itself. An alarm,
+//!   run after a refused probe line. If the stream is somehow still running after the
+//!   error, the run resets the controller itself: [`BACKSTOP_DELAY`] after it once the
+//!   controller confirmed the halt (its feed hold echoed as sent), else
+//!   [`UNCONFIRMED_BACKSTOP_DELAY`] after it. An alarm,
 //!   the user's Stop, feed hold then reset, or E-STOP end the stream in the controller, so
 //!   no further line of the routine is sent.
 //! - **After a failure** the controller was left in incremental mode (G91): once it is
@@ -28,7 +30,9 @@ use std::time::{Duration, Instant};
 
 use gcodekit5_app::i18n::Translator;
 use gcodekit5_app::machine::grbl_stream::{MAX_LINE_LENGTH, prepare_program};
-use gcodekit5_app::machine::{HALT_MAX_WAIT, MachineController, MachineEvent, StreamMode};
+use gcodekit5_app::machine::{
+    HALT_MAX_WAIT, MachineController, MachineEvent, StreamMode, realtime_label,
+};
 use gcodekit5_camtools::probe_routines::{ProbeOptions, ProbeRoutineEngine};
 use gcodekit5_camtools::wcs_service::{WcsUpdateConfig, WcsUpdateService};
 use gcodekit5_core::{Position, ProbeAxis, ProbeReport, ProbeRoutine};
@@ -41,6 +45,11 @@ use crate::machine::{Machine, lock, parse_report_inches, probe_report};
 /// it resets the controller itself. Longer than that cap, so the backstop never resets a
 /// machine the controller is still letting decelerate.
 pub const BACKSTOP_DELAY: Duration = HALT_MAX_WAIT.saturating_add(Duration::from_secs(2));
+
+/// How long after an `error:` reply the run waits before it resets the controller itself
+/// when the controller has not confirmed a halt (no feed hold echoed as sent): the stream
+/// may not be halting at all, so there is no deceleration to wait for.
+pub const UNCONFIRMED_BACKSTOP_DELAY: Duration = Duration::from_secs(2);
 
 const NOT_CONNECTED: &str = n_!("The machine is not connected.");
 const RUN_IN_PROGRESS: &str = n_!("A probe run is still in progress.");
@@ -182,6 +191,9 @@ pub struct ProbeRun {
     reset_sent: bool,
     /// When the first `error:` reply arrived, for the backstop.
     error_at: Option<Instant>,
+    /// Whether the controller confirmed it halts the stream after that error: a feed hold
+    /// was echoed as sent after it. Only then does the backstop wait [`BACKSTOP_DELAY`].
+    halt_confirmed: bool,
     phase: Phase,
 }
 
@@ -230,7 +242,10 @@ impl ProbeRun {
         let lines: Arc<[String]> = program_lines(&output.gcode)?.into();
         lock(machine.controller())
             .start_stream_with(lines, StreamMode::StopOnError)
-            .map_err(|e| format!("{}: {e}", tr.tr(NOT_STARTED)))?;
+            .map_err(|e| {
+                let e = crate::machine::worker_message(&e.to_string(), tr);
+                format!("{}: {e}", tr.tr(NOT_STARTED))
+            })?;
         tracing::info!(routine = %output.description, "probe run started");
         let run = Self {
             controller: machine.controller().clone(),
@@ -241,6 +256,7 @@ impl ProbeRun {
             failure: None,
             reset_sent: false,
             error_at: None,
+            halt_confirmed: false,
             phase: Phase::Streaming,
         };
         Ok((run, format!("{}: {}", tr.tr(PROBING), output.description)))
@@ -268,6 +284,8 @@ impl ProbeRun {
     /// # Returns
     /// What happened, in order; after `Succeeded`, `Restored` or `Aborted` the run is over.
     pub fn handle(&mut self, events: &[MachineEvent], tr: &Translator) -> Vec<Outcome> {
+        // Also with no events: the controller may have gone quiet.
+        self.check_backstop();
         let mut outcomes = Vec::new();
         for event in events {
             if matches!(event, MachineEvent::Disconnected) {
@@ -289,16 +307,36 @@ impl ProbeRun {
         outcomes
     }
 
-    fn while_streaming(&mut self, event: &MachineEvent, tr: &Translator) -> Option<Outcome> {
-        // Backstop: the controller halts a stop-on-error stream itself; reset only if it has
-        // not ended the stream well after the error.
-        if let Some(at) = self.error_at
-            && !self.reset_sent
-            && at.elapsed() >= BACKSTOP_DELAY
-        {
+    /// How long until the backstop resets the controller (zero once it is due), or `None`
+    /// while none is armed: before any `error:`, after the run sent its reset, or once the
+    /// routine stopped streaming. The app hands the run an empty batch of events when it is
+    /// due and asks for a repaint then, so the backstop fires even when no machine event
+    /// arrives.
+    pub fn backstop_in(&self) -> Option<Duration> {
+        if self.phase != Phase::Streaming || self.reset_sent {
+            return None;
+        }
+        // The long wait (the controller's deceleration cap) applies only once the controller
+        // has confirmed the halt.
+        let delay = if self.halt_confirmed {
+            BACKSTOP_DELAY
+        } else {
+            UNCONFIRMED_BACKSTOP_DELAY
+        };
+        self.error_at.map(|at| delay.saturating_sub(at.elapsed()))
+    }
+
+    /// Backstop: the controller halts a stop-on-error stream itself; reset only if it has
+    /// not ended the stream well after the error ([`Self::backstop_in`]).
+    fn check_backstop(&mut self) {
+        if self.backstop_in() == Some(Duration::ZERO) {
             tracing::warn!("probe stream still running after an error; stopping it");
             self.stop();
         }
+    }
+
+    fn while_streaming(&mut self, event: &MachineEvent, tr: &Translator) -> Option<Outcome> {
+        self.check_backstop();
         match event {
             MachineEvent::Received(line) => {
                 if let Some(inches) = parse_report_inches(line) {
@@ -331,15 +369,21 @@ impl ProbeRun {
                 let reason = self
                     .failure
                     .clone()
-                    .map(|line| format!("{}: {line}", tr.tr(CONTROLLER_REPORTED)))
+                    .map(|line| controller_reported(&line, tr))
                     .unwrap_or_else(|| tr.tr(STOPPED).into_owned());
                 Some(self.fail(reason, tr))
+            }
+            MachineEvent::Sent(line) => {
+                // The controller's feed hold after the error: it is halting the stream.
+                if self.error_at.is_some() && Some(line.as_str()) == realtime_label(b'!') {
+                    self.halt_confirmed = true;
+                }
+                None
             }
             MachineEvent::Connected
             | MachineEvent::Disconnected
             | MachineEvent::StatusReport(_)
-            | MachineEvent::StreamProgress { .. }
-            | MachineEvent::Sent(_) => None,
+            | MachineEvent::StreamProgress { .. } => None,
         }
     }
 
@@ -370,7 +414,7 @@ impl ProbeRun {
     /// The stream finished: the result, or why there is none.
     fn finish(&mut self, tr: &Translator) -> Outcome {
         if let Some(line) = self.failure.clone() {
-            return self.fail(format!("{}: {line}", tr.tr(CONTROLLER_REPORTED)), tr);
+            return self.fail(controller_reported(&line, tr), tr);
         }
         let mut report = ProbeReport::new(self.routine.clone());
         for r in &self.reports {
@@ -394,6 +438,16 @@ impl ProbeRun {
             tr.tr(RESTORE_HINT)
         ))
     }
+}
+
+/// "Controller reported: <message>", the controller's message as the console shows it
+/// (its own texts translated, its replies kept).
+fn controller_reported(message: &str, tr: &Translator) -> String {
+    format!(
+        "{}: {}",
+        tr.tr(CONTROLLER_REPORTED),
+        crate::machine::worker_message(message, tr)
+    )
 }
 
 /// The text shown for a successful run (GTK's wording).
@@ -484,7 +538,7 @@ pub fn apply(
         .map_err(|e| e.to_string())?;
     lock(machine.controller())
         .send_line(&result.command)
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| crate::machine::worker_message(&e.to_string(), tr))?;
     tracing::info!(command = %result.command, "applied probe result");
     Ok(result.command)
 }

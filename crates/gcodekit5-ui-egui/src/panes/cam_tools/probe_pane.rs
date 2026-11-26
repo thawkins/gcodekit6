@@ -77,6 +77,12 @@ impl CamToolsPane {
         self.probe.last.as_ref().map(|s| s.position)
     }
 
+    /// How long until the running probe's backstop is due (zero once it is), if one is armed
+    /// (see `ProbeRun::backstop_in`).
+    pub fn probe_backstop_in(&self) -> Option<std::time::Duration> {
+        self.probe.run.as_ref().and_then(ProbeRun::backstop_in)
+    }
+
     /// Takes the machine's events into the run (the app hands every event to the pane,
     /// drawn or not).
     ///

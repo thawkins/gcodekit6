@@ -205,6 +205,7 @@ impl MachineControlPane {
             }
             Err(error) => {
                 tracing::warn!(%error, "connect refused");
+                let error = crate::machine::worker_message(&error.to_string(), tr);
                 self.notice = Some(format!("{}: {error}", tr.tr("Error connecting")));
             }
         }
@@ -296,6 +297,8 @@ impl MachineControlPane {
             | Command::OpenDeviceManager
             | Command::OpenToolsManager
             | Command::OpenMaterialsManager
+            | Command::OpenFirmwareSettings
+            | Command::OpenDeviceInfo
             | Command::OpenHelp
             | Command::About => return false,
         }
@@ -392,10 +395,17 @@ impl Pane for MachineControlPane {
                     None => {}
                 }
                 if let Some(notice) = &self.notice {
-                    ui.colored_label(ui.visuals().error_fg_color, notice);
+                    // A controller refusal is kept in English; translated here.
+                    ui.colored_label(
+                        ui.visuals().error_fg_color,
+                        crate::machine::worker_message(notice, tr),
+                    );
                 }
                 if let Some(error) = &status.last_error {
-                    ui.colored_label(ui.visuals().warn_fg_color, error);
+                    ui.colored_label(
+                        ui.visuals().warn_fg_color,
+                        crate::machine::worker_message(error, tr),
+                    );
                 }
                 ui.separator();
                 self.show_safety(ui, tr, status);

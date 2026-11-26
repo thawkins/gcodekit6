@@ -7,14 +7,17 @@ use gcodekit5_ui_egui::frame::caption_msgid;
 use gcodekit5_ui_egui::menu;
 use gcodekit5_ui_egui::panes::{cam_tools, console, designer, editor, machine_control, visualizer};
 use gcodekit5_ui_egui::status_bar;
-use gcodekit5_ui_egui::windows::{about, settings};
+use gcodekit5_ui_egui::windows::{
+    about, device_info, device_manager, firmware_settings, help, materials_manager, settings,
+    tools_manager,
+};
 use gcodekit5_ui_egui::workspace::PaneId;
 
 const LANGUAGES: [&str; 5] = ["de", "es", "fr", "it", "pt"];
 
 /// Translations that are spelled like the English msgid; the Translator cannot tell them
 /// from a missing entry, so the po file is checked for them instead.
-const IDENTICAL: [(&str, &str); 173] = [
+const IDENTICAL: [(&str, &str); 231] = [
     ("de", "G-Code Editor"),
     ("de", "Designer"),
     ("it", "Designer"),
@@ -36,6 +39,15 @@ const IDENTICAL: [(&str, &str); 173] = [
     ("de", "System"),
     ("de", "Version"),
     ("es", "General"),
+    // Materials Manager: words spelled the same.
+    ("de", "Optional"),
+    ("de", "Minimal"),
+    ("fr", "Composite"),
+    ("fr", "Excellent"),
+    ("fr", "Minimal"),
+    // Device Manager delete question.
+    ("es", "No"),
+    ("it", "No"),
     ("fr", "Version"),
     // Machine Control: technical terms kept as in English.
     ("de", "Port:"),
@@ -196,6 +208,59 @@ const IDENTICAL: [(&str, &str); 173] = [
     ("de", "X-max / Y-min"),
     ("de", "X-min / Y-max"),
     ("de", "X-max / Y-max"),
+    // Firmware Settings and Device Info: technical terms and names kept as in English.
+    ("de", "Filter:"),
+    ("de", "ID"),
+    ("de", "Name:"),
+    ("de", "Firmware:"),
+    ("de", "Version:"),
+    ("de", "CNC"),
+    ("de", "Laser"),
+    ("de", "Firmware"),
+    ("de", "Plasma"),
+    ("de", "Encoder"),
+    ("de", "Modbus"),
+    ("de", "RS485"),
+    ("de", "Repetier EEPROM"),
+    ("es", "ID"),
+    ("es", "Firmware:"),
+    ("es", "CNC"),
+    ("es", "Firmware"),
+    ("es", "Homing"),
+    ("es", "Plasma"),
+    ("es", "Modbus"),
+    ("es", "RS485"),
+    ("fr", "ID"),
+    ("fr", "Description"),
+    ("fr", "CNC"),
+    ("fr", "Laser"),
+    ("fr", "Firmware"),
+    ("fr", "Plasma"),
+    ("fr", "Modbus"),
+    ("fr", "RS485"),
+    ("fr", "Repetier EEPROM"),
+    ("it", "ID"),
+    ("it", "Firmware:"),
+    ("it", "CNC"),
+    ("it", "Laser"),
+    ("it", "Firmware"),
+    ("it", "Homing"),
+    ("it", "I/O"),
+    ("it", "Plasma"),
+    ("it", "Encoder"),
+    ("it", "Modbus"),
+    ("it", "RS485"),
+    ("pt", "ID"),
+    ("pt", "Firmware:"),
+    ("pt", "CNC"),
+    ("pt", "Laser"),
+    ("pt", "Firmware"),
+    ("pt", "Plasma"),
+    ("pt", "Modbus"),
+    ("pt", "RS485"),
+    // Help: the index page's title.
+    ("de", "Index"),
+    ("fr", "Index"),
 ];
 
 fn msgids() -> Vec<&'static str> {
@@ -206,6 +271,12 @@ fn msgids() -> Vec<&'static str> {
         .chain(menu::msgids())
         .chain(settings::msgids())
         .chain(about::msgids())
+        .chain(firmware_settings::msgids())
+        .chain(device_info::msgids())
+        .chain(device_manager::msgids())
+        .chain(tools_manager::msgids())
+        .chain(materials_manager::msgids())
+        .chain(help::msgids())
         .chain(dialogs::msgids())
         .chain(machine_control::msgids())
         .chain(console::msgids())
@@ -215,6 +286,7 @@ fn msgids() -> Vec<&'static str> {
         .chain(cam_tools::msgids())
         .chain(gcodekit5_ui_egui::app::designer_files::msgids())
         .chain(status_bar::MSGIDS.iter().copied())
+        .chain(gcodekit5_ui_egui::machine::worker_msgids())
         .collect()
 }
 

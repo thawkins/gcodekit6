@@ -28,6 +28,11 @@ pub struct Setting {
     pub read_only: bool,
     /// Unit of measure (e.g., "mm/min", "usec", "RPM")
     pub unit: Option<String>,
+    /// Repetier EEPROM value type as its `EPR:` line reports it (0 byte, 1 16-bit integer,
+    /// 2 32-bit integer, 3 float), which decides how `M206` writes it; `None` for GRBL and
+    /// for a position the controller has not reported.
+    #[serde(default)]
+    pub eeprom_type: Option<u8>,
 }
 
 /// GRBL Settings Manager

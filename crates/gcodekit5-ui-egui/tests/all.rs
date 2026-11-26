@@ -32,6 +32,8 @@ mod test_cam_input_bounds;
 mod test_cam_jigsaw;
 #[path = "test_cam_presets.rs"]
 mod test_cam_presets;
+#[path = "test_cam_probe_backstop.rs"]
+mod test_cam_probe_backstop;
 #[path = "test_cam_probe_review.rs"]
 mod test_cam_probe_review;
 #[path = "test_cam_probe_routines.rs"]
@@ -88,12 +90,20 @@ mod test_designer_text_tool;
 mod test_designer_toolbox;
 #[path = "test_designer_toolpath.rs"]
 mod test_designer_toolpath;
+#[path = "test_device_info.rs"]
+mod test_device_info;
+#[path = "test_device_manager.rs"]
+mod test_device_manager;
 #[path = "test_dialogs.rs"]
 mod test_dialogs;
 #[path = "test_editor.rs"]
 mod test_editor;
+#[path = "test_firmware_settings.rs"]
+mod test_firmware_settings;
 #[path = "test_frame.rs"]
 mod test_frame;
+#[path = "test_help.rs"]
+mod test_help;
 #[path = "test_hidpi.rs"]
 mod test_hidpi;
 #[path = "test_machine_jog.rs"]
@@ -102,6 +112,10 @@ mod test_machine_jog;
 mod test_machine_pane;
 #[path = "test_machine_probe_report.rs"]
 mod test_machine_probe_report;
+#[path = "test_machine_worker_messages.rs"]
+mod test_machine_worker_messages;
+#[path = "test_materials_manager.rs"]
+mod test_materials_manager;
 #[path = "test_quit.rs"]
 mod test_quit;
 #[path = "test_settings_window.rs"]
@@ -110,6 +124,8 @@ mod test_settings_window;
 mod test_smoke;
 #[path = "test_status_bar.rs"]
 mod test_status_bar;
+#[path = "test_tools_manager.rs"]
+mod test_tools_manager;
 #[path = "test_translations.rs"]
 mod test_translations;
 #[path = "test_visualizer.rs"]

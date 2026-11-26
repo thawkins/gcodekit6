@@ -41,6 +41,6 @@ If you have connection problems:
 ---
 ## Related
 [Gcode Editor](help:gcode_editor)
-[Device Console](help:device-console)
+[Device Console](help:device_console)
 [Visualizer](help:visualizer)
 [Index](help:index)

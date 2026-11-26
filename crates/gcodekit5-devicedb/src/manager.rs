@@ -21,6 +21,8 @@ pub struct DeviceManager {
     /// Set when the last load could not read part of an existing file; the next save
     /// backs the original up before overwriting it.
     needs_backup: ThreadSafeRw<bool>,
+    /// Where the last backup of an unreadable file was written, if one was.
+    last_backup: ThreadSafeRw<Option<PathBuf>>,
 }
 
 impl DeviceManager {
@@ -33,6 +35,7 @@ impl DeviceManager {
             config_path,
             file_lock: thread_safe(()),
             needs_backup: thread_safe_rw(false),
+            last_backup: thread_safe_rw(None),
         }
     }
 
@@ -138,6 +141,12 @@ impl DeviceManager {
         *self.needs_backup.read()
     }
 
+    /// Where the last backup of an unreadable profiles file was written (by a save after a
+    /// load that could not read all of it), if one was.
+    pub fn last_backup(&self) -> Option<PathBuf> {
+        self.last_backup.read().clone()
+    }
+
     fn mark_needs_backup(&self) {
         *self.needs_backup.write() = true;
     }
@@ -173,6 +182,7 @@ impl DeviceManager {
                 backup = %backup.display(),
                 "Backed up device profiles file before overwriting unreadable entries"
             );
+            *self.last_backup.write() = Some(backup);
         }
         *needs_backup = false;
         Ok(())
@@ -180,9 +190,11 @@ impl DeviceManager {
 
     /// Persist all profiles and the active profile id to the configuration file.
     ///
-    /// The write is atomic (temp file + rename). If the last load skipped unreadable
-    /// data, the original file is first copied to a timestamped `.bak-` file; if that
-    /// backup fails the save is aborted so nothing is lost.
+    /// The write goes through `gcodekit5_core::files::write_atomic` (temp file flushed to
+    /// disk, then renamed; a read-only file is refused and the file's permissions are
+    /// kept). If the last load skipped unreadable data, the original file is first copied
+    /// to a timestamped `.bak-` file; if that backup fails the save is aborted so nothing
+    /// is lost.
     ///
     /// # Errors
     /// Returns an error if the backup, serialisation or file write fails.
@@ -210,12 +222,10 @@ impl DeviceManager {
             serde_json::to_string_pretty(&data)?
         };
 
-        // Write to a sibling temp file and rename so a crash mid-write cannot leave a
-        // truncated profiles file (which would then fail to load).
-        let tmp_path = self.config_path.with_extension("json.tmp");
-        fs::write(&tmp_path, content).context("Failed to write device profiles file")?;
-        fs::rename(&tmp_path, &self.config_path)
-            .context("Failed to replace device profiles file")?;
+        // A crash or power loss mid-write must not leave a truncated profiles file (which
+        // would then fail to load).
+        gcodekit5_core::files::write_atomic(&self.config_path, &content)
+            .context("Failed to write device profiles file")?;
 
         Ok(())
     }

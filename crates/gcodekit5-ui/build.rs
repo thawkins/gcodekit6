@@ -3,6 +3,9 @@ use std::fs;
 use std::path::Path;
 use std::process::Command;
 
+/// Where the shared resources (markdown, help_images, icons, images) live.
+const EGUI_RESOURCES: &str = "../gcodekit5-ui-egui/resources";
+
 fn main() {
     // Compile PO files
     let po_dir = Path::new("../../po");
@@ -11,6 +14,9 @@ fn main() {
 
     println!("cargo:rerun-if-changed=../../po");
     println!("cargo:rerun-if-changed=resources");
+    // The help markdown, help images, icons and images live in the egui crate, which
+    // embeds them; the GTK gresource bundle reads the same files from there.
+    println!("cargo:rerun-if-changed={EGUI_RESOURCES}");
 
     if po_dir.exists() {
         for entry in fs::read_dir(po_dir).expect("Failed to read po dir") {
@@ -41,7 +47,7 @@ fn main() {
     println!("cargo:rustc-env=LOCALE_DIR={}", locale_dir.display());
 
     glib_build_tools::compile_resources(
-        &["resources"],
+        &["resources", EGUI_RESOURCES],
         "resources/gresources.xml",
         "gcodekit5.gresource",
     );

@@ -10,7 +10,7 @@ Materials are used to:
 
 ## Left panel: browse & filter
 - **Search** by name/subcategory.
-- **Category** filter groups materials (woods, plastics, ferrous/non‑ferrous metals, composites, stone/ceramic).
+- **Category** filter groups materials (woods, plastics, ferrous/non-ferrous metals, composites, stone/ceramic).
 
 ## Right panel: material details
 Typical fields include:
@@ -23,9 +23,9 @@ Typical fields include:
 - Notes for safety, workholding, and finishing
 
 ## Best practices
-- Use clear names (e.g. “Aluminum 6061‑T6”, “Baltic Birch Plywood”, “HDPE”).
+- Use clear names (e.g. “Aluminum 6061-T6”, “Baltic Birch Plywood”, “HDPE”).
 - Put supplier/temper in **subcategory** when it matters.
-- Add hazard notes for dusty or fume‑producing materials.
+- Add hazard notes for dusty or fume-producing materials.
 
 ## Related
 - [CNC Tools](help:tools_manager)

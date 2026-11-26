@@ -90,16 +90,30 @@ impl From<PersistedTool> for Tool {
     }
 }
 
+/// The file, in the settings folder of the GTK build, that holds the custom tools.
+pub const TOOLS_FILE: &str = "custom_tools.json";
+
+/// The tool library (the standard tools plus the user's custom tools) and the file the
+/// custom tools are kept in.
+///
+/// Saves are atomic (a temporary file renamed over the target). When the file exists but
+/// cannot be read, the error is kept ([`ToolsManagerBackend::load_error`]) and the next
+/// write first copies the file to `custom_tools.json.bak-<time>`
+/// ([`ToolsManagerBackend::last_backup`]), so an unreadable library is never lost; if that
+/// copy fails, nothing is written.
 pub struct ToolsManagerBackend {
     library: ToolLibrary,
     storage_path: PathBuf,
+    load_error: Option<String>,
+    needs_backup: bool,
+    last_backup: Option<PathBuf>,
 }
 
 impl ToolsManagerBackend {
     /// Creates the backend with the standard library plus the custom tools
-    /// saved in the user's configuration directory (`gcodekit5/custom_tools.json`).
+    /// saved in [`ToolsManagerBackend::default_storage_path`].
     pub fn new() -> Self {
-        Self::with_storage_path(Self::get_storage_path())
+        Self::with_storage_path(Self::default_storage_path())
     }
 
     /// Creates the backend with custom tools loaded from, and saved to,
@@ -111,51 +125,101 @@ impl ToolsManagerBackend {
     /// * `storage_path` - the JSON file holding the custom tools
     pub fn with_storage_path(storage_path: PathBuf) -> Self {
         let mut library = gcodekit5_core::data::tools::init_standard_library();
-
-        // Load custom tools from disk if they exist
-        if let Ok(custom_tools) = Self::load_from_file(&storage_path) {
-            for tool in custom_tools {
-                library.add_tool(tool);
+        let mut load_error = None;
+        if storage_path.exists() {
+            match Self::load_from_file(&storage_path) {
+                Ok(custom_tools) => {
+                    for tool in custom_tools {
+                        library.add_tool(tool);
+                    }
+                }
+                Err(e) => {
+                    tracing::error!(
+                        path = %storage_path.display(),
+                        error = %e,
+                        "custom tools file not readable; it is backed up before the next save"
+                    );
+                    load_error = Some(e.to_string());
+                }
             }
         }
-
+        let needs_backup = load_error.is_some();
         Self {
             library,
             storage_path,
+            load_error,
+            needs_backup,
+            last_backup: None,
         }
     }
 
-    fn get_storage_path() -> PathBuf {
-        let mut path = dirs::config_dir()
-            .or_else(dirs::home_dir)
-            .unwrap_or_else(|| PathBuf::from("."));
-        path.push("gcodekit5");
-        std::fs::create_dir_all(&path).ok();
-        path.push("custom_tools.json");
-        path
+    /// The custom tools file both builds use: `custom_tools.json` in the GTK build's
+    /// settings folder ([`gcodekit5_settings::SettingsManager::config_directory`]), or in
+    /// `~/gcodekit5` on a platform without a configuration folder.
+    pub fn default_storage_path() -> PathBuf {
+        storage_dir().join(TOOLS_FILE)
     }
 
-    fn load_from_file(path: &PathBuf) -> Result<Vec<Tool>, BoxedError> {
+    /// The file the custom tools are kept in.
+    pub fn storage_path(&self) -> &Path {
+        &self.storage_path
+    }
+
+    /// Why the custom tools file could not be read when the backend was created, if it
+    /// could not.
+    pub fn load_error(&self) -> Option<&str> {
+        self.load_error.as_deref()
+    }
+
+    /// Where a save copied the unreadable custom tools file before replacing it, if one did.
+    pub fn last_backup(&self) -> Option<&Path> {
+        self.last_backup.as_deref()
+    }
+
+    fn load_from_file(path: &Path) -> Result<Vec<Tool>, BoxedError> {
         let contents = std::fs::read_to_string(path)?;
         let tools: Vec<PersistedTool> = serde_json::from_str(&contents)?;
         Ok(tools.into_iter().map(Into::into).collect())
     }
 
-    fn save_to_file(&self) -> Result<(), BoxedError> {
-        // Only save custom tools (tool numbers are intentionally not persisted)
-        let custom_tools: Vec<PersistedTool> = self
+    /// The custom tools as the file holds them.
+    fn custom_json(&self) -> Result<String, BoxedError> {
+        // Only custom tools are saved (tool numbers are intentionally not persisted).
+        let mut custom_tools: Vec<PersistedTool> = self
             .library
             .get_all_tools()
             .into_iter()
             .filter(|t| t.custom)
             .map(PersistedTool::from)
             .collect();
+        custom_tools.sort_by(|a, b| a.id.0.cmp(&b.id.0));
+        Ok(serde_json::to_string_pretty(&custom_tools)?)
+    }
 
-        let json = serde_json::to_string_pretty(&custom_tools)?;
-        std::fs::write(&self.storage_path, json)?;
+    fn save_to_file(&mut self) -> Result<(), BoxedError> {
+        let json = self.custom_json()?;
+        self.backup_if_needed()?;
+        write_atomic(&self.storage_path, &json)?;
         Ok(())
     }
 
+    /// Copies an unreadable custom tools file aside before it is first replaced.
+    fn backup_if_needed(&mut self) -> Result<(), BoxedError> {
+        if !self.needs_backup {
+            return Ok(());
+        }
+        if self.storage_path.exists() {
+            let backup = backup_path(&self.storage_path);
+            std::fs::copy(&self.storage_path, &backup)?;
+            tracing::warn!(backup = %backup.display(), "backed up unreadable custom tools file");
+            self.last_backup = Some(backup);
+        }
+        self.needs_backup = false;
+        Ok(())
+    }
+
+    /// Adds `tool` (replacing one with the same id) and writes the custom tools file; a
+    /// write error is only logged. Prefer [`ToolsManagerBackend::save_tool`].
     pub fn add_tool(&mut self, tool: Tool) {
         self.library.add_tool(tool);
         // Save custom tools to disk
@@ -184,7 +248,8 @@ impl ToolsManagerBackend {
         Ok(())
     }
 
-    /// Removes the tool with `id` and writes the custom tools file.
+    /// Removes the tool with `id` and writes the custom tools file. A custom tool that
+    /// replaced a standard tool gives way to the standard tool again, as after a restart.
     ///
     /// # Returns
     /// The removed tool, or `None` when no tool has that id.
@@ -194,7 +259,16 @@ impl ToolsManagerBackend {
     /// differs from what is on disk.
     pub fn remove_tool(&mut self, id: &ToolId) -> Result<Option<Tool>, String> {
         let removed = self.library.remove_tool(id);
+        let standard = gcodekit5_core::data::tools::init_standard_library()
+            .get_tool(id)
+            .cloned();
+        if let Some(standard) = standard.clone() {
+            self.library.add_tool(standard);
+        }
         if let Err(e) = self.save_to_file() {
+            if standard.is_some() {
+                self.library.remove_tool(id);
+            }
             if let Some(tool) = removed {
                 self.library.add_tool(tool);
             }
@@ -203,10 +277,12 @@ impl ToolsManagerBackend {
         Ok(removed)
     }
 
+    /// The tool with `id`, if the library has one.
     pub fn get_tool(&self, id: &ToolId) -> Option<&Tool> {
         self.library.get_tool(id)
     }
 
+    /// The tools whose name matches `query` (every tool for an empty query).
     pub fn search_tools(&self, query: &str) -> Vec<&Tool> {
         if query.is_empty() {
             self.library.get_all_tools()
@@ -215,106 +291,89 @@ impl ToolsManagerBackend {
         }
     }
 
+    /// Every tool, standard and custom (unordered).
     pub fn get_all_tools(&self) -> Vec<&Tool> {
         self.library.get_all_tools()
     }
 
+    /// Writes the custom tools to `path` in the custom tools file's format.
+    ///
+    /// # Errors
+    /// The tools cannot be serialised or the file cannot be written.
     pub fn export_custom_tools<P: AsRef<Path>>(&self, path: P) -> Result<(), BoxedError> {
-        let custom_tools: Vec<PersistedTool> = self
-            .library
-            .get_all_tools()
-            .into_iter()
-            .filter(|t| t.custom)
-            .map(PersistedTool::from)
-            .collect();
-
-        let json = serde_json::to_string_pretty(&custom_tools)?;
-        std::fs::write(path, json)?;
+        let json = self.custom_json()?;
+        write_atomic(path.as_ref(), &json)?;
         Ok(())
     }
 
+    /// Removes every custom and imported tool and deletes the custom tools file (an
+    /// unreadable file is backed up first). The standard tools they replaced come back.
+    ///
+    /// # Errors
+    /// The backup or the delete failed; the library is then unchanged.
     pub fn reset_custom_tools(&mut self) -> Result<(), BoxedError> {
-        // Remove custom tools from library
-        let ids: Vec<ToolId> = self
-            .library
-            .get_all_tools()
-            .into_iter()
-            .filter(|t| t.custom)
-            .map(|t| t.id.clone())
-            .collect();
-
-        for id in ids {
-            let _ = self.library.remove_tool(&id);
+        self.backup_if_needed()?;
+        match std::fs::remove_file(&self.storage_path) {
+            Ok(()) => {}
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+            Err(e) => return Err(e.into()),
         }
-
-        // Remove persisted file
-        if self.storage_path.exists() {
-            let _ = std::fs::remove_file(&self.storage_path);
-        }
-
+        self.library = gcodekit5_core::data::tools::init_standard_library();
         Ok(())
     }
 
     /// Import tools from a GTC package (.zip file)
+    ///
+    /// # Errors
+    /// The package cannot be read, or the custom tools file cannot be written (the
+    /// imported tools are then dropped again).
     pub fn import_gtc_package<P: AsRef<Path>>(
         &mut self,
         zip_path: P,
     ) -> Result<GtcImportResult, BoxedError> {
-        // Determine next tool number
-        let next_number = self
-            .library
-            .get_all_tools()
-            .iter()
-            .map(|t| t.number)
-            .max()
-            .unwrap_or(0)
-            + 1;
-
-        let mut importer = GtcImporter::new(next_number);
+        let mut importer = GtcImporter::new(self.next_tool_number());
         let result = importer.import_from_zip(zip_path)?;
-
-        // Add imported tools to library
-        for tool in &result.imported_tools {
-            self.library.add_tool(tool.clone());
-        }
-
-        // Save to disk
-        if let Err(e) = self.save_to_file() {
-            tracing::warn!("Failed to save tools after GTC import: {}", e);
-        }
-
+        self.add_imported(&result)?;
         Ok(result)
     }
 
     /// Import tools from a GTC JSON file
+    ///
+    /// # Errors
+    /// The file cannot be read, or the custom tools file cannot be written (the imported
+    /// tools are then dropped again).
     pub fn import_gtc_json<P: AsRef<Path>>(
         &mut self,
         json_path: P,
     ) -> Result<GtcImportResult, BoxedError> {
-        // Determine next tool number
-        let next_number = self
-            .library
+        let mut importer = GtcImporter::new(self.next_tool_number());
+        let result = importer.import_from_json(json_path)?;
+        self.add_imported(&result)?;
+        Ok(result)
+    }
+
+    /// One more than the highest tool number in the library.
+    fn next_tool_number(&self) -> u32 {
+        self.library
             .get_all_tools()
             .iter()
             .map(|t| t.number)
             .max()
             .unwrap_or(0)
-            + 1;
+            + 1
+    }
 
-        let mut importer = GtcImporter::new(next_number);
-        let result = importer.import_from_json(json_path)?;
-
-        // Add imported tools to library
+    /// Adds the imported tools and saves; on a failed save the library is put back.
+    fn add_imported(&mut self, result: &GtcImportResult) -> Result<(), BoxedError> {
+        let previous = self.library.clone();
         for tool in &result.imported_tools {
             self.library.add_tool(tool.clone());
         }
-
-        // Save to disk
         if let Err(e) = self.save_to_file() {
-            tracing::warn!("Failed to save tools after GTC import: {}", e);
+            self.library = previous;
+            return Err(e);
         }
-
-        Ok(result)
+        Ok(())
     }
 }
 
@@ -324,11 +383,12 @@ impl Default for ToolsManagerBackend {
     }
 }
 
-// Helper conversion functions for UI
+/// The tool type whose name is `s`, if any.
 pub fn string_to_tool_type(s: &str) -> Option<ToolType> {
     ToolType::all().iter().find(|t| t.to_string() == s).cloned()
 }
 
+/// The tool material with GTK's combo text `s`, if any.
 pub fn string_to_tool_material(s: &str) -> Option<ToolMaterial> {
     match s {
         "HSS" => Some(ToolMaterial::HSS),
@@ -337,4 +397,37 @@ pub fn string_to_tool_material(s: &str) -> Option<ToolMaterial> {
         "Diamond" => Some(ToolMaterial::Diamond),
         _ => None,
     }
+}
+
+/// The GTK build's settings folder, or `~/gcodekit5` without a platform config folder.
+pub(crate) fn storage_dir() -> PathBuf {
+    gcodekit5_settings::SettingsManager::config_directory()
+        .ok()
+        .or_else(|| dirs::home_dir().map(|home| home.join("gcodekit5")))
+        .unwrap_or_else(|| PathBuf::from("."))
+}
+
+/// `<file>.bak-<seconds>.<millis>` beside `path`.
+pub(crate) fn backup_path(path: &Path) -> PathBuf {
+    let stamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default();
+    let name = path
+        .file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or_default();
+    path.with_file_name(format!(
+        "{name}.bak-{}.{:03}",
+        stamp.as_secs(),
+        stamp.subsec_millis()
+    ))
+}
+
+/// Writes `text` to `path` with the shared atomic write ([`crate::files::write_atomic`]),
+/// creating the folder first.
+pub(crate) fn write_atomic(path: &Path, text: &str) -> std::io::Result<()> {
+    if let Some(parent) = path.parent().filter(|p| !p.as_os_str().is_empty()) {
+        std::fs::create_dir_all(parent)?;
+    }
+    crate::files::write_atomic(path, text)
 }

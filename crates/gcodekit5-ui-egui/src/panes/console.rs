@@ -25,7 +25,8 @@ use gcodekit5_app::console::{ConsolePanel, MessageLevel};
 use gcodekit5_app::i18n::Translator;
 use gcodekit5_app::machine::{MachineController, MachineEvent};
 
-use crate::machine::{MachineStatus, lock};
+use crate::machine::{MachineStatus, lock, worker_message};
+use crate::windows::help::{self, HelpTopic};
 use crate::workspace::{Pane, PaneContext, PaneId};
 
 /// Messages the log keeps; older ones are dropped (the GTK console keeps 5000 lines too).
@@ -117,12 +118,12 @@ impl ConsolePane {
                     .add_message(MessageLevel::Info, tr.tr("Device disconnected")),
                 MachineEvent::Error(message) => self.log.add_message(
                     MessageLevel::Error,
-                    format!("{}: {message}", tr.tr("Error")),
+                    format!("{}: {}", tr.tr("Error"), worker_message(message, tr)),
                 ),
                 MachineEvent::Sent(line) => self.log.add_command(line),
                 MachineEvent::StreamHalted { reason } => self.log.add_message(
                     MessageLevel::Error,
-                    format!("{}: {reason}", tr.tr(PROGRAM_HALTED)),
+                    format!("{}: {}", tr.tr(PROGRAM_HALTED), worker_message(reason, tr)),
                 ),
                 MachineEvent::Received(line) => {
                     let line = line.trim();
@@ -252,12 +253,15 @@ impl Pane for ConsolePane {
             .show_separator_line(false)
             .show(ui, |ui| {
                 if let Some(notice) = &self.notice {
-                    ui.colored_label(ui.visuals().error_fg_color, notice);
+                    // A controller refusal is kept in English; translated here.
+                    ui.colored_label(ui.visuals().error_fg_color, worker_message(notice, tr));
                 }
                 ui.horizontal(|ui| {
                     if ui.button(tr.tr("Clear")).clicked() {
                         self.log.clear();
                     }
+                    // GTK's console header had the Machine Control help button.
+                    help::help_button(ui, HelpTopic::MachineControl, tr);
                 });
                 self.show_entry(ui, tr, &status);
             });

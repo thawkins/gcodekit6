@@ -50,6 +50,16 @@ pub enum FilePurpose {
     OpenGerberFolder,
     /// Choose the image the Laser Image Engraver engraves.
     OpenEngravingImage,
+    /// Choose where to save the firmware settings list.
+    ExportFirmwareSettings,
+    /// Choose a saved firmware settings list to load.
+    ImportFirmwareSettings,
+    /// Choose a GTC tool catalog package (.zip) to import into the tool library.
+    ImportGtcPackage,
+    /// Choose a GTC tool catalog (.json) to import into the tool library.
+    ImportGtcJson,
+    /// Choose where to export the custom tools.
+    ExportCustomTools,
 }
 
 impl FilePurpose {
@@ -68,6 +78,11 @@ impl FilePurpose {
             Self::SaveCamPreset => n_!("Save Parameters"),
             Self::OpenGerberFolder => n_!("Open Gerber Directory"),
             Self::OpenEngravingImage => n_!("Select Image"),
+            Self::ExportFirmwareSettings => n_!("Export Settings"),
+            Self::ImportFirmwareSettings => n_!("Import Settings"),
+            Self::ImportGtcPackage => n_!("Import GTC Package"),
+            Self::ImportGtcJson => n_!("Import GTC JSON"),
+            Self::ExportCustomTools => n_!("Export Custom Tools"),
         }
     }
 
@@ -99,6 +114,12 @@ impl FilePurpose {
             // A folder has no file types.
             Self::OpenGerberFolder => Vec::new(),
             Self::OpenEngravingImage => vec![FileFilter::ENGRAVING_IMAGE],
+            // GTK's firmware settings dialogs offered no file types.
+            Self::ExportFirmwareSettings | Self::ImportFirmwareSettings => Vec::new(),
+            Self::ImportGtcPackage => open(FileFilter::GTC_PACKAGE),
+            Self::ImportGtcJson => open(FileFilter::JSON),
+            // GTK's export offered JSON only.
+            Self::ExportCustomTools => vec![FileFilter::JSON],
         }
     }
 }
@@ -149,6 +170,16 @@ impl FileFilter {
         name_msgid: n_!("Image files"),
         extensions: &["png", "jpg", "jpeg", "bmp", "gif", "tif", "tiff"],
     };
+    /// GTC tool catalog packages.
+    pub const GTC_PACKAGE: Self = Self {
+        name_msgid: n_!("GTC Packages"),
+        extensions: &["zip"],
+    };
+    /// JSON files (GTC catalogs, exported custom tools).
+    pub const JSON: Self = Self {
+        name_msgid: "JSON",
+        extensions: &["json"],
+    };
     /// The G-code types the designer's export offers (GTK's).
     pub const GCODE_EXPORT: Self = Self {
         name_msgid: n_!("G-Code Files"),
@@ -194,6 +225,12 @@ pub enum ConfirmRequest {
     UnsavedGcode,
     /// The design has unsaved changes: Save, Discard or Cancel.
     UnsavedDesign,
+    /// The CNC Tools window holds an unsaved tool: Save, Discard or Cancel.
+    UnsavedTool,
+    /// The Materials Manager holds an unsaved material: Save, Discard or Cancel.
+    UnsavedMaterial,
+    /// The Device Manager holds an unsaved device profile: Save, Discard or Cancel.
+    UnsavedDevice,
     /// Changed settings take effect after a restart: restart now (Yes) or later (No).
     Restart,
     /// A job is running while the user quits: stop it and quit (Yes) or keep running (No).
@@ -211,6 +248,18 @@ impl ConfirmRequest {
             Self::UnsavedDesign => (
                 n_!("Unsaved changes"),
                 n_!("The current design has unsaved changes. Save them before continuing?"),
+            ),
+            Self::UnsavedTool => (
+                n_!("Unsaved changes"),
+                n_!("The tool has unsaved changes. Save them before continuing?"),
+            ),
+            Self::UnsavedMaterial => (
+                n_!("Unsaved changes"),
+                n_!("The material has unsaved changes. Save them before continuing?"),
+            ),
+            Self::UnsavedDevice => (
+                n_!("Unsaved changes"),
+                n_!("The device profile has unsaved changes. Save them before continuing?"),
             ),
             Self::Restart => (
                 n_!("Restart to apply settings?"),
@@ -238,7 +287,9 @@ pub enum ConfirmChoice {
 
 impl ConfirmChoice {
     /// The answer to an unsaved-changes prompt ([`ConfirmRequest::UnsavedGcode`],
-    /// [`ConfirmRequest::UnsavedDesign`]): Yes is Save, No is Discard.
+    /// [`ConfirmRequest::UnsavedDesign`], [`ConfirmRequest::UnsavedTool`],
+    /// [`ConfirmRequest::UnsavedMaterial`], [`ConfirmRequest::UnsavedDevice`]): Yes is Save,
+    /// No is Discard.
     pub fn as_unsaved(self) -> UnsavedChangesChoice {
         match self {
             Self::Yes => UnsavedChangesChoice::Save,
@@ -416,7 +467,11 @@ impl Dialogs {
         let save = tr.tr(n_!("Save")).into_owned();
         let discard = tr.tr(n_!("Discard")).into_owned();
         let (level, buttons) = match request {
-            ConfirmRequest::UnsavedGcode | ConfirmRequest::UnsavedDesign => (
+            ConfirmRequest::UnsavedGcode
+            | ConfirmRequest::UnsavedDesign
+            | ConfirmRequest::UnsavedTool
+            | ConfirmRequest::UnsavedMaterial
+            | ConfirmRequest::UnsavedDevice => (
                 MessageLevel::Warning,
                 MessageButtons::YesNoCancelCustom(
                     save.clone(),
@@ -542,6 +597,11 @@ pub fn msgids() -> Vec<&'static str> {
         FilePurpose::SaveCamPreset,
         FilePurpose::OpenGerberFolder,
         FilePurpose::OpenEngravingImage,
+        FilePurpose::ExportFirmwareSettings,
+        FilePurpose::ImportFirmwareSettings,
+        FilePurpose::ImportGtcPackage,
+        FilePurpose::ImportGtcJson,
+        FilePurpose::ExportCustomTools,
     ]
     .map(FilePurpose::title_msgid);
     let filters = [
@@ -551,6 +611,7 @@ pub fn msgids() -> Vec<&'static str> {
         FileFilter::SVG,
         FileFilter::DXF,
         FileFilter::IMAGE,
+        FileFilter::GTC_PACKAGE,
     ]
     .map(|f| f.name_msgid)
     .into_iter()
@@ -558,6 +619,9 @@ pub fn msgids() -> Vec<&'static str> {
     let confirms = [
         ConfirmRequest::UnsavedGcode,
         ConfirmRequest::UnsavedDesign,
+        ConfirmRequest::UnsavedTool,
+        ConfirmRequest::UnsavedMaterial,
+        ConfirmRequest::UnsavedDevice,
         ConfirmRequest::Restart,
         ConfirmRequest::StopJob,
     ]

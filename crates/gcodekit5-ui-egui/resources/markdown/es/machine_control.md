@@ -42,6 +42,6 @@ Si tiene problemas de conexión:
 ---
 ## Relacionado
 [Editor de G-code](help:gcode_editor)
-[Consola de Dispositivo](help:device-console)
+[Consola de Dispositivo](help:device_console)
 [Visualizer](help:visualizer)
 [Index](help:index)

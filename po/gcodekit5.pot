@@ -1119,6 +1119,9 @@ msgstr ""
 msgid "Setting not changed"
 msgstr ""
 
+msgid "Setting stored with another value"
+msgstr ""
+
 msgid "Export Settings"
 msgstr ""
 
@@ -3723,4 +3726,787 @@ msgid "Stop the running job before generating."
 msgstr ""
 
 msgid "Must be at most 2000 mm"
+msgstr ""
+
+msgid "connect failed"
+msgstr ""
+
+msgid "write failed"
+msgstr ""
+
+msgid "read failed"
+msgstr ""
+
+msgid "machine worker thread panicked"
+msgstr ""
+
+msgid "cycle start ignored: probe stream halting"
+msgstr ""
+
+msgid "line too long for the controller buffer"
+msgstr ""
+
+msgid "program line too long for the controller buffer"
+msgstr ""
+
+msgid "on program line"
+msgstr ""
+
+msgid "dropped: controller reset after probe error"
+msgstr ""
+
+msgid "jog ignored: invalid distance or feed"
+msgstr ""
+
+msgid "jog ignored: a program is streaming"
+msgstr ""
+
+msgid "Failed to load image file"
+msgstr ""
+
+msgid "The engraving worker stopped"
+msgstr ""
+
+msgid "already connected"
+msgstr ""
+
+msgid "a program is already streaming"
+msgstr ""
+
+msgid "Firmware Settings"
+msgstr ""
+
+msgid "Device Info"
+msgstr ""
+
+msgid "Protocol mismatch: No valid parameters received from device"
+msgstr ""
+
+msgid "Setting written:"
+msgstr ""
+
+msgid "a job is running"
+msgstr ""
+
+msgid "Build"
+msgstr ""
+
+msgid "waiting for the controller to answer earlier commands"
+msgstr ""
+
+msgid "unknown EEPROM value type"
+msgstr ""
+
+msgid "Enter a value"
+msgstr ""
+
+msgid "Enter a whole number"
+msgstr ""
+
+msgid "The value is out of range"
+msgstr ""
+
+msgid "Dimensions"
+msgstr ""
+
+msgid "Device profiles could not be read:"
+msgstr ""
+
+msgid "No settings folder: device profiles cannot be loaded or saved."
+msgstr ""
+
+msgid "Failed to save device"
+msgstr ""
+
+msgid "Device not changed"
+msgstr ""
+
+msgid "Device saved:"
+msgstr ""
+
+msgid "Device deleted:"
+msgstr ""
+
+msgid "Active device:"
+msgstr ""
+
+msgid "Please connect to a device first."
+msgstr ""
+
+msgid "No settings reported yet: Retrieve them in Firmware Settings first."
+msgstr ""
+
+msgid "Device dimensions, spindle speed, and capabilities have been updated from the connected device. Click Save to apply changes."
+msgstr ""
+
+msgid "Devices"
+msgstr ""
+
+msgid "Search devices..."
+msgstr ""
+
+msgid "Add Device"
+msgstr ""
+
+msgid "Active"
+msgstr ""
+
+msgid "Sync from Device"
+msgstr ""
+
+msgid "Update device information from connected device"
+msgstr ""
+
+msgid "Set Active"
+msgstr ""
+
+msgid "Please select or create a device entry to edit"
+msgstr ""
+
+msgid "Delete device?"
+msgstr ""
+
+msgid "Delete '{}'? This cannot be undone."
+msgstr ""
+
+msgid "Device Type:"
+msgstr ""
+
+msgid "Controller:"
+msgstr ""
+
+msgid "Connection Type:"
+msgstr ""
+
+msgid "Baud Rate:"
+msgstr ""
+
+msgid "TCP Host:"
+msgstr ""
+
+msgid "TCP Port:"
+msgstr ""
+
+msgid "Timeout (ms):"
+msgstr ""
+
+msgid "Auto Reconnect"
+msgstr ""
+
+msgid "X Axis:"
+msgstr ""
+
+msgid "Y Axis:"
+msgstr ""
+
+msgid "Z Axis:"
+msgstr ""
+
+msgid "Min:"
+msgstr ""
+
+msgid "Max:"
+msgstr ""
+
+msgid "Limits"
+msgstr ""
+
+msgid "Max S-Value:"
+msgstr ""
+
+msgid "No of Axes:"
+msgstr ""
+
+msgid "Has Spindle"
+msgstr ""
+
+msgid "Spindle Power (W):"
+msgstr ""
+
+msgid "Max Spindle Speed (RPM):"
+msgstr ""
+
+msgid "Has Laser"
+msgstr ""
+
+msgid "Laser Power (W):"
+msgstr ""
+
+msgid "Has Coolant"
+msgstr ""
+
+msgid "Pen Mode (Repetier: M3/M5 become pen down/up Z moves)"
+msgstr ""
+
+msgid "FluidNC (supported via GRBL)"
+msgstr ""
+
+msgid "grblHAL (supported via GRBL)"
+msgstr ""
+
+msgid "TinyG (not supported)"
+msgstr ""
+
+msgid "g2core (not supported)"
+msgstr ""
+
+msgid "Smoothieware (not supported)"
+msgstr ""
+
+msgid "Marlin (not supported)"
+msgstr ""
+
+msgid "Serial"
+msgstr ""
+
+msgid "CNC Mill"
+msgstr ""
+
+msgid "CNC Lathe"
+msgstr ""
+
+msgid "Laser Cutter"
+msgstr ""
+
+msgid "3D Printer"
+msgstr ""
+
+msgid "Plotter"
+msgstr ""
+
+msgid "Invalid TCP Port"
+msgstr ""
+
+msgid "TCP Port must be a number"
+msgstr ""
+
+msgid "Invalid Timeout"
+msgstr ""
+
+msgid "Timeout must be a number (ms)"
+msgstr ""
+
+msgid "Invalid TCP Host"
+msgstr ""
+
+msgid "TCP Host must not contain spaces"
+msgstr ""
+
+msgid "TCP Host must not be empty for network connections"
+msgstr ""
+
+msgid "Invalid X Min"
+msgstr ""
+
+msgid "Invalid X Max"
+msgstr ""
+
+msgid "Invalid Y Min"
+msgstr ""
+
+msgid "Invalid Y Max"
+msgstr ""
+
+msgid "Invalid Z Min"
+msgstr ""
+
+msgid "Invalid Z Max"
+msgstr ""
+
+msgid "Invalid No of Axes"
+msgstr ""
+
+msgid "Number of axes must be an integer between 1 and 6"
+msgstr ""
+
+msgid "Invalid Max Feed Rate"
+msgstr ""
+
+msgid "Invalid Max S-Value"
+msgstr ""
+
+msgid "Max S-Value must be a number"
+msgstr ""
+
+msgid "Invalid Spindle Power"
+msgstr ""
+
+msgid "Spindle power must be a number (W)"
+msgstr ""
+
+msgid "Invalid Max Spindle Speed"
+msgstr ""
+
+msgid "Max spindle speed must be an integer (RPM)"
+msgstr ""
+
+msgid "Invalid Laser Power"
+msgstr ""
+
+msgid "Laser power must be a number (W)"
+msgstr ""
+
+msgid "Unsupported controller"
+msgstr ""
+
+msgid "The selected controller '{}' is not supported yet. Please choose a supported one and try again."
+msgstr ""
+
+msgid "The active device cannot be deleted. Set another device active first."
+msgstr ""
+
+msgid "The only device cannot be deleted."
+msgstr ""
+
+msgid "Check that the active device's controller in the Device Manager matches the machine."
+msgstr ""
+
+msgid "A copy of the unreadable profiles file was kept in"
+msgstr ""
+
+msgid "Settings stored in device profile:"
+msgstr ""
+
+msgid "Settings not stored in a device profile: no profile matches the connected port."
+msgstr ""
+
+msgid "Basic Info"
+msgstr ""
+
+msgid "Geometry"
+msgstr ""
+
+msgid "Manufacturer"
+msgstr ""
+
+msgid "Notes"
+msgstr ""
+
+msgid "No settings folder: custom tools cannot be loaded or saved."
+msgstr ""
+
+msgid "The custom tools file could not be read:"
+msgstr ""
+
+msgid "A copy of the unreadable custom tools file was kept in"
+msgstr ""
+
+msgid "Tool ID already exists. Please choose a unique ID."
+msgstr ""
+
+msgid "Tool saved:"
+msgstr ""
+
+msgid "Tool deleted:"
+msgstr ""
+
+msgid "Custom tools removed."
+msgstr ""
+
+msgid "Reset failed:"
+msgstr ""
+
+msgid "Import complete."
+msgstr ""
+
+msgid "Skipped:"
+msgstr ""
+
+msgid "Errors:"
+msgstr ""
+
+msgid "Custom tools exported."
+msgstr ""
+
+msgid "Search (name, id, type, diameter)..."
+msgstr ""
+
+msgid "All Types"
+msgstr ""
+
+msgid "All Materials"
+msgstr ""
+
+msgid "Filters"
+msgstr ""
+
+msgid "Min diameter (mm)"
+msgstr ""
+
+msgid "Max diameter (mm)"
+msgstr ""
+
+msgid "New Tool"
+msgstr ""
+
+msgid "Create a new custom tool"
+msgstr ""
+
+msgid "Library"
+msgstr ""
+
+msgid "Import GTC (.zip)..."
+msgstr ""
+
+msgid "Import tool catalog from a GTC zip package"
+msgstr ""
+
+msgid "Import GTC (.json)..."
+msgstr ""
+
+msgid "Import tool catalog from a GTC JSON file"
+msgstr ""
+
+msgid "Export Custom Tools..."
+msgstr ""
+
+msgid "Export custom tools to a JSON file"
+msgstr ""
+
+msgid "Reset Custom Tools..."
+msgstr ""
+
+msgid "Remove all custom/imported tools and delete local storage"
+msgstr ""
+
+msgid "Please select or create a tool to edit"
+msgstr ""
+
+msgid "Save changes"
+msgstr ""
+
+msgid "Discard changes"
+msgstr ""
+
+msgid "Delete this tool"
+msgstr ""
+
+msgid "Only custom tools can be deleted."
+msgstr ""
+
+msgid "Delete tool?"
+msgstr ""
+
+msgid "Reset custom tools?"
+msgstr ""
+
+msgid "This will delete all custom/imported tools and remove local custom tools storage."
+msgstr ""
+
+msgid "ID:"
+msgstr ""
+
+msgid "Tool Number:"
+msgstr ""
+
+msgid "Tool Type:"
+msgstr ""
+
+msgid "Tool Material:"
+msgstr ""
+
+msgid "Coating:"
+msgstr ""
+
+msgid "Shank:"
+msgstr ""
+
+msgid "Diameter (mm):"
+msgstr ""
+
+msgid "Length (mm):"
+msgstr ""
+
+msgid "Flute Length (mm):"
+msgstr ""
+
+msgid "Shaft Diameter (mm):"
+msgstr ""
+
+msgid "Number of Flutes:"
+msgstr ""
+
+msgid "Corner Radius (mm):"
+msgstr ""
+
+msgid "Only for corner radius end mills"
+msgstr ""
+
+msgid "Tip Angle (deg):"
+msgstr ""
+
+msgid "Used for drills / V-bits"
+msgstr ""
+
+msgid "Manufacturer:"
+msgstr ""
+
+msgid "Part Number:"
+msgstr ""
+
+msgid "Additional Notes:"
+msgstr ""
+
+msgid "Flat End Mill"
+msgstr ""
+
+msgid "Ball End Mill"
+msgstr ""
+
+msgid "Corner Radius End Mill"
+msgstr ""
+
+msgid "V-Bit"
+msgstr ""
+
+msgid "Drill Bit"
+msgstr ""
+
+msgid "Spot Drill"
+msgstr ""
+
+msgid "Engraving Bit"
+msgstr ""
+
+msgid "Chamfer Tool"
+msgstr ""
+
+msgid "Specialty"
+msgstr ""
+
+msgid "Carbide"
+msgstr ""
+
+msgid "Coated Carbide"
+msgstr ""
+
+msgid "Diamond"
+msgstr ""
+
+msgid "Derived (Straight from shaft diameter)"
+msgstr ""
+
+msgid "Collet"
+msgstr ""
+
+msgid "Tapered"
+msgstr ""
+
+msgid "Tool ID is required"
+msgstr ""
+
+msgid "Tool name is required"
+msgstr ""
+
+msgid "Invalid diameter"
+msgstr ""
+
+msgid "Invalid length"
+msgstr ""
+
+msgid "Invalid flute length"
+msgstr ""
+
+msgid "Invalid shaft diameter"
+msgstr ""
+
+msgid "Invalid corner radius"
+msgstr ""
+
+msgid "Invalid tip angle"
+msgstr ""
+
+msgid "Import GTC Package"
+msgstr ""
+
+msgid "Import GTC JSON"
+msgstr ""
+
+msgid "Export Custom Tools"
+msgstr ""
+
+msgid "GTC Packages"
+msgstr ""
+
+msgid "Cannot Save Material"
+msgstr ""
+
+msgid "Could not save the material:"
+msgstr ""
+
+msgid "Could not delete the material:"
+msgstr ""
+
+msgid "Machining"
+msgstr ""
+
+msgid "Safety"
+msgstr ""
+
+msgid "No settings folder: custom materials cannot be loaded or saved."
+msgstr ""
+
+msgid "The custom materials file could not be read:"
+msgstr ""
+
+msgid "A copy of the unreadable custom materials file was kept in"
+msgstr ""
+
+msgid "A material with this ID already exists."
+msgstr ""
+
+msgid "Material saved:"
+msgstr ""
+
+msgid "Material deleted:"
+msgstr ""
+
+msgid "No materials found"
+msgstr ""
+
+msgid "New Material"
+msgstr ""
+
+msgid "Please select or create a material to edit"
+msgstr ""
+
+msgid "Machinability:"
+msgstr ""
+
+msgid "Only custom materials can be deleted."
+msgstr ""
+
+msgid "Delete material?"
+msgstr ""
+
+msgid "The material has unsaved changes. Save them before continuing?"
+msgstr ""
+
+msgid "Subcategory:"
+msgstr ""
+
+msgid "e.g., Hardwood, Alloy"
+msgstr ""
+
+msgid "Density (kg/m3):"
+msgstr ""
+
+msgid "Machinability (1-10):"
+msgstr ""
+
+msgid "Tensile Strength (MPa):"
+msgstr ""
+
+msgid "Melting Point (deg C):"
+msgstr ""
+
+msgid "Optional"
+msgstr ""
+
+msgid "Chip Type:"
+msgstr ""
+
+msgid "Heat Sensitivity:"
+msgstr ""
+
+msgid "Abrasiveness:"
+msgstr ""
+
+msgid "Surface Finish:"
+msgstr ""
+
+msgid "Dust Hazard:"
+msgstr ""
+
+msgid "Fume Hazard:"
+msgstr ""
+
+msgid "Coolant Required"
+msgstr ""
+
+msgid "Additional Notes and Tips:"
+msgstr ""
+
+msgid "Engineered Wood"
+msgstr ""
+
+msgid "Plastic"
+msgstr ""
+
+msgid "Non-Ferrous Metal"
+msgstr ""
+
+msgid "Ferrous Metal"
+msgstr ""
+
+msgid "Composite"
+msgstr ""
+
+msgid "Stone and Ceramic"
+msgstr ""
+
+msgid "Segmented"
+msgstr ""
+
+msgid "Granular"
+msgstr ""
+
+msgid "Small"
+msgstr ""
+
+msgid "Low"
+msgstr ""
+
+msgid "Moderate"
+msgstr ""
+
+msgid "High"
+msgstr ""
+
+msgid "Excellent"
+msgstr ""
+
+msgid "Good"
+msgstr ""
+
+msgid "Fair"
+msgstr ""
+
+msgid "Rough"
+msgstr ""
+
+msgid "Minimal"
+msgstr ""
+
+msgid "Name is required"
+msgstr ""
+
+msgid "Subcategory is required"
+msgstr ""
+
+msgid "Tensile strength must be a number"
+msgstr ""
+
+msgid "Melting point must be a number"
+msgstr ""
+
+msgid "ID is required"
+msgstr ""
+
+msgid "ID must not contain spaces"
+msgstr ""
+
+msgid "Index"
+msgstr ""
+
+msgid "the controller stored a different value:"
+msgstr ""
+
+msgid "written"
+msgstr ""
+
+msgid "stored"
+msgstr ""
+
+msgid "The device profile has unsaved changes. Save them before continuing?"
 msgstr ""

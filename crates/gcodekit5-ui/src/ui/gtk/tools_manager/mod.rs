@@ -23,7 +23,11 @@ use crate::ui::gtk::common::dialog::UnsavedChangesChoice;
 use crate::ui::gtk::common::spacing;
 use crate::ui::gtk::help_browser;
 use crate::ui::gtk::platform;
-use crate::ui::tools_manager_backend::{ToolsManagerBackend, string_to_tool_material};
+use crate::ui::tools_manager_backend::ToolsManagerBackend;
+use gcodekit5_app::tool_form::{
+    COATINGS, ShankChoice, TOOL_MATERIALS, ToolFilter, ToolForm, can_delete, has_corner_radius,
+    has_tip_angle, tool_contents_equal, tool_material_from_filter_id, tool_type_from_filter_id,
+};
 
 use gcodekit5_core::data::tools::{ShankType, Tool, ToolCoating, ToolId, ToolMaterial, ToolType};
 use gcodekit5_core::{Shared, SharedOption, shared, shared_none};
@@ -441,68 +445,32 @@ impl ToolsManagerView {
         }
 
         let backend = self.backend.borrow();
-        let mut tools: Vec<&Tool> = backend.get_all_tools();
+        let tools: Vec<&Tool> = backend.get_all_tools();
 
-        let q = self.search_entry.text().to_string().to_lowercase();
-        if !q.is_empty() {
-            tools.retain(|t| {
-                let dia = format!("{:.3}", t.diameter);
-                t.name.to_lowercase().contains(&q)
-                    || t.id.0.to_lowercase().contains(&q)
-                    || t.tool_type.to_string().to_lowercase().contains(&q)
-                    || dia.contains(&q)
-            });
-        }
-
-        if let Some(type_id) = self.type_filter.active_id()
-            && type_id.as_str() != "all"
-        {
-            tools.retain(|tool| {
-                let tool_type_str = match tool.tool_type {
-                    ToolType::EndMillFlat => "endmill_flat",
-                    ToolType::EndMillBall => "endmill_ball",
-                    ToolType::EndMillCornerRadius => "endmill_cr",
-                    ToolType::VBit => "vbit",
-                    ToolType::DrillBit => "drill",
-                    ToolType::SpotDrill => "spot",
-                    ToolType::EngravingBit => "engraving",
-                    ToolType::ChamferTool => "chamfer",
-                    ToolType::Specialty => "specialty",
-                };
-                tool_type_str == type_id.as_str()
-            });
-        }
-
-        if let Some(mat_id) = self.material_filter.active_id()
-            && mat_id.as_str() != "all"
-        {
-            tools.retain(|tool| tool.material.to_string() == mat_id.as_str());
-        }
-
-        let dia_min_txt = self.dia_min.text().to_string();
-        let dia_max_txt = self.dia_max.text().to_string();
-        let dia_min = dia_min_txt.parse::<f32>().ok();
-        let dia_max = dia_max_txt.parse::<f32>().ok();
-
-        if !dia_min_txt.trim().is_empty() && dia_min.is_none() {
+        let filter = ToolFilter {
+            search: self.search_entry.text().to_string(),
+            tool_type: self
+                .type_filter
+                .active_id()
+                .and_then(|id| tool_type_from_filter_id(id.as_str())),
+            material: self
+                .material_filter
+                .active_id()
+                .and_then(|id| tool_material_from_filter_id(id.as_str())),
+            dia_min: self.dia_min.text().to_string(),
+            dia_max: self.dia_max.text().to_string(),
+        };
+        if filter.dia_min_invalid() {
             self.dia_min.add_css_class("error");
         } else {
             self.dia_min.remove_css_class("error");
         }
-        if !dia_max_txt.trim().is_empty() && dia_max.is_none() {
+        if filter.dia_max_invalid() {
             self.dia_max.add_css_class("error");
         } else {
             self.dia_max.remove_css_class("error");
         }
-
-        if let Some(min) = dia_min {
-            tools.retain(|t| t.diameter >= min);
-        }
-        if let Some(max) = dia_max {
-            tools.retain(|t| t.diameter <= max);
-        }
-
-        tools.sort_by(|a, b| a.id.0.cmp(&b.id.0).then(a.name.cmp(&b.name)));
+        let tools = filter.apply(tools);
 
         for tool in tools {
             let row = ListBoxRow::new();
@@ -685,7 +653,8 @@ impl ToolsManagerView {
 
             self.right_panel_stack.set_visible_child_name("edit");
             self.cancel_btn.set_sensitive(true);
-            self.delete_btn.set_sensitive(true);
+            // Only custom tools can be deleted (as in the egui build).
+            self.delete_btn.set_sensitive(can_delete(tool));
 
             self.update_type_dependent_fields();
             self.update_save_state();
@@ -706,11 +675,8 @@ impl ToolsManagerView {
             _ => ToolType::EndMillFlat,
         };
 
-        let show_corner_radius = tt == ToolType::EndMillCornerRadius;
-        let show_tip_angle = matches!(
-            tt,
-            ToolType::VBit | ToolType::DrillBit | ToolType::SpotDrill
-        );
+        let show_corner_radius = has_corner_radius(tt);
+        let show_tip_angle = has_tip_angle(tt);
 
         self.edit_corner_radius.set_sensitive(show_corner_radius);
         self.edit_tip_angle.set_sensitive(show_tip_angle);
@@ -738,21 +704,11 @@ impl ToolsManagerView {
         }
     }
 
-    fn coating_from_combo(text: &str) -> Option<ToolCoating> {
-        match text {
-            "TiN" => Some(ToolCoating::TiN),
-            "TiAlN" => Some(ToolCoating::TiAlN),
-            "DLC" => Some(ToolCoating::DLC),
-            "AlOx" => Some(ToolCoating::AlOx),
-            _ => None,
-        }
-    }
-
-    fn shank_from_combo(idx: Option<u32>, shaft_diameter_mm: f32) -> ShankType {
+    fn shank_from_combo(idx: Option<u32>) -> ShankChoice {
         match idx {
-            Some(1) => ShankType::Collet,
-            Some(2) => ShankType::Tapered,
-            _ => ShankType::Straight((shaft_diameter_mm * 10.0) as u32),
+            Some(1) => ShankChoice::Collet,
+            Some(2) => ShankChoice::Tapered,
+            _ => ShankChoice::Derived,
         }
     }
 
@@ -763,168 +719,48 @@ impl ToolsManagerView {
         buffer.text(&start, &end, true).to_string()
     }
 
-    fn build_tool_from_form(&self) -> Result<Tool, String> {
-        let tool_id = self.edit_id.text().trim().to_string();
-        if tool_id.is_empty() {
-            return Err("Tool ID is required".to_string());
-        }
-
-        let tool_name = self.edit_name.text().trim().to_string();
-        if tool_name.is_empty() {
-            return Err("Tool name is required".to_string());
-        }
-
+    /// The form's values, as the shared [`ToolForm`].
+    fn read_form(&self) -> ToolForm {
         let tool_type = Self::tool_type_from_active(self.edit_tool_type.active());
-
-        let material_text = self
-            .edit_material
-            .active_text()
-            .map(|s| s.to_string())
-            .unwrap_or_else(|| "Carbide".to_string());
-        let tool_material = string_to_tool_material(&material_text)
-            .ok_or_else(|| "Invalid tool material".to_string())?;
-
-        let diameter = self
-            .edit_diameter
-            .text()
-            .trim()
-            .parse::<f32>()
-            .map_err(|_| "Invalid diameter".to_string())?;
-        let length = self
-            .edit_length
-            .text()
-            .trim()
-            .parse::<f32>()
-            .map_err(|_| "Invalid length".to_string())?;
-        let flute_length = self
-            .edit_flute_length
-            .text()
-            .trim()
-            .parse::<f32>()
-            .map_err(|_| "Invalid flute length".to_string())?;
-        let shaft_diameter_mm = self
-            .edit_shaft_diameter
-            .text()
-            .trim()
-            .parse::<f32>()
-            .map_err(|_| "Invalid shaft diameter".to_string())?;
-
-        let flutes = self.edit_flutes.value() as u32;
-
-        let corner_radius = if self.edit_corner_radius.is_sensitive() {
-            let txt = self.edit_corner_radius.text().trim().to_string();
-            if txt.is_empty() {
-                None
-            } else {
-                Some(
-                    txt.parse::<f32>()
-                        .map_err(|_| "Invalid corner radius".to_string())?,
-                )
-            }
-        } else {
-            None
-        };
-
-        let tip_angle = if self.edit_tip_angle.is_sensitive() {
-            let txt = self.edit_tip_angle.text().trim().to_string();
-            if txt.is_empty() {
-                None
-            } else {
-                Some(
-                    txt.parse::<f32>()
-                        .map_err(|_| "Invalid tip angle".to_string())?,
-                )
-            }
-        } else {
-            None
-        };
-
-        let coating = self
-            .edit_coating
-            .active_text()
-            .map(|s| s.to_string())
-            .and_then(|t| Self::coating_from_combo(&t));
-
-        let shank = Self::shank_from_combo(self.edit_shank.active(), shaft_diameter_mm);
-
-        let manufacturer = {
-            let text = self.edit_manufacturer.text().trim().to_string();
-            if text.is_empty() { None } else { Some(text) }
-        };
-
-        let part_number = {
-            let text = self.edit_part_number.text().trim().to_string();
-            if text.is_empty() { None } else { Some(text) }
-        };
-
-        let description = Self::read_text_view(&self.edit_description);
-        let notes = Self::read_text_view(&self.edit_notes);
-
-        let tool_number = self.edit_number.value() as u32;
-
-        let mut tool = Tool::new(
-            ToolId(tool_id),
-            tool_number,
-            tool_name,
+        let material = TOOL_MATERIALS
+            .get(self.edit_material.active().unwrap_or(1) as usize)
+            .copied()
+            .unwrap_or(ToolMaterial::Carbide);
+        let coating = COATINGS
+            .get(self.edit_coating.active().unwrap_or(0) as usize)
+            .copied()
+            .flatten();
+        ToolForm {
+            id: self.edit_id.text().to_string(),
+            number: self.edit_number.value() as u32,
+            name: self.edit_name.text().to_string(),
             tool_type,
-            diameter,
-            length,
-        );
-
-        tool.custom = true;
-        tool.description = description;
-        tool.material = tool_material;
-        tool.coating = coating;
-        tool.shank = shank;
-        tool.flute_length = flute_length;
-        tool.shaft_diameter = Some(shaft_diameter_mm);
-        tool.flutes = flutes;
-        tool.corner_radius = corner_radius;
-        tool.tip_angle = tip_angle;
-        tool.manufacturer = manufacturer;
-        tool.part_number = part_number;
-        tool.notes = notes;
-
-        Ok(tool)
+            material,
+            coating,
+            shank: Self::shank_from_combo(self.edit_shank.active()),
+            diameter: self.edit_diameter.text().to_string(),
+            length: self.edit_length.text().to_string(),
+            flute_length: self.edit_flute_length.text().to_string(),
+            shaft_diameter: self.edit_shaft_diameter.text().to_string(),
+            flutes: self.edit_flutes.value() as u32,
+            corner_radius: self.edit_corner_radius.text().to_string(),
+            tip_angle: self.edit_tip_angle.text().to_string(),
+            manufacturer: self.edit_manufacturer.text().to_string(),
+            part_number: self.edit_part_number.text().to_string(),
+            description: Self::read_text_view(&self.edit_description),
+            notes: Self::read_text_view(&self.edit_notes),
+        }
     }
 
-    fn tool_contents_equal(a: &Tool, b: &Tool) -> bool {
-        // Helper for float comparison with tolerance matching UI precision (3 decimals)
-        let eq_f32 = |x: f32, y: f32| (x - y).abs() < 0.0001;
-
-        // Helper for Option<f32>
-        let eq_opt_f32 = |x: Option<f32>, y: Option<f32>| match (x, y) {
-            (Some(vx), Some(vy)) => eq_f32(vx, vy),
-            (None, None) => true,
-            _ => false,
+    fn build_tool_from_form(&self) -> Result<Tool, String> {
+        let base = if *self.is_creating.borrow() {
+            None
+        } else {
+            self.selected_tool.borrow().clone()
         };
-
-        // Helper for shaft diameter (None implies == diameter)
-        let eq_shaft = |t: &Tool| t.shaft_diameter.unwrap_or(t.diameter);
-
-        // Helper for strings (treat None and Some("") as equal)
-        let eq_str = |x: &Option<String>, y: &Option<String>| {
-            x.as_deref().unwrap_or("").trim() == y.as_deref().unwrap_or("").trim()
-        };
-
-        a.id.0 == b.id.0
-            && a.number == b.number
-            && a.name == b.name
-            && a.description == b.description
-            && a.tool_type == b.tool_type
-            && eq_f32(a.diameter, b.diameter)
-            && eq_f32(a.length, b.length)
-            && eq_f32(a.flute_length, b.flute_length)
-            && a.flutes == b.flutes
-            && eq_opt_f32(a.corner_radius, b.corner_radius)
-            && eq_opt_f32(a.tip_angle, b.tip_angle)
-            && eq_f32(eq_shaft(a), eq_shaft(b))
-            && a.material == b.material
-            && a.coating == b.coating
-            && a.shank == b.shank
-            && eq_str(&a.manufacturer, &b.manufacturer)
-            && eq_str(&a.part_number, &b.part_number)
-            && a.notes == b.notes
+        self.read_form()
+            .build(base.as_ref())
+            .map_err(|msgid| t!(msgid))
     }
 
     fn is_dirty(&self) -> bool {
@@ -945,7 +781,7 @@ impl ToolsManagerView {
             return true;
         };
 
-        !Self::tool_contents_equal(&orig, &current)
+        !tool_contents_equal(&orig, &current)
     }
 
     /// Asks whether to save the edited tool before `proceed` replaces the form.
@@ -1054,6 +890,9 @@ impl ToolsManagerView {
 
     fn delete_tool(&self) {
         if let Some(ref tool) = *self.selected_tool.borrow() {
+            if !can_delete(tool) {
+                return;
+            }
             let tool_id = tool.id.clone();
 
             if let Some(window) = self.widget.root().and_downcast::<gtk4::Window>() {

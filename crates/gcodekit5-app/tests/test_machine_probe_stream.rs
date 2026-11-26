@@ -1,6 +1,6 @@
 //! A stream started in [`StreamMode::StopOnError`] (the probe routines' mode): an `error:`
 //! reply makes the worker stop feeding lines at once, feed-hold (`!`), wait for the hold to
-//! complete (`Hold:0` or `Idle`, polled with `?`), then soft-reset (0x18), and report why
+//! complete (`Hold:0` or an `Alarm`, polled with `?`), then soft-reset (0x18), and report why
 //! with [`MachineEvent::StreamHalted`] before the stream's end. The wait is a second without
 //! a fresh report, extended while the machine reports `Hold:1` (still decelerating) up to
 //! [`HALT_MAX_WAIT`]. Cycle start is refused and no manual line is written while halting.
@@ -417,13 +417,196 @@ fn test_probe_stream_halt_skips_every_report_owed_before_the_hold() {
         Some(0),
         "the stale replies were not all read"
     );
-    // A fresh report after the hold completes it.
+    // A fresh report after the hold completes it: from Idle, `!` puts GRBL in `Hold:0` at
+    // once. (Replies to `?`s written during the halt still say `Idle`: GRBL never reports
+    // that after a hold, so they cannot complete it.)
+    shared.inject("<Hold:0|MPos:0.000,0.000,0.000|FS:0,0>\n");
     *shared.reply_budget.lock().expect("budget") = None;
     let from = Instant::now();
     let waited = until_reset(&shared, &mut controller, &mut events, from, EVENTUALLY);
     assert!(
         waited < Duration::from_millis(500),
         "the fresh report did not reset: {waited:?}"
+    );
+    check_halt(&shared);
+}
+
+#[test]
+fn test_probe_stream_halt_never_resets_on_a_stale_hold_complete() {
+    // Every `?` so far is owed `Hold:0`, from an earlier user pause since resumed; no reply
+    // is read yet.
+    let shared = Arc::new(LoopbackShared::default());
+    *shared.reply_budget.lock().expect("budget") = Some(0);
+    shared.inject("<Hold:0|MPos:0.000,0.000,0.000|FS:0,0>\n");
+    let (shared, mut controller) = connected_over(shared);
+    let mut events = Vec::new();
+    until(&mut controller, &mut events, "5 status queries", || {
+        shared.status_queries() >= 5
+    });
+    // The machine runs again: every later `?` is owed a report of it decelerating.
+    shared.inject("<Hold:1|MPos:0.000,0.000,0.000|FS:500,0>\n");
+    until(&mut controller, &mut events, "a query owed Hold:1", || {
+        shared.status_queries() >= 6
+    });
+    error_mid_stream(&shared, &mut controller, &mut events);
+    let log = shared.log();
+    let hold = realtime_at(&log, b'!').expect("a feed hold");
+    let stale = log[..hold]
+        .iter()
+        .filter(|w| **w == Wrote::Realtime(b'?'))
+        .count();
+    assert!(stale > 5, "only {stale} queries before the hold");
+    // Release every reply: the stale `Hold:0`s first, then `Hold:1`s. A stale `Hold:0` must
+    // not reset the machine, which is still moving.
+    *shared.reply_budget.lock().expect("budget") = None;
+    no_reset_for(
+        &shared,
+        &mut controller,
+        &mut events,
+        Duration::from_millis(600),
+    );
+    // A fresh `Hold:0` completes the hold.
+    shared.inject("<Hold:0|MPos:0.000,0.000,0.000|FS:0,0>\n");
+    let from = Instant::now();
+    let waited = until_reset(&shared, &mut controller, &mut events, from, EVENTUALLY);
+    assert!(
+        waited < Duration::from_millis(800),
+        "the fresh Hold:0 did not reset: {waited:?}"
+    );
+    check_halt(&shared);
+}
+
+#[test]
+fn test_probe_stream_halt_forgets_status_replies_that_never_came() {
+    // No report injected yet: every `?` written is lost (never answered).
+    let (shared, mut controller) = connected();
+    let mut events = Vec::new();
+    until(
+        &mut controller,
+        &mut events,
+        "25 lost status queries",
+        || shared.status_queries() >= 25,
+    );
+    error_mid_stream(&shared, &mut controller, &mut events);
+    // From now on every `?` is answered: the machine is still decelerating. Lost replies
+    // must not make the halt skip these fresh reports until its one-second timeout.
+    shared.inject("<Hold:1|MPos:0.000,0.000,0.000|FS:500,0>\n");
+    no_reset_for(
+        &shared,
+        &mut controller,
+        &mut events,
+        Duration::from_millis(1800),
+    );
+    shared.inject("<Hold:0|MPos:0.000,0.000,0.000|FS:0,0>\n");
+    let from = Instant::now();
+    let waited = until_reset(&shared, &mut controller, &mut events, from, EVENTUALLY);
+    assert!(
+        waited < Duration::from_millis(800),
+        "the reset did not follow Hold:0: {waited:?}"
+    );
+    check_halt(&shared);
+}
+
+/// Polls until the stream ended, at most `limit`; returns how long that took.
+fn until_stopped(
+    controller: &mut MachineController,
+    events: &mut Vec<MachineEvent>,
+    limit: Duration,
+) -> Duration {
+    let from = Instant::now();
+    while !events
+        .iter()
+        .any(|e| matches!(e, MachineEvent::StreamStopped { .. }))
+    {
+        assert!(from.elapsed() < limit, "no StreamStopped within {limit:?}");
+        events.extend(controller.poll());
+        std::thread::sleep(Duration::from_millis(1));
+    }
+    from.elapsed()
+}
+
+#[test]
+fn test_probe_stream_halt_ends_on_a_user_soft_reset() {
+    let (shared, mut controller) = connected();
+    let mut events = Vec::new();
+    error_mid_stream(&shared, &mut controller, &mut events);
+    controller.realtime(RealtimeCommand::SoftReset);
+    let waited = until_stopped(&mut controller, &mut events, EVENTUALLY);
+    assert!(
+        waited < Duration::from_millis(500),
+        "the soft reset waited for the halt: {waited:?}"
+    );
+    assert!(!controller.is_streaming());
+    // The halt is over: it does not reset a second time or report itself later.
+    std::thread::sleep(Duration::from_millis(1500));
+    events.extend(controller.poll());
+    let resets = shared
+        .log()
+        .iter()
+        .filter(|w| **w == Wrote::Realtime(0x18))
+        .count();
+    assert_eq!(resets, 1, "{:?}", shared.log());
+    assert!(
+        !events
+            .iter()
+            .any(|e| matches!(e, MachineEvent::StreamHalted { .. })),
+        "{events:?}"
+    );
+    check_halt(&shared);
+}
+
+#[test]
+fn test_stream_ends_on_a_user_soft_reset() {
+    let (shared, mut controller) = connected();
+    let mut events = Vec::new();
+    controller.start_stream(program()).expect("start");
+    until(&mut controller, &mut events, "5 lines", || {
+        lines(&shared) >= 5
+    });
+    controller.realtime(RealtimeCommand::SoftReset);
+    until_stopped(&mut controller, &mut events, EVENTUALLY);
+    assert!(!controller.is_streaming());
+    let log = shared.log();
+    let reset = realtime_at(&log, 0x18).expect("a soft reset");
+    assert!(
+        !log[reset..].iter().any(|w| matches!(w, Wrote::Line(_))),
+        "a line was written after the reset: {:?}",
+        &log[reset..]
+    );
+    let written = lines(&shared);
+    std::thread::sleep(Duration::from_millis(200));
+    controller.poll();
+    assert_eq!(lines(&shared), written);
+}
+
+#[test]
+fn test_probe_stream_halt_never_resets_on_a_late_stale_idle_over_a_slow_link() {
+    // A slow link (a Wi-Fi or telnet bridge): every status reply arrives 2.6 s after its `?`.
+    let shared = Arc::new(LoopbackShared::default());
+    *shared.reply_delay.lock().expect("delay") = Duration::from_millis(2600);
+    shared.inject("<Idle|MPos:0.000,0.000,0.000|FS:0,0>\n");
+    let (shared, mut controller) = connected_over(shared);
+    let mut events = Vec::new();
+    // Replies are flowing, each owed `Idle` from before any hold.
+    let settled = Instant::now() + Duration::from_millis(3500);
+    until(&mut controller, &mut events, "replies flowing", || {
+        Instant::now() >= settled
+    });
+    error_mid_stream(&shared, &mut controller, &mut events);
+    // After the hold the machine decelerates; the late replies still say `Idle`.
+    shared.inject("<Hold:1|MPos:0.000,0.000,0.000|FS:500,0>\n");
+    no_reset_for(
+        &shared,
+        &mut controller,
+        &mut events,
+        Duration::from_millis(3500),
+    );
+    shared.inject("<Hold:0|MPos:0.000,0.000,0.000|FS:0,0>\n");
+    let from = Instant::now();
+    let waited = until_reset(&shared, &mut controller, &mut events, from, EVENTUALLY);
+    assert!(
+        waited < Duration::from_secs(4),
+        "the reset did not follow Hold:0: {waited:?}"
     );
     check_halt(&shared);
 }

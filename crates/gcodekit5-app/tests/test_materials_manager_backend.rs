@@ -74,6 +74,8 @@ fn test_persistence() {
     // Cleanup
     {
         let mut backend = MaterialsManagerBackend::with_storage_path(storage.clone());
-        backend.remove_material(&MaterialId("test_persist".to_string()));
+        backend
+            .remove_material(&MaterialId("test_persist".to_string()))
+            .expect("remove");
     }
 }

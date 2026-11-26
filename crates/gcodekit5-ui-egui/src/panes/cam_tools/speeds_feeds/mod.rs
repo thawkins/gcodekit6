@@ -187,6 +187,31 @@ impl SpeedsFeedsParams {
         );
     }
 
+    /// Takes the libraries again after the Tools or Materials manager changed them, keeping
+    /// the page's other inputs: a chosen tool or material takes its new values, or is
+    /// cleared when it was deleted; an open selection dialog's row choice is cleared.
+    ///
+    /// # Arguments
+    /// * `tools` - The tool library.
+    /// * `materials` - The material library.
+    pub fn replace_libraries(&mut self, mut tools: Vec<Tool>, mut materials: Vec<Material>) {
+        tools.sort_by(|a, b| gtk_order(&a.name, &b.name));
+        materials.sort_by(|a, b| gtk_order(&a.name, &b.name));
+        self.tool = self
+            .tool
+            .take()
+            .and_then(|old| tools.iter().find(|t| t.id == old.id).cloned());
+        self.material = self
+            .material
+            .take()
+            .and_then(|old| materials.iter().find(|m| m.id == old.id).cloned());
+        self.tools = tools;
+        self.materials = materials;
+        if let Some(picker) = self.picker.as_mut() {
+            picker.chosen = None;
+        }
+    }
+
     /// Chooses the library tool `id`.
     ///
     /// # Returns

@@ -3,8 +3,8 @@
 The CNC Tools tab manages cutter/tool definitions used by CAM generators and feeds/speeds calculations.
 
 ## What this library is (and isn’t)
-- ✅ A **tool library** for CAM and generators.
-- ❌ Not a controller “tool table” (no automatic tool length offsets, etc.).
+- A **tool library** for CAM and generators.
+- Not a controller “tool table” (no automatic tool length offsets, etc.).
 
 ## Left panel: browse & filter
 Use the left panel to quickly find tools:
@@ -36,8 +36,8 @@ Use the **Library** panel to:
 - Reset custom/imported tools (destructive)
 
 ## Workflow examples
-- Create a tool → set geometry → Save.
-- Import a GTC catalog → filter by diameter/material → review/edit a tool.
+- Create a tool -> set geometry -> Save.
+- Import a GTC catalog -> filter by diameter/material -> review/edit a tool.
 - Export custom tools to JSON for backup/sharing.
 
 ## Related

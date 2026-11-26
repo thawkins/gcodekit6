@@ -13,15 +13,15 @@ Un *perfil de dispositivo* es independiente de la conexión activa de la máquin
 Los perfiles de dispositivo se editan mediante pestañas (p. ej., Conexión, Área de trabajo, Capacidades).
 
 ### Botones de acción
-- **💾 Guardar** - Guarda los cambios en el perfil del dispositivo.
-- **❌ Cancelar** - Descarta los cambios y cierra el formulario de edición.
-- **🗑️ Eliminar** - Elimina el perfil del dispositivo (con confirmación).
-- **🔄 Sincronizar desde el dispositivo** - Actualiza la información del dispositivo conectado (solo se habilita cuando está conectado). Esta información muestra:
+- **Guardar** - Guarda los cambios en el perfil del dispositivo.
+- **Cancelar** - Descarta los cambios y cierra el formulario de edición.
+- **Eliminar** - Elimina el perfil del dispositivo (con confirmación).
+- **Sincronizar desde el dispositivo** - Actualiza la información del dispositivo conectado (solo se habilita cuando está conectado). Esta información muestra:
 - Dimensiones máximas de recorrido desde $130, $131, $132 (recorrido máximo en X/Y/Z).
 - Velocidad máxima del husillo desde $30.
 - Capacidad del modo láser desde $32.
 - Información de la versión del firmware.
-- **✓ Establecer como activo** - Establece este perfil como el dispositivo predeterminado.
+- **Establecer como activo** - Establece este perfil como el dispositivo predeterminado.
 
 ### Conexión
 Configurar cómo acceder al controlador:
@@ -37,8 +37,8 @@ Establecer los límites de recorrido de la máquina (X/Y/Z mín./máx.). Estas f
 
 ### Capacidades
 Habilite las funciones que afectan a la interfaz de usuario y las trayectorias de la herramienta:
-- **Tiene husillo** → habilita los campos de potencia del husillo y velocidad máxima del husillo
-- **Tiene láser** → habilita los campos de potencia del láser
+- **Tiene husillo** -> habilita los campos de potencia del husillo y velocidad máxima del husillo
+- **Tiene láser** -> habilita los campos de potencia del láser
 - Compatibilidad con refrigerante (si su controlador/máquina lo utiliza)
 
 ## Consejos para el flujo de trabajo

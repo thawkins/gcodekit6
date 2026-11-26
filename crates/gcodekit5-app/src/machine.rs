@@ -40,8 +40,8 @@ use grbl_stream::{
 
 /// How often the worker asks for a status report while it waits for a feed hold to complete.
 const HALT_QUERY_INTERVAL: Duration = Duration::from_millis(50);
-/// How long the worker waits for a feed hold to complete before it soft-resets anyway, when
-/// no fresh status report says the machine is still decelerating (`Hold:1`).
+/// How long the worker waits for a feed hold to complete before it soft-resets anyway, after
+/// the hold or the latest status report that did not complete it.
 const HALT_TIMEOUT: Duration = Duration::from_secs(1);
 /// The longest a halt waits for a feed hold to complete, however long fresh `Hold:1`
 /// reports say the machine is still decelerating; it soft-resets then.
@@ -50,20 +50,82 @@ pub const HALT_MAX_WAIT: Duration = Duration::from_secs(10);
 const STATUS_INTERVAL: Duration = Duration::from_millis(200);
 /// The most status queries whose replies are tracked; see [`WorkerState::query_tags`].
 const MAX_QUERY_TAGS: usize = 3;
+/// The shortest time a `?` may stay unanswered before the worker presumes its reply lost (a
+/// reply dropped by a reset or the transport); on a slower link the time follows the
+/// observed reply latency, see [`WorkerState::lost_reply_timeout`].
+const QUERY_REPLY_TIMEOUT: Duration = Duration::from_secs(2);
+/// The most unanswered `?`s the worker remembers; see [`WorkerState::unanswered_queries`].
+const MAX_UNANSWERED_QUERIES: usize = 256;
 /// How long an idle worker waits for a command before reading the transport again.
 const IDLE_WAIT: Duration = Duration::from_millis(2);
+
+/// The English texts of the messages the controller and its worker word themselves in
+/// [`MachineEvent::Error`] and [`MachineEvent::StreamHalted`], and of the fixed
+/// [`MachineError`]s (which also reach the UI as such events). Each is a msgid: this crate
+/// stays toolkit-free and emits English, and a front end translates at display time. A
+/// message is a text alone, or a text followed by `": "` and a detail (a line, a transport
+/// error); [`ON_PROGRAM_LINE`](worker_text::ON_PROGRAM_LINE) joins a controller reply
+/// (`error:N`) to its line number. The controller's own replies are protocol, not texts.
+pub mod worker_text {
+    /// The transport could not be opened; followed by the transport's error.
+    pub const CONNECT_FAILED: &str = "connect failed";
+    /// A write to the transport failed; followed by the transport's error.
+    pub const WRITE_FAILED: &str = "write failed";
+    /// A read from the transport failed; followed by the transport's error.
+    pub const READ_FAILED: &str = "read failed";
+    /// The worker thread ended unexpectedly.
+    pub const WORKER_PANICKED: &str = "machine worker thread panicked";
+    /// Cycle start refused while a stop-on-error stream halts.
+    pub const CYCLE_START_IGNORED: &str = "cycle start ignored: probe stream halting";
+    /// A manual line too long for the controller; followed by the line.
+    pub const LINE_TOO_LONG: &str = "line too long for the controller buffer";
+    /// A program line too long for the controller; followed by its line number.
+    pub const PROGRAM_LINE_TOO_LONG: &str = "program line too long for the controller buffer";
+    /// Joins a controller reply to the program line it refused: `error:9 on program line 41`.
+    pub const ON_PROGRAM_LINE: &str = "on program line";
+    /// A manual line dropped by a halt's reset; followed by the line.
+    pub const DROPPED_AFTER_PROBE_ERROR: &str = "dropped: controller reset after probe error";
+    /// A jog with an unusable distance or feed; followed by both.
+    pub const JOG_INVALID: &str = "jog ignored: invalid distance or feed";
+    /// A jog refused while a program streams.
+    pub const JOG_WHILE_STREAMING: &str = "jog ignored: a program is streaming";
+    /// [`MachineError::AlreadyConnected`](super::MachineError::AlreadyConnected).
+    pub const ALREADY_CONNECTED: &str = "already connected";
+    /// [`MachineError::NotConnected`](super::MachineError::NotConnected).
+    pub const NOT_CONNECTED: &str = "not connected";
+    /// [`MachineError::StreamInProgress`](super::MachineError::StreamInProgress).
+    pub const STREAM_IN_PROGRESS: &str = "a program is already streaming";
+
+    /// Every text above, for a front end's translation table.
+    pub const ALL: [&str; 14] = [
+        CONNECT_FAILED,
+        WRITE_FAILED,
+        READ_FAILED,
+        WORKER_PANICKED,
+        CYCLE_START_IGNORED,
+        LINE_TOO_LONG,
+        PROGRAM_LINE_TOO_LONG,
+        ON_PROGRAM_LINE,
+        DROPPED_AFTER_PROBE_ERROR,
+        JOG_INVALID,
+        JOG_WHILE_STREAMING,
+        ALREADY_CONNECTED,
+        NOT_CONNECTED,
+        STREAM_IN_PROGRESS,
+    ];
+}
 
 /// Errors returned by [`MachineController`] calls.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 pub enum MachineError {
     /// `connect` was called while a connection is open.
-    #[error("already connected")]
+    #[error("{}", worker_text::ALREADY_CONNECTED)]
     AlreadyConnected,
     /// The call needs an open connection.
-    #[error("not connected")]
+    #[error("{}", worker_text::NOT_CONNECTED)]
     NotConnected,
     /// `start_stream` was called while a program is streaming.
-    #[error("a program is already streaming")]
+    #[error("{}", worker_text::STREAM_IN_PROGRESS)]
     StreamInProgress,
     /// The connection settings are not usable.
     #[error("invalid connection settings: {0}")]
@@ -249,9 +311,11 @@ pub enum StreamMode {
     #[default]
     Normal,
     /// Stop at once (a probe routine, whose later lines are relative moves that must not run
-    /// after a refused probe line): stop feeding lines, feed hold (`!`), wait up to a second
-    /// for the hold to complete (`Hold:0` or `Idle`, polling `?`), then soft reset (0x18),
-    /// which keeps the machine position once the motion has stopped. Reported as
+    /// after a refused probe line): stop feeding lines, feed hold (`!`), wait for the hold to
+    /// complete (a `Hold:0` or `Alarm` report after the hold, polling `?`; each report that
+    /// does not complete it extends the wait by a second, up to [`HALT_MAX_WAIT`]; a second
+    /// without any report ends it), then soft reset (0x18), which keeps the machine position
+    /// once the motion has stopped. Reported as
     /// [`MachineEvent::StreamHalted`] then [`MachineEvent::StreamStopped`].
     StopOnError,
 }
@@ -286,6 +350,8 @@ enum Command {
     Pause,
     Resume,
     Stop,
+    /// A `$J=` jog line, answered through [`MachineController::lines_answered`]'s own jog
+    /// count rather than a state-line sequence number.
     Line(String),
     /// A command line that may change the machine state, with its sequence number.
     StateLine(String, u64),
@@ -311,12 +377,21 @@ struct Worker {
 /// connect timeout.
 pub struct MachineController {
     factory: TransportFactory,
+    /// The settings of the last connection started (kept after it closes).
+    last_connection: Option<ConnectionSettings>,
     repaint: SharedHook,
     streaming: Arc<AtomicBool>,
     /// Sequence number of the last command line sent with [`send_line`](Self::send_line).
     requested: u64,
     /// The highest such sequence number written before the latest status report.
     fresh: Arc<AtomicU64>,
+    /// The highest such sequence number whose reply (`ok` or `error:N`) was read, or which
+    /// a reset dropped; see [`lines_answered`](Self::lines_answered).
+    answered: Arc<AtomicU64>,
+    /// How many jogs were handed to the worker on this connection.
+    jogs_requested: u64,
+    /// How many of those jogs were answered or dropped (never to run).
+    jogs_answered: Arc<AtomicU64>,
     worker: Option<Worker>,
     /// Workers told to shut down while still connecting; reaped once finished.
     closing: Vec<JoinHandle<()>>,
@@ -354,10 +429,14 @@ impl MachineController {
     pub fn with_transport(factory: TransportFactory) -> Self {
         Self {
             factory,
+            last_connection: None,
             repaint: Arc::new(Mutex::new(None)),
             streaming: Arc::new(AtomicBool::new(false)),
             requested: 0,
             fresh: Arc::new(AtomicU64::new(0)),
+            answered: Arc::new(AtomicU64::new(0)),
+            jogs_requested: 0,
+            jogs_answered: Arc::new(AtomicU64::new(0)),
             worker: None,
             closing: Vec::new(),
             pending: Vec::new(),
@@ -400,6 +479,9 @@ impl MachineController {
         self.streaming = Arc::new(AtomicBool::new(false));
         self.requested = 0;
         self.fresh = Arc::new(AtomicU64::new(0));
+        self.answered = Arc::new(AtomicU64::new(0));
+        self.jogs_requested = 0;
+        self.jogs_answered = Arc::new(AtomicU64::new(0));
         let state = WorkerState::new(
             (self.factory)(),
             cmd_rx,
@@ -410,6 +492,7 @@ impl MachineController {
             self.streaming.clone(),
             ready.clone(),
             self.fresh.clone(),
+            [self.answered.clone(), self.jogs_answered.clone()],
         );
         let handle = std::thread::Builder::new()
             .name("machine-controller".to_string())
@@ -421,6 +504,7 @@ impl MachineController {
             handle,
             ready,
         });
+        self.last_connection = Some(cfg.clone());
         Ok(())
     }
 
@@ -507,18 +591,22 @@ impl MachineController {
     pub fn jog(&mut self, axis: Axis, distance_mm: f32, feed_mm_min: f32) {
         if !distance_mm.is_finite() || !(feed_mm_min.is_finite() && feed_mm_min > 0.0) {
             self.pending.push(MachineEvent::Error(format!(
-                "jog ignored: invalid distance {distance_mm} or feed {feed_mm_min}"
+                "{}: {distance_mm}, {feed_mm_min}",
+                worker_text::JOG_INVALID
             )));
             return;
         }
         if self.streaming.load(Ordering::SeqCst) {
             self.pending.push(MachineEvent::Error(
-                "jog ignored: a program is streaming".to_string(),
+                worker_text::JOG_WHILE_STREAMING.to_string(),
             ));
             return;
         }
         let line = linear_jog_command(axis.letter(), distance_mm, feed_mm_min);
-        self.send_or_report(Command::Line(line));
+        match self.send(Command::Line(line)) {
+            Ok(()) => self.jogs_requested += 1,
+            Err(e) => self.pending.push(MachineEvent::Error(e.to_string())),
+        }
     }
 
     /// Queues one command line (`$H`, `$X`, an MDI line), trimmed of spaces, behind any
@@ -578,6 +666,23 @@ impl MachineController {
         self.fresh.load(Ordering::SeqCst) >= self.requested
     }
 
+    /// The settings of the last connection started (port or host, type), kept after it
+    /// closes so events read before the close can still be attributed to it.
+    pub fn last_connection(&self) -> Option<&ConnectionSettings> {
+        self.last_connection.as_ref()
+    }
+
+    /// Whether every line sent with [`send_line`](Self::send_line) or [`jog`](Self::jog) has
+    /// had its reply (`ok` or `error:N`) or was dropped (by a reset, or a jog cancel for a
+    /// queued jog). The controller reports no event for a manual line's `ok`, so a front end
+    /// that tells a line's answer by the order of the replies (a setting write) must start
+    /// only when nothing earlier is unanswered: a jog's `error:15` must not be taken for the
+    /// write's. True before any line is sent.
+    pub fn lines_answered(&self) -> bool {
+        self.answered.load(Ordering::SeqCst) >= self.requested
+            && self.jogs_answered.load(Ordering::SeqCst) >= self.jogs_requested
+    }
+
     /// Whether a program is streaming: from a successful
     /// [`start_stream`](Self::start_stream) until it finishes or stops.
     pub fn is_streaming(&self) -> bool {
@@ -635,7 +740,7 @@ impl MachineController {
         self.pending.extend(worker.events.try_iter());
         if joined.is_err() {
             self.pending.push(MachineEvent::Error(
-                "machine worker thread panicked".to_string(),
+                worker_text::WORKER_PANICKED.to_string(),
             ));
             self.pending.push(MachineEvent::Disconnected);
         }
@@ -713,12 +818,14 @@ struct Halt {
     /// When the feed hold was written.
     started: Instant,
     /// When to soft-reset without a completed hold: [`HALT_TIMEOUT`] after the hold or the
-    /// latest fresh `Hold:1` report, never later than [`HALT_MAX_WAIT`] after the hold.
+    /// latest status report that did not complete it (a stale one, `Hold:1`, `Idle`, ...),
+    /// never later than [`HALT_MAX_WAIT`] after the hold.
     deadline: Instant,
     /// When to ask for the next status report.
     next_query: Instant,
     /// Status reports still owed to `?`s written before the hold; they may describe the
-    /// machine before it, so they do not count as a completed hold.
+    /// machine before it (even a `Hold:0` of an earlier pause), so they do not count as a
+    /// completed hold.
     stale_reports: usize,
 }
 
@@ -732,6 +839,15 @@ struct WorkerState {
     window: CharCountWindow,
     /// One entry per line in `window`: true for a program line, false for a manual one.
     in_flight_is_program: VecDeque<bool>,
+    /// The state-line sequence number of each manual line in `window`, oldest first (0 for
+    /// a jog).
+    in_flight_seq: VecDeque<u64>,
+    /// Shared with the controller: the highest state-line sequence number answered or
+    /// dropped, see [`MachineController::lines_answered`].
+    answered: Arc<AtomicU64>,
+    /// Shared with the controller: how many jogs (sequence number 0) were answered or
+    /// dropped, see [`MachineController::lines_answered`].
+    jogs_answered: Arc<AtomicU64>,
     splitter: ResponseLineSplitter,
     /// Manual lines waiting for room, each with its state-line sequence number (0 for a jog).
     manual: VecDeque<(String, u64)>,
@@ -747,9 +863,24 @@ struct WorkerState {
     /// Capped at [`MAX_QUERY_TAGS`]: on overflow the two oldest tags merge into the lower one,
     /// so a lagging queue only ever under-states freshness.
     query_tags: VecDeque<u64>,
-    /// `?`s written and not yet answered, uncapped (unlike [`Self::query_tags`]): how many
-    /// reports a halt must skip as possibly describing the machine before the hold.
-    queries_outstanding: usize,
+    /// When each `?` not yet answered was written, oldest first: how many reports a halt must
+    /// skip as possibly describing the machine before the hold. A status report pops the
+    /// oldest entry (nothing when none is left, so an unsolicited report cannot underflow
+    /// it). The count corrects itself and stays bounded: an entry older than
+    /// [`Self::lost_reply_timeout`] is presumed lost and dropped (logged), at most
+    /// [`MAX_UNANSWERED_QUERIES`] are kept (the oldest goes first), and a reset clears them.
+    /// An unsolicited report (auto-reporting firmware) can still answer for a `?` and make
+    /// the count low until that `?`'s own reply arrives; the next `?`s set it right again.
+    /// A miscount cannot make a halt reset in motion: only a `Hold:0` or `Alarm` report
+    /// completes a halt, see [`Halt`].
+    unanswered_queries: VecDeque<Instant>,
+    /// The slowest recent reply: the age of the `?` each status report answered, decaying by
+    /// 1/16 per report. A slow link (a Wi-Fi or telnet bridge) raises it, so its late replies
+    /// are not presumed lost.
+    reply_latency: Duration,
+    /// Whether lost replies were logged since the last status report, so a dead link logs
+    /// once rather than at every `?`.
+    lost_logged: bool,
     /// A `$J` jog was queued and is not known to be over: set when it is queued and again when
     /// it is written, cleared by jog cancel (0x85, which also drops queued jogs), soft reset
     /// (0x18), or an `Idle` report after a `Jog` one received since it was written.
@@ -774,6 +905,7 @@ impl WorkerState {
         streaming: Arc<AtomicBool>,
         ready: Arc<AtomicBool>,
         fresh: Arc<AtomicU64>,
+        [answered, jogs_answered]: [Arc<AtomicU64>; 2],
     ) -> Self {
         Self {
             comm,
@@ -783,6 +915,9 @@ impl WorkerState {
             ready,
             window: CharCountWindow::default(),
             in_flight_is_program: VecDeque::new(),
+            in_flight_seq: VecDeque::new(),
+            answered,
+            jogs_answered,
             splitter: ResponseLineSplitter::new(),
             manual: VecDeque::new(),
             stream: None,
@@ -790,7 +925,9 @@ impl WorkerState {
             written_seq: 0,
             fresh,
             query_tags: VecDeque::new(),
-            queries_outstanding: 0,
+            unanswered_queries: VecDeque::new(),
+            reply_latency: Duration::ZERO,
+            lost_logged: false,
             jog_outstanding: false,
             jog_seen: false,
             halt: None,
@@ -801,8 +938,10 @@ impl WorkerState {
     /// disconnects.
     fn run(mut self, params: &ConnectionParams) {
         if let Err(e) = self.comm.connect(params) {
-            self.sink
-                .emit(MachineEvent::Error(format!("connect failed: {e}")));
+            self.sink.emit(MachineEvent::Error(format!(
+                "{}: {e}",
+                worker_text::CONNECT_FAILED
+            )));
             // A stream queued while connecting never started.
             self.streaming.store(false, Ordering::SeqCst);
             self.sink.emit(MachineEvent::Disconnected);
@@ -876,7 +1015,9 @@ impl WorkerState {
                         self.handle_response(&line);
                     }
                 }
-                Err(e) => return Exit::TransportError(format!("read failed: {e}")),
+                Err(e) => {
+                    return Exit::TransportError(format!("{}: {e}", worker_text::READ_FAILED));
+                }
             }
         }
     }
@@ -885,7 +1026,7 @@ impl WorkerState {
         self.comm
             .send(data)
             .map(|_| ())
-            .map_err(|e| format!("write failed: {e}"))
+            .map_err(|e| format!("{}: {e}", worker_text::WRITE_FAILED))
     }
 
     fn handle_command(&mut self, cmd: Command) -> Result<(), String> {
@@ -908,9 +1049,21 @@ impl WorkerState {
                     || byte == RealtimeCommand::SoftReset.byte()
                 {
                     // A jog still waiting in the queue must not start after the cancel or
-                    // the reset.
-                    self.manual.retain(|(line, _)| !line.starts_with("$J="));
+                    // the reset; it is answered by never running.
+                    let (jogs, kept): (Vec<_>, Vec<_>) = self
+                        .manual
+                        .drain(..)
+                        .partition(|(line, _)| line.starts_with("$J="));
+                    self.manual = kept.into();
+                    for (_, seq) in jogs {
+                        self.drop_line(seq);
+                    }
                     self.jog_outstanding = false;
+                }
+                if byte == RealtimeCommand::SoftReset.byte() {
+                    // The reset drops the controller's buffered program lines: end the
+                    // stream (and any halt) now rather than feed a resetting controller.
+                    self.end_stream(false);
                 }
             }
             Command::Pause => {
@@ -952,7 +1105,7 @@ impl WorkerState {
     fn refuse_cycle_start(&self) {
         tracing::warn!("cycle start ignored while a probe stream halts");
         self.sink.emit(MachineEvent::Error(
-            "cycle start ignored: probe stream halting".to_string(),
+            worker_text::CYCLE_START_IGNORED.to_string(),
         ));
     }
 
@@ -973,8 +1126,55 @@ impl WorkerState {
             *next = (*next).min(oldest);
         }
         self.query_tags.push_back(self.written_seq);
-        self.queries_outstanding += 1;
+        self.forget_lost_queries();
+        if self.unanswered_queries.len() >= MAX_UNANSWERED_QUERIES {
+            self.unanswered_queries.pop_front();
+        }
+        self.unanswered_queries.push_back(Instant::now());
         Ok(())
+    }
+
+    /// How long a `?` may stay unanswered before its reply is presumed lost: twice the
+    /// slowest recent reply, at least [`QUERY_REPLY_TIMEOUT`], at most [`HALT_MAX_WAIT`].
+    fn lost_reply_timeout(&self) -> Duration {
+        (self.reply_latency * 2).clamp(QUERY_REPLY_TIMEOUT, HALT_MAX_WAIT)
+    }
+
+    /// Drops the unanswered `?`s older than [`Self::lost_reply_timeout`]: their replies are
+    /// presumed lost. Logged, once per silence (or always while halting).
+    fn forget_lost_queries(&mut self) {
+        let now = Instant::now();
+        let timeout = self.lost_reply_timeout();
+        let before = self.unanswered_queries.len();
+        while self
+            .unanswered_queries
+            .front()
+            .is_some_and(|at| now.duration_since(*at) >= timeout)
+        {
+            self.unanswered_queries.pop_front();
+        }
+        let forgotten = before - self.unanswered_queries.len();
+        if forgotten > 0 && (self.halt.is_some() || !self.lost_logged) {
+            tracing::warn!(
+                forgotten,
+                ?timeout,
+                halting = self.halt.is_some(),
+                "status replies presumed lost"
+            );
+            self.lost_logged = true;
+        }
+    }
+
+    /// Takes the oldest unanswered `?` as answered by a status report, and learns the reply
+    /// latency from it.
+    fn answer_query(&mut self) {
+        self.lost_logged = false;
+        let decayed = self.reply_latency.saturating_sub(self.reply_latency / 16);
+        if let Some(at) = self.unanswered_queries.pop_front() {
+            self.reply_latency = decayed.max(at.elapsed());
+        } else {
+            self.reply_latency = decayed;
+        }
     }
 
     /// Queues a manual line (`seq` > 0 for a state line), or reports one too long for the
@@ -983,14 +1183,10 @@ impl WorkerState {
     fn queue_manual(&mut self, line: String, seq: u64) {
         if !self.window.fits_at_all(&line) {
             self.sink.emit(MachineEvent::Error(format!(
-                "line too long for the controller buffer: {line}"
+                "{}: {line}",
+                worker_text::LINE_TOO_LONG
             )));
-            // The refused line never runs, but a lower state line still queued must be
-            // written first: hand the sequence number to the last queued state line.
-            match self.manual.iter_mut().rev().find(|(_, s)| *s > 0) {
-                Some((_, queued)) => *queued = (*queued).max(seq),
-                None => self.written_seq = self.written_seq.max(seq),
-            }
+            self.drop_line(seq);
             return;
         }
         if line.starts_with("$J=") {
@@ -998,6 +1194,29 @@ impl WorkerState {
             self.jog_seen = false;
         }
         self.manual.push_back((line, seq));
+    }
+
+    /// Counts a manual line that never runs (refused, or dropped from the queue) as
+    /// answered: a jog (`seq` 0) at once; a state line once every lower state line still
+    /// queued or in flight is, by handing its sequence number to the last of them.
+    fn drop_line(&mut self, seq: u64) {
+        if seq == 0 {
+            self.jogs_answered.fetch_add(1, Ordering::SeqCst);
+            return;
+        }
+        match self.manual.iter_mut().rev().find(|(_, s)| *s > 0) {
+            Some((_, queued)) => *queued = (*queued).max(seq),
+            None => {
+                self.written_seq = self.written_seq.max(seq);
+                // Answered with the last state line in flight, or at once when none is.
+                match self.in_flight_seq.iter_mut().rev().find(|s| **s > 0) {
+                    Some(in_flight) => *in_flight = (*in_flight).max(seq),
+                    None => {
+                        self.answered.fetch_max(seq, Ordering::SeqCst);
+                    }
+                }
+            }
+        }
     }
 
     /// Writes manual lines, then program lines, while they fit in the RX buffer. Nothing is
@@ -1023,6 +1242,7 @@ impl WorkerState {
             self.sink
                 .emit(MachineEvent::Sent(line.trim_end_matches('\n').to_string()));
             self.in_flight_is_program.push_back(false);
+            self.in_flight_seq.push_back(seq);
             self.written_seq = self.written_seq.max(seq);
             self.manual.pop_front();
         }
@@ -1040,7 +1260,8 @@ impl WorkerState {
             let line = raw.trim();
             if !self.window.fits_at_all(line) {
                 self.sink.emit(MachineEvent::Error(format!(
-                    "line {} is too long for the controller buffer",
+                    "{}: {}",
+                    worker_text::PROGRAM_LINE_TOO_LONG,
                     sent + 1
                 )));
                 self.end_stream(false);
@@ -1078,19 +1299,25 @@ impl WorkerState {
             }
             GrblResponseLine::Status(report) => {
                 let status = StatusParser::parse_full(&report);
-                self.queries_outstanding = self.queries_outstanding.saturating_sub(1);
+                self.answer_query();
                 let state = status.machine_state.as_deref();
-                let held = state.is_some_and(|s| s.starts_with("Hold:0") || s.starts_with("Idle"));
-                let decelerating = state.is_some_and(|s| s.starts_with("Hold:1"));
+                // GRBL 1.1 and grblHAL enter Hold on `!` from any running or idle state (from
+                // Idle the hold is complete at once: `Hold:0`), so after the hold only
+                // `Hold:0` proves the machine stopped; an `Alarm` has stopped it too. `Idle`
+                // or `Run` can only be a report from before the hold (a late reply on a slow
+                // link, or a miscounted one), and `Hold:1` says it still decelerates.
+                let stopped =
+                    state.is_some_and(|s| s.starts_with("Hold:0") || s.starts_with("Alarm"));
                 if let Some(halt) = self.halt.as_mut() {
-                    if halt.stale_reports > 0 {
-                        halt.stale_reports -= 1;
-                    } else if held {
+                    if halt.stale_reports == 0 && stopped {
                         self.finish_halt();
-                    } else if decelerating {
-                        // Still slowing down: a reset now would come in motion.
+                    } else {
+                        // A report owed to a `?` from before the hold, or one that does not
+                        // say the machine stopped: replies are still coming, so wait for the
+                        // next one rather than reset in motion (never past the cap).
+                        halt.stale_reports = halt.stale_reports.saturating_sub(1);
                         let cap = halt.started + HALT_MAX_WAIT;
-                        halt.deadline = (Instant::now() + HALT_TIMEOUT).min(cap);
+                        halt.deadline = halt.deadline.max(Instant::now() + HALT_TIMEOUT).min(cap);
                     }
                 }
                 self.follow_jog(status.machine_state.as_deref());
@@ -1137,6 +1364,13 @@ impl WorkerState {
             return;
         }
         let is_program = self.in_flight_is_program.pop_front().unwrap_or(false);
+        if !is_program && let Some(seq) = self.in_flight_seq.pop_front() {
+            if seq == 0 {
+                self.jogs_answered.fetch_add(1, Ordering::SeqCst);
+            } else {
+                self.answered.fetch_max(seq, Ordering::SeqCst);
+            }
+        }
         let stream = match self.stream.as_mut() {
             Some(stream) if is_program => stream,
             _ => {
@@ -1150,11 +1384,10 @@ impl WorkerState {
         let (sent, acked, total) = (stream.sent, stream.acked, stream.program.len());
         let halt = error.is_some() && stream.mode == StreamMode::StopOnError;
         if let Some(code) = error {
-            self.sink.emit(MachineEvent::Error(format!(
-                "error:{code} on program line {acked}"
-            )));
+            let message = format!("error:{code} {} {acked}", worker_text::ON_PROGRAM_LINE);
+            self.sink.emit(MachineEvent::Error(message.clone()));
             if halt && self.halt.is_none() {
-                self.begin_halt(format!("error:{code} on program line {acked}"));
+                self.begin_halt(message);
             }
         }
         self.sink
@@ -1178,13 +1411,14 @@ impl WorkerState {
     /// Starts halting the stream: no line is fed from now on, and a feed hold is written.
     /// A failed write is retried by the reset ([`Self::drive_halt`]).
     fn begin_halt(&mut self, reason: String) {
+        self.forget_lost_queries();
         let now = Instant::now();
         self.halt = Some(Halt {
             reason,
             started: now,
             deadline: now + HALT_TIMEOUT,
             next_query: now,
-            stale_reports: self.queries_outstanding,
+            stale_reports: self.unanswered_queries.len(),
         });
         match self.write(&[RealtimeCommand::FeedHold.byte()]) {
             Ok(()) => self.echo_realtime(RealtimeCommand::FeedHold.byte()),
@@ -1194,7 +1428,8 @@ impl WorkerState {
 
     /// While halting: asks for status every [`HALT_QUERY_INTERVAL`], and soft-resets once
     /// the halt's deadline passes without a completed hold ([`HALT_TIMEOUT`] after the hold
-    /// or the latest fresh `Hold:1`, at most [`HALT_MAX_WAIT`] after the hold).
+    /// or the latest report that did not complete it, at most [`HALT_MAX_WAIT`] after the
+    /// hold).
     fn drive_halt(&mut self) -> Result<(), String> {
         let Some(halt) = self.halt.as_mut() else {
             return Ok(());
@@ -1226,7 +1461,8 @@ impl WorkerState {
         let dropped: Vec<String> = self.manual.iter().map(|(line, _)| line.clone()).collect();
         for line in dropped {
             self.sink.emit(MachineEvent::Error(format!(
-                "dropped: controller reset after probe error: {line}"
+                "{}: {line}",
+                worker_text::DROPPED_AFTER_PROBE_ERROR
             )));
         }
         self.reset_buffers();
@@ -1260,12 +1496,25 @@ impl WorkerState {
     fn reset_buffers(&mut self) {
         self.jog_outstanding = false;
         self.query_tags.clear();
-        self.queries_outstanding = 0;
+        self.unanswered_queries.clear();
         self.window = CharCountWindow::default();
         self.in_flight_is_program.clear();
+        // Every jog in flight or queued is answered or dropped.
+        let jogs = self
+            .manual
+            .iter()
+            .map(|(_, seq)| *seq)
+            .chain(self.in_flight_seq.iter().copied())
+            .filter(|seq| *seq == 0)
+            .count();
+        self.jogs_answered
+            .fetch_add(u64::try_from(jogs).unwrap_or(u64::MAX), Ordering::SeqCst);
         // Dropped state lines never run: a report after the reset describes the machine.
         let dropped = self.manual.drain(..).map(|(_, seq)| seq).max().unwrap_or(0);
         self.written_seq = self.written_seq.max(dropped);
+        // Every line in flight or queued is answered or dropped.
+        self.in_flight_seq.clear();
+        self.answered.fetch_max(self.written_seq, Ordering::SeqCst);
         self.splitter.clear();
     }
 }

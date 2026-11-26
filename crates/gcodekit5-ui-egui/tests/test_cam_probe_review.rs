@@ -43,6 +43,8 @@ fn test_cam_probe_error_holds_then_resets_in_the_controller() {
     click(&mut h, "Probe");
     until(&mut h, "the first lines", |_| lines(&shared).len() >= 3);
     reply(&shared, "error:9");
+    // The feed hold completes (GRBL reports `Hold:0` after `!`, never `Idle`).
+    reply(&shared, "<Hold:0|MPos:1.000,2.000,3.000|FS:0,0>");
     until(&mut h, "the reset", |_| {
         shared.log().contains(&Wrote::Realtime(0x18))
     });
@@ -67,6 +69,7 @@ fn test_cam_probe_error_holds_then_resets_in_the_controller() {
         result(app).contains("error:9")
     });
     // The machine reports Idle: G90 is restored and the run ends.
+    reply(&shared, IDLE);
     until(&mut h, "the run's end", |app| {
         !app.cam_tools().borrow().probe_running()
     });

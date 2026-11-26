@@ -134,7 +134,7 @@ impl EngraveJob {
                 Ok(EngraveMessage::Done(result)) => return JobState::Done(result),
                 Err(TryRecvError::Empty) => return JobState::Running,
                 Err(TryRecvError::Disconnected) => {
-                    return JobState::Done(Err("the engraving worker stopped".to_string()));
+                    return JobState::Done(Err(super::WORKER_STOPPED.to_string()));
                 }
             }
         }

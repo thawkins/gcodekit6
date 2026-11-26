@@ -170,9 +170,10 @@ impl CamToolsPane {
                 }
                 Some(delivery) => self.request_to_editor(gcode, delivery),
             },
-            // The worker's own refusals are msgids.
+            // The worker's own refusals start with msgids.
             Err(error) => {
-                self.notice = Some(CamError::Generator(tr.tr(&error).into_owned()).message(tr));
+                let text = super::bitmap_engraving::refusal_text(&error, tr);
+                self.notice = Some(CamError::Generator(text).message(tr));
             }
         }
     }
