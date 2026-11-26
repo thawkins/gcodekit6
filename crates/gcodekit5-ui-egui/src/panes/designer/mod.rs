@@ -53,6 +53,9 @@ use shape_gallery::ShapeGallery;
 use crate::commands::Command;
 use crate::workspace::{Pane, PaneContext, PaneId};
 
+/// How far Duplicate moves the copies right and up, in mm (GTK's Ctrl+D offset).
+pub const DUPLICATE_OFFSET_MM: f64 = 10.0;
+
 /// The msgids the pane shows, for the translation check.
 pub fn msgids() -> Vec<&'static str> {
     let mut ids = toolbox::msgids();
@@ -663,6 +666,8 @@ impl Pane for DesignerPane {
             Command::AlignCenterY => self.edit(DesignerState::align_selected_vertical_center),
             Command::Group => self.edit(DesignerState::group_selected),
             Command::Ungroup => self.edit(DesignerState::ungroup_selected),
+            Command::Duplicate => self.edit(|state| state.duplicate_selected(DUPLICATE_OFFSET_MM)),
+            Command::FitDevice => self.apply_view(ViewAction::FitWorkArea),
             Command::FileNew
             | Command::FileNew3d
             | Command::FileOpen

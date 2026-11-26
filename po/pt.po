@@ -4701,3 +4701,6 @@ msgstr "Há demasiados atalhos alterados"
 
 msgid "These saved shortcuts broke a shortcut rule and use their default keys again: {commands}"
 msgstr "Estes atalhos guardados violavam uma regra e voltam a usar as teclas predefinidas: {commands}"
+
+msgid "Duplicate"
+msgstr "Duplicar"

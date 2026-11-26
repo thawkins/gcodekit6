@@ -4618,3 +4618,6 @@ msgstr ""
 
 msgid "These saved shortcuts broke a shortcut rule and use their default keys again: {commands}"
 msgstr ""
+
+msgid "Duplicate"
+msgstr ""

@@ -582,3 +582,105 @@ fn test_edit_menu_and_keys_act_on_shapes_anywhere_on_the_designer_page() {
     h.run();
     assert_eq!(ids(&designer.borrow()).len(), 4);
 }
+
+/// GTK's Ctrl+D on the canvas: copies of the selection 10 mm right and up, with new ids,
+/// selected instead of the originals, as one undo step; never while a text field has the
+/// keyboard.
+#[test]
+fn test_duplicate_key_copies_the_selection_10mm_away_in_one_undo_step() {
+    let (mut h, designer) = app_with_two_selected();
+    let before = ids(&designer.borrow());
+    let originals: Vec<Bounds> = before.iter().map(|id| bounds_in(&designer, *id)).collect();
+    h.key_press_modifiers(Modifiers::COMMAND, egui::Key::D);
+    h.run();
+    let after = ids(&designer.borrow());
+    assert_eq!(after.len(), 4, "{after:?}");
+    let copies: Vec<u64> = after
+        .iter()
+        .copied()
+        .filter(|id| !before.contains(id))
+        .collect();
+    assert_eq!(
+        selected(&designer.borrow()),
+        copies,
+        "the copies are selected"
+    );
+    for (copy, original) in copies.iter().zip(&originals) {
+        let b = bounds_in(&designer, *copy);
+        let moved = (
+            original.0 + 10.0,
+            original.1 + 10.0,
+            original.2 + 10.0,
+            original.3 + 10.0,
+        );
+        assert!(close4(b, moved), "{b:?} vs {moved:?}");
+    }
+    for (id, original) in before.iter().zip(&originals) {
+        assert!(
+            close4(bounds_in(&designer, *id), *original),
+            "original moved"
+        );
+    }
+    h.key_press_modifiers(Modifiers::COMMAND, egui::Key::Z);
+    h.run();
+    assert_eq!(
+        ids(&designer.borrow()),
+        before,
+        "one undo removes both copies"
+    );
+    designer.borrow_mut().state_mut().select_all();
+    h.run();
+    let field = h.get_by_role_and_label(egui::accesskit::Role::TextInput, "X:");
+    field.focus();
+    h.run();
+    h.key_press_modifiers(Modifiers::COMMAND, egui::Key::D);
+    h.run();
+    assert_eq!(ids(&designer.borrow()), before, "no copy while typing");
+}
+
+#[test]
+fn test_duplicate_from_context_menu() {
+    let mut h = harness(pane_with_rects(&[(0.0, 0.0, 10.0, 10.0)]));
+    menu_item(&mut h, 5.0, 5.0, "Duplicate");
+    let all = ids(h.state());
+    assert_eq!(all.len(), 2);
+    assert!(close4(bounds(h.state(), all[1]), (10.0, 10.0, 20.0, 20.0)));
+}
+
+/// GTK's canvas view keys: + and = zoom in, - out, R resets to 100 %, F fits the shapes and
+/// D the device work area; none runs while a text field has the keyboard.
+#[test]
+fn test_view_keys_run_on_the_canvas_but_not_while_typing() {
+    let (mut h, designer) = app_with_two_selected();
+    let zoom = |d: &std::rc::Rc<std::cell::RefCell<DesignerPane>>| d.borrow().state().canvas.zoom();
+    h.key_press(egui::Key::R);
+    h.run();
+    assert!((zoom(&designer) - 1.0).abs() < 1e-9, "R resets to 100 %");
+    for key in [egui::Key::Plus, egui::Key::Equals] {
+        let before = zoom(&designer);
+        h.key_press(key);
+        h.run();
+        assert!(zoom(&designer) > before, "{key:?} zooms in");
+    }
+    let before = zoom(&designer);
+    h.key_press(egui::Key::Minus);
+    h.run();
+    assert!(zoom(&designer) < before, "- zooms out");
+    h.key_press(egui::Key::F);
+    h.run();
+    let fitted = zoom(&designer);
+    assert!(fitted > 1.0, "F fits the two small squares: {fitted}");
+    h.key_press(egui::Key::D);
+    h.run();
+    let device = zoom(&designer);
+    assert!(device < fitted, "D fits the 250 mm work area: {device}");
+    let field = h.get_by_role_and_label(egui::accesskit::Role::TextInput, "X:");
+    field.focus();
+    h.run();
+    h.key_press(egui::Key::R);
+    h.run();
+    assert!(
+        (zoom(&designer) - device).abs() < 1e-9,
+        "no view key while typing"
+    );
+}

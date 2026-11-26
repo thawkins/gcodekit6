@@ -184,7 +184,14 @@ pub fn check(keymap: &Keymap, command: Command, binding: &Binding) -> Result<(),
         return Err(Refusal::Locked);
     }
     let home = home(keymap, command);
-    if binding.scope_or(&home) != &home {
+    // A key works in the command's own scope, or in a scope one of its default keys works
+    // in (the designer canvas's view keys and Ctrl+I, which GTK bound there as well).
+    let scope = binding.scope_or(&home);
+    let default_scope = keymap
+        .default_bindings(&command.command_ref())
+        .iter()
+        .any(|b| b.scope_or(&home) == scope);
+    if scope != &home && !default_scope {
         return Err(Refusal::WrongScope);
     }
     let trigger = binding.trigger;
@@ -226,7 +233,7 @@ pub fn check(keymap: &Keymap, command: Command, binding: &Binding) -> Result<(),
         .find(|other| {
             let other_home = self::home(keymap, *other);
             keymap.bindings(&other.command_ref()).iter().any(|b| {
-                overlap(b.scope_or(&other_home), &home)
+                overlap(b.scope_or(&other_home), scope)
                     && !b.trigger.double
                     && same_chord(b.trigger.chord, chord)
             })

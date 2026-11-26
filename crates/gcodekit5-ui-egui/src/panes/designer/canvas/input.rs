@@ -569,6 +569,7 @@ pub fn msgids() -> Vec<&'static str> {
         n_!("Cut"),
         n_!("Copy"),
         n_!("Paste"),
+        n_!("Duplicate"),
         n_!("Delete"),
         n_!("Group"),
         n_!("Ungroup"),
@@ -622,6 +623,10 @@ fn context_menu(
     }
     if !state.clipboard.is_empty() && item(ui, true, "Paste") {
         state.paste_at_location(at.0, at.1);
+    }
+    // GTK's Ctrl+D; the entry is the key's place in a menu (GTK's menu had none).
+    if item(ui, selection, "Duplicate") {
+        state.duplicate_selected(crate::panes::designer::DUPLICATE_OFFSET_MM);
     }
     if item(ui, selection, "Delete") {
         state.delete_selected();

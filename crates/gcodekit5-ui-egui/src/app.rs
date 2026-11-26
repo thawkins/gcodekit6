@@ -1124,7 +1124,9 @@ impl GcodeKitApp {
             | Command::AlignCenterX
             | Command::AlignCenterY
             | Command::Group
-            | Command::Ungroup => {
+            | Command::Ungroup
+            | Command::Duplicate
+            | Command::FitDevice => {
                 if !self.route_to_active_designer(cmd) {
                     tracing::debug!(?cmd, "no design to edit");
                 }

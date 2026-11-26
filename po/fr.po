@@ -4713,3 +4713,6 @@ msgstr "Trop de raccourcis sont modifiés"
 
 msgid "These saved shortcuts broke a shortcut rule and use their default keys again: {commands}"
 msgstr "Ces raccourcis enregistrés enfreignaient une règle et reprennent leurs touches par défaut : {commands}"
+
+msgid "Duplicate"
+msgstr "Dupliquer"

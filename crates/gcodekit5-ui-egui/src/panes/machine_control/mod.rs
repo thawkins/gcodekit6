@@ -641,7 +641,9 @@ impl MachineControlPane {
             | Command::AlignCenterX
             | Command::AlignCenterY
             | Command::Group
-            | Command::Ungroup => return false,
+            | Command::Ungroup
+            | Command::Duplicate
+            | Command::FitDevice => return false,
         }
         true
     }

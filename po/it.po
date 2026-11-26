@@ -4709,3 +4709,6 @@ msgstr "Troppe scorciatoie sono modificate"
 
 msgid "These saved shortcuts broke a shortcut rule and use their default keys again: {commands}"
 msgstr "Queste scorciatoie salvate violavano una regola e tornano ai tasti predefiniti: {commands}"
+
+msgid "Duplicate"
+msgstr "Duplica"

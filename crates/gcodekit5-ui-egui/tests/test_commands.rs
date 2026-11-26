@@ -123,6 +123,26 @@ const GTK_ACCELERATORS: &[(&str, &str, Command, Where)] = &[
         Command::AlignCenterY,
         Where::Panel("Designer"),
     ),
+    // The designer canvas's other keys (`designer/ui_builders.rs`): Ctrl+D duplicates, the
+    // view keys, and Ctrl+I imports an image.
+    (
+        "<Ctrl>d",
+        "Cmd+D",
+        Command::Duplicate,
+        Where::Panel("Designer"),
+    ),
+    ("plus", "+", Command::ZoomIn, Where::Panel("Designer")),
+    ("equal", "=", Command::ZoomIn, Where::Panel("Designer")),
+    ("minus", "-", Command::ZoomOut, Where::Panel("Designer")),
+    ("f", "F", Command::ZoomFit, Where::Panel("Designer")),
+    ("r", "R", Command::ResetView, Where::Panel("Designer")),
+    ("d", "D", Command::FitDevice, Where::Panel("Designer")),
+    (
+        "<Ctrl>i",
+        "Cmd+I",
+        Command::FileImportImage,
+        Where::Panel("Designer"),
+    ),
     // Jog: machine_control/mod.rs's numeric keypad keys (`key.to_unicode()`, so the top-row
     // digits jogged too; egui reports both as the digit), in Machine Control only.
     (
@@ -335,6 +355,11 @@ const PAGE_CONTROLS: &[(Command, Page, &str)] = &[
     (Command::ViewFront, Page::Visualizer, "Front View"),
     (Command::ViewIso, Page::Visualizer, "Isometric (SE)"),
     (Command::ResetView, Page::Visualizer, "Reset View"),
+    (
+        Command::FitDevice,
+        Page::Designer,
+        "Fit to Device Working Area",
+    ),
 ];
 
 /// The designer shape commands, with the label of their entry in the canvas context menu
@@ -348,6 +373,7 @@ const DESIGNER_MENU: &[(Command, &str)] = &[
     (Command::AlignCenterY, "Align Center Y"),
     (Command::Group, "Group"),
     (Command::Ungroup, "Ungroup"),
+    (Command::Duplicate, "Duplicate"),
 ];
 
 /// The menus hold every command but those with a page control ([`PAGE_CONTROLS`]), those a

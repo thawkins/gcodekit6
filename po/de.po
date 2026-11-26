@@ -4706,3 +4706,6 @@ msgstr "Zu viele Tastenkürzel sind geändert"
 
 msgid "These saved shortcuts broke a shortcut rule and use their default keys again: {commands}"
 msgstr "Diese gespeicherten Tastenkürzel verstießen gegen eine Regel und verwenden wieder ihre Standardtasten: {commands}"
+
+msgid "Duplicate"
+msgstr "Duplizieren"

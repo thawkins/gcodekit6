@@ -234,7 +234,9 @@ impl Page {
             | Command::AlignCenterX
             | Command::AlignCenterY
             | Command::Group
-            | Command::Ungroup => None,
+            | Command::Ungroup
+            | Command::Duplicate
+            | Command::FitDevice => None,
         }
     }
 }

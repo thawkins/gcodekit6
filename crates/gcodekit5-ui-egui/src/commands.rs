@@ -154,6 +154,10 @@ pub enum Command {
     Group,
     /// Ungroup the designer selection.
     Ungroup,
+    /// Duplicate the designer selection 10 mm right and up (GTK's canvas Ctrl+D).
+    Duplicate,
+    /// Fit the device work area into the designer view (GTK's canvas D).
+    FitDevice,
 }
 
 /// Where a default binding works.
@@ -175,7 +179,7 @@ struct Spec {
 
 impl Command {
     /// Every command, in menu order.
-    pub const ALL: [Command; 55] = [
+    pub const ALL: [Command; 57] = [
         Command::FileNew,
         Command::FileNew3d,
         Command::FileOpen,
@@ -231,6 +235,8 @@ impl Command {
         Command::AlignCenterY,
         Command::Group,
         Command::Ungroup,
+        Command::Duplicate,
+        Command::FitDevice,
     ];
 
     /// The command's catalog entry.
@@ -246,11 +252,12 @@ impl Command {
             Command::FileSave => ("file.save", n_!("Save"), App, &["Cmd+S"]),
             Command::FileSaveAs => ("file.save_as", n_!("Save As..."), App, &["Cmd+Shift+S"]),
             Command::FileImport => ("file.import", n_!("Import"), App, &[]),
+            // GTK's app key, and Ctrl+I on the designer canvas (`designer/ui_builders.rs`).
             Command::FileImportImage => (
                 "file.import_image",
                 n_!("Import Image..."),
                 App,
-                &["Cmd+Shift+I"],
+                &["Cmd+Shift+I", "Designer: Cmd+I"],
             ),
             Command::FileExportGcode => ("file.export_gcode", n_!("Export G-Code..."), App, &[]),
             Command::FileExportSvg => ("file.export_svg", n_!("Export SVG..."), App, &[]),
@@ -290,10 +297,27 @@ impl Command {
             Command::JogYNeg => ("jog.y_neg", n_!("Jog Y-"), MC, &["2"]),
             Command::JogZPos => ("jog.z_pos", n_!("Jog Z+"), MC, &["9"]),
             Command::JogZNeg => ("jog.z_neg", n_!("Jog Z-"), MC, &["3"]),
-            Command::ZoomFit => ("view.zoom_fit", n_!("Zoom to Fit"), VIS, &["F"]),
-            Command::ZoomIn => ("view.zoom_in", n_!("Zoom In"), VIS, &["+"]),
-            Command::ZoomOut => ("view.zoom_out", n_!("Zoom Out"), VIS, &["-"]),
-            Command::ResetView => ("view.reset", n_!("Reset View"), VIS, &["Cmd+0"]),
+            // GTK's view keys of the visualizer, and of the designer canvas
+            // (`designer/ui_builders.rs`: + and = zoom in, - out, F fits, R resets).
+            Command::ZoomFit => (
+                "view.zoom_fit",
+                n_!("Zoom to Fit"),
+                VIS,
+                &["F", "Designer: F"],
+            ),
+            Command::ZoomIn => (
+                "view.zoom_in",
+                n_!("Zoom In"),
+                VIS,
+                &["+", "Designer: +", "Designer: ="],
+            ),
+            Command::ZoomOut => ("view.zoom_out", n_!("Zoom Out"), VIS, &["-", "Designer: -"]),
+            Command::ResetView => (
+                "view.reset",
+                n_!("Reset View"),
+                VIS,
+                &["Cmd+0", "Designer: R"],
+            ),
             Command::ViewTop => ("view.top", n_!("Top"), App, &[]),
             Command::ViewFront => ("view.front", n_!("Front"), App, &[]),
             Command::ViewIso => ("view.iso", n_!("Isometric"), App, &[]),
@@ -341,6 +365,13 @@ impl Command {
             ),
             Command::Group => ("designer.group", n_!("Group"), DES, &["Cmd+G"]),
             Command::Ungroup => ("designer.ungroup", n_!("Ungroup"), DES, &["Cmd+Shift+G"]),
+            Command::Duplicate => ("designer.duplicate", n_!("Duplicate"), DES, &["Cmd+D"]),
+            Command::FitDevice => (
+                "designer.fit_device",
+                n_!("Fit to Device Working Area"),
+                DES,
+                &["D"],
+            ),
         };
         Spec {
             id,
@@ -389,6 +420,7 @@ impl Command {
                 | Command::AlignCenterY
                 | Command::Group
                 | Command::Ungroup
+                | Command::Duplicate
         )
     }
 

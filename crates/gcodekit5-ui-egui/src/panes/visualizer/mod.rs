@@ -888,7 +888,9 @@ impl Pane for VisualizerPane {
             | Command::AlignCenterX
             | Command::AlignCenterY
             | Command::Group
-            | Command::Ungroup => return false,
+            | Command::Ungroup
+            | Command::Duplicate
+            | Command::FitDevice => return false,
         };
         self.apply(action);
         true
