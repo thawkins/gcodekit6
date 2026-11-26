@@ -166,19 +166,30 @@ pub struct Simulation<'a> {
     pub notice: Option<String>,
 }
 
-/// A labelled length field in mm.
-fn length_row(ui: &mut egui::Ui, label: &str, value: &mut f32) {
+/// A labelled length field: `value` is kept in mm and shown in `units` with 2 decimals.
+fn length_row(ui: &mut egui::Ui, label: &str, value: &mut f32, units: MeasurementSystem) {
+    let per_unit = match units {
+        MeasurementSystem::Metric => 1.0,
+        MeasurementSystem::Imperial => 25.4,
+    };
+    let mut shown = *value / per_unit;
     ui.horizontal(|ui| {
         ui.label(label);
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            ui.add(
-                egui::DragValue::new(value)
-                    .range(0.0..=10_000.0)
-                    .speed(0.1)
-                    .max_decimals(3)
-                    .suffix(" mm"),
-            )
-            .on_hover_text(label);
+            let changed = ui
+                .add(
+                    egui::DragValue::new(&mut shown)
+                        .range(0.0..=10_000.0 / per_unit)
+                        .speed(0.1 / per_unit)
+                        .fixed_decimals(2)
+                        .suffix(format!(" {}", get_unit_label(units))),
+                )
+                .on_hover_text(label)
+                .changed();
+            // Written back only when edited, so showing a value never rounds the stored mm.
+            if changed {
+                *value = shown * per_unit;
+            }
         });
     });
 }
@@ -226,7 +237,7 @@ pub fn resolution_tooltip(tr: &Translator) -> String {
 }
 
 /// The Simulation section.
-fn simulation(ui: &mut egui::Ui, sim: Simulation<'_>, tr: &Translator) {
+fn simulation(ui: &mut egui::Ui, sim: Simulation<'_>, units: MeasurementSystem, tr: &Translator) {
     egui::CollapsingHeader::new(tr.tr("Simulation"))
         .id_salt("visualizer-simulation")
         .default_open(true)
@@ -239,10 +250,10 @@ fn simulation(ui: &mut egui::Ui, sim: Simulation<'_>, tr: &Translator) {
             crate::theme::group_frame(ui).show(ui, |ui| {
                 crate::theme::section_heading(ui, &tr.tr("Stock"));
                 let setup = sim.setup;
-                length_row(ui, &tr.tr("Width"), &mut setup.width);
-                length_row(ui, &tr.tr("Height"), &mut setup.height);
-                length_row(ui, &tr.tr("Thickness"), &mut setup.thickness);
-                length_row(ui, &tr.tr("Tool Diameter"), &mut setup.tool_diameter);
+                length_row(ui, &tr.tr("Width"), &mut setup.width, units);
+                length_row(ui, &tr.tr("Height"), &mut setup.height, units);
+                length_row(ui, &tr.tr("Thickness"), &mut setup.thickness, units);
+                length_row(ui, &tr.tr("Tool Diameter"), &mut setup.tool_diameter, units);
                 choice_row(
                     ui,
                     "visualizer-stock-z0",
@@ -391,7 +402,7 @@ pub fn show(
     ui.add_space(4.0);
     display(ui, display_state, units, tr);
     if let Some(sim) = simulation {
-        self::simulation(ui, sim, tr);
+        self::simulation(ui, sim, units, tr);
     }
     egui::CollapsingHeader::new(tr.tr("Inspector"))
         .id_salt("visualizer-inspector")

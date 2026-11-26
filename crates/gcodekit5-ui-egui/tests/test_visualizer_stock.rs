@@ -774,3 +774,43 @@ fn test_show_stock_removal_tooltip_states_the_resolution() -> TestResult {
     assert!(harness.query_by_label(&text).is_some(), "tooltip shown");
     Ok(())
 }
+
+/// The values the stock fields show, in order (Width, Height, Thickness, Tool Diameter).
+fn stock_field_values(harness: &Harness<'_, VisualizerPane>) -> Vec<String> {
+    harness
+        .get_all_by_role(egui::accesskit::Role::SpinButton)
+        .filter_map(|n| n.value())
+        .collect()
+}
+
+#[test]
+fn test_stock_fields_follow_the_measurement_system() -> TestResult {
+    let mut harness = pane_harness(VisualizerPane::new());
+    shown(
+        &mut harness,
+        StockSetup {
+            width: 254.0,
+            height: 25.4,
+            thickness: 12.7,
+            tool_diameter: 6.35,
+            ..StockSetup::default()
+        },
+    );
+    harness.run();
+    assert_eq!(
+        stock_field_values(&harness),
+        ["254.00 mm", "25.40 mm", "12.70 mm", "6.35 mm"]
+    );
+    let mut imperial = config(true);
+    imperial.ui.measurement_system = gcodekit5_core::units::MeasurementSystem::Imperial;
+    harness.state_mut().configure(&imperial);
+    harness.run();
+    assert_eq!(
+        stock_field_values(&harness),
+        ["10.00 in", "1.00 in", "0.50 in", "0.25 in"]
+    );
+    // Shown in inches, kept in mm: drawing the fields changes nothing.
+    let setup = harness.state().stock_setup();
+    assert_eq!((setup.width, setup.tool_diameter), (254.0, 6.35));
+    settle(&mut harness)
+}
