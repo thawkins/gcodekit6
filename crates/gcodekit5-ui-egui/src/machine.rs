@@ -152,6 +152,49 @@ impl MachineStatus {
         })
     }
 
+    /// The work position of A, B and C in degrees, for each rotary axis the latest report
+    /// carries (`WPos`, or `MPos - WCO`); `None` for an axis it does not.
+    pub fn work_rotary(&self) -> [Option<f32>; 3] {
+        let Some(report) = self.report.as_ref() else {
+            return [None; 3];
+        };
+        let off = |o: Option<f64>| o.unwrap_or(0.0);
+        if let Some(w) = report.wpos {
+            return [w.a, w.b, w.c].map(|v| v.map(|v| v as f32));
+        }
+        match (report.mpos, self.wco) {
+            (Some(m), Some(o)) => {
+                [(m.a, o.a), (m.b, o.b), (m.c, o.c)].map(|(v, o)| v.map(|v| (v - off(o)) as f32))
+            }
+            (Some(_) | None, _) => [None; 3],
+        }
+    }
+
+    /// The machine position of A, B and C in degrees, for each rotary axis the latest
+    /// report carries (`MPos`, or `WPos + WCO`); `None` for an axis it does not.
+    pub fn machine_rotary(&self) -> [Option<f32>; 3] {
+        let Some(report) = self.report.as_ref() else {
+            return [None; 3];
+        };
+        let off = |o: Option<f64>| o.unwrap_or(0.0);
+        if let Some(m) = report.mpos {
+            return [m.a, m.b, m.c].map(|v| v.map(|v| v as f32));
+        }
+        match (report.wpos, self.wco) {
+            (Some(w), Some(o)) => {
+                [(w.a, o.a), (w.b, o.b), (w.c, o.c)].map(|(v, o)| v.map(|v| (v + off(o)) as f32))
+            }
+            (Some(_) | None, _) => [None; 3],
+        }
+    }
+
+    /// The planner blocks and RX bytes free of the latest report's `Bf:` field, as
+    /// `plan/rx` (GTK's "Buffer:" readout); `None` when the controller does not send it.
+    pub fn buffer_text(&self) -> Option<String> {
+        let buffer = self.report.as_ref()?.buffer?;
+        Some(format!("{}/{}", buffer.plan, buffer.rx))
+    }
+
     /// Takes `word` as the active system: a G54-G59 one, or one outside them (then unknown
     /// to the zero commands).
     fn set_wcs(&mut self, word: WcsWord) {

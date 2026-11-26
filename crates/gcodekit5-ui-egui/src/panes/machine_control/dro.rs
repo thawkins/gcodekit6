@@ -28,7 +28,12 @@ pub(super) const MSGIDS: &[&str] = &[
     n_!("Spindle:"),
     n_!("Zero"),
     n_!("Set work axis to zero"),
+    n_!("Buffer:"),
+    n_!("Machine Limits"),
 ];
+
+/// The degree sign rotary values are shown with, as GTK shows them.
+const DEGREES: &str = "\u{b0}";
 
 /// How the work position block offers its Zero buttons.
 pub(super) struct ZeroButtons<'a> {
@@ -168,5 +173,64 @@ pub(super) fn show_state(
             .map_or_else(|| "-".to_string(), |s| s.to_string());
         ui.weak(format!("{} {feed}", tr.tr("Feed:")));
         ui.weak(format!("{} {spindle}", tr.tr("Spindle:")));
+        let buffer = status.buffer_text().unwrap_or_else(|| "-".to_string());
+        ui.weak(format!("{} {buffer}", tr.tr("Buffer:")));
     });
+}
+
+/// The configured travel the Machine Limits section falls back to: X, Y, Z in mm and A, B,
+/// C in degrees (Preferences > Machine).
+pub(super) type ConfiguredLimits = [f32; 6];
+
+/// The Machine Limits rows as `(axis, text)`: X, Y and Z from the controller's max travel
+/// (`$130`-`$132`) once read, else the configured limit, in `units`; then each rotary axis
+/// the machine reports, from its configured limit in degrees. As GTK's
+/// `refresh_limit_labels`.
+///
+/// # Arguments
+/// * `status` - The machine status.
+/// * `units` - The measurement system to show lengths in.
+/// * `configured` - The configured limits.
+pub(super) fn limit_rows(
+    status: &MachineStatus,
+    units: MeasurementSystem,
+    configured: &ConfiguredLimits,
+) -> Vec<(char, String)> {
+    let unit = get_unit_label(units);
+    let mut rows: Vec<(char, String)> = ['X', 'Y', 'Z']
+        .into_iter()
+        .enumerate()
+        .map(|(i, axis)| {
+            let max = status.grbl_travel[i].unwrap_or(configured[i]);
+            (axis, format!("0 - {} {unit}", format_length(max, units)))
+        })
+        .collect();
+    let reported = status.machine_rotary();
+    for (i, axis) in ['A', 'B', 'C'].into_iter().enumerate() {
+        if reported[i].is_some() {
+            rows.push((axis, format!("0 - {:.1}{DEGREES}", configured[3 + i])));
+        }
+    }
+    rows
+}
+
+/// Draws the Machine Limits section ([`limit_rows`]).
+pub(super) fn show_limits(
+    ui: &mut egui::Ui,
+    tr: &Translator,
+    status: &MachineStatus,
+    units: MeasurementSystem,
+    configured: &ConfiguredLimits,
+) {
+    crate::theme::section_heading(ui, &tr.tr("Machine Limits"));
+    egui::Grid::new("machine-control-limits")
+        .num_columns(2)
+        .spacing([8.0, 4.0])
+        .show(ui, |ui| {
+            for (axis, text) in limit_rows(status, units, configured) {
+                ui.weak(format!("{axis}:"));
+                ui.label(text);
+                ui.end_row();
+            }
+        });
 }

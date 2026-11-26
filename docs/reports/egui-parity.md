@@ -78,7 +78,7 @@ Status values:
 | E-Stop (soft reset), also with Machine Control hidden | 10-machine-control, 85-safety | Ported | `test_status_bar::status_bar_estop_stops_stream_without_machine_control`, `test_console_pane::console_echoes_soft_reset_label` |
 | Escape as E-Stop | 10-machine-control, 90-shortcuts | Not applicable | GTK never bound Escape; egui keeps it unbound for safety (`test_machine_pane::escape_is_unbound`); soft reset is `Cmd+Shift+K` (`test_commands::safety_chords_bound_everywhere`) |
 | Quick Z-touch and edge probe from Machine Control | PROBING (Quick Probe) | Gap | GTK Machine Control has quick probe buttons; egui has only the Probe Routines CAM page |
-| Machine limits and buffer readout | *(GTK)* | Gap | GTK Machine Control shows "Machine Limits" and "Buffer:"; egui does not |
+| Machine limits and buffer readout | *(GTK)* | Ported | `test_machine_limits_buffer::machine_limits_follow_grbl_travel`, `test_machine_limits_buffer::rotary_limit_shown_once_axis_reported`, `test_machine_limits_buffer::buffer_shown_from_status_report` |
 | Command line in Machine Control | *(GTK)* | Ported | `test_machine_jog::jog_blocked_after_command_line_until_fresh_report` |
 
 ## Overrides

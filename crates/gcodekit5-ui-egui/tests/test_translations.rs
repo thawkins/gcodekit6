@@ -17,7 +17,7 @@ const LANGUAGES: [&str; 5] = ["de", "es", "fr", "it", "pt"];
 
 /// Translations that are spelled like the English msgid; the Translator cannot tell them
 /// from a missing entry, so the po file is checked for them instead.
-const IDENTICAL: [(&str, &str); 239] = [
+const IDENTICAL: [(&str, &str); 241] = [
     // Visualizer Simulation section.
     ("de", "Simulation"),
     ("fr", "Simulation"),
@@ -271,6 +271,9 @@ const IDENTICAL: [(&str, &str); 239] = [
     // Machine Control work zero: the axis Zero button.
     ("it", "Zero"),
     ("pt", "Zero"),
+    // Machine Control: the Buffer readout.
+    ("it", "Buffer:"),
+    ("pt", "Buffer:"),
 ];
 
 fn msgids() -> Vec<&'static str> {

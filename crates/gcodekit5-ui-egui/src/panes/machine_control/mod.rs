@@ -120,6 +120,8 @@ pub struct MachineControlPane {
     units: MeasurementSystem,
     /// The units feeds are shown in.
     feed_units: FeedRateUnits,
+    /// The configured travel the Machine Limits section falls back to.
+    limits: dro::ConfiguredLimits,
     /// A refusal of the pane's own (not the controller's), shown until the next action.
     notice: Option<String>,
     /// The emergency stop picture (`images/eStop2.png`): `None` until first drawn, then the
@@ -183,6 +185,7 @@ impl MachineControlPane {
             confirm: None,
             units: MeasurementSystem::Metric,
             feed_units: FeedRateUnits::MmPerMin,
+            limits: [200.0, 200.0, 100.0, 360.0, 360.0, 360.0],
             notice: None,
             estop_image: None,
         }
@@ -211,6 +214,15 @@ impl MachineControlPane {
         self.units = config.ui.measurement_system;
         self.feed_units = config.ui.feed_rate_units;
         let travel = [machine.x_limit, machine.y_limit, machine.z_limit].map(|v| v as f32);
+        self.limits = [
+            machine.x_limit,
+            machine.y_limit,
+            machine.z_limit,
+            machine.a_limit,
+            machine.b_limit,
+            machine.c_limit,
+        ]
+        .map(|v| v as f32);
         self.jog.configure(self.units, self.feed_units, travel);
     }
 
@@ -552,6 +564,8 @@ impl MachineControlPane {
             Some(wcs::Action::Select(wcs)) => self.select_wcs(machine, tr, wcs),
             Some(wcs::Action::ZeroAll | wcs::Action::GoToZero { .. }) | None => {}
         }
+        ui.add_space(SECTION_GAP);
+        dro::show_limits(ui, tr, status, self.units, &self.limits);
         ui.add_space(SECTION_GAP);
         match stream::show(ui, tr, status, has_program) {
             Some(stream::Action::Start) => request = Some(Command::StreamStart),
