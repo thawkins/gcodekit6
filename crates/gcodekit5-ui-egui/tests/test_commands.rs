@@ -64,7 +64,13 @@ const GTK_ACCELERATORS: &[(&str, &str, Command, Where)] = &[
     ("!", "!", Command::FeedHold, Where::App),
     // craft_keymap has no `~` key: on the US layout `~` is Shift+`, which is how the chord
     // is stored and matched. On other layouts Shift+` is a different key from `~`.
-    ("~", "Shift+`", Command::CycleStart, Where::App),
+    // GTK's ~ was app-wide; here a bare motion key works only in Machine Control.
+    (
+        "~",
+        "Shift+`",
+        Command::CycleStart,
+        Where::Panel(commands::MACHINE_CONTROL_SCOPE),
+    ),
     // View: the visualizer's keys.
     ("f", "F", Command::ZoomFit, Where::Panel("Visualizer")),
     ("plus", "+", Command::ZoomIn, Where::Panel("Visualizer")),

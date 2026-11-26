@@ -25,7 +25,7 @@ Status values:
 | Main window opens maximized with docked panes | SPEC 5.1 | Ported | `test_smoke::main_window_opens_maximized`, `test_workspace::default_layout_has_all_panes` |
 | Pane layout persists; small windows keep panes reachable | SPEC 5.1 | Ported | `test_workspace::layout_persists`, `test_workspace::tiny_window_keeps_panes_in_overflow_menu` |
 | Menus with every command and its shortcut | SPEC 5.4 | Ported | `test_commands::menu_contains_every_command`, `test_commands::menu_shows_keymap_shortcuts` |
-| Every GTK accelerator bound, no conflicts | 90-shortcuts | Ported | `test_commands::every_gtk_accelerator_bound`, `test_commands::no_keymap_conflicts` |
+| Every GTK accelerator bound, no conflicts | 90-shortcuts | Ported | `test_commands::every_gtk_accelerator_bound`, `test_commands::no_keymap_conflicts`, `test_motion_keys_typing::test_cycle_start_tilde_runs_only_in_machine_control` (deviation from GTK: Cycle Start's `~` works only while Machine Control has the keyboard, not app-wide, since a bare key that resumes a held job must not fire from a stray press on another page) |
 | Quit asks about a running job and unsaved work | 20-gcode-editor | Ported | `test_quit::quit_asks_job_first_then_unsaved_work`, `test_quit::quit_prompts_and_cancel_keeps_app_open` |
 | Light / Dark / System theme | 70-settings, SPEC 5.5 | Ported | `test_smoke::dark_palette_applied`, `test_smoke::theme_override_beats_desktop` |
 | Translations (UI language, restart on change) | SPEC 6.3 | Ported | `test_translations::every_ui_msgid_is_translated`, `test_settings_window::language_change_requests_restart` |

@@ -10,7 +10,7 @@
 //!   no key on the letter of the feed hold or soft reset chord, so a slipped modifier never
 //!   starts what was meant to stop; and outside Machine Control it needs Ctrl, Alt, Cmd or a
 //!   function key, since a bare key there would run on every page (GTK's `~` for cycle
-//!   start stays as a default);
+//!   start is therefore a Machine Control key);
 //! - a jog key is a plain letter, digit or symbol key: craft-keymap's typing rule holds those
 //!   back while a text field has the keyboard, so a rebound jog key never jogs while typing,
 //!   and Escape, Tab, Enter, Space and the arrows stay with the widgets.
@@ -210,15 +210,10 @@ pub fn check(keymap: &Keymap, command: Command, binding: &Binding) -> Result<(),
     if command.is_jog() && !jog_key_ok(keymap, chord) {
         return Err(Refusal::JogKeyNotPlain);
     }
-    let own_default = keymap
-        .default_bindings(&command.command_ref())
-        .iter()
-        .any(|b| b.trigger.chord == chord);
     if command.starts_motion()
         && home.as_str() != commands::MACHINE_CONTROL_SCOPE
         && chord.is_plain()
         && !chord.is_function_key()
-        && !own_default
     {
         return Err(Refusal::MotionKeyNotModified);
     }

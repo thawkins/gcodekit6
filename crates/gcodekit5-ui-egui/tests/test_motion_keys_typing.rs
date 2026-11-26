@@ -56,10 +56,20 @@ const CASES: [(Command, &str, Modifiers, Key); 6] = [
     ),
 ];
 
+/// Gives Machine Control the keyboard, as a press in the pane does (Cycle Start's keys work
+/// only there).
+fn arm_machine_control(h: &mut Harness<'_, GcodeKitApp>) {
+    use egui_kittest::kittest::Queryable;
+    h.get_by_label("Machine State").click();
+    h.step();
+    h.step();
+}
+
 #[test]
 fn test_motion_keys_run_when_no_text_field_has_the_keyboard() {
     for (command, text, modifiers, key) in CASES {
         let mut h = app_with(command, text);
+        arm_machine_control(&mut h);
         press(&mut h, modifiers, key);
         assert_eq!(h.state().last_dispatched(), Some(command), "{text}");
     }
@@ -181,4 +191,16 @@ fn test_menu_click_runs_home_after_typing() {
         .click();
     h.run();
     assert_eq!(h.state().last_dispatched(), Some(Command::Home));
+}
+
+/// GTK's `~` (Shift+`) resumes only while Machine Control has the keyboard, never from a
+/// stray press elsewhere.
+#[test]
+fn test_cycle_start_tilde_runs_only_in_machine_control() {
+    let mut h = connected_app();
+    press(&mut h, Modifiers::SHIFT, Key::Backtick);
+    assert_ne!(h.state().last_dispatched(), Some(Command::CycleStart));
+    arm_machine_control(&mut h);
+    press(&mut h, Modifiers::SHIFT, Key::Backtick);
+    assert_eq!(h.state().last_dispatched(), Some(Command::CycleStart));
 }

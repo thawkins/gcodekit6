@@ -48,8 +48,9 @@ A key is refused, with the reason shown above the list, when:
   commands cannot be changed;
 - a command that moves the machine (jog, home, stream start, cycle start) would use the letter
   of one of those keys;
-- a command that moves the machine, other than the jog keys of Machine Control, would get a key
-  without Ctrl, Alt or a function key (it would run on every page);
+- a command that moves the machine and works everywhere (Home, Stream Start) would get a key
+  without Ctrl, Alt or a function key (it would run on every page); the jog keys and Cycle
+  Start's `~` work only while Machine Control has the keyboard;
 - a jog key is not a plain letter, digit or symbol key (with Ctrl, Alt or a function key it would
   jog while you type in a text field);
 - Alt and the letter open a menu in any of the languages;

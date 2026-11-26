@@ -274,7 +274,10 @@ impl Command {
             ),
             // craft-keymap has no `~` key. Shift+` types `~` only on US-style layouts; on others
             // (German, French, ...) this chord is a different key from the one typing `~`.
-            Command::CycleStart => ("machine.cycle_start", n_!("Cycle Start"), App, &["Shift+`"]),
+            // GTK bound it app-wide; a bare key that resumes a held job runs here only while
+            // Machine Control has the keyboard (its arming rules), never from a stray press on
+            // another page.
+            Command::CycleStart => ("machine.cycle_start", n_!("Cycle Start"), MC, &["Shift+`"]),
             // Never a bare Escape: it would reset the controller when closing a dropdown.
             Command::SoftReset => ("machine.soft_reset", n_!("Reset"), App, &["Cmd+Shift+K"]),
             Command::Home => ("machine.home", n_!("Home"), App, &["Cmd+Home"]),
