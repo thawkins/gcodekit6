@@ -162,11 +162,7 @@ impl CamToolsPane {
         match result {
             Ok(gcode) => match run.delivery {
                 None => {
-                    self.output = Some(Output {
-                        tool: CamTool::BitmapEngraving,
-                        input: run.input,
-                        gcode,
-                    });
+                    self.output = Some(Output::new(CamTool::BitmapEngraving, run.input, gcode));
                 }
                 Some(delivery) => self.request_to_editor(gcode, delivery),
             },

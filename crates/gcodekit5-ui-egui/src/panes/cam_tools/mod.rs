@@ -129,6 +129,54 @@ struct Output {
     input: String,
     /// The program.
     gcode: String,
+    /// Where each line of `gcode` is, so the view draws only the rows in sight.
+    lines: Vec<std::ops::Range<usize>>,
+}
+
+impl Output {
+    /// `gcode`, made by `tool`'s page from `input`, with its lines found once.
+    fn new(tool: CamTool, input: String, gcode: String) -> Self {
+        let mut start = 0;
+        let lines = gcode
+            .split_inclusive('\n')
+            .map(|line| {
+                let range = start..start + line.trim_end_matches(['\n', '\r']).len();
+                start += line.len();
+                range
+            })
+            .collect();
+        Self {
+            tool,
+            input,
+            gcode,
+            lines,
+        }
+    }
+}
+
+/// Rows of generated G-code the sidebar shows at once.
+const OUTPUT_ROWS: usize = 12;
+
+/// Draws `output` read-only in a code frame [`OUTPUT_ROWS`] rows high, laying out only the
+/// rows in view: a bitmap engraving can be several MB.
+fn show_output(ui: &mut egui::Ui, output: &Output) {
+    let row_height = ui.text_style_height(&egui::TextStyle::Monospace);
+    let spacing = ui.spacing().item_spacing.y;
+    egui::Frame::new()
+        .fill(ui.visuals().code_bg_color)
+        .inner_margin(4.0)
+        .show(ui, |ui| {
+            egui::ScrollArea::both()
+                .id_salt("cam-generated")
+                .max_height((row_height + spacing) * OUTPUT_ROWS as f32)
+                .auto_shrink([false, true])
+                .show_rows(ui, row_height, output.lines.len(), |ui, rows| {
+                    for range in &output.lines[rows] {
+                        let line = output.gcode.get(range.clone()).unwrap_or_default();
+                        ui.add(egui::Label::new(egui::RichText::new(line).monospace()).extend());
+                    }
+                });
+        });
 }
 
 /// The CAM Tools pane.
@@ -260,10 +308,14 @@ impl CamToolsPane {
     /// The program the last Generate made on the open page, while the page's input is still
     /// the one it was made from.
     pub fn output(&self) -> Option<&str> {
+        self.current_output().map(|o| o.gcode.as_str())
+    }
+
+    /// The generated program of the page shown, while its input is unchanged.
+    fn current_output(&self) -> Option<&Output> {
         self.output
             .as_ref()
             .filter(|o| Some(o.tool) == self.open && o.input == self.input_key(o.tool))
-            .map(|o| o.gcode.as_str())
     }
 
     /// Everything `tool`'s page holds, to tell when its output is out of date.
@@ -439,7 +491,7 @@ impl CamToolsPane {
                 match delivery {
                     None => {
                         let input = self.input_key(tool);
-                        self.output = Some(Output { tool, input, gcode });
+                        self.output = Some(Output::new(tool, input, gcode));
                     }
                     Some(delivery) => self.request_to_editor(gcode, delivery),
                 }
@@ -572,17 +624,9 @@ impl CamToolsPane {
                 if tool == CamTool::BitmapEngraving {
                     self.show_bitmap_progress(ui, tr);
                 }
-                if let Some(gcode) = self.output() {
-                    let mut text = gcode;
-                    let name = crate::theme::section_heading(ui, &tr.tr("Generated G-Code"));
-                    ui.add(
-                        egui::TextEdit::multiline(&mut text)
-                            .id_salt("cam-generated")
-                            .code_editor()
-                            .desired_rows(12)
-                            .desired_width(f32::INFINITY),
-                    )
-                    .labelled_by(name.id);
+                if let Some(output) = self.current_output() {
+                    crate::theme::section_heading(ui, &tr.tr("Generated G-Code"));
+                    show_output(ui, output);
                 }
             });
     }

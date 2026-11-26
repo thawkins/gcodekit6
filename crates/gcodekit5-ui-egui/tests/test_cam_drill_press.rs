@@ -1,6 +1,11 @@
 //! The Drill Press page: GTK's defaults render, invalid input is shown at the field and
 //! disables the actions, and the program is byte-identical to the GTK page's for the same
 //! input (fixtures captured from the GTK path by `capture_cam_fixtures`).
+//!
+//! The fixtures in `tests/fixtures/cam/` are frozen references: `capture_cam_fixtures`, which
+//! wrote them from the GTK pages, was in the GTK crate deleted in `26740e3` (its source is at
+//! `6841d84`). Change a fixture only deliberately, by hand, in the commit that changes the
+//! generator's output and says why.
 
 use egui_kittest::Harness;
 use egui_kittest::kittest::Queryable;
@@ -246,4 +251,43 @@ fn test_cam_generated_output_clears_when_the_input_changes() {
     frames(&mut h, 2);
     assert_eq!(pane(&h).output(), None);
     assert!(h.query_by_label("Generated G-Code").is_none());
+}
+
+/// A long generated program is not laid out whole every frame: only the rows in view are
+/// drawn, so no widget holds the whole text.
+#[test]
+fn test_cam_generated_output_draws_only_the_rows_in_view() {
+    let mut h = open_tool_tall(CamTool::DrillPress);
+    {
+        let mut cam = pane(&h);
+        let page = cam.drill_press_mut();
+        page.bottom_z = "-50".into();
+        page.peck_depth = "0.05".into();
+    }
+    frames(&mut h, 2);
+    h.get_by_label("Generate").click();
+    frames(&mut h, 3);
+    let output = pane(&h).output().map(str::to_string).unwrap_or_default();
+    let lines = output.lines().count();
+    assert!(lines > 1000, "only {lines} lines generated");
+    // A label keeps its text in `value`, other widgets in `label`.
+    let text = |n: &egui_kittest::kittest::AccessKitNode<'_>| n.value().or_else(|| n.label());
+    let first = output.lines().next().unwrap_or_default().to_string();
+    assert!(
+        h.query_all_by(|n| text(n).as_deref() == Some(first.as_str()))
+            .next()
+            .is_some(),
+        "the first line {first:?} is not shown"
+    );
+    assert!(
+        h.query_all_by(|n| text(n).is_some_and(|t| t.lines().count() > 100))
+            .next()
+            .is_none(),
+        "a widget holds the whole program"
+    );
+    let shown: std::collections::HashSet<&str> = output.lines().collect();
+    let rows = h
+        .query_all_by(|n| text(n).is_some_and(|t| shown.contains(t.as_str())))
+        .count();
+    assert!(rows < 100, "{rows} rows drawn");
 }
