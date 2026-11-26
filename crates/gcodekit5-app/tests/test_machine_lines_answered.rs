@@ -140,6 +140,155 @@ fn test_lines_answered_after_a_reset_drops_jogs() {
         controller.jog(Axis::Y, 1.0, 1000.0);
     }
     assert!(wait(&mut controller, |_| jogs_written(&shared) > 0));
+    // Some jogs may still be in the worker's channel when the banner is read: they were
+    // sent before the reset, so they are dropped too. One written after the reset would,
+    // with acks held, never be answered.
     shared.inject("Grbl 1.1h ['$' for help]\n");
     assert!(wait(&mut controller, MachineController::lines_answered));
+}
+
+/// A jog sent before the controller reset itself, but still in the worker's channel when
+/// the reset banner was read, is dropped rather than written after the reset.
+#[test]
+fn test_jog_sent_before_a_reset_never_runs_after_it() {
+    use gcodekit5_app::machine::Axis;
+    let (mut controller, shared) = connected();
+    shared.hold_acks.store(true, Ordering::SeqCst);
+    let before_reset = Instant::now();
+    shared.inject("Grbl 1.1h ['$' for help]\n");
+    assert!(
+        wait_event(&mut controller, |e| matches!(
+            e,
+            MachineEvent::Received(line) if line.starts_with("Grbl")
+        )),
+        "banner never read"
+    );
+    controller.jog_sent_earlier(Axis::Y, 1.0, 1000.0, before_reset);
+    // The drop is reported, so the user sees the jog was not sent.
+    assert!(
+        wait_event(&mut controller, |e| matches!(
+            e,
+            MachineEvent::Error(text)
+                if text == "not sent: the controller was reset: $J=G91 G21 Y1.00 F1000"
+        )),
+        "drop not reported"
+    );
+    assert!(wait(&mut controller, MachineController::lines_answered));
+    assert_eq!(jogs_written(&shared), 0, "{:?}", shared.log());
+}
+
+/// A line sent in answer to the reset banner (the UI's `$G`) is written, never dropped as
+/// sent before the reset: the worker stamps the reset before it reports the banner. The
+/// repaint hook, called by the worker right after each event, holds the worker for a while
+/// so the line is sent before the worker could stamp the reset afterwards.
+#[test]
+fn test_line_sent_in_answer_to_a_reset_banner_is_written() {
+    use std::sync::atomic::AtomicBool;
+    let (mut controller, shared) = connected();
+    let stall = Arc::new(AtomicBool::new(false));
+    let hook_stall = Arc::clone(&stall);
+    controller.set_repaint_hook(Box::new(move || {
+        if hook_stall.load(Ordering::SeqCst) {
+            std::thread::sleep(Duration::from_millis(200));
+        }
+    }));
+    stall.store(true, Ordering::SeqCst);
+    shared.inject("Grbl 1.1h ['$' for help]\n");
+    assert!(
+        wait_event(&mut controller, |e| matches!(
+            e,
+            MachineEvent::Received(line) if line.starts_with("Grbl")
+        )),
+        "banner never read"
+    );
+    controller.send_query("$G").expect("send $G");
+    stall.store(false, Ordering::SeqCst);
+    assert!(wait(&mut controller, MachineController::lines_answered));
+    assert!(written(&shared, "$G"), "$G dropped: {:?}", shared.log());
+}
+
+/// A program start still in the worker's channel when the controller's reset banner is
+/// read never runs: it is reported and ends as stopped, with no program line written.
+#[test]
+fn test_stream_started_before_a_reset_never_runs_after_it() {
+    let (mut controller, shared) = connected();
+    let before_reset = Instant::now();
+    shared.inject("Grbl 1.1h ['$' for help]\n");
+    assert!(
+        wait_event(&mut controller, |e| matches!(
+            e,
+            MachineEvent::Received(line) if line.starts_with("Grbl")
+        )),
+        "banner never read"
+    );
+    let program: Arc<[String]> = vec!["G1 X5 F100".to_string(), "G1 X9".to_string()].into();
+    controller
+        .start_stream_sent_earlier(program, before_reset)
+        .expect("start");
+    let mut events = Vec::new();
+    let deadline = Instant::now() + EVENTUALLY;
+    while !events
+        .iter()
+        .any(|e| matches!(e, MachineEvent::StreamStopped { .. }))
+        && Instant::now() < deadline
+    {
+        events.extend(controller.poll());
+        std::thread::sleep(Duration::from_millis(1));
+    }
+    assert!(
+        events.contains(&MachineEvent::StreamStopped { acked: 0, total: 2 }),
+        "{events:?}"
+    );
+    assert!(
+        events.contains(&MachineEvent::Error(
+            "not sent: the controller was reset: G1 X5 F100".to_string()
+        )),
+        "{events:?}"
+    );
+    assert!(!controller.is_streaming());
+    assert!(!written(&shared, "G1 X5 F100"), "{:?}", shared.log());
+}
+
+/// Polls `controller` until an event matching `cond` arrives or [`EVENTUALLY`] passes.
+fn wait_event(controller: &mut MachineController, cond: impl Fn(&MachineEvent) -> bool) -> bool {
+    let deadline = Instant::now() + EVENTUALLY;
+    while Instant::now() < deadline {
+        if controller.poll().iter().any(&cond) {
+            return true;
+        }
+        std::thread::sleep(Duration::from_millis(1));
+    }
+    false
+}
+
+#[test]
+fn test_query_line_is_answered_but_keeps_the_report_fresh() {
+    let (mut controller, shared) = connected();
+    shared.hold_acks.store(true, Ordering::SeqCst);
+    controller.send_query("$G").expect("query");
+    // `$G` changes nothing on the machine: the last report still describes it.
+    assert!(controller.report_fresh());
+    assert!(!controller.lines_answered(), "queued, not answered");
+    assert!(wait(&mut controller, |_| written(&shared, "$G")));
+    shared.hold_acks.store(false, Ordering::SeqCst);
+    assert!(wait(&mut controller, MachineController::lines_answered));
+    assert!(controller.report_fresh());
+}
+
+#[test]
+fn test_query_line_has_send_line_checks() {
+    let mut offline = MachineController::new();
+    assert_eq!(
+        offline.send_query("$G"),
+        Err(gcodekit5_app::machine::MachineError::NotConnected)
+    );
+    let (mut controller, _shared) = connected();
+    assert_eq!(
+        controller.send_query(""),
+        Err(gcodekit5_app::machine::MachineError::EmptyLine)
+    );
+    assert_eq!(
+        controller.send_query("$G?"),
+        Err(gcodekit5_app::machine::MachineError::RealtimeCharacter('?'))
+    );
 }

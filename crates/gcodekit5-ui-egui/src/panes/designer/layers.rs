@@ -1,11 +1,13 @@
 //! The Layers pane: the design's shapes in drawing order, with selection, visibility, lock,
 //! rename, z-order and grouping.
 //!
-//! Ported from the GTK `designer_layers.rs`. The pane shares the Designer's state
-//! ([`DesignerPane`]): clicking a row selects the shape on the canvas, and the canvas's
-//! selection shows in the rows. Every change to the design goes through the model's undo
-//! commands, one step per action: grouping, ungrouping, deleting, moving up and down, the
-//! position field, and renaming. Each marks the design modified.
+//! Ported from the GTK `designer_layers.rs`, laid out as GTK's: the "Objects" heading with
+//! the Group and Ungroup icon buttons, rows of operation icon, position, kind and number,
+//! name and group badge, and the z-order icon buttons under the list. The pane shares the
+//! Designer's state ([`DesignerPane`]): clicking a row selects the shape on the canvas, and
+//! the canvas's selection shows in the rows. Every change to the design goes through the
+//! model's undo commands, one step per action: grouping, ungrouping, deleting, moving up
+//! and down, the position field, and renaming. Each marks the design modified.
 //!
 //! GTK has no visibility or lock; they are added here. They are view state of the Designer
 //! pane ([`ShapeFlags`](super::canvas::ShapeFlags)): not undoable, not saved, and a hidden or
@@ -13,8 +15,8 @@
 //!
 //! Rows run bottom to top in drawing order (position 1 is drawn first). A position field
 //! takes a number and Enter, as in GTK; a move that would split a group is refused with a
-//! notice (GTK's dialog). Keys: Delete removes the selection (not during a canvas drag) while the pointer is over the
-//! pane and no text field has focus.
+//! notice (GTK's dialog). Keys: Delete removes the selection (not during a canvas drag)
+//! while the pointer is over the pane and no text field has focus.
 //!
 //! Dependencies: `egui`, `gcodekit5-designer` (model and commands), `gcodekit5-app`
 //! (translations).
@@ -29,10 +31,20 @@ use gcodekit5_designer::model::{ParametricPathSource, Shape};
 use gcodekit5_designer::shapes::OperationType;
 
 use super::DesignerPane;
+use crate::icons::{self, Icon};
 use crate::workspace::{Pane, PaneContext, PaneId};
 
-/// A z-order button: its msgid, whether it is enabled, and the model call it makes.
-type Move = (&'static str, bool, fn(&mut DesignerState) -> bool);
+/// A z-order button: its msgid, whether it is enabled, the model call it makes, and its
+/// icon.
+type Move = (&'static str, bool, fn(&mut DesignerState) -> bool, MoveIcon);
+
+/// A z-order button's icon: an app SVG (GTK's move-to-top and move-to-bottom) or a Tabler
+/// icon.
+#[derive(Clone, Copy)]
+enum MoveIcon {
+    App(&'static str),
+    Tabler(Icon),
+}
 
 /// One row of the list, read from the design.
 struct Row {
@@ -188,52 +200,83 @@ impl LayersPane {
         }
     }
 
-    /// Group, Ungroup and the four z-order buttons.
-    fn toolbar(&mut self, ui: &mut egui::Ui, d: &mut DesignerPane, rows: &[Row], tr: &Translator) {
+    /// The header: the "Objects" heading with the Group and Ungroup icon buttons on the
+    /// right, as GTK.
+    fn header(&mut self, ui: &mut egui::Ui, d: &mut DesignerPane, rows: &[Row], tr: &Translator) {
+        let selected = rows.iter().filter(|r| r.selected).count();
+        let grouped = rows.iter().any(|r| r.selected && r.group.is_some());
+        ui.horizontal(|ui| {
+            crate::theme::section_heading(ui, &tr.tr("Objects"));
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                let ungroup = ui
+                    .add_enabled_ui(grouped, |ui| {
+                        icons::icon_only_button(ui, Icon::Ungroup, &tr.tr("Ungroup"))
+                    })
+                    .inner;
+                if ungroup.clicked() {
+                    d.state_mut().ungroup_selected();
+                }
+                let group = ui
+                    .add_enabled_ui(selected >= 2, |ui| {
+                        icons::icon_only_button(ui, Icon::Group, &tr.tr("Group"))
+                    })
+                    .inner;
+                if group.clicked() {
+                    d.state_mut().group_selected();
+                }
+            });
+        });
+    }
+
+    /// The four z-order icon buttons under the list (GTK's move-to-top SVG, up, down and
+    /// the move-to-bottom SVG).
+    fn z_order(&mut self, ui: &mut egui::Ui, d: &mut DesignerPane, rows: &[Row], tr: &Translator) {
         let selected: Vec<usize> = rows
             .iter()
             .filter(|r| r.selected)
             .map(|r| r.position)
             .collect();
-        let grouped = rows.iter().any(|r| r.selected && r.group.is_some());
         let (first, last) = (selected.contains(&1), selected.contains(&rows.len()));
         // GTK: with a single selected row at an end, the moves toward that end are disabled.
         let single = selected.len() == 1;
         let start_ok = !selected.is_empty() && !(single && first);
         let end_ok = !selected.is_empty() && !(single && last);
-        ui.horizontal_wrapped(|ui| {
-            if ui
-                .add_enabled(selected.len() >= 2, egui::Button::new(tr.tr("Group")))
-                .clicked()
-            {
-                d.state_mut().group_selected();
-            }
-            if ui
-                .add_enabled(grouped, egui::Button::new(tr.tr("Ungroup")))
-                .clicked()
-            {
-                d.state_mut().ungroup_selected();
-            }
-            let moves: [Move; 4] = [
-                (
-                    n_!("Move to start"),
-                    start_ok,
-                    DesignerState::move_selected_to_top,
-                ),
-                (n_!("Move up"), start_ok, DesignerState::move_selected_up),
-                (n_!("Move down"), end_ok, DesignerState::move_selected_down),
-                (
-                    n_!("Move to end"),
-                    end_ok,
-                    DesignerState::move_selected_to_bottom,
-                ),
-            ];
-            for (msgid, enabled, apply) in moves {
-                if ui
-                    .add_enabled(enabled, egui::Button::new(tr.tr(msgid)))
-                    .clicked()
-                    && !apply(d.state_mut())
-                {
+        let moves: [Move; 4] = [
+            (
+                n_!("Move to start"),
+                start_ok,
+                DesignerState::move_selected_to_top,
+                MoveIcon::App("move_to_top.svg"),
+            ),
+            (
+                n_!("Move up"),
+                start_ok,
+                DesignerState::move_selected_up,
+                MoveIcon::Tabler(Icon::JogUp),
+            ),
+            (
+                n_!("Move down"),
+                end_ok,
+                DesignerState::move_selected_down,
+                MoveIcon::Tabler(Icon::JogDown),
+            ),
+            (
+                n_!("Move to end"),
+                end_ok,
+                DesignerState::move_selected_to_bottom,
+                MoveIcon::App("move_to_bottom.svg"),
+            ),
+        ];
+        ui.horizontal(|ui| {
+            for (msgid, enabled, apply, icon) in moves {
+                let name = tr.tr(msgid);
+                let response = ui
+                    .add_enabled_ui(enabled, |ui| match icon {
+                        MoveIcon::App(file) => icons::app_icon_button(ui, file, 28.0, false, &name),
+                        MoveIcon::Tabler(icon) => icons::icon_only_button(ui, icon, &name),
+                    })
+                    .inner;
+                if response.clicked() && !apply(d.state_mut()) {
                     self.notice = true;
                 }
             }
@@ -268,24 +311,12 @@ impl LayersPane {
         let hidden = d.flags().is_hidden(row.id);
         let locked = d.flags().is_locked(row.id);
         ui.horizontal(|ui| {
-            if ui
-                .selectable_label(hidden, tr.tr(if hidden { "Show" } else { "Hide" }))
-                .clicked()
-            {
-                d.set_hidden(row.id, !hidden);
-            }
-            if ui
-                .selectable_label(locked, tr.tr(if locked { "Unlock" } else { "Lock" }))
-                .clicked()
-            {
-                d.set_locked(row.id, !locked);
-            }
-            let operation = match row.operation {
-                OperationType::Pocket => (n_!("Pocket operation"), n_!("Pocket")),
-                OperationType::Profile => (n_!("Profile operation"), n_!("Profile")),
+            let (icon, tooltip) = match row.operation {
+                OperationType::Pocket => (Icon::Select, n_!("Pocket operation")),
+                OperationType::Profile => (Icon::Files, n_!("Profile operation")),
             };
-            ui.weak(tr.tr(operation.1))
-                .on_hover_text(tr.tr(operation.0));
+            ui.add(icon.themed(ui).fit_to_exact_size(egui::vec2(14.0, 14.0)))
+                .on_hover_text(tr.tr(tooltip));
             // A locked shape is read-only here: no rename, no move in the order.
             ui.add_enabled_ui(!locked, |ui| {
                 self.position_field(ui, d, row, rows.len(), tr)
@@ -301,6 +332,18 @@ impl LayersPane {
             }
             ui.add_enabled_ui(!locked, |ui| self.name_field(ui, d, row, tr));
             self.group_badge(ui, d, rows, row, tr);
+            let (icon, name) = if hidden {
+                (Icon::Hide, "Show")
+            } else {
+                (Icon::Show, "Hide")
+            };
+            if toggle(ui, icon, hidden, &tr.tr(name)).clicked() {
+                d.set_hidden(row.id, !hidden);
+            }
+            let name = if locked { "Unlock" } else { "Lock" };
+            if toggle(ui, Icon::Unlock, locked, &tr.tr(name)).clicked() {
+                d.set_locked(row.id, !locked);
+            }
         });
     }
 
@@ -425,8 +468,8 @@ impl LayersPane {
 
     /// A single-line field showing `shown`, or the text being typed while it has focus.
     ///
-    /// `name` is the field's accessible name. Returns the response, and the finished text when editing ended this frame (Enter, or
-    /// focus lost).
+    /// `name` is the field's accessible name. Returns the response, and the finished text
+    /// when editing ended this frame (Enter, or focus lost).
     fn text_field(
         &mut self,
         ui: &mut egui::Ui,
@@ -523,10 +566,8 @@ impl Pane for LayersPane {
             return;
         };
         let list = rows(d.state());
-        ui.strong(tr.tr("Objects"));
-        self.toolbar(ui, &mut d, &list, tr);
+        self.header(ui, &mut d, &list, tr);
         self.notice(ui, tr);
-        ui.separator();
         // Delete with the pointer over the pane, unless a text field (a rename) has the keys.
         let over = ui.rect_contains_pointer(ui.max_rect());
         if over
@@ -538,10 +579,28 @@ impl Pane for LayersPane {
         }
         egui::ScrollArea::vertical()
             .auto_shrink([false, false])
+            .max_height((ui.available_height() - Z_ORDER_HEIGHT).max(0.0))
             .show(ui, |ui| {
                 for row in &list {
                     self.row(ui, &mut d, &list, row, tr);
                 }
             });
+        self.z_order(ui, &mut d, &list, tr);
     }
+}
+
+/// Height kept under the list for the z-order buttons, in points.
+const Z_ORDER_HEIGHT: f32 = 40.0;
+
+/// A small icon toggle in a row, drawn selected while `on`; `name` is its tooltip and
+/// accessible name.
+fn toggle(ui: &mut egui::Ui, icon: Icon, on: bool, name: &str) -> egui::Response {
+    let response = ui.add(
+        egui::Button::image(icon.themed(ui).fit_to_exact_size(egui::vec2(14.0, 14.0)))
+            .selected(on)
+            .frame_when_inactive(on),
+    );
+    let enabled = response.enabled();
+    response.widget_info(|| egui::WidgetInfo::selected(egui::Role::Button, enabled, on, name));
+    response.on_hover_text(name)
 }

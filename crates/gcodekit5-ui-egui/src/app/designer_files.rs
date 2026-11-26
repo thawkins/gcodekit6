@@ -21,18 +21,23 @@
 //! would swap the program under the running job, like File > Open. The refusal is shown on
 //! the pane that asked. A CAM Preview then brings the visualizer to the front.
 //!
+//! A designer handoff also records the Designer's stock size and tool diameter in
+//! [`super::AppState::stock_seed`], which the visualizer's stock removal simulation takes with
+//! the new program (GTK's `sync_stock_from_designer` and tool sync).
+//!
 //! Dependencies: `gcodekit5-designer` (machine mode), `gcodekit5-app` (translations).
 
 use std::path::Path;
 
 use gcodekit5_app::UnsavedChangesChoice;
-use gcodekit5_designer::designer_state::MachineMode;
+use gcodekit5_designer::designer_state::{DesignerState, MachineMode};
 
 use super::{AfterSave, GcodeKitApp};
 use crate::commands::Command;
 use crate::dialogs::{Asked, ConfirmRequest, DialogAnswer, FilePurpose};
 use crate::panes::cam_tools::CamDelivery;
 use crate::panes::designer::ToEditor;
+use crate::panes::visualizer::StockSeed;
 use crate::workspace::PaneId;
 
 /// A request to replace the editor's program, and who made it.
@@ -93,6 +98,23 @@ const HANDOFF_BEHIND_OPEN: &str =
 /// Said on the editor when File > Open is refused because a handoff waits for an answer.
 pub(super) const OPEN_BEHIND_HANDOFF: &str =
     n_!("Answer the question about the editor's unsaved changes before opening a file.");
+
+/// The Designer's stock, if it has one, and tool, for the visualizer's stock removal
+/// simulation.
+///
+/// # Arguments
+/// * `state` - The Designer's state.
+/// * `serial` - Tags this program's seed.
+fn stock_seed(state: &DesignerState, serial: u64) -> StockSeed {
+    StockSeed {
+        serial,
+        stock: state
+            .stock_material
+            .as_ref()
+            .map(|stock| [stock.width, stock.height, stock.thickness]),
+        tool_diameter: state.tool_settings.tool_diameter as f32,
+    }
+}
 
 /// `path` with `extension` when it has none (GTK's default extensions).
 fn with_default_extension(path: &Path, extension: &str) -> std::path::PathBuf {
@@ -217,7 +239,12 @@ impl GcodeKitApp {
 
     /// Queues a file dialog for `purpose` with its filters (and a suggested name for a save).
     fn ask_file(&mut self, purpose: FilePurpose, file_name: Option<&str>) {
-        let filters = purpose.filters();
+        let filters = match purpose {
+            FilePurpose::ImportDesign => crate::dialogs::import_design_filters(
+                self.state.settings.config().ui.enable_stl_import,
+            ),
+            _ => purpose.filters(),
+        };
         match file_name {
             Some(name) => self.dialogs.save_file_named(purpose, &filters, name),
             None => self.dialogs.open_file(purpose, &filters),
@@ -379,12 +406,7 @@ impl GcodeKitApp {
             return;
         };
         self.designer.borrow_mut().add_generated_paths(&generated);
-        let shown = self.workspace.apply(craft_ui::docking::Action::Activate {
-            panel: PaneId::Designer,
-        });
-        if let Err(error) = shown {
-            tracing::warn!(?error, "designer not brought to the front");
-        }
+        self.workspace.show_pane(PaneId::Designer);
     }
 
     /// Delivers one handoff, or asks first about the editor's unsaved edits.
@@ -464,7 +486,16 @@ impl GcodeKitApp {
                     ToEditor::Generate => designer.generate_to_editor(&tr),
                     ToEditor::Frame => designer.frame_to_editor(),
                 }
-                designer.take_editor_gcode()
+                let gcode = designer.take_editor_gcode();
+                if gcode.is_some() {
+                    self.state.stock_seed = Some(stock_seed(
+                        designer.state(),
+                        self.state
+                            .stock_seed
+                            .map_or(1, |s| s.serial.wrapping_add(1)),
+                    ));
+                }
+                gcode
             }
             Handoff::Cam(_) => self.cam_tools.borrow_mut().take_editor_gcode(),
         };
@@ -477,12 +508,7 @@ impl GcodeKitApp {
             .replace_with_generated(gcode);
         self.sync_editor(true);
         if handoff == Handoff::Cam(CamDelivery::Preview) {
-            let shown = self.workspace.apply(craft_ui::docking::Action::Activate {
-                panel: PaneId::Visualizer,
-            });
-            if let Err(error) = shown {
-                tracing::warn!(?error, "visualizer not brought to the front");
-            }
+            self.workspace.show_pane(PaneId::Visualizer);
         }
     }
 }

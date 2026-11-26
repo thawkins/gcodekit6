@@ -35,12 +35,12 @@ const SAMPLE: [&str; 13] = [
     "M5",
 ];
 
-fn sample() -> Arc<[String]> {
+pub(crate) fn sample() -> Arc<[String]> {
     SAMPLE.iter().map(|s| s.to_string()).collect()
 }
 
 /// `p` in normalised device coordinates under `view_proj`.
-fn ndc(view_proj: glam::Mat4, p: Vec3) -> Vec3 {
+pub(crate) fn ndc(view_proj: glam::Mat4, p: Vec3) -> Vec3 {
     let clip = view_proj * p.extend(1.0);
     clip.xyz() / clip.w
 }
@@ -141,19 +141,19 @@ fn test_orbit_pan_zoom() {
 #[test]
 fn test_toolpath_tags_each_segment_with_its_line() {
     let mesh = toolpath::build(&sample());
-    let lines: Vec<u32> = mesh.vertices.iter().map(|v| v.line).collect();
+    let lines: Vec<u32> = mesh.vertices.iter().map(|v| v.line()).collect();
     // Line 2 (G0 Z5) is the first move; M3/M5 and modal lines draw nothing.
     assert_eq!(lines.first(), Some(&2));
     assert!(lines.windows(2).all(|w| w[0] <= w[1]), "program order");
     assert!(!lines.contains(&4) && !lines.contains(&12));
     // The quarter arc (line 8) is split into several segments.
-    let arc = mesh.vertices.iter().filter(|v| v.line == 8).count();
+    let arc = mesh.vertices.iter().filter(|v| v.line() == 8).count();
     assert!(arc >= 8, "arc split into {} vertices", arc);
     // Rapids are travel, feed moves with the spindle on are cuts.
     let colour = |line: u32| {
         mesh.vertices
             .iter()
-            .find(|v| v.line == line)
+            .find(|v| v.line() == line)
             .map(|v| v.color)
     };
     assert_eq!(colour(3), Some(TRAVEL_COLOR));
@@ -175,7 +175,7 @@ fn test_toolpath_keeps_counting_past_real_dwells() {
         .map(|s| s.to_string())
         .collect();
     let mesh = toolpath::build(&program);
-    let lines: Vec<u32> = mesh.vertices.iter().map(|v| v.line).collect();
+    let lines: Vec<u32> = mesh.vertices.iter().map(|v| v.line()).collect();
     assert_eq!(lines, vec![0, 0, 2, 2, 3, 3]);
 }
 
@@ -231,7 +231,7 @@ fn test_view_commands_move_the_camera() {
 }
 
 /// The pane in a harness without a GPU renderer, drawn with an English translator.
-fn pane_harness(pane: VisualizerPane) -> Harness<'static, VisualizerPane> {
+pub(crate) fn pane_harness(pane: VisualizerPane) -> Harness<'static, VisualizerPane> {
     let tr = Translator::new("en");
     Harness::builder()
         .with_size(egui::vec2(480.0, 360.0))
@@ -246,7 +246,10 @@ fn pane_harness(pane: VisualizerPane) -> Harness<'static, VisualizerPane> {
 }
 
 /// Loads `program` into the harness's pane and steps until its toolpath is built.
-fn load(harness: &mut Harness<'_, VisualizerPane>, program: Arc<[String]>) -> TestResult {
+pub(crate) fn load(
+    harness: &mut Harness<'_, VisualizerPane>,
+    program: Arc<[String]>,
+) -> TestResult {
     let ctx = harness.ctx.clone();
     harness.state_mut().load_program(Some(program), &ctx);
     let deadline = Instant::now() + Duration::from_secs(10);
@@ -268,9 +271,21 @@ fn test_nav_cube_click_front_sets_view() -> TestResult {
     harness.get_by_label("Front View").click();
     harness.run();
     assert_eq!(harness.state().camera().angles(), StdView::Front.angles());
-    harness.get_by_label("Top View").click();
-    harness.run();
-    assert_eq!(harness.state().camera().angles(), StdView::Top.angles());
+    // The nav cube's T comes first; the floating Top View button under it is the second.
+    assert_eq!(harness.get_all_by_label("Top View").count(), 2);
+    for index in 0..2 {
+        harness
+            .state_mut()
+            .apply(visualizer::NavAction::View(StdView::Front));
+        harness.run();
+        harness
+            .get_all_by_label("Top View")
+            .nth(index)
+            .ok_or("Top View button")?
+            .click();
+        harness.run();
+        assert_eq!(harness.state().camera().angles(), StdView::Top.angles());
+    }
     Ok(())
 }
 
@@ -386,16 +401,18 @@ fn test_toolpath_fits_buffer_limit() {
     );
 }
 
-/// The pane in a harness that renders through wgpu with the visualizer installed.
-fn gpu_harness(pane: VisualizerPane) -> Harness<'static, VisualizerPane> {
+/// The pane in a harness that renders through wgpu with the visualizer installed; the view
+/// beside the sidebar is 480x360, the size these tests were written for.
+pub(crate) fn gpu_harness(pane: VisualizerPane) -> Harness<'static, VisualizerPane> {
     let render_state = egui_kittest::wgpu::create_render_state(
         egui_kittest::wgpu::default_wgpu_setup(),
         egui_wgpu::RendererOptions::PREDICTABLE,
     );
     visualizer::install(&render_state);
     let tr = Translator::new("en");
+    // 250 points of sidebar and a 480x360 view.
     Harness::builder()
-        .with_size(egui::vec2(480.0, 360.0))
+        .with_size(egui::vec2(730.0, 360.0))
         .with_theme(egui::Theme::Dark)
         .renderer(egui_kittest::wgpu::WgpuTestRenderer::from_render_state(
             render_state,
@@ -413,10 +430,10 @@ fn gpu_harness(pane: VisualizerPane) -> Harness<'static, VisualizerPane> {
 
 /// Snapshot options: the checked-in references (made with Mesa lavapipe on Fedora; CI runs
 /// Ubuntu's lavapipe). A pixel fails beyond a YIQ distance of 1.0 (kittest's default is
-/// 0.6), and up to 40 failing pixels of the 172,800 pass: enough for a Mesa line-rasteriser
+/// 0.6), and up to 40 failing pixels of the 262,800 pass: enough for a Mesa line-rasteriser
 /// difference on a few line ends, while a missing, recoloured or moved line (hundreds of
 /// pixels) still fails.
-fn snapshot_options() -> SnapshotOptions {
+pub(crate) fn snapshot_options() -> SnapshotOptions {
     SnapshotOptions::new()
         .threshold(1.0)
         .max_failed_pixels(40)
@@ -424,7 +441,7 @@ fn snapshot_options() -> SnapshotOptions {
 }
 
 /// Whether `image` has a pixel within 2 px of `world`'s projection that `matches`.
-fn pixel_near(
+pub(crate) fn pixel_near(
     image: &dyn Fn(u32, u32) -> Option<[u8; 4]>,
     pane: &VisualizerPane,
     world: Vec3,

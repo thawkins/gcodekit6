@@ -10,6 +10,9 @@
 //! been injected, every later `?` is answered with the latest injected report. Replies owed
 //! are handed out in order, at most [`LoopbackShared::reply_budget`] of them when it is set,
 //! each no sooner than [`LoopbackShared::reply_delay`] after its `?` (a slow link).
+//!
+//! It stands in for a Repetier controller too: each numbered line gets its `ok`, and
+//! [`LoopbackShared::resend_once`] answers one line with `Resend:N` and `ok` instead.
 
 use std::collections::VecDeque;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
@@ -61,6 +64,10 @@ pub struct LoopbackShared {
     /// The length of [`LoopbackShared::log`] when the transport was last closed, so a test
     /// can tell what was written before the close.
     pub closed_at: Mutex<Option<usize>>,
+    /// A Repetier line number: the first line written as `N<n> ...` is answered with
+    /// `Resend:<n>` and `ok`, as Repetier firmware answers a checksum error, instead of the
+    /// line's own `ok`; then cleared.
+    pub resend_once: Mutex<Option<u32>>,
 }
 
 impl LoopbackShared {
@@ -141,6 +148,28 @@ impl LoopbackShared {
             *left -= 1;
         }
         Some(reply)
+    }
+
+    /// Whether `line` is the numbered line [`LoopbackShared::resend_once`] names; if so it
+    /// is recorded, answered with `Resend:<n>` and the request is cleared.
+    fn take_resend(&self, line: &str) -> bool {
+        let mut resend = self
+            .resend_once
+            .lock()
+            .expect("loopback resend mutex poisoned");
+        let Some(n) = *resend else {
+            return false;
+        };
+        if !line.starts_with(&format!("N{n} ")) {
+            return false;
+        }
+        *resend = None;
+        self.log
+            .lock()
+            .expect("loopback log mutex poisoned")
+            .push(Wrote::Line(line.to_string()));
+        self.inject(&format!("Resend:{n}\nok\n"));
+        true
     }
 
     /// How many complete lines were written.
@@ -227,6 +256,9 @@ impl Communicator for Loopback {
             if b == b'\n' {
                 let line = String::from_utf8_lossy(&self.carry).to_string();
                 self.carry.clear();
+                if self.shared.take_resend(&line) {
+                    continue;
+                }
                 self.shared
                     .log
                     .lock()

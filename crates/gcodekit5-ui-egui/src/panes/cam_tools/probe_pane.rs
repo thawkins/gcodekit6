@@ -27,7 +27,9 @@ fn invalidates_result(event: &MachineEvent) -> bool {
             let line = line.trim().to_ascii_uppercase();
             line.starts_with("$H") || line.starts_with("0X18")
         }
-        MachineEvent::Disconnected | MachineEvent::StreamHalted { .. } => true,
+        MachineEvent::Disconnected
+        | MachineEvent::StreamHalted { .. }
+        | MachineEvent::ProtocolMismatch { .. } => true,
         MachineEvent::Connected
         | MachineEvent::StatusReport(_)
         | MachineEvent::StreamProgress { .. }

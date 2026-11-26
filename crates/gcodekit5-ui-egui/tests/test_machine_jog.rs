@@ -5,7 +5,6 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use craft_ui::docking::{Action, Placement};
 use egui_kittest::Harness;
 use egui_kittest::kittest::Queryable;
 use gcodekit5_app::machine::RealtimeCommand;
@@ -136,25 +135,16 @@ fn test_hold_cancelled_when_window_loses_focus() {
     harness.input_mut().focused = true;
 }
 
-/// I2b: the Machine Control pane hidden behind another tab ends the hold.
+/// I2b: the Machine Control pane hidden by another page ends the hold.
 #[test]
 fn test_hold_cancelled_when_pane_hidden() {
     let (mut harness, shared) = hold_app(loopback_config(), Some([-100.0, -100.0, -50.0]));
     press(&mut harness, "Jog X+");
     wait_jogs(&shared, 1);
-    let workspace = harness.state_mut().workspace_mut();
-    workspace
-        .apply(Action::Move {
-            panel: PaneId::MachineControl,
-            anchor: PaneId::Visualizer,
-            placement: Placement::Tab { before: None },
-        })
-        .expect("move the pane into the visualizer's tabs");
-    workspace
-        .apply(Action::Activate {
-            panel: PaneId::Visualizer,
-        })
-        .expect("show the visualizer");
+    harness
+        .state_mut()
+        .workspace_mut()
+        .show_pane(PaneId::Visualizer);
     harness.step();
     assert!(wait_until(|| cancels(&shared) == 1), "{:?}", shared.log());
 }
@@ -266,6 +256,37 @@ fn test_hold_refused_at_limit() {
     let _ = harness.get_by_label("Jog refused: no travel left in that direction.");
     release(&mut harness, at);
     assert_eq!(settled_cancels(&shared), 0);
+}
+
+/// A hold clamped to less travel than a jog line can write (5 um left: it would be sent
+/// as `X0.00`) is refused like one at the limit, with no zero-length jog; with 0.01 mm left
+/// it moves exactly that.
+#[test]
+fn test_hold_refused_when_clamped_below_a_written_step() {
+    for (mpos, expected) in [
+        (-0.005_f32, None),
+        (-0.0049, None),
+        (-0.0051, Some("$J=G91 G21 X0.01 F1000")),
+    ] {
+        let (mut harness, shared) = hold_app(loopback_config(), Some([mpos, -100.0, -50.0]));
+        let at = press(&mut harness, "Jog X+");
+        harness.step();
+        match expected {
+            None => {
+                let _ = harness.get_by_label("Jog refused: no travel left in that direction.");
+                release(&mut harness, at);
+                assert!(
+                    crate::test_machine_keyboard_jog::settled_jogs(&harness, &shared).is_empty(),
+                    "{mpos}: {:?}",
+                    shared.log()
+                );
+            }
+            Some(line) => {
+                assert_eq!(wait_jogs(&shared, 1), [line], "{mpos}");
+                release(&mut harness, at);
+            }
+        }
+    }
 }
 
 /// I3: without a machine position the hold does not move and the pane says why.

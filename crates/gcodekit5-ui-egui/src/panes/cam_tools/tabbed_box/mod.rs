@@ -449,25 +449,37 @@ impl TabbedBoxParams {
 /// # Returns
 /// The action button pressed, if any; never a generating one while the input has problems.
 pub fn show(ui: &mut egui::Ui, params: &mut TabbedBoxParams, tr: &Translator) -> CamAction {
-    ui.horizontal_wrapped(|ui| {
-        ui.spacing_mut().item_spacing.x = 0.0;
-        ui.label(tr.tr(DESCRIPTION_START));
-        ui.hyperlink_to(tr.tr("Boxes"), "https://github.com/florianfesti/boxes");
-        ui.label(tr.tr(DESCRIPTION_END));
-    });
     let errors = params.parameters().err().unwrap_or_default();
-    show_fields(ui, params, tr, &errors);
-    common::page_errors(ui, tr, &errors);
-    common::action_row(
+    common::cam_page(
         ui,
-        tr,
-        errors.is_empty(),
-        &[
-            (n_!("Generate"), CamAction::Generate),
-            (n_!("Send to Editor"), CamAction::SendToEditor),
-            (n_!("Preview"), CamAction::Preview),
-            (n_!("Generate Shapes"), CamAction::SendToDesigner),
-        ],
+        common::SIDEBAR_SHARE,
+        params,
+        |ui, _| {
+            ui.horizontal_wrapped(|ui| {
+                ui.spacing_mut().item_spacing.x = 0.0;
+                ui.label(tr.tr(DESCRIPTION_START));
+                ui.hyperlink_to(tr.tr("Boxes"), "https://github.com/florianfesti/boxes");
+                ui.label(tr.tr(DESCRIPTION_END));
+            });
+        },
+        |ui, params| {
+            show_fields(ui, params, tr, &errors);
+            common::page_errors(ui, tr, &errors);
+            CamAction::None
+        },
+        |ui, _| {
+            common::action_row(
+                ui,
+                tr,
+                errors.is_empty(),
+                &[
+                    (n_!("Generate"), CamAction::Generate),
+                    (n_!("Send to Editor"), CamAction::SendToEditor),
+                    (n_!("Preview"), CamAction::Preview),
+                    (n_!("Generate Shapes"), CamAction::SendToDesigner),
+                ],
+            )
+        },
     )
 }
 

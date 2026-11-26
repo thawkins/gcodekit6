@@ -13,6 +13,7 @@ use gcodekit5_core::data::materials::{Material, MaterialId};
 use gcodekit5_settings::SettingsManager;
 use gcodekit5_settings::config::Config;
 use gcodekit5_ui_egui::commands::Command;
+use gcodekit5_ui_egui::workspace::Page;
 use gcodekit5_ui_egui::{AppState, GcodeKitApp};
 
 use crate::machine_support::app_harness;
@@ -76,10 +77,7 @@ fn app_with(file: &Path) -> Harness<'static, GcodeKitApp> {
     let mut h = app_harness(GcodeKitApp::from_state(state));
     h.state_mut().dispatch(Command::OpenMaterialsManager);
     h.run_steps(3);
-    assert!(
-        h.query_by_label("Materials Manager").is_some(),
-        "window not open"
-    );
+    assert_eq!(h.state().page(), Page::Materials, "page not shown");
     h
 }
 
@@ -346,6 +344,15 @@ fn test_materials_manager_quit_discard_drops_the_edit() {
     search(&mut h, "bog");
     click(&mut h, "Bog Oak");
     set_field(&mut h, "Name:", "Never Saved");
+    // Cancel from another page brings the Materials page back with the edit.
+    h.get_by_role_and_label(Role::Tab, "CAM Tools").click();
+    h.run_steps(2);
+    let shown =
+        crate::test_tools_manager::quit_answering(&mut h, craft_dialogs::MessageResult::Cancel);
+    assert_eq!(shown, ["Unsaved changes"]);
+    assert!(!h.state().quit_confirmed());
+    assert_eq!(h.state().page(), Page::Materials);
+    assert!(h.state().materials_manager().has_unsaved_changes());
     let shown = crate::test_tools_manager::quit_answering(
         &mut h,
         craft_dialogs::MessageResult::Custom("Discard".into()),

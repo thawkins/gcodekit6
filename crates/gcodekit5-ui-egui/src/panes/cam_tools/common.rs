@@ -11,6 +11,8 @@
 use gcodekit5_app::i18n::Translator;
 use gcodekit5_core::units::{self, MeasurementSystem};
 
+use crate::icons::{Icon, icon_button};
+
 /// What a page asks the pane to do after drawing.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CamAction {
@@ -335,15 +337,16 @@ pub fn any(_v: f64) -> Option<&'static str> {
     None
 }
 
-/// A section heading.
+/// A section heading: the bold title of the framed group under it (GTK's
+/// `PreferencesGroup` title).
 ///
 /// # Arguments
 /// * `ui` - The page's `Ui`.
 /// * `tr` - Translator for the current UI language.
 /// * `title` - The heading's msgid.
 pub fn heading(ui: &mut egui::Ui, tr: &Translator, title: &str) {
-    ui.add_space(6.0);
-    ui.strong(tr.tr(title));
+    ui.add_space(8.0);
+    crate::theme::section_heading(ui, &tr.tr(title));
 }
 
 /// One labelled text field of a two-column grid, with its unit after it and the first
@@ -427,21 +430,29 @@ pub fn combo_row<T: Copy + PartialEq>(
 /// * `value` - The checkbox's state.
 pub fn check_row(ui: &mut egui::Ui, tr: &Translator, label: &'static str, value: &mut bool) {
     let name = ui.label(tr.tr(label));
-    ui.checkbox(value, "").labelled_by(name.id);
+    crate::theme::checkbox(ui, value, "").labelled_by(name.id);
     ui.end_row();
 }
 
-/// A two-column grid of fields.
+/// Narrowest a framed group of fields gets, so the groups of a page line up.
+const GROUP_WIDTH: f32 = 460.0;
+
+/// A two-column grid of fields in a framed group (GTK's `PreferencesGroup` card).
 ///
 /// # Arguments
 /// * `ui` - The page's `Ui`.
 /// * `id` - The grid's id salt.
 /// * `rows` - Draws the rows.
 pub fn grid(ui: &mut egui::Ui, id: &str, rows: impl FnOnce(&mut egui::Ui)) {
-    egui::Grid::new(id)
-        .num_columns(2)
-        .spacing([12.0, 6.0])
-        .show(ui, rows);
+    let frame = crate::theme::group_frame(ui).inner_margin(egui::Margin::symmetric(10, 6));
+    frame.show(ui, |ui| {
+        ui.set_min_width(GROUP_WIDTH.min(ui.available_width()));
+        egui::Grid::new(id)
+            .num_columns(2)
+            .spacing([12.0, 6.0])
+            .min_col_width(160.0)
+            .show(ui, rows);
+    });
 }
 
 /// The problems with the whole page, in the error colour.
@@ -479,8 +490,8 @@ pub fn gcode_actions(ui: &mut egui::Ui, tr: &Translator, valid: bool) -> CamActi
     )
 }
 
-/// The page's action buttons, disabled while the input has problems, then Load and Save of
-/// the page's preset (always enabled).
+/// Load and Save of the page's preset (always enabled), then the page's action buttons,
+/// disabled while the input has problems, the first given drawn last as the main one.
 ///
 /// # Arguments
 /// * `ui` - The page's `Ui`.
@@ -498,24 +509,125 @@ pub fn action_row(
 ) -> CamAction {
     let mut action = CamAction::None;
     ui.add_space(8.0);
+    // GTK's order: Load and Save, then the page's actions with the main one (the first
+    // given, GTK's suggested-action Generate) at the right end.
     ui.horizontal_wrapped(|ui| {
-        for (msgid, what) in buttons {
-            if ui
-                .add_enabled(valid, egui::Button::new(tr.tr(msgid)))
-                .clicked()
-            {
-                action = *what;
+        for (icon, msgid, what) in [
+            (Icon::Open, n_!("Load"), CamAction::LoadPreset),
+            (Icon::Save, n_!("Save"), CamAction::SavePreset),
+        ] {
+            if icon_button(ui, icon, &tr.tr(msgid)).clicked() {
+                action = what;
             }
         }
         ui.separator();
-        for (msgid, what) in [
-            (n_!("Load"), CamAction::LoadPreset),
-            (n_!("Save"), CamAction::SavePreset),
-        ] {
-            if ui.button(tr.tr(msgid)).clicked() {
-                action = what;
+        let main = buttons.first();
+        for (msgid, what) in buttons.iter().skip(1).chain(main) {
+            let button = if Some(&(*msgid, *what)) == main {
+                crate::theme::primary_button(tr.tr(msgid))
+            } else {
+                egui::Button::new(tr.tr(msgid))
+            };
+            if ui.add_enabled(valid, button).clicked() {
+                action = *what;
             }
         }
     });
     action
+}
+
+/// Share of a tool page's width its sidebar takes (GTK's paned starts at 40%).
+pub const SIDEBAR_SHARE: f32 = 0.40;
+
+/// The id under which [`cam_page`] leaves the sidebar's unused room, for the pane's own
+/// sidebar items (the bitmap job's progress, the generated program).
+pub(super) fn sidebar_rest_id() -> egui::Id {
+    egui::Id::unique("gcodekit5-cam-sidebar-rest")
+}
+
+/// Lays a tool page out as GTK does: a sidebar on the left (the page's description), and
+/// on the right the form, which scrolls, over the action buttons, which stay at the bottom
+/// right. `state` (the page's input) is handed to each part in turn: first the sidebar,
+/// then the form, then the actions.
+///
+/// # Arguments
+/// * `ui` - The page's `Ui`; the page takes all the room left in it.
+/// * `share` - The sidebar's share of the width, such as [`SIDEBAR_SHARE`].
+/// * `state` - The page's input.
+/// * `sidebar` - Draws the sidebar.
+/// * `form` - Draws the form; returns what a button in it asked for, if anything.
+/// * `actions` - Draws the action buttons; returns the one pressed, if any.
+///
+/// # Returns
+/// The action buttons' answer, else the form's.
+pub fn cam_page<S>(
+    ui: &mut egui::Ui,
+    share: f32,
+    state: &mut S,
+    sidebar: impl FnOnce(&mut egui::Ui, &mut S),
+    form: impl FnOnce(&mut egui::Ui, &mut S) -> CamAction,
+    actions: impl FnOnce(&mut egui::Ui, &mut S) -> CamAction,
+) -> CamAction {
+    const GAP: f32 = 12.0;
+    let rect = ui.available_rect_before_wrap();
+    let side_width = (rect.width() * share).round();
+    let divider = rect.left() + side_width;
+    let side_rect = egui::Rect::from_min_max(rect.min, egui::pos2(divider - GAP, rect.bottom()));
+    let right = egui::Rect::from_min_max(egui::pos2(divider + GAP, rect.top()), rect.max);
+    // The action row's size from the last frame (one row until it has been drawn).
+    // Kept per page (each page has its own input type), so a page shown after another
+    // does not start from that page's row width.
+    let size_id = ui
+        .scope_id()
+        .with(("gcodekit5-cam-actions-size", std::any::type_name::<S>()));
+    let last: egui::Vec2 = ui
+        .data(|d| d.get_temp(size_id))
+        .unwrap_or(egui::vec2(0.0, ui.spacing().interact_size.y + 12.0));
+    let actions_top = right.bottom() - last.y;
+    let form_rect = egui::Rect::from_min_max(right.min, egui::pos2(right.right(), actions_top));
+    let actions_rect = egui::Rect::from_min_max(egui::pos2(right.left(), actions_top), right.max);
+    ui.painter().vline(
+        divider,
+        rect.y_range(),
+        ui.visuals().widgets.noninteractive.bg_stroke,
+    );
+
+    let top_down = egui::Layout::top_down(egui::Align::Min);
+    let mut side = ui.new_child(egui::UiBuilder::new().max_rect(side_rect).layout(top_down));
+    sidebar(&mut side, state);
+    let rest_top = side.min_rect().bottom() + GAP;
+    let rest = egui::Rect::from_min_max(egui::pos2(side_rect.left(), rest_top), side_rect.max);
+    ui.data_mut(|d| d.insert_temp(sidebar_rest_id(), rest));
+
+    let mut form_ui = ui.new_child(egui::UiBuilder::new().max_rect(form_rect).layout(top_down));
+    let from_form = egui::ScrollArea::vertical()
+        .id_salt("cam-tool-page")
+        .auto_shrink([false, false])
+        .show(&mut form_ui, |ui| form(ui, state))
+        .inner;
+
+    // Right aligned (GTK's `halign(End)`): the row starts its own width, as measured last
+    // frame, left of the right edge. Its room reaches past that edge, so the measured width
+    // is the row's natural one, not one squeezed by the offset.
+    let start = (actions_rect.right() - last.x).max(actions_rect.left());
+    let room = egui::Rect::from_min_size(
+        egui::pos2(start, actions_rect.top()),
+        egui::vec2(actions_rect.width(), actions_rect.height()),
+    );
+    let mut actions_ui = ui.new_child(egui::UiBuilder::new().max_rect(room).layout(top_down));
+    actions_ui.set_clip_rect(actions_rect.intersect(ui.clip_rect()));
+    let pressed = actions(&mut actions_ui, state);
+    let size = actions_ui.min_rect().size();
+    ui.data_mut(|d| d.insert_temp(size_id, size));
+    // A row that changed size (first visit, Stop appearing, another language) is placed
+    // right in a second pass of this frame instead of waiting for the next input.
+    if (size - last).abs().max_elem() > 0.5 {
+        ui.ctx().request_discard("cam action row size");
+    }
+    ui.allocate_rect(rect, egui::Sense::hover());
+    if pressed == CamAction::None {
+        from_form
+    } else {
+        pressed
+    }
 }

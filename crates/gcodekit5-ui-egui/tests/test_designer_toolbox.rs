@@ -217,3 +217,15 @@ fn test_configure_applies_the_measurement_system() {
     assert!(shows_suffix(&imperial, "in/min"));
     assert!(!shows_suffix(&imperial, "mm/min"));
 }
+
+#[test]
+fn test_snap_threshold_range_is_the_same_length_in_both_systems() {
+    use gcodekit5_ui_egui::panes::designer::toolbox::{SNAP_THRESHOLD_MAX_MM, snap_threshold_max};
+    assert_eq!(snap_threshold_max(Metric), SNAP_THRESHOLD_MAX_MM);
+    let inches = snap_threshold_max(Imperial);
+    assert!(
+        (inches * 25.4 - SNAP_THRESHOLD_MAX_MM).abs() < 1e-9,
+        "{inches} in"
+    );
+    assert!(inches < 0.4, "imperial max {inches} in is more than 10 mm");
+}

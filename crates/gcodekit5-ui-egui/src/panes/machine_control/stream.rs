@@ -5,6 +5,7 @@
 
 use gcodekit5_app::i18n::Translator;
 
+use crate::icons::Icon;
 use crate::machine::{MachineStatus, Progress};
 
 /// The msgids this section shows.
@@ -38,49 +39,62 @@ pub(super) fn progress_text(progress: Progress) -> String {
     format!("{} / {}", progress.acked, progress.total)
 }
 
-/// Draws the section.
+/// Draws the section: Send and Stop, then Pause and Resume, two to a row and of equal
+/// width as in GTK, then the progress bar.
 pub(super) fn show(
     ui: &mut egui::Ui,
     tr: &Translator,
     status: &MachineStatus,
     has_program: bool,
 ) -> Option<Action> {
-    ui.strong(tr.tr("Job Control"));
-    let mut action = None;
-    ui.horizontal_wrapped(|ui| {
-        let can_start = status.connected && !status.streaming && has_program;
-        let hint = if has_program {
-            tr.tr("Send G-code from the editor")
-        } else {
-            tr.tr("No program loaded")
-        };
-        let buttons = [
-            (tr.tr("Send"), hint, can_start, Action::Start),
+    crate::theme::section_heading(ui, &tr.tr("Job Control"));
+    let can_start = status.connected && !status.streaming && !status.estopped && has_program;
+    let hint = if has_program {
+        tr.tr("Send G-code from the editor")
+    } else {
+        tr.tr("No program loaded")
+    };
+    let width = (ui.available_width() - ui.spacing().item_spacing.x) / 2.0;
+    let size = egui::vec2(width, 0.0);
+    let send = crate::theme::primary_icon_button(Icon::Send.themed(ui), tr.tr("Send"));
+    let stop = crate::theme::destructive_icon_button(ui, Icon::Stop.themed(ui), tr.tr("Stop"));
+    let pause = egui::Button::image_and_text(Icon::Pause.themed(ui), tr.tr("Pause"));
+    let resume = egui::Button::image_and_text(Icon::Play.themed(ui), tr.tr("Resume"));
+    let rows = [
+        [
+            (send, hint, can_start, Action::Start),
+            (stop, tr.tr("Stop"), status.streaming, Action::Stop),
+        ],
+        [
             (
-                tr.tr("Pause"),
+                pause,
                 tr.tr("Pause streaming (!)"),
                 status.streaming,
                 Action::Pause,
             ),
             (
-                tr.tr("Resume"),
+                resume,
                 tr.tr("Resume streaming (~)"),
                 status.streaming,
                 Action::Resume,
             ),
-            (tr.tr("Stop"), tr.tr("Stop"), status.streaming, Action::Stop),
-        ];
-        for (text, hover, enabled, button_action) in buttons {
-            if ui
-                .add_enabled(enabled, egui::Button::new(text))
-                .on_hover_text(hover)
-                .on_disabled_hover_text(tr.tr("No program loaded"))
-                .clicked()
-            {
-                action = Some(button_action);
+        ],
+    ];
+    let mut action = None;
+    for row in rows {
+        ui.horizontal(|ui| {
+            for (button, hover, enabled, button_action) in row {
+                if ui
+                    .add_enabled(enabled, button.min_size(size))
+                    .on_hover_text(hover)
+                    .on_disabled_hover_text(tr.tr("No program loaded"))
+                    .clicked()
+                {
+                    action = Some(button_action);
+                }
             }
-        }
-    });
+        });
+    }
     if let Some(progress) = status.progress {
         let fraction = if progress.total == 0 {
             1.0

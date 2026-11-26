@@ -362,43 +362,52 @@ fn file_name(path: &Path) -> String {
 /// # Returns
 /// The action button pressed, if any; never a generating one while the input has problems.
 pub fn show(ui: &mut egui::Ui, params: &mut GerberParams, tr: &Translator) -> CamAction {
-    ui.label(tr.tr(DESCRIPTION));
     let errors = params.parameters().err().unwrap_or_default();
-    let mut action = CamAction::None;
-    heading(ui, tr, n_!("Gerber Project"));
-    ui.horizontal_wrapped(|ui| {
-        ui.label(tr.tr(n_!("Select Directory")));
-        if ui.button(tr.tr(n_!("Browse..."))).clicked() {
-            action = CamAction::ChooseFolder;
-        }
-        match &params.directory {
-            Some(dir) => ui.label(file_name(dir)),
-            None => ui.weak(tr.tr(NO_DIRECTORY_SELECTED)),
-        };
-    });
-    if params.directory.is_some() && !params.layer_files.is_empty() {
-        match params.layer_file() {
-            Some(file) => ui.weak(file_name(file)),
-            None => ui.weak(tr.tr(LAYER_NOT_FOUND)),
-        };
-    }
-    show_fields(ui, params, tr, &errors);
-    common::page_errors(ui, tr, &errors);
-    let pressed = common::action_row(
+    common::cam_page(
         ui,
-        tr,
-        errors.is_empty(),
-        &[
-            (n_!("Generate"), CamAction::Generate),
-            (n_!("Send to Editor"), CamAction::SendToEditor),
-            (n_!("Preview"), CamAction::Preview),
-        ],
-    );
-    if pressed == CamAction::None {
-        action
-    } else {
-        pressed
-    }
+        common::SIDEBAR_SHARE,
+        params,
+        |ui, _| {
+            ui.label(tr.tr(DESCRIPTION));
+        },
+        |ui, params| {
+            let mut action = CamAction::None;
+            heading(ui, tr, n_!("Gerber Project"));
+            ui.horizontal_wrapped(|ui| {
+                ui.label(tr.tr(n_!("Select Directory")));
+                if crate::icons::icon_button(ui, crate::icons::Icon::Open, &tr.tr(n_!("Browse...")))
+                    .clicked()
+                {
+                    action = CamAction::ChooseFolder;
+                }
+                match &params.directory {
+                    Some(dir) => ui.label(file_name(dir)),
+                    None => ui.weak(tr.tr(NO_DIRECTORY_SELECTED)),
+                };
+            });
+            if params.directory.is_some() && !params.layer_files.is_empty() {
+                match params.layer_file() {
+                    Some(file) => ui.weak(file_name(file)),
+                    None => ui.weak(tr.tr(LAYER_NOT_FOUND)),
+                };
+            }
+            show_fields(ui, params, tr, &errors);
+            common::page_errors(ui, tr, &errors);
+            action
+        },
+        |ui, _| {
+            common::action_row(
+                ui,
+                tr,
+                errors.is_empty(),
+                &[
+                    (n_!("Generate"), CamAction::Generate),
+                    (n_!("Send to Editor"), CamAction::SendToEditor),
+                    (n_!("Preview"), CamAction::Preview),
+                ],
+            )
+        },
+    )
 }
 
 /// The page's groups of fields.

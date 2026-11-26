@@ -1,4 +1,4 @@
-//! The Firmware Settings window (GTK's Device Config settings list): the controller's
+//! The Firmware Settings page (GTK's Device Config settings list): the controller's
 //! settings, filtered by search text and category, read from the controller (Retrieve),
 //! edited one at a time, and saved to or loaded from a JSON file.
 //!
@@ -90,10 +90,9 @@ struct Write {
     value: String,
 }
 
-/// The Firmware Settings window.
+/// The Device Config page (GTK's name for the firmware settings).
 #[derive(Debug)]
 pub struct FirmwareSettingsWindow {
-    open: bool,
     table: SettingsManager,
     /// The settings whose value the controller reported (on this connection, since the
     /// last Retrieve): only these can be edited, never a definition's placeholder `0`.
@@ -118,7 +117,6 @@ pub struct FirmwareSettingsWindow {
 impl Default for FirmwareSettingsWindow {
     fn default() -> Self {
         Self {
-            open: false,
             table: SettingsManager::new(),
             reported: BTreeSet::new(),
             search: String::new(),
@@ -136,22 +134,6 @@ impl Default for FirmwareSettingsWindow {
 }
 
 impl FirmwareSettingsWindow {
-    /// Opens the window.
-    pub fn open(&mut self) {
-        self.open = true;
-    }
-
-    /// Closes the window.
-    pub fn close(&mut self) {
-        self.open = false;
-        self.edit = None;
-    }
-
-    /// Whether the window is open.
-    pub fn is_open(&self) -> bool {
-        self.open
-    }
-
     /// The GRBL settings the controller reported on this connection (number to value), for
     /// the Device Manager's Sync from Device.
     pub fn reported_values(&self) -> HashMap<u16, String> {
@@ -198,7 +180,7 @@ impl FirmwareSettingsWindow {
         self.notice = Some((text, error));
     }
 
-    /// Takes the controller's events, in order, whether the window is open or not.
+    /// Takes the controller's events, in order, whether the page is shown or not.
     ///
     /// # Arguments
     /// * `events` - Events no observer has seen yet.
@@ -222,6 +204,7 @@ impl FirmwareSettingsWindow {
                 | MachineEvent::StatusReport(_)
                 | MachineEvent::StreamProgress { .. }
                 | MachineEvent::StreamHalted { .. }
+                | MachineEvent::ProtocolMismatch { .. }
                 | MachineEvent::StreamFinished { .. }
                 | MachineEvent::StreamStopped { .. }
                 | MachineEvent::Sent(_)

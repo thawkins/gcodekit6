@@ -25,13 +25,7 @@ pub fn cam_app(
     crate::test_designer_files_app::Shared,
 ) {
     let (mut h, script) = app(state);
-    let shown = h
-        .state_mut()
-        .workspace_mut()
-        .apply(craft_ui::docking::Action::Activate {
-            panel: PaneId::CamTools,
-        });
-    assert!(shown.is_ok(), "{shown:?}");
+    h.state_mut().workspace_mut().show_pane(PaneId::CamTools);
     frames(&mut h, 2);
     (h, script)
 }

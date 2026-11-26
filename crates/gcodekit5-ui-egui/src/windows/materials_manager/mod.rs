@@ -1,4 +1,4 @@
-//! The Materials Manager window (GTK's Materials Manager): the material library searched
+//! The Materials Manager page (GTK's Materials Manager): the material library searched
 //! and filtered by category, listed by category then name, and an edit form in five tabs
 //! (Basic Info, Properties, Machining, Safety, Notes).
 //!
@@ -86,9 +86,8 @@ enum Question {
     Unsaved(Next),
 }
 
-/// The Materials Manager window.
+/// The Materials page.
 pub struct MaterialsManagerWindow {
-    open: bool,
     /// The library and its file; `None` without a settings folder.
     backend: Option<MaterialsManagerBackend>,
     /// Why the file could not be read, until the window shows it.
@@ -107,7 +106,6 @@ pub struct MaterialsManagerWindow {
 impl std::fmt::Debug for MaterialsManagerWindow {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("MaterialsManagerWindow")
-            .field("open", &self.open)
             .field("filter", &self.filter)
             .field("notice", &self.notice)
             .finish_non_exhaustive()
@@ -125,7 +123,6 @@ impl MaterialsManagerWindow {
             .as_ref()
             .and_then(|b| b.load_error().map(str::to_string));
         Self {
-            open: false,
             backend,
             load_error,
             backup_named: None,
@@ -137,12 +134,12 @@ impl MaterialsManagerWindow {
         }
     }
 
-    /// Opens the window, telling why the library could not be read if it could not.
+    /// Prepares the page each time it is shown, telling why the library could not be read
+    /// if it could not.
     ///
     /// # Arguments
     /// * `tr` - Translator for a notice.
     pub fn open(&mut self, tr: &Translator) {
-        self.open = true;
         if self.backend.is_none() {
             let text = n_!("No settings folder: custom materials cannot be loaded or saved.");
             self.say(tr.tr(text).into_owned(), true);
@@ -153,24 +150,12 @@ impl MaterialsManagerWindow {
         }
     }
 
-    /// Whether the window is open.
-    pub fn is_open(&self) -> bool {
-        self.open
-    }
-
-    /// Closes the window, as its title-bar button does: an unsaved material stays in the
-    /// form (shown again when the window reopens) and the quit flow asks about it.
-    pub fn close(&mut self) {
-        self.open = false;
-        self.question = None;
-    }
-
     /// Whether the form holds a material with changes not saved yet.
     pub fn has_unsaved_changes(&self) -> bool {
         self.is_dirty()
     }
 
-    /// Saves the form for the quit flow's Save, opening the window so a refusal shows.
+    /// Saves the form for the quit flow's Save (the app shows the page when it is refused).
     ///
     /// # Arguments
     /// * `tr` - Translator for the notice.
@@ -178,7 +163,6 @@ impl MaterialsManagerWindow {
     /// # Returns
     /// Whether the material was saved.
     pub fn save_for_quit(&mut self, tr: &Translator) -> bool {
-        self.open = true;
         self.save(tr)
     }
 

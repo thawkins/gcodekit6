@@ -7,6 +7,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use gcodekit5_app::i18n::Translator;
+use gcodekit5_devicedb::DeviceProfile;
 use gcodekit5_settings::config::Config;
 
 use super::DesignerPane;
@@ -42,6 +43,13 @@ impl Pane for SharedDesigner {
                 tracing::warn!(%error, ?command, "designer busy; command dropped");
                 false
             }
+        }
+    }
+
+    fn set_device(&mut self, profile: Option<&DeviceProfile>) {
+        match self.0.try_borrow_mut() {
+            Ok(mut pane) => pane.set_device(profile),
+            Err(error) => tracing::warn!(%error, "designer busy; device not applied"),
         }
     }
 

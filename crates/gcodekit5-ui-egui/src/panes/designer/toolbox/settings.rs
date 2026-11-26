@@ -210,8 +210,7 @@ fn tool_settings(
     }
     if !laser {
         let mut on = state.tool_settings.continuous_z_between_passes;
-        if ui
-            .checkbox(&mut on, tr.tr("Continuous Z"))
+        if crate::theme::checkbox(ui, &mut on, tr.tr("Continuous Z"))
             .on_hover_text(
                 tr.tr("Keep tool at cutting depth between passes when XY start is unchanged"),
             )

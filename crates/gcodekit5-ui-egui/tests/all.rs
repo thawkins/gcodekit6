@@ -74,6 +74,8 @@ mod test_designer_gallery;
 mod test_designer_import;
 #[path = "test_designer_layers.rs"]
 mod test_designer_layers;
+#[path = "test_designer_page_layout.rs"]
+mod test_designer_page_layout;
 #[path = "test_designer_properties.rs"]
 mod test_designer_properties;
 #[path = "test_designer_properties_cam.rs"]
@@ -82,14 +84,20 @@ mod test_designer_properties_cam;
 mod test_designer_properties_commit;
 #[path = "test_designer_properties_shapes.rs"]
 mod test_designer_properties_shapes;
+#[path = "test_designer_shape_ops.rs"]
+mod test_designer_shape_ops;
 #[path = "test_designer_snapshots.rs"]
 mod test_designer_snapshots;
+#[path = "test_designer_stl_import.rs"]
+mod test_designer_stl_import;
 #[path = "test_designer_text_tool.rs"]
 mod test_designer_text_tool;
 #[path = "test_designer_toolbox.rs"]
 mod test_designer_toolbox;
 #[path = "test_designer_toolpath.rs"]
 mod test_designer_toolpath;
+#[path = "test_designer_work_area.rs"]
+mod test_designer_work_area;
 #[path = "test_device_info.rs"]
 mod test_device_info;
 #[path = "test_device_manager.rs"]
@@ -106,29 +114,75 @@ mod test_frame;
 mod test_help;
 #[path = "test_hidpi.rs"]
 mod test_hidpi;
+#[path = "test_icons.rs"]
+mod test_icons;
+#[path = "test_machine_control_layout.rs"]
+mod test_machine_control_layout;
 #[path = "test_machine_jog.rs"]
 mod test_machine_jog;
+#[path = "test_machine_keyboard_jog.rs"]
+mod test_machine_keyboard_jog;
+#[path = "test_machine_limits_buffer.rs"]
+mod test_machine_limits_buffer;
+#[path = "test_machine_override_target.rs"]
+mod test_machine_override_target;
 #[path = "test_machine_pane.rs"]
 mod test_machine_pane;
 #[path = "test_machine_probe_report.rs"]
 mod test_machine_probe_report;
+#[path = "test_machine_quick_probe.rs"]
+mod test_machine_quick_probe;
+#[path = "test_machine_repetier_pane.rs"]
+mod test_machine_repetier_pane;
+#[path = "test_machine_rotary_jog.rs"]
+mod test_machine_rotary_jog;
+#[path = "test_machine_work_zero.rs"]
+mod test_machine_work_zero;
 #[path = "test_machine_worker_messages.rs"]
 mod test_machine_worker_messages;
+#[path = "test_manager_pages_layout.rs"]
+mod test_manager_pages_layout;
 #[path = "test_materials_manager.rs"]
 mod test_materials_manager;
+#[path = "test_motion_keys_typing.rs"]
+mod test_motion_keys_typing;
+#[path = "test_panel_visibility.rs"]
+mod test_panel_visibility;
 #[path = "test_quit.rs"]
 mod test_quit;
+#[path = "test_settings_shortcuts.rs"]
+mod test_settings_shortcuts;
 #[path = "test_settings_window.rs"]
 mod test_settings_window;
+#[path = "test_shortcut_rules.rs"]
+mod test_shortcut_rules;
 #[path = "test_smoke.rs"]
 mod test_smoke;
 #[path = "test_status_bar.rs"]
 mod test_status_bar;
+#[path = "test_theme.rs"]
+mod test_theme;
 #[path = "test_tools_manager.rs"]
 mod test_tools_manager;
 #[path = "test_translations.rs"]
 mod test_translations;
 #[path = "test_visualizer.rs"]
 mod test_visualizer;
+#[path = "test_visualizer_2d.rs"]
+mod test_visualizer_2d;
+#[path = "test_visualizer_bounds.rs"]
+mod test_visualizer_bounds;
+#[path = "test_visualizer_display.rs"]
+mod test_visualizer_display;
+#[path = "test_visualizer_intensity.rs"]
+mod test_visualizer_intensity;
+#[path = "test_visualizer_menu.rs"]
+mod test_visualizer_menu;
+#[path = "test_visualizer_page_layout.rs"]
+mod test_visualizer_page_layout;
+#[path = "test_visualizer_preview.rs"]
+mod test_visualizer_preview;
+#[path = "test_visualizer_stock.rs"]
+mod test_visualizer_stock;
 #[path = "test_workspace.rs"]
 mod test_workspace;

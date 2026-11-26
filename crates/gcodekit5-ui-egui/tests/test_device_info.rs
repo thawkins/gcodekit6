@@ -1,6 +1,6 @@
-//! The Device Info window: what the controller reports about itself (firmware, version,
-//! build date, compile options, homing and laser mode), the device type selector writing
-//! `$32`, and Refresh asking the controller again.
+//! The Device Info panel of the Device Config page: what the controller reports about
+//! itself (firmware, version, build date, compile options, homing and laser mode), the
+//! device type selector writing `$32`, and Refresh asking the controller again.
 
 use std::time::Duration;
 
@@ -9,6 +9,7 @@ use gcodekit5_app::device_identity::{DeviceIdentity, DeviceType};
 use gcodekit5_app::test_support::Wrote;
 use gcodekit5_ui_egui::GcodeKitApp;
 use gcodekit5_ui_egui::commands::Command;
+use gcodekit5_ui_egui::workspace::Page;
 
 use crate::machine_support::{app_harness, connect, loopback_state, step_until, wait_until};
 
@@ -58,7 +59,9 @@ fn test_device_info_shows_reported_firmware_build_and_options() {
     let mut h = app_harness(GcodeKitApp::from_state(state));
     h.state_mut().dispatch(Command::OpenDeviceInfo);
     h.run_steps(2);
-    assert!(h.query_by_label("Device Info").is_some(), "window not open");
+    // Machine > Device Info shows the Device Config page, whose left panel it is (GTK).
+    assert_eq!(h.state().page(), Page::DeviceConfig);
+    assert!(h.query_by_label("Device Type").is_some(), "panel not shown");
 
     shared.inject("Grbl 1.1h ['$' for help]\n[VER:1.1h.20190825:]\n[OPT:VNMZL,15,128]\n$22=1\n");
     assert!(
@@ -96,11 +99,20 @@ fn test_device_info_laser_type_writes_32_and_refresh_asks_again() {
         && app.device_info().identity().laser == Some(true)));
 
     let before = shared.log().len();
+    // The lines written since `before`: the status poll's realtime `?` can land among them
+    // under load and is not part of the refresh.
+    let lines = || -> Vec<Wrote> {
+        shared.log()[before..]
+            .iter()
+            .filter(|w| matches!(w, Wrote::Line(_)))
+            .cloned()
+            .collect()
+    };
     h.get_by_label("Refresh device info").click();
     h.run_steps(2);
-    assert!(wait_until(|| shared.log().len() >= before + 2));
+    assert!(wait_until(|| lines().len() >= 2));
     assert_eq!(
-        shared.log()[before..before + 2],
+        lines()[..2],
         [Wrote::Line("$I".to_string()), Wrote::Line("$$".to_string())]
     );
 }

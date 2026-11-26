@@ -394,9 +394,6 @@ pub struct SerialCommunicator {
     pub detected_protocol: ControllerProtocol,
 
     pub repetier_processor: crate::firmware::repetier::processor::RepetierProcessor,
-    repetier_events: Vec<RepetierEvent>,
-    repetier_flow_paused: bool,
-    repetier_flow_stopped: bool,
 
     /// Lines written on the GRBL path that await their `ok` / `error:N`.
     reply_ledger: reply_ledger::ReplyLedger,
@@ -416,9 +413,6 @@ impl SerialCommunicator {
             configured_protocol: ControllerProtocol::Unknown,
             detected_protocol: ControllerProtocol::Unknown,
             repetier_processor: crate::firmware::repetier::processor::RepetierProcessor::new(),
-            repetier_events: Vec::new(),
-            repetier_flow_paused: false,
-            repetier_flow_stopped: false,
             reply_ledger: reply_ledger::ReplyLedger::new(),
             unread: Vec::new(),
         }
@@ -513,29 +507,6 @@ impl SerialCommunicator {
                 CommunicatorEvent::Timeout => listener.on_timeout(),
             }
         }
-    }
-
-    /// Returns and clears the Repetier events accumulated since the last call
-    pub fn take_repetier_events(&mut self) -> Vec<RepetierEvent> {
-        std::mem::take(&mut self.repetier_events)
-    }
-
-    /// Checks if the Repetier stream is paused by the user
-    /// The RepetierSender checks this before sending each command
-    pub fn repetier_is_paused(&self) -> bool {
-        self.repetier_flow_paused
-    }
-
-    /// Checks if the Repetier stream has been paused by the user
-    /// The RepetierSender checks this to terminate its loop
-    pub fn repetier_is_stopped(&self) -> bool {
-        self.repetier_flow_stopped
-    }
-
-    /// Clears the flow control flags
-    pub fn repetier_reset_flow_control(&mut self) {
-        self.repetier_flow_paused = false;
-        self.repetier_flow_stopped = false;
     }
 
     /// Returns the current value of Repetier's line counter N
@@ -692,8 +663,6 @@ impl Communicator for SerialCommunicator {
         self.unread.clear();
         self.configured_protocol = ControllerProtocol::Unknown;
         self.detected_protocol = ControllerProtocol::Unknown;
-        self.repetier_flow_paused = false;
-        self.repetier_flow_stopped = false;
 
         match opened {
             Ok(port) => {
@@ -758,13 +727,11 @@ impl Communicator for SerialCommunicator {
                 }
 
                 if data == b"!" {
-                    tracing::debug!("[REPETIER] Pause requested; streaming on hold");
-                    self.repetier_flow_paused = true;
+                    tracing::debug!("[REPETIER] Pause requested; not written");
                     return Ok(0);
                 }
                 if data == b"~" {
-                    tracing::debug!("[REPETIER] Resume requested; streaming continues");
-                    self.repetier_flow_paused = false;
+                    tracing::debug!("[REPETIER] Resume requested; not written");
                     return Ok(0);
                 }
                 // 0x18 = Ctrl-X (soft reset)
@@ -774,7 +741,6 @@ impl Communicator for SerialCommunicator {
                 // descartaría porque no encaja en su formato N<num>*ck).
                 if data == [0x18u8] {
                     tracing::debug!("[REPETIER] Soft reset (sent without the processor)");
-                    self.repetier_flow_stopped = true;
 
                     // Enviar directo al puerto.
                     let mut bytes_to_send = data;
@@ -894,8 +860,6 @@ impl Communicator for SerialCommunicator {
                                     }
                                 }
                             }
-
-                            self.repetier_events.extend(result.events.clone());
 
                             data = result.display;
                         } else {

@@ -1,6 +1,11 @@
 //! The Spoilboard Surfacing page: GTK's defaults render, invalid input is shown at the
 //! field and disables the actions, the program is byte-identical to the GTK page's (fixtures
 //! from `capture_cam_fixtures`), and a device with fewer than 3 axes is refused.
+//!
+//! The fixtures in `tests/fixtures/cam/` are frozen references: `capture_cam_fixtures`, which
+//! wrote them from the GTK pages, was in the GTK crate deleted in `26740e3` (its source is at
+//! `6841d84`). Change a fixture only deliberately, by hand, in the commit that changes the
+//! generator's output and says why.
 
 use egui_kittest::kittest::Queryable;
 use gcodekit5_core::units::MeasurementSystem;

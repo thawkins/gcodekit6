@@ -83,7 +83,9 @@ fn test_nav_cube_faces_hit_at_every_scale() -> TestResult {
                     },
                 ));
             harness.run();
-            let rect = harness.get_by_label(name).rect();
+            // The nav cube's button comes first: "Top View" is also the floating button
+            // under it, as in GTK.
+            let rect = harness.get_all_by_label(name).next().ok_or(name)?.rect();
             // Centre and a point just inside each corner: the edges of the hit area.
             let inset = egui::vec2(1.0, 1.0);
             let spots = [
@@ -124,8 +126,9 @@ fn test_editor_click_selects_same_line_at_every_scale() -> TestResult {
         let tr = Translator::new("en");
         let mut pane = EditorPane::new();
         pane.buffer_mut().set_text(text.clone());
+        // Tall enough for all 40 lines under the find and replace rows.
         let mut harness = Harness::builder()
-            .with_size(egui::vec2(480.0, 600.0))
+            .with_size(egui::vec2(480.0, 700.0))
             .with_pixels_per_point(ppp)
             .build_ui_state(
                 move |ui, pane: &mut EditorPane| {

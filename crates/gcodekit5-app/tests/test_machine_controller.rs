@@ -187,6 +187,91 @@ fn test_jog_writes_jog_command() {
     );
 }
 
+/// A rotary jog keeps 3 decimals (degrees); a jog that would be written as zero, on any
+/// axis, is refused rather than sent as a zero-length move.
+#[test]
+fn test_rotary_jog_has_three_decimals_and_zero_jogs_are_refused() {
+    use gcodekit5_app::machine::{Axis, MachineEvent};
+    let shared = Arc::new(LoopbackShared::default());
+    let mut controller = loopback_controller(&shared, Duration::from_millis(1));
+    connect(&mut controller);
+    controller.jog(Axis::A, 0.0004, 1000.0);
+    controller.jog(Axis::X, 0.004, 1000.0);
+    let refused = controller
+        .poll()
+        .into_iter()
+        .filter(|e| matches!(e, MachineEvent::Error(t) if t.starts_with("jog ignored")))
+        .count();
+    assert_eq!(refused, 2);
+    controller.jog(Axis::A, 0.012, 1000.0);
+    assert!(
+        wait_until(|| shared
+            .log()
+            .contains(&Wrote::Line("$J=G91 G21 A0.012 F1000".to_string()))),
+        "rotary jog not written: {:?}",
+        shared.log()
+    );
+    let jogs = shared
+        .log()
+        .into_iter()
+        .filter(|w| matches!(w, Wrote::Line(l) if l.starts_with("$J=")))
+        .count();
+    assert_eq!(jogs, 1, "{:?}", shared.log());
+}
+
+/// The zero-length guard judges the text the line writes: a distance that writes as
+/// `0.00` is refused, one that writes `0.01` is sent, and no written jog is ever zero.
+#[test]
+fn test_jog_guard_and_formatter_round_alike() {
+    use gcodekit5_app::machine::Axis;
+    use gcodekit5_app::machine::grbl_stream::{jog_writes_zero, linear_jog_command};
+    // The guard agrees with the line actually written: what it lets through writes a
+    // non-zero value, what it refuses would have written zero.
+    for (d, written) in [
+        (0.005_f32, "$J=G91 G21 X0.00 F1000"),
+        (-0.005, "$J=G91 G21 X-0.00 F1000"),
+        (0.0049, "$J=G91 G21 X0.00 F1000"),
+        (0.0051, "$J=G91 G21 X0.01 F1000"),
+        (-0.0051, "$J=G91 G21 X-0.01 F1000"),
+    ] {
+        assert_eq!(linear_jog_command('X', d, 1000.0), written, "{d}");
+        assert_eq!(
+            jog_writes_zero(d, 2),
+            written.contains("X0.00") || written.contains("X-0.00"),
+            "{d}: {written}"
+        );
+    }
+    assert!(jog_writes_zero(0.00049, 3));
+    assert!(!jog_writes_zero(0.0006, 3));
+
+    let shared = Arc::new(LoopbackShared::default());
+    let mut controller = loopback_controller(&shared, Duration::from_millis(1));
+    connect(&mut controller);
+    for d in [0.005_f32, -0.005, 0.0049, 0.0051] {
+        controller.jog(Axis::X, d, 1000.0);
+    }
+    assert!(
+        wait_until(|| shared
+            .log()
+            .contains(&Wrote::Line("$J=G91 G21 X0.01 F1000".to_string()))),
+        "0.0051 not written: {:?}",
+        shared.log()
+    );
+    std::thread::sleep(Duration::from_millis(20));
+    for w in shared.log() {
+        if let Wrote::Line(line) = w
+            && let Some(rest) = line.strip_prefix("$J=G91 G21 X")
+        {
+            let value: f32 = rest
+                .split(' ')
+                .next()
+                .and_then(|v| v.parse().ok())
+                .expect("value");
+            assert!(value != 0.0, "zero-length jog written: {line}");
+        }
+    }
+}
+
 #[test]
 fn test_repaint_hook_called_on_event() {
     let shared = Arc::new(LoopbackShared::default());
@@ -834,7 +919,8 @@ fn test_report_fresh_only_after_line_written() {
     assert!(wait_fresh(&mut controller), "never fresh after the write");
 }
 
-/// A soft reset written as a raw real-time byte drops a queued jog, like jog cancel.
+/// A soft reset written as a raw real-time byte drops a queued jog and the queued line
+/// before it, as `stop()` does.
 #[test]
 fn test_soft_reset_drops_queued_jog() {
     let (shared, mut controller) = full_window();
@@ -843,12 +929,13 @@ fn test_soft_reset_drops_queued_jog() {
     controller.realtime(RealtimeCommand::SoftReset);
     assert!(wait_until(|| shared.log().contains(&Wrote::Realtime(0x18))));
     shared.hold_acks.store(false, Ordering::SeqCst);
-    assert!(
-        wait_until(|| shared.lines_written() == 4),
-        "{:?}",
+    std::thread::sleep(Duration::from_millis(50));
+    assert_eq!(
+        shared.lines_written(),
+        3,
+        "queued line written after the reset: {:?}",
         shared.log()
     );
-    std::thread::sleep(Duration::from_millis(50));
     assert!(
         !shared
             .log()
@@ -961,4 +1048,63 @@ fn test_lagging_replies_err_stale() {
         !controller.report_fresh(),
         "a lagging reply to a query before $H counted as fresh"
     );
+}
+
+/// `realtime(SoftReset)` keeps the rule `stop()` keeps: no line sent before the reset runs
+/// after it, not even one still queued behind a full receive window.
+#[test]
+fn test_soft_reset_drops_lines_queued_before_it() {
+    let shared = Arc::new(LoopbackShared::default());
+    shared.hold_acks.store(true, Ordering::SeqCst);
+    let mut controller = loopback_controller(&shared, Duration::from_millis(1));
+    connect(&mut controller);
+    let lines: Vec<String> = (0..20)
+        .map(|i| format!("G1 X{i}.000 Y{i}.000 F1000"))
+        .collect();
+    for line in &lines {
+        controller.send_line(line).expect("send_line");
+    }
+    // The window fills: some lines are written, the rest wait behind it.
+    assert!(wait_until(|| shared.lines_written() > 0), "no line sent");
+    controller.realtime(RealtimeCommand::SoftReset);
+    assert!(wait_until(|| shared.log().contains(&Wrote::Realtime(0x18))));
+    // The controller answers what it had; nothing queued before the reset may follow it.
+    shared.hold_acks.store(false, Ordering::SeqCst);
+    let settle = Instant::now() + Duration::from_millis(300);
+    while Instant::now() < settle {
+        controller.poll();
+        std::thread::sleep(Duration::from_millis(5));
+    }
+    let log = shared.log();
+    let reset_at = log
+        .iter()
+        .position(|w| *w == Wrote::Realtime(0x18))
+        .expect("soft reset written");
+    let after: Vec<&Wrote> = log[reset_at..]
+        .iter()
+        .filter(|w| matches!(w, Wrote::Line(l) if lines.contains(l)))
+        .collect();
+    assert!(after.is_empty(), "written after the reset: {after:?}");
+}
+
+/// A reconnect starts without the last connection's program: the WCS watch must not judge
+/// a program that ran on the earlier connection.
+#[test]
+fn test_reconnect_forgets_the_streamed_program() {
+    let shared = Arc::new(LoopbackShared::default());
+    let mut controller = loopback_controller(&shared, Duration::from_millis(1));
+    connect(&mut controller);
+    controller.start_stream(program(3)).expect("start_stream");
+    assert!(
+        wait_for(&mut controller, |e| matches!(
+            e,
+            MachineEvent::StreamFinished { .. }
+        ))
+        .is_some()
+    );
+    assert!(controller.streamed_program().is_some());
+    controller.disconnect();
+    assert!(wait_for(&mut controller, |e| *e == MachineEvent::Disconnected).is_some());
+    connect(&mut controller);
+    assert!(controller.streamed_program().is_none());
 }

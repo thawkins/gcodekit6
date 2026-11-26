@@ -1,7 +1,7 @@
 //! The menus: built from the command catalog, laid out by `craft_menu` for the platform, and
 //! shown natively on macOS or as an in-window bar elsewhere.
 //!
-//! [`menu_bar`] is the app's own menu tree, every [`Command`] but jogging in it. [`Menus`] keeps
+//! [`menu_bar`] is the app's own menu tree: GTK's File, Edit, Machine and Help. [`Menus`] keeps
 //! it laid out for [`Target::current`] with the keymap's shortcuts, and either draws it with
 //! `craft_menu::MenuBarUi` (Windows, Linux, and macOS when AppKit refused the native menus) or
 //! drives the macOS `NativeMenu`, whose key equivalents come back to egui as key presses so the
@@ -52,14 +52,20 @@ pub const LAYOUT_LABELS: [&str; 25] = [
     n_!("Scroll menu down"),
 ];
 
-/// The English msgids of the top-level menu titles, in bar order.
-pub const MENU_TITLES: [&str; 6] = [
-    n_!("File"),
-    n_!("Edit"),
-    n_!("View"),
-    n_!("Machine"),
-    n_!("Tools"),
-    n_!("Help"),
+/// The English msgids of the top-level menu titles, in bar order: GTK's four.
+pub const MENU_TITLES: [&str; 4] = [n_!("File"), n_!("Edit"), n_!("Machine"), n_!("Help")];
+
+/// The access keys (mnemonics) the in-window menu bar gives [`MENU_TITLES`], in bar order, for
+/// every shipped language. Alt and one of these letters opens a menu, so the shortcut editor
+/// gives no command such a key. `test_commands::test_designer_alt_keys_leave_the_menu_mnemonics`
+/// checks the table against the bar.
+pub const MENU_MNEMONICS: [(&str, [char; 4]); 6] = [
+    ("en", ['f', 'e', 'm', 'h']),
+    ("de", ['d', 'b', 'm', 'h']),
+    ("es", ['a', 'e', 'm', 'y']),
+    ("fr", ['f', 'd', 'm', 'a']),
+    ("it", ['f', 'm', 'a', 'i']),
+    ("pt", ['f', 'e', 'm', 'a']),
 ];
 
 /// A menu item running `command`, labelled in the current language.
@@ -80,14 +86,17 @@ fn menu(tr: &Translator, title: &str, role: MenuRole, rows: &[Option<Command>]) 
 }
 
 /// The app's menus, labelled through `tr`, before any platform layout and without shortcuts
-/// (`craft_menu::apply_keymap` adds them). Every [`Command`] but jogging is in them; About,
-/// Preferences and Quit are tagged so each layout puts them where the platform expects.
+/// ([`apply_shortcuts`] adds them): GTK's File, Edit, Machine and Help. The commands
+/// left out have a home elsewhere: jogging and the visualizer's view commands are buttons on
+/// their pages (Reset View also keeps its `Cmd+0` key), and the manager windows of earlier
+/// builds are page tabs ([`crate::workspace::Page::for_command`]). About, Preferences and
+/// Quit are tagged so each layout puts them where the platform expects.
 ///
 /// # Arguments
 /// * `tr` - Translator for the labels.
 pub fn menu_bar(tr: &Translator) -> MenuBar {
     use Command as C;
-    let [file, edit, view, machine, tools, help] = MENU_TITLES;
+    let [file, edit, machine, help] = MENU_TITLES;
     let menus = vec![
         menu(
             tr,
@@ -127,21 +136,6 @@ pub fn menu_bar(tr: &Translator) -> MenuBar {
         ),
         menu(
             tr,
-            view,
-            MenuRole::View,
-            &[
-                Some(C::ZoomFit),
-                Some(C::ZoomIn),
-                Some(C::ZoomOut),
-                Some(C::ResetView),
-                None,
-                Some(C::ViewTop),
-                Some(C::ViewFront),
-                Some(C::ViewIso),
-            ],
-        ),
-        menu(
-            tr,
             machine,
             MenuRole::Other,
             &[
@@ -158,18 +152,7 @@ pub fn menu_bar(tr: &Translator) -> MenuBar {
                 Some(C::Home),
                 Some(C::Unlock),
                 Some(C::SoftReset),
-            ],
-        ),
-        menu(
-            tr,
-            tools,
-            MenuRole::Other,
-            &[
-                Some(C::OpenDeviceManager),
-                Some(C::OpenToolsManager),
-                Some(C::OpenMaterialsManager),
                 None,
-                Some(C::OpenFirmwareSettings),
                 Some(C::OpenDeviceInfo),
             ],
         ),
@@ -188,6 +171,39 @@ pub fn menu_bar(tr: &Translator) -> MenuBar {
     bar.tag_item(&C::OpenSettings.command_ref(), ItemRole::Settings);
     bar.tag_item(&C::Quit.command_ref(), ItemRole::Quit);
     bar
+}
+
+/// Puts `keymap`'s shortcuts on `bar`'s items (`craft_menu::apply_keymap`), then shows on each
+/// item only a key that works on every page. A key bound in one pane's scope only (Cycle
+/// Start's `~`, which works only while Machine Control has the keyboard) would promise a key
+/// that does nothing elsewhere, so such an item shows no key; Preferences' Shortcuts page
+/// lists it with where it works. GTK's menus had no such item.
+///
+/// # Arguments
+/// * `bar` - The menus to label.
+/// * `keymap` - The keymap whose bindings the items show.
+pub fn apply_shortcuts(bar: &mut MenuBar, keymap: &Keymap) {
+    craft_menu::apply_keymap(bar, keymap);
+    for menu in &mut bar.menus {
+        for node in &mut menu.children {
+            let Node::Item(item) = node else {
+                continue;
+            };
+            let Some(bindable) = keymap.bindable(&item.command) else {
+                continue;
+            };
+            let app_wide = keymap.bindings(&item.command).into_iter().any(|b| {
+                Some(b.trigger.chord) == item.shortcut && b.scope_or(&bindable.scope).is_app()
+            });
+            if !app_wide {
+                item.shortcut = keymap
+                    .bindings(&item.command)
+                    .into_iter()
+                    .find(|b| !b.trigger.double && b.scope_or(&bindable.scope).is_app())
+                    .map(|b| b.trigger.chord);
+            }
+        }
+    }
 }
 
 /// The overflow menu's title, which egui's default fonts cannot draw.
@@ -231,6 +247,8 @@ pub struct Menus {
     /// The bar laid out for [`Target::current`], drawn in the window when there is no native
     /// menu.
     laid_out: MenuBar,
+    /// Counts the changes of `laid_out`, so the native menu is laid out again after one.
+    version: u64,
     /// The macOS menu bar, when AppKit accepted it.
     #[cfg(target_os = "macos")]
     native: Option<craft_menu::NativeMenu>,
@@ -254,15 +272,26 @@ impl Menus {
     pub fn new(tr: &Translator, keymap: &Keymap) -> Self {
         Self {
             laid_out: Self::layout(tr, keymap, Target::current()),
+            version: 0,
             #[cfg(target_os = "macos")]
             native: None,
         }
     }
 
+    /// Shows `keymap`'s shortcuts from now on, after the user changed them.
+    ///
+    /// # Arguments
+    /// * `tr` - Translator for the labels.
+    /// * `keymap` - The keymap whose bindings the items show.
+    pub fn set_keymap(&mut self, tr: &Translator, keymap: &Keymap) {
+        self.laid_out = Self::layout(tr, keymap, Target::current());
+        self.version += 1;
+    }
+
     /// The app's menus with `keymap`'s shortcuts, laid out for `target`.
     fn layout(tr: &Translator, keymap: &Keymap, target: Target) -> MenuBar {
         let mut bar = menu_bar(tr);
-        craft_menu::apply_keymap(&mut bar, keymap);
+        apply_shortcuts(&mut bar, keymap);
         let label = |english: &'static str| layout_label(tr, english);
         let options = LayoutOptions {
             label: &label,
@@ -328,9 +357,9 @@ impl Menus {
         if let Some(native) = &mut self.native {
             native.set_gate(gate);
             let chosen = native.take_clicks(ctx);
-            // The menus do not change after start-up yet, so one state value is enough.
+            // The menus change only with the shortcuts, which bump `version`.
             let layout = self.laid_out.clone();
-            native.sync_with(0, move || craft_menu::Layout {
+            native.sync_with(self.version, move || craft_menu::Layout {
                 bar: layout,
                 clashes: Vec::new(),
             });

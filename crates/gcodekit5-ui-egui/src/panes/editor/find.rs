@@ -1,6 +1,6 @@
-//! Find in the editor's text: the next or previous match of a query, wrapping around, and
-//! the number of matches. Matching ignores ASCII case (G-code is ASCII; `x10` finds `X10`),
-//! as the GTK editor's search did by default.
+//! Find in the editor's text: the next or previous match of a query, wrapping around, the
+//! number of matches, and the text with every match replaced. Matching ignores ASCII case
+//! (G-code is ASCII; `x10` finds `X10`), as the GTK editor's search did by default.
 //!
 //! Ranges are byte ranges into the text. ASCII case folding keeps every byte where it is, so
 //! a match in the folded text is the same range in the original.
@@ -68,4 +68,32 @@ pub fn find_previous(text: &str, needle: &str, before: usize) -> Option<Range<us
 /// * `needle` - The query; an empty one occurs nowhere.
 pub fn count(text: &str, needle: &str) -> usize {
     starts(text, needle).count()
+}
+
+/// `text` with every match of `needle` replaced by `replacement`, left to right without
+/// overlaps (`aa` in `aaaa` is two matches), with the same ASCII-case-insensitive matching
+/// as find.
+///
+/// # Arguments
+/// * `text` - The text to change.
+/// * `needle` - The query; an empty one matches nothing.
+/// * `replacement` - What each match becomes.
+///
+/// # Returns
+/// The new text and the number of matches replaced.
+pub fn replace_all(text: &str, needle: &str, replacement: &str) -> (String, usize) {
+    let mut out = String::with_capacity(text.len());
+    let mut copied = 0;
+    let mut replaced = 0;
+    for start in starts(text, needle) {
+        if start < copied {
+            continue;
+        }
+        out.push_str(&text[copied..start]);
+        out.push_str(replacement);
+        copied = start + needle.len();
+        replaced += 1;
+    }
+    out.push_str(&text[copied..]);
+    (out, replaced)
 }

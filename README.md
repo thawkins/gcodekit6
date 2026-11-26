@@ -1,6 +1,7 @@
 # GCodeKit5-Design
 
-A modern, cross-platform G-Code sender for Laser and CNC machine controller written in Rust with GTK4 UI framework.
+A modern, cross-platform G-Code sender for Laser and CNC machine controller written in Rust with an egui user interface (eframe and wgpu, with the craft-libs
+window, menu, keymap and dialog crates).
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE-MIT)
 [![License: APACHE](https://img.shields.io/badge/license-apache-blue.svg)](LICENSE-APACHE)
@@ -8,7 +9,7 @@ A modern, cross-platform G-Code sender for Laser and CNC machine controller writ
 
 ## Overview
 
-GCodeKit5 is a Rust-based CNC machine controller providing a modern alternative to Universal G-Code Sender. It supports multiple controller firmware types including GRBL, grblHAL, TinyG, g2core, Smoothieware, and FluidNC through a unified, intuitive interface built with the GTK4 UI framework.
+GCodeKit5 is a Rust-based CNC machine controller providing a modern alternative to Universal G-Code Sender. It supports multiple controller firmware types including GRBL, grblHAL, TinyG, g2core, Smoothieware, and FluidNC through a unified, intuitive interface built with egui.
 
 <img src="crates/gcodekit5-ui-egui/resources/help_images/designer.png" alt="Designer" width="800">
 
@@ -32,13 +33,14 @@ GCodeKit5 is a Rust-based CNC machine controller providing a modern alternative 
 - This "boxes" plugin also has the ability to create gears and sprokets of different types with greater flexibility and possibilities than the tools in gcodekit-design, so the use of "boxes" is also recommended for these topics.
 
 ## Architecture
-GCodeKit5 is organized as a Cargo workspace with 7 crates for modular compilation and better code organization:
+GCodeKit5 is organized as a Cargo workspace with 9 crates for modular compilation and better code organization:
 
 - **gcodekit5-core** - Core types, traits, state management, events, and data models
 - **gcodekit5-camtools** - CAM tools and special G-code processing operations
 - **gcodekit5-designer** - Visual design tools and toolpath generation
 - **gcodekit5-communication** - Serial, TCP, WebSocket protocols and firmware implementations (GRBL family and Repetier)
-- **gcodekit5-ui** - GTK4-based UI components, visualizer, settings, and editor integration
+- **gcodekit5-app** - Toolkit-free application logic: the machine controller worker, work zero, translations and command history
+- **gcodekit5-ui-egui** - The egui front end: pages, panes, visualizer, designer, CAM tools, managers, editor and settings
 - **gcodekit5-devicedb** - Device profile management
 - **gcodekit5-settings** - Application settings management
 - **gcodekit5-visualizer** - 2D/3D visualization engine
@@ -342,11 +344,15 @@ cd gcodekit5
 # Build release version (optimized)
 cargo build --release
 
-# Run the application
+# Run the application (egui front end, the default)
 cargo run --release
 ```
 
 The compiled binary will be located at `target/release/gcodekit5`.
+
+The GTK4 front end has been removed; egui is the only front end. Features ported from it,
+and the manual checks still pending before release, are listed in
+`docs/reports/egui-parity.md`.
 
 ### Development Build
 ```bash
@@ -410,7 +416,8 @@ RUST_LOG=debug cargo run
 
 ### Technology Stack
 - **Rust**: System programming language for memory safety and performance
-- **GTK4**: Modern declarative UI framework
+- **egui / eframe**: Immediate-mode UI, drawn with wgpu (the visualizer renders with wgpu too)
+- **craft-libs**: Window, native menu, keyboard shortcuts and native file dialogs
 - **Tokio**: Async runtime for non-blocking I/O
 - **Serialport-rs**: Cross-platform serial communication
 - **Tracing**: Structured logging and diagnostics
@@ -425,12 +432,11 @@ Settings files are stored in platform-specific locations:
 - **macOS**: `~/Library/Application Support/gcodekit5/config.json`
 - **Windows**: `%APPDATA%\gcodekit5\config.json`
 
-## Libraries needed to compile in Kubuntu 26.04
-- **Run**:  
-  sudo apt update && sudo apt install -y build-essential pkg-config libglib2.0-dev-bin libglib2.0-dev libcairo2-dev libgdk-pixbuf-2.0-dev libpango1.0-dev libgtk-4-dev libudev-dev libadwaita-1-dev libgtksourceview-5-dev
-  
-  - To recognize the language packs, install:  
-  sudo apt update && sudo apt install gettext -y
+## Libraries needed to compile on Linux (Debian/Ubuntu)
+- **Build**:  
+  sudo apt update && sudo apt install -y build-essential pkg-config libudev-dev libxkbcommon-dev libwayland-dev libx11-dev libxcursor-dev libxrandr-dev libxi-dev
+- **Run**: a Vulkan or OpenGL driver for wgpu (for example `libvulkan1 mesa-vulkan-drivers`).
+- Translations are built from `po/*.po` at compile time; gettext is not needed.
 
 
 ## Development
@@ -449,7 +455,7 @@ GCodeKit5 provides a development container for a one-click development environme
 
 The container includes:
 - Rust toolchain with clippy, rustfmt, and rust-analyzer
-- GTK4 and libadwaita development libraries
+- The libraries the egui build needs (udev, xkbcommon, Wayland and X11)
 - Flatpak build tools
 - Helpful VS Code extensions pre-installed
 
@@ -597,9 +603,15 @@ You may choose either license for your use of this software.
 ## Acknowledgments
 
 - **Inspiration**: Universal G-Code Sender (UGS) project
-- **Frameworks**: GTK4 and GTK4-rs UI teams for excellent cross-platform toolkit
+- **Frameworks**: the egui, eframe, winit and wgpu projects
 - **Firmware**: GRBL, TinyG, g2core, and other open-source CNC firmware projects
 - **Community**: Rust community for excellent tooling and support
+
+## Third-party assets
+
+- **Icons**: the egui front end's toolbar and button icons are from
+  [Tabler Icons](https://tabler.io/icons) 3.31.0 (c) Pawel Kuna, MIT License. The SVGs the
+  code uses and the licence text are in `crates/gcodekit5-ui-egui/resources/icons/tabler/`.
 
 ## Support
 
@@ -619,29 +631,11 @@ You may choose either license for your use of this software.
 ### Recent Updates (1.2.0-beta.2a) Fixed an issue with moving multiple objects using grips and Fix Dead Keys on Wayland (2026-10-25)
   - When modifying the grips of a set of objects, they would lose their position. This issue has been fixed.
 
-- #### Fix: Accents and Dead Keys on Wayland (GTK 4.20+)
+- #### Fix: Accents and Dead Keys on Wayland (GTK front end only)
 
-  - As of GTK 4.19.2/4.20, the Wayland backend no longer processes dead keys or
-composition sequences internally; this responsibility is delegated to the
-compositor or an input method (such as IBus or Fcitx5). If no input method
-is active, typing `´` followed by `a` results in `a` instead of `á`. This
-affects any text requiring accents, diacritics, or the character `ñ`.
-
-  - To avoid this issue without requiring the user to install or configure an
-input method, the application sets `GTK_IM_MODULE=simple` upon startup—**provided
-the user has not already set a different value** (`src/gtk_app.rs`, at the
-beginning of `main()`). This restores the classic GTK behavior on Wayland
-and has no effect on X11 or Windows:
-
-    - **X11**: GTK retains its original internal processing; the variable is
-ignored in this context.
-    - **Windows**: Input is handled via the native IME, which does not depend
-on `GTK_IM_MODULE`.
-
-  - If you need to use a specific input method (for example, for Japanese or
-Chinese), set the environment variable `GTK_IM_MODULE=ibus` (or `fcitx`)
-before launching the application; the app will respect that value and
-will not overwrite it.
+  - This release set `GTK_IM_MODULE=simple` at startup so the GTK front end composed dead
+keys on Wayland. The GTK front end, and this workaround with it, has since been removed;
+the egui front end does not read `GTK_IM_MODULE`.
 
 ### Recent Updates (1.2.0-beta.2) - refactor: consolidate Sender trait, enforce protocol consistency, and dead code cleanup (2026-10-20)
 - This update consolidates communication architecture, enforces strict protocol validation, and removes obsolete code. All changes have been verified in real-world environments
@@ -895,4 +889,4 @@ This project is in active development. New features are being added regularly, a
 
 ---
 
-**Built with ❤️ using Rust and GTK4**
+**Built with ❤️ using Rust and egui**

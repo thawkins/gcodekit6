@@ -30,14 +30,38 @@ Access settings from the **Settings** panel. Changes take effect immediately unl
 
 ## Keyboard Shortcuts
 
-All keyboard shortcuts are customizable:
+The **Shortcuts** page of Preferences lists every command, where its keys work (everywhere, or
+only while Machine Control, the Visualizer or the Designer has the keyboard) and its keys:
 
-1. Navigate to the **Shortcuts** section in Settings
-2. Click on a shortcut entry
-3. Press the new key combination
-4. The shortcut is remapped immediately
+1. Type part of a command's name in **Filter:** to find it, and click it to choose it (the
+   buttons under the list act on the chosen command)
+2. Click **Change**, then press the new key combination (Escape cancels); it replaces the
+   command's first key, or the key you clicked in its row. **Add** gives it one more key
+3. Click **Apply**: the new key works at once and shows in the menus
 
-Click **Reset to Defaults** to restore all shortcuts to their default bindings. Conflicts are detected and flagged if two actions share the same key combination.
+**Clear** removes a command's keys, **Reset** gives one command its default keys back (unless
+another command now uses one of them; the reason is shown), and **Reset All** every command. **Cancel** drops the changes.
+
+A key is refused, with the reason shown above the list, when:
+
+- it is the E-STOP (soft reset, Ctrl+Shift+K) or feed hold (`!`, Ctrl+Shift+H) key; those two
+  commands cannot be changed;
+- a command that moves the machine (jog, home, stream start, cycle start) would use the letter
+  of one of those keys;
+- a command that moves the machine and works everywhere (Home, Stream Start) would get a key
+  without Ctrl, Alt or a function key (it would run on every page); the jog keys and Cycle
+  Start's `~` work only while Machine Control has the keyboard;
+- a jog key is not a plain letter, digit or symbol key (with Ctrl, Alt or a function key it would
+  jog while you type in a text field);
+- Alt and the letter open a menu in any of the languages;
+- another command already uses it where both could run.
+
+A command that moves the machine never runs from its key while a text field has the keyboard,
+whatever the key; File > Run only previews the program and is not one of them.
+
+Shortcuts are saved with the other settings. A saved shortcut that breaks one of these rules
+(for example after editing the settings file by hand) is replaced by the command's default, and
+a notice at start names the commands.
 
 See [Keyboard Shortcuts Reference](90-shortcuts.md) for the full default list.
 

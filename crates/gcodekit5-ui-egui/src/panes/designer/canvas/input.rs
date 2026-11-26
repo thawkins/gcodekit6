@@ -13,8 +13,14 @@
 //! - With the canvas focused (after a press in it): Delete/Backspace delete the selection,
 //!   Escape cancels a polyline or deselects. A text field elsewhere owns the keyboard
 //!   instead, so these never fire while typing.
-//! - Right-click with a selection: a context menu with Delete, Rotate and Array... (the pane
-//!   opens the Array dialog).
+//! - Right-click with a selection: GTK's context menu with Cut, Copy, Paste, Delete, Mirror
+//!   on X / Y, Array... (the pane opens the Array dialog), Rotate, Align, Group / Ungroup
+//!   (also Ctrl+G / Ctrl+Shift+G), the boolean operations (Union, Diff, Inter) and Convert
+//!   to Path / Rectangle. With only a clipboard the same menu opens for Paste, the entries
+//!   that need a selection disabled. Cut, Copy and Paste use the design's own clipboard
+//!   (`DesignerState::clipboard`), as GTK did, not the system clipboard; Paste centres the
+//!   copies on the point right-clicked. Align also has GTK's Alt keys, through the app's
+//!   keymap (`crate::commands`) while the canvas has the keyboard.
 //!
 //! Drawing tools and moves snap to the snap step; selection hit tests use the raw pointer.
 //!
@@ -76,6 +82,9 @@ pub struct CanvasInput {
     pub(crate) text_click: Option<(f64, f64)>,
     /// The context menu's "Array..." was chosen, until the pane opens the dialog.
     pub(crate) array_click: bool,
+    /// The world point of the last right-click: where the context menu's Paste puts the
+    /// clipboard (GTK's pointer position).
+    pub(crate) menu_at: (f64, f64),
 }
 
 /// The world point (mm) under `p`.
@@ -196,12 +205,19 @@ impl CanvasInput {
             self.click(state, flags, tool, world(view, p), double, modifiers);
         }
         self.wheel(ui, response, view, state);
+        if response.secondary_clicked()
+            && let Some(p) = response.interact_pointer_pos()
+        {
+            self.menu_at = world(view, p);
+        }
         let finished = response.secondary_clicked()
             && tool == DesignerTool::Polyline
             && self.finish_polyline(state, true);
-        if !finished && state.selected_count() > 0 {
+        // GTK: a menu for a selection, or for Paste while the clipboard holds shapes.
+        if !finished && (state.selected_count() > 0 || !state.clipboard.is_empty()) {
+            let at = self.menu_at;
             response.context_menu(|ui| {
-                self.array_click |= context_menu(ui, state, tr);
+                self.array_click |= context_menu(ui, state, tr, at);
             });
         }
     }
@@ -498,33 +514,175 @@ const ROTATIONS: [(&str, f64); 5] = [
     (n_!("180°"), 180.0),
 ];
 
+/// A designer model operation on the selection.
+type SelectionOp = fn(&mut DesignerState);
+
+/// The Align submenu: label msgid and the model's operation, in GTK's order.
+const ALIGNMENTS: [(&str, SelectionOp); 6] = [
+    (
+        n_!("Align Left"),
+        DesignerState::align_selected_horizontal_left,
+    ),
+    (
+        n_!("Align Right"),
+        DesignerState::align_selected_horizontal_right,
+    ),
+    (n_!("Align Top"), DesignerState::align_selected_vertical_top),
+    (
+        n_!("Align Bottom"),
+        DesignerState::align_selected_vertical_bottom,
+    ),
+    (
+        n_!("Align Center X"),
+        DesignerState::align_selected_horizontal_center,
+    ),
+    (
+        n_!("Align Center Y"),
+        DesignerState::align_selected_vertical_center,
+    ),
+];
+
+/// The boolean operations: GTK's short labels and the model's operation. Each replaces the
+/// selected shapes by one new shape (the operation's result), as one undo step.
+const BOOLEANS: [(&str, SelectionOp); 3] = [
+    (n_!("Union"), DesignerState::perform_boolean_union),
+    (n_!("Diff"), DesignerState::perform_boolean_difference),
+    (n_!("Inter"), DesignerState::perform_boolean_intersection),
+];
+
+/// GTK's conversions: each replaces the selected shapes by one new shape, a path through
+/// all their outlines or the rectangle of their bounds, as one undo step.
+const CONVERSIONS: [(&str, SelectionOp); 2] = [
+    (
+        n_!("Convert to Path"),
+        DesignerState::convert_selected_to_path,
+    ),
+    (
+        n_!("Convert to Rectangle"),
+        DesignerState::convert_selected_to_rectangle,
+    ),
+];
+
 /// The msgids of the context menu.
 pub fn msgids() -> Vec<&'static str> {
-    let mut ids = vec![n_!("Delete"), n_!("Rotate"), n_!("Array...")];
+    let mut ids = vec![
+        n_!("Cut"),
+        n_!("Copy"),
+        n_!("Paste"),
+        n_!("Duplicate"),
+        n_!("Delete"),
+        n_!("Group"),
+        n_!("Ungroup"),
+        n_!("Mirror on X"),
+        n_!("Mirror on Y"),
+        n_!("Rotate"),
+        n_!("Array..."),
+        n_!("Align"),
+    ];
     ids.extend(ROTATIONS.iter().map(|(label, _)| *label));
+    ids.extend(ALIGNMENTS.iter().map(|(label, _)| *label));
+    ids.extend(BOOLEANS.iter().map(|(label, _)| *label));
+    ids.extend(CONVERSIONS.iter().map(|(label, _)| *label));
     ids
 }
 
-/// The right-click menu for the selection: Delete, Rotate by a fixed angle, and Array...
+/// The right-click menu, in GTK's order: Cut, Copy, Paste (while the clipboard holds
+/// shapes), Delete, Group and Ungroup (when the selection can be), for two shapes or more
+/// Union, Diff and Inter, Mirror on X and Y, Array..., Rotate by a fixed angle, for two
+/// shapes or more Align, then Convert to Path and Convert to Rectangle. Without a selection
+/// (a menu for Paste) the entries that need one are shown disabled. Each edit is one undo
+/// step.
+///
+/// # Arguments
+/// * `at` - The world point right-clicked, where Paste centres the clipboard.
 ///
 /// # Returns
 /// Whether "Array..." was chosen.
-fn context_menu(ui: &mut egui::Ui, state: &mut DesignerState, tr: &Translator) -> bool {
-    if ui.button(tr.tr("Delete")).clicked() {
-        state.delete_selected();
-        ui.close();
+fn context_menu(
+    ui: &mut egui::Ui,
+    state: &mut DesignerState,
+    tr: &Translator,
+    at: (f64, f64),
+) -> bool {
+    let selection = state.selected_count() > 0;
+    // An entry that needs a selection is shown disabled without one, as GTK's whole menu.
+    let item = |ui: &mut egui::Ui, enabled: bool, label: &str| {
+        let clicked = ui
+            .add_enabled(enabled, egui::Button::new(tr.tr(label)))
+            .clicked();
+        if clicked {
+            ui.close();
+        }
+        clicked
+    };
+    if item(ui, selection, "Cut") {
+        editing::cut_selected(state);
     }
-    ui.menu_button(tr.tr("Rotate"), |ui| {
-        for (label, degrees) in ROTATIONS {
-            if ui.button(tr.tr(label)).clicked() {
-                editing::rotate_selected_by(state, degrees);
-                ui.close();
+    if item(ui, selection, "Copy") {
+        state.copy_selected();
+    }
+    if !state.clipboard.is_empty() && item(ui, true, "Paste") {
+        state.paste_at_location(at.0, at.1);
+    }
+    // GTK's Ctrl+D; the entry is the key's place in a menu (GTK's menu had none).
+    if item(ui, selection, "Duplicate") {
+        state.duplicate_selected(crate::panes::designer::DUPLICATE_OFFSET_MM);
+    }
+    if item(ui, selection, "Delete") {
+        state.delete_selected();
+    }
+    ui.separator();
+    let can_group = state.can_group();
+    let can_ungroup = state.can_ungroup();
+    if can_group && item(ui, true, "Group") {
+        state.group_selected();
+    }
+    if can_ungroup && item(ui, true, "Ungroup") {
+        state.ungroup_selected();
+    }
+    if can_group || can_ungroup {
+        ui.separator();
+    }
+    // GTK offers the boolean operations for two shapes or more.
+    if state.can_perform_boolean_op() {
+        for (label, op) in BOOLEANS {
+            if item(ui, true, label) {
+                op(state);
             }
         }
+        ui.separator();
+    }
+    if item(ui, selection, "Mirror on X") {
+        state.mirror_selected_x();
+    }
+    if item(ui, selection, "Mirror on Y") {
+        state.mirror_selected_y();
+    }
+    let array = item(ui, selection, "Array...");
+    ui.add_enabled_ui(selection, |ui| {
+        ui.menu_button(tr.tr("Rotate"), |ui| {
+            for (label, degrees) in ROTATIONS {
+                if item(ui, true, label) {
+                    editing::rotate_selected_by(state, degrees);
+                }
+            }
+        });
     });
-    let array = ui.button(tr.tr("Array...")).clicked();
-    if array {
-        ui.close();
+    // GTK offers Align for two shapes or more.
+    if state.selected_count() >= 2 {
+        ui.menu_button(tr.tr("Align"), |ui| {
+            for (label, align) in ALIGNMENTS {
+                if item(ui, true, label) {
+                    align(state);
+                }
+            }
+        });
+    }
+    ui.separator();
+    for (label, convert) in CONVERSIONS {
+        if item(ui, selection, label) {
+            convert(state);
+        }
     }
     array
 }

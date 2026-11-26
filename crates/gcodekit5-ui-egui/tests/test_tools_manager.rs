@@ -15,6 +15,7 @@ use gcodekit5_settings::SettingsManager;
 use gcodekit5_settings::config::Config;
 use gcodekit5_ui_egui::commands::Command;
 use gcodekit5_ui_egui::windows::tools_manager::GtcFile;
+use gcodekit5_ui_egui::workspace::Page;
 use gcodekit5_ui_egui::{AppState, GcodeKitApp};
 
 use crate::machine_support::app_harness;
@@ -110,7 +111,7 @@ fn app_with(file: &Path) -> Harness<'static, GcodeKitApp> {
     let mut h = app_harness(GcodeKitApp::from_state(state));
     h.state_mut().dispatch(Command::OpenToolsManager);
     h.run_steps(3);
-    assert!(h.query_by_label("CNC Tools").is_some(), "window not open");
+    assert_eq!(h.state().page(), Page::CncTools, "page not shown");
     h
 }
 
@@ -417,13 +418,13 @@ fn test_tools_manager_filters_are_stored_when_they_change() {
     h.run_steps(3);
     h.state_mut().tools_manager_mut().filter_mut().tool_type = Some(ToolType::VBit);
     search(&mut h, "bit");
-    // Stored while the window is still open, and so in the settings file.
+    // Stored while the page is still shown, and so in the settings file.
     let ui = &h.state().state().config().ui;
     assert_eq!(ui.tools_manager_type_filter, "vbit");
     assert_eq!(ui.tools_manager_search, "bit");
     let (reloaded, _problem) = SettingsManager::open(dirs);
     assert_eq!(reloaded.config().ui.tools_manager_type_filter, "vbit");
-    assert!(h.state().tools_manager().is_open());
+    assert_eq!(h.state().page(), Page::CncTools);
 }
 
 #[test]
@@ -441,7 +442,7 @@ fn test_tools_manager_untouched_filters_are_not_written() {
     h.run_steps(3);
     assert!(
         !settings_file.exists(),
-        "settings written by opening the window"
+        "settings written by showing the page"
     );
     // A change is written once ...
     h.state_mut().tools_manager_mut().filter_mut().tool_type = Some(ToolType::VBit);
@@ -494,10 +495,10 @@ fn test_tools_manager_quit_asks_and_saves_an_unsaved_tool() {
     search(&mut h, "router bit");
     click(&mut h, "My Router Bit");
     set_field(&mut h, "Name:", "Quit Saved Bit");
-    // Closing the window (its title-bar button) keeps the edit; the quit asks about it.
-    h.state_mut().tools_manager_mut().close();
+    // Leaving the page keeps the edit; the quit asks about it.
+    h.get_by_role_and_label(Role::Tab, "Designer").click();
     h.run_steps(2);
-    assert!(!h.state().tools_manager().is_open());
+    assert_eq!(h.state().page(), Page::Designer);
     let shown = quit_answering(&mut h, craft_dialogs::MessageResult::Custom("Save".into()));
     assert_eq!(shown, ["Unsaved changes"]);
     assert_eq!(
@@ -514,9 +515,13 @@ fn test_tools_manager_quit_cancel_keeps_the_edit() {
     search(&mut h, "router bit");
     click(&mut h, "My Router Bit");
     set_field(&mut h, "Name:", "Unsaved Bit");
+    // Asked about from another page; Cancel brings the CNC Tools page back.
+    h.get_by_role_and_label(Role::Tab, "Designer").click();
+    h.run_steps(2);
     let shown = quit_answering(&mut h, craft_dialogs::MessageResult::Cancel);
     assert_eq!(shown, ["Unsaved changes"]);
     assert!(!h.state().quit_confirmed());
+    assert_eq!(h.state().page(), Page::CncTools);
     assert_eq!(
         h.get_by_role_and_label(Role::TextInput, "Name:")
             .value()

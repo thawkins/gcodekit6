@@ -7,7 +7,8 @@
 //! primary click places it there (snapped unless the Select tool is active, as GTK) as one
 //! undo step; Escape drops it.
 //!
-//! Not ported: the template icons (GTK's SVG resources); the cards show text only.
+//! Each card shows the template's SVG icon (GTK's resources, 48 points) over its name and
+//! description.
 //!
 //! Dependencies: `egui`, `gcodekit5-designer` (shapes, parametric generators),
 //! `gcodekit5-app` (translations).
@@ -29,6 +30,8 @@ pub struct ShapeTemplate {
     pub name: &'static str,
     /// The msgid of the card's description.
     pub description: &'static str,
+    /// The app SVG (in `resources/icons/`) on the card.
+    pub icon: &'static str,
     /// Makes the shape centred on a point (mm).
     pub make: fn(Point) -> Shape,
 }
@@ -38,26 +41,31 @@ pub const TEMPLATES: [ShapeTemplate; 6] = [
     ShapeTemplate {
         name: n_!("Spur Gear"),
         description: n_!("Standard involute spur gear"),
+        icon: "gear.svg",
         make: |c| Shape::Gear(DesignGear::new(c, 2.0, 20)),
     },
     ShapeTemplate {
         name: n_!("Sprocket"),
         description: n_!("Chain sprocket for #40 chain"),
+        icon: "sprocket1.svg",
         make: |c| Shape::Sprocket(DesignSprocket::new(c, 12.7, 15)),
     },
     ShapeTemplate {
         name: n_!("Timing Pulley"),
         description: n_!("XL timing belt pulley"),
+        icon: "timingpulley.svg",
         make: timing_pulley,
     },
     ShapeTemplate {
         name: n_!("Slot"),
         description: n_!("Rectangular slot/cutout"),
+        icon: "slot.svg",
         make: slot,
     },
     ShapeTemplate {
         name: n_!("L-Bracket"),
         description: n_!("L-shaped bracket with holes"),
+        icon: "Lsupport.svg",
         make: |c| {
             Shape::Path(DesignPath::from_lyon_path(&generate_l_bracket(
                 c, 80.0, 60.0, 5.0, 2.5, 15.0,
@@ -67,6 +75,7 @@ pub const TEMPLATES: [ShapeTemplate; 6] = [
     ShapeTemplate {
         name: n_!("U-Bracket"),
         description: n_!("U-shaped channel bracket"),
+        icon: "Usupport.svg",
         make: |c| {
             Shape::Path(DesignPath::from_lyon_path(&generate_u_bracket(
                 c, 100.0, 40.0, 5.0, 2.5, 15.0,
@@ -236,20 +245,36 @@ impl ShapeGallery {
     }
 }
 
-/// One card: the name as a button with the description under it.
+/// Edge length of a card's icon in points (GTK's 48 px).
+const CARD_ICON: f32 = 48.0;
+
+/// One card, as GTK's: the icon over the name and the description in a framed group; the
+/// whole card is clickable. The name is the card's accessible label.
 ///
 /// # Returns
 /// Whether the card was clicked.
 fn card(ui: &mut egui::Ui, template: &ShapeTemplate, tr: &Translator) -> bool {
-    ui.vertical(|ui| {
+    let shown = crate::theme::group_frame(ui).show(ui, |ui| {
         ui.set_width(150.0);
-        let clicked = ui
-            .add(egui::Button::new(
-                egui::RichText::new(tr.tr(template.name)).strong(),
-            ))
-            .clicked();
-        ui.add(egui::Label::new(egui::RichText::new(tr.tr(template.description)).small()).wrap());
-        clicked
-    })
-    .inner
+        ui.vertical_centered(|ui| {
+            if let Some(image) = crate::icons::app_icon(ui, template.icon, CARD_ICON) {
+                ui.add(image);
+            }
+            ui.add(
+                egui::Label::new(egui::RichText::new(tr.tr(template.name)).strong())
+                    .selectable(false),
+            );
+            ui.add(
+                egui::Label::new(egui::RichText::new(tr.tr(template.description)).small())
+                    .selectable(false)
+                    .wrap(),
+            );
+        });
+    });
+    let id = ui
+        .scope_id()
+        .with(("gcodekit5-gallery-card", template.name));
+    ui.interact(shown.response.rect, id, egui::Sense::click())
+        .on_hover_cursor(egui::CursorIcon::PointingHand)
+        .clicked()
 }

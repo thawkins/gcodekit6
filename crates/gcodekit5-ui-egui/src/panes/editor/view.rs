@@ -136,6 +136,8 @@ impl EditorPane {
         let lines = self.buffer.line_count();
         let gutter_width = gutter::width(ui, &style.font, lines);
         let text_id = ui.make_persistent_id("gcodekit5-editor-text-edit");
+        self.reset_undo_for_new_content(ui.ctx(), text_id);
+        self.apply_pending_undo(ui.ctx(), text_id);
         self.apply_find_selection(ui.ctx(), text_id);
         let area = self.scroll_area(ui, row_height);
         let editable = !self.locked;
@@ -234,6 +236,33 @@ impl EditorPane {
         self.last_cursor = Some(index);
         ctx.memory_mut(|m| m.request_focus(id));
         ctx.request_repaint();
+    }
+
+    /// Drops the text field's undo history when the text was replaced as a whole (a file
+    /// opened, the editor cleared, a program generated), so Ctrl+Z cannot bring the old
+    /// text back into the new.
+    fn reset_undo_for_new_content(&mut self, ctx: &egui::Context, id: egui::Id) {
+        if !self.buffer.take_new_content() {
+            return;
+        }
+        if let Some(mut state) = egui::TextEdit::load_state(ctx, id) {
+            state.clear_undoer();
+            state.store(ctx, id);
+        }
+    }
+
+    /// Records the text before a replace as an undo point of the text field, so one undo
+    /// (Ctrl+Z) brings it back whole; any typing before it becomes its own undo step.
+    fn apply_pending_undo(&mut self, ctx: &egui::Context, id: egui::Id) {
+        let Some(old) = self.pending_undo.take() else {
+            return;
+        };
+        let mut state = egui::TextEdit::load_state(ctx, id).unwrap_or_default();
+        let cursor = state.cursor.char_range().unwrap_or_default();
+        let mut undoer = state.undoer();
+        undoer.add_undo(&(cursor, old));
+        state.set_undoer(undoer);
+        state.store(ctx, id);
     }
 
     /// Selects the find match in the text field, once, when one was just found.

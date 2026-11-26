@@ -196,6 +196,16 @@ impl Camera {
         self.inner.set_view(yaw, pitch);
     }
 
+    /// Turns to `yaw` and `pitch` degrees (as [`StdView::angles`] gives them), keeping the
+    /// target and distance.
+    ///
+    /// # Arguments
+    /// * `yaw` - Degrees around Z.
+    /// * `pitch` - Degrees above the XY plane.
+    pub fn look(&mut self, yaw: f32, pitch: f32) {
+        self.inner.set_view(yaw, pitch);
+    }
+
     /// Back to the default: isometric, 100 mm from the origin.
     pub fn reset(&mut self) {
         let aspect = self.inner.aspect_ratio;

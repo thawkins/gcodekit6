@@ -218,6 +218,7 @@ fn painted_outlines(designer: &DesignerPane) -> usize {
             palette,
             LineWidths::default(),
             &[],
+            designer.work_area(),
         );
     });
     output.textures_delta.clear();

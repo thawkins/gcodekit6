@@ -4,6 +4,7 @@
 
 use gcodekit5_visualizer::visualizer::{
     MAX_MESH_FLOATS, StockXyReference, StockZeroReference, generate_surface_mesh_within,
+    grid_face_count_within,
 };
 use gcodekit5_visualizer::{
     StockSimulator3D, ToolpathSegment, ToolpathSegmentType, Visualizer, toolpath_from_commands,
@@ -335,4 +336,88 @@ fn test_stock_zero_reference_still_applies_with_xy_reference() {
     sim.simulate_toolpath(&[plunge(0.0, 0.0, 7.0)]);
     assert_eq!(sim.stock_top_z(), 10.0);
     assert_eq!(sim.height_map().height_at(5, 5), Some(7.0));
+}
+
+/// Mesh positions, three per triangle, with each triangle's normal.
+fn triangles(mesh: &[f32]) -> Vec<([glam::Vec3; 3], glam::Vec3)> {
+    let vertex = |v: &[f32; 10]| {
+        (
+            glam::Vec3::new(v[0], v[1], v[2]),
+            glam::Vec3::new(v[3], v[4], v[5]),
+        )
+    };
+    mesh.as_chunks::<10>()
+        .0
+        .as_chunks::<3>()
+        .0
+        .iter()
+        .map(|t| {
+            let (a, n) = vertex(&t[0]);
+            ([a, vertex(&t[1]).0, vertex(&t[2]).0], n)
+        })
+        .collect()
+}
+
+/// Whether `p` lies strictly inside the segment `a -> b`.
+fn strictly_inside(a: glam::Vec3, b: glam::Vec3, p: glam::Vec3) -> bool {
+    let ab = b - a;
+    let t = (p - a).dot(ab) / ab.length_squared();
+    t > 1e-4 && t < 1.0 - 1e-4 && (a + ab * t).distance(p) < 1e-4
+}
+
+#[test]
+fn test_mesh_top_surface_has_no_t_junctions() {
+    // Pockets at two depths and a slot, so merged tops of several sizes meet
+    // each other and walls part-way along their edges.
+    let mut sim = StockSimulator3D::new(12.0, 10.0, 5.0, 1.0, 1.0).expect("valid stock");
+    sim.simulate_toolpath(&[
+        plunge(3.0, 3.0, -2.0),
+        linear((3.0, 3.0, -2.0), (9.0, 3.0, -2.0)),
+        plunge(8.0, 7.0, -3.5),
+        plunge(4.0, 7.5, -1.0),
+    ]);
+    let mesh = sim.get_mesh();
+    let tris = triangles(&mesh);
+    let vertices: Vec<glam::Vec3> = tris.iter().flat_map(|(t, _)| *t).collect();
+    let mut checked = 0;
+    for (t, normal) in tris.iter().filter(|(_, n)| n.z > 0.5) {
+        for k in 0..3 {
+            let (a, b) = (t[k], t[(k + 1) % 3]);
+            // A fan edge from a face centre is interior to its face; only
+            // edges on the face outline can meet other faces.
+            if let Some(p) = vertices.iter().find(|p| strictly_inside(a, b, **p)) {
+                panic!("T-junction: {p} inside edge {a} -> {b} (normal {normal})");
+            }
+            checked += 1;
+        }
+    }
+    assert!(checked > 0);
+}
+
+#[test]
+fn test_stock_removal_face_list_stops_at_the_budget() {
+    // Near the vertex budget the face list itself (tops, bottoms and walls) used to grow
+    // without bound before the mesh was checked: it must stop once it passes the quads that
+    // still fit.
+    let sim = ramped_stock();
+    let map = sim.height_map();
+    let all = grid_face_count_within(map, MAX_MESH_FLOATS).expect("faces within the budget");
+    assert!(all > 40, "a ramp has many faces: {all}");
+    // Room for 20 quads (6 vertices of 10 floats each).
+    assert_eq!(grid_face_count_within(map, 20 * 60), None);
+    assert_eq!(grid_face_count_within(map, all * 60), Some(all));
+    assert_eq!(grid_face_count_within(map, (all - 1) * 60), None);
+}
+
+#[test]
+fn test_stock_removal_face_budget_allows_exactly_quads_left() {
+    // Uncut stock: one top, one bottom and four walls. Room for exactly six quads is
+    // enough at every stage (tops, bottoms, walls); room for five is not, nor for one,
+    // where the bottoms find no room left after the top.
+    let sim = StockSimulator3D::new(10.0, 10.0, 5.0, 0.5, 1.0).expect("valid stock");
+    let map = sim.height_map();
+    assert_eq!(grid_face_count_within(map, 6 * 60), Some(6));
+    assert_eq!(grid_face_count_within(map, 5 * 60), None);
+    assert_eq!(grid_face_count_within(map, 2 * 60), None);
+    assert_eq!(grid_face_count_within(map, 60), None);
 }

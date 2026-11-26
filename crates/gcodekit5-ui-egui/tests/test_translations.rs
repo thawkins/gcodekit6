@@ -17,7 +17,33 @@ const LANGUAGES: [&str; 5] = ["de", "es", "fr", "it", "pt"];
 
 /// Translations that are spelled like the English msgid; the Translator cannot tell them
 /// from a missing entry, so the po file is checked for them instead.
-const IDENTICAL: [(&str, &str); 231] = [
+const IDENTICAL: [(&str, &str); 265] = [
+    // Designer context menu: GTK's short boolean labels.
+    ("es", "Inter"),
+    ("fr", "Union"),
+    // Visualizer run preview speeds.
+    ("de", "Normal"),
+    ("es", "Normal"),
+    ("pt", "Normal"),
+    ("de", "Turbo"),
+    ("es", "Turbo"),
+    ("fr", "Turbo"),
+    ("it", "Turbo"),
+    ("pt", "Turbo"),
+    // Visualizer 2D / 3D view mode.
+    ("de", "2D"),
+    ("es", "2D"),
+    ("fr", "2D"),
+    ("it", "2D"),
+    ("pt", "2D"),
+    ("de", "3D"),
+    ("es", "3D"),
+    ("fr", "3D"),
+    ("it", "3D"),
+    ("pt", "3D"),
+    // Visualizer Simulation section.
+    ("de", "Simulation"),
+    ("fr", "Simulation"),
     ("de", "G-Code Editor"),
     ("de", "Designer"),
     ("it", "Designer"),
@@ -27,6 +53,10 @@ const IDENTICAL: [(&str, &str); 231] = [
     ("fr", "Zoom"),
     ("it", "Zoom"),
     ("pt", "Zoom"),
+    ("de", "Cursor"),
+    ("es", "Cursor"),
+    ("pt", "Cursor"),
+    ("es", "Inspector"),
     ("fr", "Machine"),
     ("fr", "Documentation"),
     ("fr", "Services"),
@@ -261,12 +291,24 @@ const IDENTICAL: [(&str, &str); 231] = [
     // Help: the index page's title.
     ("de", "Index"),
     ("fr", "Index"),
+    // Machine Control work zero: the axis Zero button.
+    ("it", "Zero"),
+    ("pt", "Zero"),
+    // Machine Control: the Buffer readout.
+    ("it", "Buffer:"),
+    ("pt", "Buffer:"),
+    // The startup notice about reset shortcuts: its OK button.
+    ("de", "OK"),
+    ("fr", "OK"),
+    ("it", "OK"),
+    ("pt", "OK"),
 ];
 
 fn msgids() -> Vec<&'static str> {
     PaneId::ALL
         .into_iter()
         .map(PaneId::title_msgid)
+        .chain(gcodekit5_ui_egui::workspace::msgids())
         .chain([Button::Minimize, Button::Maximize, Button::Close].map(caption_msgid))
         .chain(menu::msgids())
         .chain(settings::msgids())
@@ -285,6 +327,7 @@ fn msgids() -> Vec<&'static str> {
         .chain(designer::msgids())
         .chain(cam_tools::msgids())
         .chain(gcodekit5_ui_egui::app::designer_files::msgids())
+        .chain(gcodekit5_ui_egui::app::msgids())
         .chain(status_bar::MSGIDS.iter().copied())
         .chain(gcodekit5_ui_egui::machine::worker_msgids())
         .collect()

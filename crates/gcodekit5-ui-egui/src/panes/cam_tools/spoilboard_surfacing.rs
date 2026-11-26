@@ -238,46 +238,56 @@ pub fn show(
     params: &mut SpoilboardSurfacingParams,
     tr: &Translator,
 ) -> CamAction {
-    ui.label(tr.tr(DESCRIPTION));
     let errors = params.parameters().err().unwrap_or_default();
-    let unit = units::get_unit_label(params.units);
-    heading(ui, tr, n_!("Spoilboard Dimensions"));
-    grid(ui, "cam-surfacing-dimensions", |ui| {
-        field_row(ui, tr, WIDTH, &mut params.width, unit, &errors);
-        field_row(ui, tr, HEIGHT, &mut params.height, unit, &errors);
-    });
-    heading(ui, tr, n_!("Tool Settings"));
-    grid(ui, "cam-surfacing-tool", |ui| {
-        field_row(
-            ui,
-            tr,
-            TOOL_DIAMETER,
-            &mut params.tool_diameter,
-            unit,
-            &errors,
-        );
-        field_row(ui, tr, CUT_DEPTH, &mut params.cut_depth, unit, &errors);
-        field_row(ui, tr, STEPOVER, &mut params.stepover_percent, "", &errors);
-    });
-    heading(ui, tr, n_!("Machine Settings"));
-    grid(ui, "cam-surfacing-machine", |ui| {
-        field_row(ui, tr, FEED_RATE, &mut params.feed_rate, "", &errors);
-        field_row(
-            ui,
-            tr,
-            SPINDLE_SPEED,
-            &mut params.spindle_speed,
-            "",
-            &errors,
-        );
-        field_row(ui, tr, SAFE_Z, &mut params.safe_z, unit, &errors);
-        common::check_row(
-            ui,
-            tr,
-            n_!("Home Device Before Start"),
-            &mut params.home_before,
-        );
-    });
-    common::page_errors(ui, tr, &errors);
-    common::gcode_actions(ui, tr, errors.is_empty())
+    common::cam_page(
+        ui,
+        common::SIDEBAR_SHARE,
+        params,
+        |ui, _| {
+            ui.label(tr.tr(DESCRIPTION));
+        },
+        |ui, params| {
+            let unit = units::get_unit_label(params.units);
+            heading(ui, tr, n_!("Spoilboard Dimensions"));
+            grid(ui, "cam-surfacing-dimensions", |ui| {
+                field_row(ui, tr, WIDTH, &mut params.width, unit, &errors);
+                field_row(ui, tr, HEIGHT, &mut params.height, unit, &errors);
+            });
+            heading(ui, tr, n_!("Tool Settings"));
+            grid(ui, "cam-surfacing-tool", |ui| {
+                field_row(
+                    ui,
+                    tr,
+                    TOOL_DIAMETER,
+                    &mut params.tool_diameter,
+                    unit,
+                    &errors,
+                );
+                field_row(ui, tr, CUT_DEPTH, &mut params.cut_depth, unit, &errors);
+                field_row(ui, tr, STEPOVER, &mut params.stepover_percent, "", &errors);
+            });
+            heading(ui, tr, n_!("Machine Settings"));
+            grid(ui, "cam-surfacing-machine", |ui| {
+                field_row(ui, tr, FEED_RATE, &mut params.feed_rate, "", &errors);
+                field_row(
+                    ui,
+                    tr,
+                    SPINDLE_SPEED,
+                    &mut params.spindle_speed,
+                    "",
+                    &errors,
+                );
+                field_row(ui, tr, SAFE_Z, &mut params.safe_z, unit, &errors);
+                common::check_row(
+                    ui,
+                    tr,
+                    n_!("Home Device Before Start"),
+                    &mut params.home_before,
+                );
+            });
+            common::page_errors(ui, tr, &errors);
+            CamAction::None
+        },
+        |ui, _| common::gcode_actions(ui, tr, errors.is_empty()),
+    )
 }

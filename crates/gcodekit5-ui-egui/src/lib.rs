@@ -1,7 +1,7 @@
 //! egui + craft-libs front end for GCodeKit5.
 //!
 //! Dependencies: `egui` and `eframe` for the UI and native window, `craft-ui` for widgets and
-//! docking, `craft-window` for the window frame policy, `craft-keymap` and `craft-menu` for
+//! page tabs, `craft-window` for the window frame policy, `craft-keymap` and `craft-menu` for
 //! key bindings and menus, `craft-platform` for the desktop's
 //! light/dark preference, `gcodekit5-app` and `gcodekit5-settings` for state and settings.
 
@@ -21,10 +21,12 @@ pub mod commands;
 pub mod dialogs;
 mod files;
 pub mod frame;
+pub mod icons;
 pub mod machine;
 pub mod menu;
 pub mod panes;
 pub mod resources;
+pub mod shortcuts;
 pub mod status_bar;
 pub mod theme;
 pub mod windows;
@@ -49,14 +51,14 @@ pub struct LaunchOptions {
 /// `Ok(())` on a clean exit, or an error if the native window cannot start.
 pub fn run(options: LaunchOptions) -> anyhow::Result<()> {
     let LaunchOptions { files } = options;
-    let settings = AppState::load_settings();
+    let (settings, settings_problem) = AppState::load_settings();
     gcodekit5_app::i18n::set_language(&settings.config().ui.language);
     let decision = craft_window::policy::decide_for(
         craft_window::Prefix::new("GCODEKIT5"),
         craft_window::policy::Backend::from_env(),
         frame::title_bar_pref(&settings.config().ui),
     );
-    let state = AppState::new(settings, decision);
+    let state = AppState::new(settings, decision).with_settings_problem(settings_problem);
     // Keep eframe's default `depth_buffer: 0` and `multisampling: 0`: the visualizer's wgpu
     // pipelines (`panes::visualizer::install`) draw inside egui's pass and are built for no
     // depth attachment and one sample per pixel.

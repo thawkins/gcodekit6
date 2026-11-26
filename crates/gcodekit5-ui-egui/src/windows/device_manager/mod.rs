@@ -1,4 +1,4 @@
-//! The Device Manager window (GTK's Device Manager): the machine profiles, searched and
+//! The Device Manager page (GTK's Device Manager): the machine profiles, searched and
 //! listed by name with the active one marked, and an edit form in four tabs (General,
 //! Connection, Dimensions, Capabilities).
 //!
@@ -86,10 +86,9 @@ struct ConfirmDelete {
     name: String,
 }
 
-/// The Device Manager window.
+/// The Device Manager page.
 #[derive(Debug)]
 pub struct DeviceManagerWindow {
-    open: bool,
     /// The profiles and their file; `None` without a settings folder.
     store: Option<DeviceManager>,
     /// Why the file could not be read or repaired, until the window shows it.
@@ -121,7 +120,6 @@ impl DeviceManagerWindow {
             store
         });
         Self {
-            open: false,
             store,
             load_error,
             backup_named: None,
@@ -134,13 +132,12 @@ impl DeviceManagerWindow {
         }
     }
 
-    /// Opens the window, telling why the profiles could not be read (and where the
-    /// unreadable file was kept) if they could not.
+    /// Prepares the page each time it is shown, telling why the profiles could not be read
+    /// (and where the unreadable file was kept) if they could not.
     ///
     /// # Arguments
     /// * `tr` - Translator for a notice.
     pub fn open(&mut self, tr: &Translator) {
-        self.open = true;
         if self.store.is_none() {
             let text = n_!("No settings folder: device profiles cannot be loaded or saved.");
             self.say(tr.tr(text).into_owned(), true);
@@ -170,11 +167,6 @@ impl DeviceManagerWindow {
             None => (note, true),
         });
         self.backup_named = Some(backup);
-    }
-
-    /// Whether the window is open.
-    pub fn is_open(&self) -> bool {
-        self.open
     }
 
     /// The profiles, by name.
@@ -297,8 +289,8 @@ impl DeviceManagerWindow {
             .is_some_and(|edit| edit.form != edit.original)
     }
 
-    /// Saves the open form for the quit flow, showing the window with the reason when the
-    /// save is refused.
+    /// Saves the open form for the quit flow (the app shows the page, with the reason, when
+    /// the save is refused).
     ///
     /// # Arguments
     /// * `job_running` - Whether a job streams (the active profile is then not replaced).
@@ -307,7 +299,6 @@ impl DeviceManagerWindow {
     /// # Returns
     /// Whether the form was saved.
     pub fn save_for_quit(&mut self, job_running: bool, tr: &Translator) -> bool {
-        self.open = true;
         self.save(job_running, tr);
         self.edit.is_none()
     }

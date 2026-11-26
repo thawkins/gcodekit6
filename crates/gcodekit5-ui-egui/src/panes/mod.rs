@@ -1,4 +1,4 @@
-//! The real panes of the docking workspace, replacing the placeholders as they land.
+//! The real panes of the pages, replacing the placeholders as they land.
 //!
 //! Dependencies: see each pane's module.
 

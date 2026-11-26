@@ -48,13 +48,7 @@ fn test_generate_replaces_the_editor_program_and_forgets_its_file() -> std::io::
         "the generated program is unsaved"
     );
     // Work in the editor, then Save: it asks where (and cancelling writes nothing).
-    let shown_editor = h
-        .state_mut()
-        .workspace_mut()
-        .apply(craft_ui::docking::Action::Activate {
-            panel: PaneId::Editor,
-        });
-    assert!(shown_editor.is_ok(), "{shown_editor:?}");
+    h.state_mut().workspace_mut().show_pane(PaneId::Editor);
     frames(&mut h, 2);
     answer(&script, [Answer::Cancelled]);
     h.state_mut().dispatch(Command::FileSave);
@@ -175,13 +169,7 @@ fn test_generate_is_refused_while_a_job_runs() {
 
 /// Shows the editor as the active document, so File > Open reaches the editor.
 fn activate_editor(h: &mut egui_kittest::Harness<'static, gcodekit5_ui_egui::GcodeKitApp>) {
-    let shown = h
-        .state_mut()
-        .workspace_mut()
-        .apply(craft_ui::docking::Action::Activate {
-            panel: PaneId::Editor,
-        });
-    assert!(shown.is_ok(), "{shown:?}");
+    h.state_mut().workspace_mut().show_pane(PaneId::Editor);
     frames(h, 2);
 }
 

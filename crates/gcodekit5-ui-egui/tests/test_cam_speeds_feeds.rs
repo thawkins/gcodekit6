@@ -1,6 +1,11 @@
 //! The Speeds and Feeds calculator: GTK's defaults render, Calculate waits for a tool, a
 //! material and safe input, unsafe input is shown inline, and the results equal the GTK
 //! page's computation for the same input (fixtures from `capture_cam_fixtures`).
+//!
+//! The fixtures in `tests/fixtures/cam/` are frozen references: `capture_cam_fixtures`, which
+//! wrote them from the GTK pages, was in the GTK crate deleted in `26740e3` (its source is at
+//! `6841d84`). Change a fixture only deliberately, by hand, in the commit that changes the
+//! generator's output and says why.
 
 use egui_kittest::kittest::Queryable;
 use gcodekit5_camtools::speeds_feeds::OperationType;

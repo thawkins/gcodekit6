@@ -1,33 +1,38 @@
-//! Docking workspace: the panes of the main window and their arrangement.
+//! The main window's pages and the panes on them, arranged as the GTK front end does: a row
+//! of eight page tabs ([`Page`], in GTK's order) above one page at a time, each page a fixed
+//! layout of panes. The four manager pages (Device Manager, Device Config, CNC Tools,
+//! Materials) hold no pane: the app draws them ([`Workspace::show`] leaves them to it).
+//! Switching pages keeps every pane's state; nothing about the arrangement is saved, so a
+//! docking layout an earlier build may have kept is never read.
 //!
-//! The arrangement is a [`craft_ui::docking::Workspace`] keyed by [`PaneId`]; it serializes
-//! with serde so it can be saved and restored. Each pane implements [`Pane`]. Until the real
-//! panes land (milestones M2 to M5) every pane is a placeholder showing its title.
+//! Each pane implements [`Pane`]; one that is not set yet is a placeholder showing its title.
 //!
 //! Panes ask for commands through [`PaneContext::request`]; the app runs them after drawing.
 //! A command that belongs to a pane (the machine commands belong to Machine Control) is handed
-//! to it through [`Workspace::route`].
+//! to it through [`Workspace::route`]. A pane that needs a confirmation queues it
+//! ([`Pane::take_confirm`]); the app asks it and hands the answer back
+//! ([`Workspace::confirmed`]).
 //!
 //! The workspace also tracks which pane the user last pressed the pointer in
 //! ([`Workspace::focused_pane`]), so the app can tell the keymap which pane has the keyboard,
 //! and the pane the user works in ([`Workspace::active_pane`]), which a press on a menu does
 //! not change, so the app can hand Undo or the zoom commands to the designer.
 //!
-//! Dependencies: `egui`, `craft-ui` (docking, with the `serde` feature), `gcodekit5-app`
-//! (translations).
+//! Dependencies: `egui`, `craft-ui` (accessible tabs), `gcodekit5-app` (translations).
 
-use craft_ui::docking::{self, DockArea, DockContent, DockStyle, Layout, Node, Permissions};
-use craft_ui::layout::{SplitAxis, SplitSize};
+use craft_ui::tabs::Tab;
 use gcodekit5_app::i18n::Translator;
 use gcodekit5_app::machine::MachineEvent;
 use gcodekit5_settings::config::Config;
-use serde::{Deserialize, Serialize};
 
-use crate::commands::{Command, MACHINE_CONTROL_SCOPE, VISUALIZER_SCOPE};
+use crate::commands::{Command, DESIGNER_SCOPE, MACHINE_CONTROL_SCOPE, VISUALIZER_SCOPE};
+use crate::dialogs::{ConfirmChoice, ConfirmRequest};
 use crate::machine::Machine;
+use crate::panes::visualizer::StockSeed;
+use gcodekit5_devicedb::{ControllerType, DeviceProfile};
 
 /// Identifies one pane of the main window.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum PaneId {
     /// Jogging, homing and machine state.
     MachineControl,
@@ -48,7 +53,7 @@ pub enum PaneId {
 }
 
 impl PaneId {
-    /// Every pane, in menu order.
+    /// Every pane.
     pub const ALL: [PaneId; 8] = [
         PaneId::MachineControl,
         PaneId::Console,
@@ -80,14 +85,173 @@ impl PaneId {
         match self {
             PaneId::MachineControl => Some(MACHINE_CONTROL_SCOPE),
             PaneId::Visualizer => Some(VISUALIZER_SCOPE),
+            PaneId::Designer => Some(DESIGNER_SCOPE),
             PaneId::Console
             | PaneId::Editor
-            | PaneId::Designer
             | PaneId::DesignerLayers
             | PaneId::DesignerProperties
             | PaneId::CamTools => None,
         }
     }
+}
+
+/// One page of the main window, as GTK's top row of tabs names them.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum Page {
+    /// Toolbox, canvas, and the inspector over the objects list.
+    Designer,
+    /// The toolpath visualizer.
+    Visualizer,
+    /// Machine controls, with the G-code editor above the console beside them.
+    MachineControl,
+    /// The CAM tool generators.
+    CamTools,
+    /// The device profiles.
+    DeviceManager,
+    /// The controller's firmware settings.
+    DeviceConfig,
+    /// The CNC tool library.
+    CncTools,
+    /// The material library.
+    Materials,
+}
+
+impl Page {
+    /// Every page, in GTK's tab order.
+    pub const ALL: [Page; 8] = [
+        Page::Designer,
+        Page::Visualizer,
+        Page::MachineControl,
+        Page::CamTools,
+        Page::DeviceManager,
+        Page::DeviceConfig,
+        Page::CncTools,
+        Page::Materials,
+    ];
+
+    /// The English msgid of the page's tab, as listed in `po/gcodekit5.pot`.
+    pub fn title_msgid(self) -> &'static str {
+        match self {
+            Page::Designer => n_!("Designer"),
+            Page::Visualizer => n_!("Visualizer"),
+            Page::MachineControl => n_!("Machine Control"),
+            Page::CamTools => n_!("CAM Tools"),
+            Page::DeviceManager => n_!("Device Manager"),
+            Page::DeviceConfig => n_!("Device Config"),
+            Page::CncTools => n_!("CNC Tools"),
+            Page::Materials => n_!("Materials"),
+        }
+    }
+
+    /// The panes the page shows; none for a manager page, which the app draws.
+    pub fn panes(self) -> &'static [PaneId] {
+        match self {
+            Page::Designer => &[
+                PaneId::Designer,
+                PaneId::DesignerProperties,
+                PaneId::DesignerLayers,
+            ],
+            Page::Visualizer => &[PaneId::Visualizer],
+            Page::MachineControl => &[PaneId::MachineControl, PaneId::Editor, PaneId::Console],
+            Page::CamTools => &[PaneId::CamTools],
+            Page::DeviceManager | Page::DeviceConfig | Page::CncTools | Page::Materials => &[],
+        }
+    }
+
+    /// The page that shows `pane`.
+    ///
+    /// # Arguments
+    /// * `pane` - The pane.
+    pub fn of_pane(pane: PaneId) -> Page {
+        match pane {
+            PaneId::MachineControl | PaneId::Editor | PaneId::Console => Page::MachineControl,
+            PaneId::Visualizer => Page::Visualizer,
+            PaneId::Designer | PaneId::DesignerLayers | PaneId::DesignerProperties => {
+                Page::Designer
+            }
+            PaneId::CamTools => Page::CamTools,
+        }
+    }
+
+    /// The page a command shows, for the commands that opened a manager window before the
+    /// managers became pages.
+    ///
+    /// # Arguments
+    /// * `command` - A command.
+    pub fn for_command(command: Command) -> Option<Page> {
+        match command {
+            Command::OpenDeviceManager => Some(Page::DeviceManager),
+            Command::OpenFirmwareSettings => Some(Page::DeviceConfig),
+            Command::OpenToolsManager => Some(Page::CncTools),
+            Command::OpenMaterialsManager => Some(Page::Materials),
+            Command::FileNew
+            | Command::FileNew3d
+            | Command::FileOpen
+            | Command::FileSave
+            | Command::FileSaveAs
+            | Command::FileImport
+            | Command::FileImportImage
+            | Command::FileExportGcode
+            | Command::FileExportSvg
+            | Command::FileRun
+            | Command::Quit
+            | Command::Undo
+            | Command::Redo
+            | Command::Cut
+            | Command::Copy
+            | Command::Paste
+            | Command::Connect
+            | Command::Disconnect
+            | Command::StreamStart
+            | Command::StreamPause
+            | Command::StreamStop
+            | Command::FeedHold
+            | Command::CycleStart
+            | Command::SoftReset
+            | Command::Home
+            | Command::Unlock
+            | Command::JogXPos
+            | Command::JogXNeg
+            | Command::JogYPos
+            | Command::JogYNeg
+            | Command::JogZPos
+            | Command::JogZNeg
+            | Command::ZoomFit
+            | Command::ZoomIn
+            | Command::ZoomOut
+            | Command::ResetView
+            | Command::ViewTop
+            | Command::ViewFront
+            | Command::ViewIso
+            | Command::OpenSettings
+            | Command::OpenDeviceInfo
+            | Command::OpenHelp
+            | Command::About
+            | Command::AlignLeft
+            | Command::AlignRight
+            | Command::AlignTop
+            | Command::AlignBottom
+            | Command::AlignCenterX
+            | Command::AlignCenterY
+            | Command::Group
+            | Command::Ungroup
+            | Command::Duplicate
+            | Command::FitDevice => None,
+        }
+    }
+}
+
+/// Every msgid the page tabs can show, for the translation guard test.
+pub fn msgids() -> Vec<&'static str> {
+    let mut ids: Vec<&'static str> = Page::ALL.into_iter().map(Page::title_msgid).collect();
+    ids.extend([
+        n_!("Inspector"),
+        n_!("Hide"),
+        n_!("Hide Properties"),
+        n_!("Unhide"),
+        n_!("Unhide Properties"),
+    ]);
+    ids
 }
 
 /// What a pane may use while it draws.
@@ -99,6 +263,20 @@ pub struct PaneContext<'a> {
     commands: &'a mut Vec<Command>,
     /// The machine connection, with this frame's events and the derived status.
     machine: Option<&'a Machine>,
+    /// The Designer's stock and tool for the program it last generated.
+    stock_seed: Option<StockSeed>,
+    /// The key that ran the jog command being routed, when a key ran it.
+    jog_key: Option<JogKey>,
+}
+
+/// The key press that ran a jog command: the key, and the modifiers held when it was
+/// pressed (a change of them ends a keyboard hold, see `panes::machine_control`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct JogKey {
+    /// The key pressed, as egui reported it.
+    pub key: egui::Key,
+    /// The modifiers held at the press.
+    pub modifiers: egui::Modifiers,
 }
 
 impl<'a> PaneContext<'a> {
@@ -112,6 +290,8 @@ impl<'a> PaneContext<'a> {
             tr,
             commands,
             machine: None,
+            stock_seed: None,
+            jog_key: None,
         }
     }
 
@@ -129,6 +309,37 @@ impl<'a> PaneContext<'a> {
         self.machine
     }
 
+    /// The same context with the Designer's stock and tool for the program it last
+    /// generated.
+    ///
+    /// # Arguments
+    /// * `seed` - The Designer's stock and tool, if it generated a program.
+    pub fn with_stock_seed(mut self, seed: Option<StockSeed>) -> Self {
+        self.stock_seed = seed;
+        self
+    }
+
+    /// The same context for a jog command run by `key` (a key press, not a button or menu):
+    /// in continuous mode the jog lasts while the key is held.
+    ///
+    /// # Arguments
+    /// * `key` - The key that ran the command.
+    pub fn with_jog_key(mut self, key: Option<JogKey>) -> Self {
+        self.jog_key = key;
+        self
+    }
+
+    /// The key that ran the jog command being routed, if a key ran it.
+    pub fn jog_key(&self) -> Option<JogKey> {
+        self.jog_key
+    }
+
+    /// The Designer's stock and tool for the program it last generated, when the app
+    /// provided it.
+    pub fn stock_seed(&self) -> Option<StockSeed> {
+        self.stock_seed
+    }
+
     /// Asks the app to run `command` once this frame's panes are drawn.
     ///
     /// # Arguments
@@ -138,12 +349,12 @@ impl<'a> PaneContext<'a> {
     }
 }
 
-/// One pane of the docking workspace.
+/// One pane of a page.
 pub trait Pane {
     /// The pane's identity in the layout.
     fn id(&self) -> PaneId;
 
-    /// The pane's tab title, translated.
+    /// The pane's title, translated.
     ///
     /// # Arguments
     /// * `tr` - Translator for the current UI language.
@@ -190,6 +401,69 @@ pub trait Pane {
     fn machine_events(&mut self, events: &[MachineEvent], tr: &Translator) {
         let _ = (events, tr);
     }
+
+    /// How long until the pane must be handed an empty batch of machine events (see
+    /// [`Pane::machine_events`]) even if the machine stays quiet: a probe run's backstop. The
+    /// app requests a repaint for then, and hands every pane the empty batch once one is due.
+    fn wake_in(&self) -> Option<std::time::Duration> {
+        None
+    }
+
+    /// Runs once every frame, whether or not the pane is drawn, for work that must follow
+    /// the machine while the pane's page is hidden (a query that keeps its state current).
+    ///
+    /// # Arguments
+    /// * `machine` - The app's machine connection.
+    fn frame(&mut self, machine: &Machine) {
+        let _ = machine;
+    }
+
+    /// Takes the active device profile's controller type (at start and when it changes).
+    ///
+    /// # Arguments
+    /// * `controller` - The controller type, if a profile is active.
+    fn set_controller(&mut self, controller: Option<&ControllerType>) {
+        let _ = controller;
+    }
+
+    /// The pane's hideable panel and whether it is shown, as a `panel_visibility` key of
+    /// the settings, for a pane whose Hide is kept between runs.
+    fn panel_visibility(&self) -> Option<(&'static str, bool)> {
+        None
+    }
+
+    /// Takes the active device profile (at start and when it changes), for a pane that uses
+    /// its work area.
+    ///
+    /// # Arguments
+    /// * `profile` - The active profile, if any.
+    fn set_device(&mut self, profile: Option<&DeviceProfile>) {
+        let _ = profile;
+    }
+
+    /// Takes the confirmation the pane wants the app to ask for, if any.
+    fn take_confirm(&mut self) -> Option<ConfirmRequest> {
+        None
+    }
+
+    /// Acts on the answer to a confirmation the pane asked for.
+    ///
+    /// # Arguments
+    /// * `request` - The question.
+    /// * `choice` - The answer.
+    /// * `ctx` - Shared state the pane may use.
+    ///
+    /// # Returns
+    /// Whether the question was the pane's.
+    fn confirmed(
+        &mut self,
+        request: ConfirmRequest,
+        choice: ConfirmChoice,
+        ctx: &mut PaneContext,
+    ) -> bool {
+        let _ = (request, choice, ctx);
+        false
+    }
 }
 
 /// A pane that shows only its title, until the real pane replaces it.
@@ -225,24 +499,45 @@ fn placeholder_panes() -> Vec<Box<dyn Pane>> {
         .collect()
 }
 
-/// The main window's panes and their docking arrangement.
-///
-/// Only the arrangement is serialized and compared; the panes are rebuilt on load.
-#[derive(Serialize, Deserialize)]
+/// The main window's pages and their panes.
 pub struct Workspace {
-    dock: docking::Workspace<PaneId>,
-    #[serde(skip, default = "placeholder_panes")]
     panes: Vec<Box<dyn Pane>>,
+    /// The page shown.
+    page: Page,
     /// The pane the user last pressed the pointer in; `None` after a press outside every pane.
-    #[serde(skip)]
     focused: Option<PaneId>,
     /// The pane the user last pressed the pointer in, kept through presses outside every
-    /// pane (a menu, a tab bar).
-    #[serde(skip)]
+    /// pane (a menu, a tab).
     active: Option<PaneId>,
     /// The panes whose bodies the last frame drew.
-    #[serde(skip)]
     drawn: Drawn,
+    /// Whether the Designer page's inspector column is hidden.
+    inspector_hidden: bool,
+    /// For each page left, the pane that had the keyboard there, restored on return; none
+    /// when a widget (a text field) had it, since its focus does not survive the hidden page.
+    page_keyboard: Vec<(Page, Option<PaneId>)>,
+    /// Whether a widget had the keyboard at the end of the last frame without a press on
+    /// the page tabs.
+    widget_focused: bool,
+    /// Where the page tabs were last drawn: a press on them changes the page, not which
+    /// pane has the keyboard.
+    tabs_rect: Option<egui::Rect>,
+    /// Whether a widget had the keyboard at the end of the last frame.
+    widget_focus_before: bool,
+    /// The windows, popups and modals shown at the end of the last frame.
+    overlays_before: Vec<egui::LayerId>,
+    /// The page changed since the last frame was drawn: focus lost by the old page's widgets
+    /// says nothing about the new page.
+    page_changed: bool,
+    /// Whether the last frame had a press other than on the page tabs (it set the keyboard
+    /// itself).
+    pressed: bool,
+    /// A press in a pane is held: from its press frame until the frame after its release.
+    /// egui moves the keyboard off a text field on the release (the click), so the focus
+    /// lost then belongs to that press, which already says where the keyboard goes.
+    press_held: bool,
+    /// The held press was released in the last frame.
+    press_released: bool,
 }
 
 /// The panes whose bodies a frame drew; the others have their holds cancelled
@@ -252,78 +547,90 @@ type Drawn = Vec<PaneId>;
 impl std::fmt::Debug for Workspace {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Workspace")
-            .field("dock", &self.dock)
+            .field("page", &self.page)
             .finish_non_exhaustive()
     }
 }
 
-impl PartialEq for Workspace {
-    fn eq(&self, other: &Self) -> bool {
-        self.dock == other.dock
+impl Default for Workspace {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
-/// A tab group holding `panels`, the first one shown.
-fn tabs(panels: Vec<PaneId>) -> Node<PaneId> {
-    Node::Tabs { panels, active: 0 }
-}
+/// The settings' `panel_visibility` key of the Designer page's inspector column.
+pub const INSPECTOR_KEY: &str = "designer_properties";
 
-/// A split of `first` and `second` along `axis`, `first` taking `ratio` of the room.
-fn split(axis: SplitAxis, ratio: f32, first: Node<PaneId>, second: Node<PaneId>) -> Node<PaneId> {
-    Node::Split {
-        axis,
-        size: SplitSize::Ratio(ratio),
-        first: Box::new(first),
-        second: Box::new(second),
-    }
-}
+/// Height of the page tab row in points.
+const TAB_HEIGHT: f32 = 26.0;
 
-/// Every pane may move and float but not close: there is no menu to reopen one yet.
-fn permissions(_pane: &PaneId) -> Permissions {
-    Permissions {
-        closable: false,
-        ..Permissions::default()
-    }
-}
+/// Share of the page's width the Machine Control page's editor and console column takes,
+/// and the Designer page's inspector column.
+const SIDE_COLUMN: f32 = 0.3;
+
+/// Narrowest the Machine Control page's editor and console column gets.
+const EDITOR_MIN: f32 = 160.0;
 
 impl Workspace {
-    /// The arrangement a first run starts with: machine control on the left, the visualizer,
-    /// editor, designer and CAM tools in the middle above the console, and the designer's
-    /// layers and properties on the right.
-    pub fn default_layout() -> Workspace {
-        let centre = split(
-            SplitAxis::Vertical,
-            0.75,
-            tabs(vec![
-                PaneId::Visualizer,
-                PaneId::Editor,
-                PaneId::Designer,
-                PaneId::CamTools,
-            ]),
-            tabs(vec![PaneId::Console]),
-        );
-        let inspector = split(
-            SplitAxis::Vertical,
-            0.5,
-            tabs(vec![PaneId::DesignerLayers]),
-            tabs(vec![PaneId::DesignerProperties]),
-        );
-        let root = split(
-            SplitAxis::Horizontal,
-            0.22,
-            tabs(vec![PaneId::MachineControl]),
-            split(SplitAxis::Horizontal, 0.75, centre, inspector),
-        );
+    /// The pages with placeholder panes, showing Machine Control (GTK's default start page).
+    pub fn new() -> Workspace {
         Workspace {
-            dock: docking::Workspace::new(Layout {
-                root: Some(root),
-                floating: Vec::new(),
-            }),
             panes: placeholder_panes(),
+            page: Page::MachineControl,
             focused: None,
             active: None,
             drawn: Drawn::new(),
+            inspector_hidden: false,
+            page_keyboard: Vec::new(),
+            widget_focused: false,
+            tabs_rect: None,
+            widget_focus_before: false,
+            overlays_before: Vec::new(),
+            page_changed: false,
+            pressed: false,
+            press_held: false,
+            press_released: false,
         }
+    }
+
+    /// The page shown.
+    pub fn page(&self) -> Page {
+        self.page
+    }
+
+    /// Shows `page` from the next frame on.
+    ///
+    /// # Arguments
+    /// * `page` - The page to show.
+    pub fn set_page(&mut self, page: Page) {
+        if page != self.page {
+            // Leaving a page ends its keyboard and pointer holds at once, and its panes lose
+            // the keyboard. The pane that had it is remembered and gets it back on return, as
+            // in GTK, where a page's keys worked again once it was shown, but not when a text
+            // field had the keyboard there: that focus is lost while the page is hidden, and a
+            // digit typed on return must not jog. A press in the pane gives it back then.
+            self.cancel_holds();
+            let left = self
+                .focused
+                .filter(|pane| self.page.panes().contains(pane) && !self.widget_focused);
+            self.page_keyboard.retain(|(p, _)| *p != self.page);
+            self.page_keyboard.push((self.page, left));
+            self.focused = self
+                .page_keyboard
+                .iter()
+                .find(|(p, _)| *p == page)
+                .and_then(|(_, pane)| *pane);
+            self.page_changed = true;
+        }
+        self.page = page;
+    }
+
+    /// Shows the page that holds `pane` from the next frame on.
+    ///
+    /// # Arguments
+    /// * `pane` - The pane to bring to the front.
+    pub fn show_pane(&mut self, pane: PaneId) {
+        self.set_page(Page::of_pane(pane));
     }
 
     /// Puts `pane` in place of the pane with the same id.
@@ -378,9 +685,23 @@ impl Workspace {
     /// # Arguments
     /// * `config` - The current settings.
     pub fn configure(&mut self, config: &Config) {
+        self.inspector_hidden = !config
+            .ui
+            .panel_visibility
+            .get(INSPECTOR_KEY)
+            .copied()
+            .unwrap_or(true);
         for pane in &mut self.panes {
             pane.configure(config);
         }
+    }
+
+    /// The hideable panels and whether each is shown, as the settings' `panel_visibility`
+    /// keeps them: the Designer inspector's and the panes' ([`Pane::panel_visibility`]).
+    pub fn panel_visibility(&self) -> Vec<(&'static str, bool)> {
+        std::iter::once((INSPECTOR_KEY, !self.inspector_hidden))
+            .chain(self.panes.iter().filter_map(|pane| pane.panel_visibility()))
+            .collect()
     }
 
     /// Hands machine `events` to every pane ([`Pane::machine_events`]).
@@ -394,15 +715,71 @@ impl Workspace {
         }
     }
 
-    /// Applies a layout change (move, activate, float...) with the workspace's permissions.
+    /// The soonest [`Pane::wake_in`] of the panes.
+    pub fn wake_in(&self) -> Option<std::time::Duration> {
+        self.panes.iter().filter_map(|pane| pane.wake_in()).min()
+    }
+
+    /// Runs every pane's per-frame work ([`Pane::frame`]), drawn or not.
     ///
     /// # Arguments
-    /// * `action` - The change.
+    /// * `machine` - The app's machine connection.
+    pub fn frame(&mut self, machine: &Machine) {
+        for pane in &mut self.panes {
+            pane.frame(machine);
+        }
+    }
+
+    /// Hands the active device profile's controller type to every pane
+    /// ([`Pane::set_controller`]).
     ///
-    /// # Errors
-    /// The docking model's refusal.
-    pub fn apply(&mut self, action: docking::Action<PaneId>) -> Result<(), docking::DockError> {
-        self.dock.apply(action, permissions).map(drop)
+    /// # Arguments
+    /// * `controller` - The controller type, if a profile is active.
+    pub fn set_controller(&mut self, controller: Option<&ControllerType>) {
+        for pane in &mut self.panes {
+            pane.set_controller(controller);
+        }
+    }
+
+    /// Hands the active device profile to every pane ([`Pane::set_controller`] with its
+    /// controller type, and [`Pane::set_device`]).
+    ///
+    /// # Arguments
+    /// * `profile` - The active profile, if any.
+    pub fn set_device(&mut self, profile: Option<&DeviceProfile>) {
+        self.set_controller(profile.map(|p| &p.controller_type));
+        for pane in &mut self.panes {
+            pane.set_device(profile);
+        }
+    }
+
+    /// Takes the confirmations the panes want asked ([`Pane::take_confirm`]).
+    pub fn take_confirms(&mut self) -> Vec<ConfirmRequest> {
+        self.panes
+            .iter_mut()
+            .filter_map(|pane| pane.take_confirm())
+            .collect()
+    }
+
+    /// Hands the answer to a pane's confirmation to the pane that asked
+    /// ([`Pane::confirmed`]).
+    ///
+    /// # Arguments
+    /// * `request` - The question.
+    /// * `choice` - The answer.
+    /// * `ctx` - Shared state passed to the panes.
+    ///
+    /// # Returns
+    /// Whether a pane took it.
+    pub fn confirmed(
+        &mut self,
+        request: ConfirmRequest,
+        choice: ConfirmChoice,
+        ctx: &mut PaneContext,
+    ) -> bool {
+        self.panes
+            .iter_mut()
+            .any(|pane| pane.confirmed(request, choice, ctx))
     }
 
     /// The pane the user last pressed the pointer in, or `None` when the last press was
@@ -417,7 +794,59 @@ impl Workspace {
         self.active.filter(|id| self.drawn.contains(id))
     }
 
-    /// Whether the last frame drew the pane `id`'s body (its tab is the one shown).
+    /// Runs at the start of every frame, before its keys are dispatched, on what the last
+    /// frame left: takes the keyboard from the panes when focus left them for something
+    /// else. A widget lost the keyboard (Enter or Escape in a field, a dialog closing; egui
+    /// does not give it back to the text field the user was in before), or a window, popup
+    /// or modal closed, unless a press in a pane in that frame says where the user is now.
+    /// A digit meant for a text field then never reaches the pane's keys (a jog) until the
+    /// user presses in the pane again.
+    ///
+    /// # Arguments
+    /// * `ctx` - The egui context.
+    pub fn begin_frame(&mut self, ctx: &egui::Context) {
+        // A lost pointer release (the window lost focus with a button held) must not leave
+        // the press held: that would stop focus loss from disarming the keys. A window
+        // without focus disarms them too; a held press with no button down and no release
+        // this frame is stale.
+        let (window_focused, button_down, button_released) =
+            ctx.input(|i| (i.focused, i.pointer.any_down(), i.pointer.any_released()));
+        if !window_focused {
+            self.focused = None;
+            self.press_held = false;
+            self.press_released = false;
+        } else if self.press_held && !self.press_released && !button_down && !button_released {
+            self.press_held = false;
+            self.press_released = false;
+        }
+        let widget_focus = ctx.memory(|m| m.focused().is_some());
+        let overlays = overlay_layers(ctx);
+        let focus_lost = self.widget_focus_before && !widget_focus;
+        let overlay_closed = self.overlays_before.iter().any(|l| !overlays.contains(l));
+        let pressed = self.pressed || self.press_held;
+        if (focus_lost || overlay_closed) && !pressed && !self.page_changed {
+            if self.focused.is_some() {
+                tracing::debug!(focus_lost, overlay_closed, "panes lose the keyboard");
+            }
+            self.focused = None;
+        }
+        self.widget_focus_before = widget_focus;
+        self.overlays_before = overlays;
+        self.page_changed = false;
+        self.pressed = false;
+        if self.press_released {
+            self.press_held = false;
+            self.press_released = false;
+        }
+    }
+
+    /// Whether the pane `id` has the keyboard: the user last pressed in it, its page is the
+    /// one shown and the last frame drew it.
+    pub fn has_keyboard(&self, id: PaneId) -> bool {
+        self.focused == Some(id) && self.page.panes().contains(&id) && self.drawn.contains(&id)
+    }
+
+    /// Whether the last frame drew the pane `id`'s body (its page is the one shown).
     ///
     /// # Arguments
     /// * `id` - The pane.
@@ -425,34 +854,145 @@ impl Workspace {
         self.drawn.contains(&id)
     }
 
-    /// Draws the workspace into the rest of `ui` and applies the user's layout changes.
+    /// Draws the row of page tabs across `ui`, each the same width, the shown page's filled.
     ///
     /// # Arguments
-    /// * `ui` - The `Ui` whose remaining room the workspace fills.
+    /// * `ui` - A top panel's `Ui`.
+    /// * `tr` - Translator for the tab labels.
+    ///
+    /// # Returns
+    /// The page whose tab was clicked this frame, if any; the caller shows it.
+    pub fn show_tabs(&mut self, ui: &mut egui::Ui, tr: &Translator) -> Option<Page> {
+        let row = ui.available_rect_before_wrap();
+        self.tabs_rect = Some(egui::Rect::from_min_size(
+            row.min,
+            egui::vec2(row.width(), TAB_HEIGHT),
+        ));
+        let width = row.width() / Page::ALL.len() as f32;
+        let mut clicked = None;
+        for (i, page) in Page::ALL.into_iter().enumerate() {
+            let rect = egui::Rect::from_min_size(
+                egui::pos2(row.left() + width * i as f32, row.top()),
+                egui::vec2(width, TAB_HEIGHT),
+            );
+            let label = tr.tr(page.title_msgid());
+            let selected = page == self.page;
+            let id = egui::Id::unique(("gcodekit5-page-tab", i));
+            let response = Tab::new(id, &label, selected).show_at(ui, rect, |ui, response| {
+                paint_tab(ui, response, rect, &label, selected);
+            });
+            if response.clicked() {
+                clicked = Some(page);
+            }
+        }
+        ui.allocate_rect(
+            egui::Rect::from_min_size(row.min, egui::vec2(row.width(), TAB_HEIGHT)),
+            egui::Sense::hover(),
+        );
+        clicked
+    }
+
+    /// Draws the shown page's panes into the rest of `ui`; a manager page draws nothing
+    /// here (the app draws it).
+    ///
+    /// # Arguments
+    /// * `ui` - The `Ui` whose remaining room the page fills.
     /// * `ctx` - Shared state passed to every pane.
     pub fn show(&mut self, ui: &mut egui::Ui, ctx: &mut PaneContext) {
-        let style = DockStyle::from_ui(ui);
         let press = ui.input(|i| {
             i.pointer
                 .any_pressed()
                 .then(|| i.pointer.press_origin())
                 .flatten()
         });
-        let mut content = Content {
+        let mut frame = Content {
             panes: &mut self.panes,
             ctx,
             press,
             pressed_in: None,
             drawn: Drawn::new(),
         };
-        let output = DockArea::new(egui::Id::unique("gcodekit5-workspace"))
-            .locked(self.dock.locked)
-            .show_content(ui, &self.dock.layout, &style, &mut content);
-        if press.is_some() {
-            self.focused = content.pressed_in;
-            self.active = content.pressed_in.or(self.active);
+        let side = ui.available_width() * SIDE_COLUMN;
+        match self.page {
+            Page::Designer => {
+                let tr = frame.ctx.tr;
+                if self.inspector_hidden {
+                    let canvas = ui.available_rect_before_wrap();
+                    frame.pane(ui, PaneId::Designer);
+                    if unhide_button(ui, canvas, tr) {
+                        self.inspector_hidden = false;
+                    }
+                } else {
+                    egui::Panel::right("gcodekit5-designer-inspector")
+                        .resizable(true)
+                        .default_size(side)
+                        .show(ui, |ui| {
+                            if inspector_header(ui, tr) {
+                                self.inspector_hidden = true;
+                            }
+                            let objects = ui.available_height() * 0.32;
+                            egui::Panel::bottom("gcodekit5-designer-objects")
+                                .resizable(true)
+                                .default_size(objects)
+                                .show(ui, |ui| frame.pane(ui, PaneId::DesignerLayers));
+                            frame.pane(ui, PaneId::DesignerProperties);
+                        });
+                    frame.pane(ui, PaneId::Designer);
+                }
+            }
+            Page::MachineControl => {
+                // The editor column shrinks first: it never covers the sidebar and the centre
+                // column's E-STOP, down to its own minimum.
+                let editor_max = (ui.available_width()
+                    - crate::panes::machine_control::COMFORT_WIDTH)
+                    .max(EDITOR_MIN);
+                egui::Panel::right("gcodekit5-machine-editor")
+                    .resizable(true)
+                    .default_size(side)
+                    .size_range(EDITOR_MIN..=editor_max)
+                    .show(ui, |ui| {
+                        let console = ui.available_height() * 0.3;
+                        egui::Panel::bottom("gcodekit5-machine-console")
+                            .resizable(true)
+                            .default_size(console)
+                            .show(ui, |ui| frame.pane(ui, PaneId::Console));
+                        frame.pane(ui, PaneId::Editor);
+                    });
+                frame.pane(ui, PaneId::MachineControl);
+            }
+            Page::Visualizer => frame.pane(ui, PaneId::Visualizer),
+            Page::CamTools => frame.pane(ui, PaneId::CamTools),
+            Page::DeviceManager | Page::DeviceConfig | Page::CncTools | Page::Materials => {}
         }
-        self.drawn = content.drawn;
+        // A press on the page tabs only changes the page: the keyboard stays with the pane
+        // that has it, so leaving the page remembers that pane. Any other press outside
+        // every pane (the menu bar, the status bar, a window) takes the keyboard from them.
+        let on_tabs = press.is_some_and(|pos| {
+            self.tabs_rect.is_some_and(|tabs| tabs.contains(pos))
+                && ui
+                    .ctx()
+                    .layer_id_at(pos)
+                    .is_none_or(|layer| layer == ui.layer_id())
+        });
+        let frame_pressed_in = frame.pressed_in;
+        if press.is_some() && !on_tabs {
+            self.focused = frame.pressed_in;
+            self.active = frame.pressed_in.or(self.active);
+        }
+        if !on_tabs {
+            self.widget_focused = ui.ctx().memory(|m| m.focused().is_some());
+        }
+        self.drawn = frame.drawn;
+        self.pressed |= press.is_some() && !on_tabs;
+        // A press in a pane holds its keyboard choice until released, wherever the pointer
+        // is released: the press began in the pane, a deliberate choice of it.
+        if press.is_some() && !on_tabs {
+            self.press_held = frame_pressed_in.is_some();
+            self.press_released = false;
+        }
+        if self.press_held && ui.input(|i| i.pointer.any_released()) {
+            self.press_released = true;
+        }
         for pane in self
             .panes
             .iter_mut()
@@ -460,18 +1000,128 @@ impl Workspace {
         {
             pane.cancel_hold();
         }
-        if let Some(error) = output.error {
-            tracing::warn!(?error, "workspace layout not drawn");
-        }
-        if !output.actions.is_empty()
-            && let Err(error) = self.dock.apply_all(output.actions, permissions)
-        {
-            tracing::warn!(?error, "workspace layout change rejected");
-        }
     }
 }
 
-/// Adapts the panes to the docking renderer for one frame.
+/// The windows, popups and modals shown (this frame or the last): `Middle` and
+/// `Foreground` layers; tooltips do not count, nor does the Designer canvas's floating
+/// toolbar, which is part of its pane.
+///
+/// # Arguments
+/// * `ctx` - The egui context.
+pub fn overlay_layers(ctx: &egui::Context) -> Vec<egui::LayerId> {
+    let toolbar = crate::panes::designer::canvas::overlay::toolbar_id();
+    ctx.memory(|m| {
+        m.areas()
+            .visible_layer_ids()
+            .into_iter()
+            .filter(|layer| matches!(layer.order, egui::Order::Middle | egui::Order::Foreground))
+            .filter(|layer| layer.id != toolbar)
+            .collect()
+    })
+}
+
+/// The Designer inspector's header: the "Inspector" heading and, on the right, the Hide
+/// button (GTK's `view-conceal` button).
+///
+/// # Returns
+/// Whether Hide was clicked.
+fn inspector_header(ui: &mut egui::Ui, tr: &Translator) -> bool {
+    ui.horizontal(|ui| {
+        crate::theme::section_heading(ui, &tr.tr("Inspector"));
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            named_icon_button(
+                ui,
+                crate::icons::Icon::Hide,
+                &tr.tr("Hide"),
+                &tr.tr("Hide Properties"),
+            )
+        })
+        .inner
+    })
+    .inner
+}
+
+/// An icon button showing `label` whose tooltip and accessible name is `name` (GTK's
+/// accessible labels for Hide and Unhide).
+///
+/// # Returns
+/// Whether it was clicked.
+pub(crate) fn named_icon_button(
+    ui: &mut egui::Ui,
+    icon: crate::icons::Icon,
+    label: &str,
+    name: &str,
+) -> bool {
+    let response = crate::icons::icon_button(ui, icon, label);
+    let enabled = response.enabled();
+    response.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, enabled, name));
+    response.on_hover_text(name).clicked()
+}
+
+/// The floating Unhide button at the top right of the Designer canvas `canvas` while the
+/// inspector is hidden (GTK's `view-reveal` button).
+///
+/// # Returns
+/// Whether it was clicked.
+fn unhide_button(ui: &mut egui::Ui, canvas: egui::Rect, tr: &Translator) -> bool {
+    let strip = egui::Rect::from_min_max(
+        egui::pos2(canvas.left(), canvas.top() + 12.0),
+        egui::pos2(canvas.right() - 12.0, canvas.top() + 48.0),
+    );
+    ui.scope_builder(
+        egui::UiBuilder::new()
+            .max_rect(strip)
+            .layout(egui::Layout::right_to_left(egui::Align::Min)),
+        |ui| {
+            named_icon_button(
+                ui,
+                crate::icons::Icon::Show,
+                &tr.tr("Unhide"),
+                &tr.tr("Unhide Properties"),
+            )
+        },
+    )
+    .inner
+}
+
+/// Paints one page tab: filled with the selection colour when it is the shown page, the
+/// hover colour while the pointer is over it, and its label centred (cut short with an
+/// ellipsis when it does not fit).
+fn paint_tab(ui: &egui::Ui, response: &egui::Response, rect: egui::Rect, label: &str, on: bool) {
+    let visuals = ui.visuals();
+    let (fill, text) = if on {
+        (visuals.selection.bg_fill, visuals.selection.stroke.color)
+    } else if response.hovered() {
+        (
+            visuals.widgets.hovered.weak_bg_fill,
+            visuals.widgets.hovered.fg_stroke.color,
+        )
+    } else {
+        (
+            visuals.widgets.inactive.weak_bg_fill,
+            visuals.widgets.inactive.fg_stroke.color,
+        )
+    };
+    let painter = ui.painter();
+    painter.rect_filled(rect, 0.0, fill);
+    painter.vline(
+        rect.right(),
+        rect.y_range(),
+        visuals.widgets.noninteractive.bg_stroke,
+    );
+    let mut job = egui::text::LayoutJob::single_section(
+        label.to_owned(),
+        egui::TextFormat::simple(egui::TextStyle::Button.resolve(ui.style()), text),
+    );
+    job.wrap = egui::text::TextWrapping::truncate_at_width(rect.width() - 8.0);
+    let galley = ui.fonts_mut(|f| f.layout_job(job));
+    let pos = rect.center() - galley.size() * 0.5;
+    painter.galley(pos, galley, text);
+}
+
+/// Draws the panes of one page for one frame, noting which were drawn and which holds the
+/// pointer press.
 struct Content<'p, 'c, 't> {
     panes: &'p mut [Box<dyn Pane>],
     ctx: &'c mut PaneContext<'t>,
@@ -483,25 +1133,30 @@ struct Content<'p, 'c, 't> {
     drawn: Drawn,
 }
 
-impl DockContent<PaneId> for Content<'_, '_, '_> {
-    fn body(&mut self, ui: &mut egui::Ui, panel: &PaneId) {
-        self.drawn.push(*panel);
-        if self.press.is_some_and(|pos| ui.max_rect().contains(pos)) {
-            self.pressed_in = Some(*panel);
+impl Content<'_, '_, '_> {
+    /// Draws the pane `id` into the rest of `ui`.
+    fn pane(&mut self, ui: &mut egui::Ui, id: PaneId) {
+        egui::CentralPanel::default().show(ui, |ui| self.body(ui, id));
+    }
+
+    /// Draws the pane `id`'s body into `ui`.
+    fn body(&mut self, ui: &mut egui::Ui, id: PaneId) {
+        self.drawn.push(id);
+        // Only a press on the page itself: a window, popup or modal above the pane (the
+        // Preferences, Help, a dialog) is its own layer, and a click on it is not a press in
+        // the pane below.
+        let on_page = |pos: egui::Pos2| {
+            ui.max_rect().contains(pos)
+                && ui
+                    .ctx()
+                    .layer_id_at(pos)
+                    .is_none_or(|layer| layer == ui.layer_id())
+        };
+        if self.press.is_some_and(on_page) {
+            self.pressed_in = Some(id);
         }
-        if let Some(pane) = self.panes.iter_mut().find(|p| p.id() == *panel) {
+        if let Some(pane) = self.panes.iter_mut().find(|p| p.id() == id) {
             pane.ui(ui, self.ctx);
         }
-    }
-
-    fn logical_label(&self, panel: &PaneId) -> String {
-        self.panes.iter().find(|p| p.id() == *panel).map_or_else(
-            || self.ctx.tr.tr(panel.title_msgid()).into_owned(),
-            |p| p.title(self.ctx.tr),
-        )
-    }
-
-    fn permissions(&self, panel: &PaneId) -> Permissions {
-        permissions(panel)
     }
 }

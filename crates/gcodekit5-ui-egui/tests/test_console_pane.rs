@@ -181,3 +181,234 @@ fn test_console_echoes_soft_reset_label() {
     harness.step();
     assert!(harness.query_by_label("> 0x18 (Reset)").is_some());
 }
+
+/// Copy last error (GTK's console header button) takes the newest error or alarm line,
+/// skipping acknowledgements and status reports.
+#[test]
+fn test_console_last_error_is_newest_error_or_alarm() {
+    let (mut pane, tr) = console();
+    assert_eq!(pane.last_error(), None);
+    pane.apply(
+        &[
+            received("error:9"),
+            received("ALARM:1"),
+            received("ok"),
+            received("[MSG:hello]"),
+        ],
+        &tr,
+    );
+    assert_eq!(pane.last_error().as_deref(), Some("ALARM:1"));
+}
+
+/// The console header's icon buttons keep their names, and Copy last error puts the line
+/// on the clipboard.
+#[test]
+fn test_console_header_buttons_in_app() {
+    let (mut harness, shared) = pane_app(Duration::from_millis(1), true);
+    shared.inject("ALARM:1\n");
+    let deadline = std::time::Instant::now() + crate::machine_support::EVENTUALLY;
+    while harness.query_all_by_label("ALARM:1").next().is_none()
+        && std::time::Instant::now() < deadline
+    {
+        harness.step();
+        std::thread::sleep(Duration::from_millis(2));
+    }
+    assert!(
+        harness.query_all_by_label("ALARM:1").next().is_some(),
+        "alarm never logged"
+    );
+    assert!(harness.query_by_label("Clear console").is_some());
+    harness.get_by_label("Copy last error").click();
+    harness.step();
+    let copied = harness
+        .output()
+        .platform_output
+        .commands
+        .iter()
+        .any(|c| matches!(c, egui::OutputCommand::CopyText(text) if text.ends_with("ALARM:1")));
+    assert!(copied, "{:?}", harness.output().platform_output.commands);
+}
+
+/// A fresh scratch folder under `target/temp` for this test.
+fn scratch(name: &str) -> std::path::PathBuf {
+    let dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../target/temp/console_history")
+        .join(format!("{name}-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).expect("scratch dir");
+    dir
+}
+
+const ENTRY: &str = "Type a command and press Enter...";
+
+/// An app connected to a loopback machine whose console keeps its history in `file`.
+fn history_app(
+    file: &std::path::Path,
+) -> (
+    egui_kittest::Harness<'static, gcodekit5_ui_egui::GcodeKitApp>,
+    std::sync::Arc<gcodekit5_app::test_support::LoopbackShared>,
+) {
+    let (state, shared) = crate::machine_support::loopback_state(Duration::from_millis(1));
+    let mut state = state.with_history_file(file.to_path_buf());
+    crate::machine_support::connect(&mut state);
+    let mut harness =
+        crate::machine_support::app_harness(gcodekit5_ui_egui::GcodeKitApp::from_state(state));
+    harness.step();
+    harness.step();
+    harness
+        .get_by_role_and_label(egui::accesskit::Role::TextInput, ENTRY)
+        .click();
+    harness.step();
+    (harness, shared)
+}
+
+/// A command typed in one session is in the next session's history (GTK's
+/// `command_history.json`), and Up brings it back.
+#[test]
+fn test_console_history_kept_across_sessions() {
+    let file = scratch("across_sessions").join(gcodekit5_app::command_history::HISTORY_FILE);
+    {
+        let (mut harness, shared) = history_app(&file);
+        harness
+            .get_by_role_and_label(egui::accesskit::Role::TextInput, ENTRY)
+            .type_text("G0 X7");
+        harness.step();
+        harness.key_press(egui::Key::Enter);
+        harness.step();
+        assert!(
+            wait_until(|| shared
+                .log()
+                .iter()
+                .any(|w| matches!(w, Wrote::Line(l) if l.trim() == "G0 X7"))),
+            "line not written"
+        );
+    }
+    let saved = gcodekit5_app::command_history::CommandHistory::load_from(&file);
+    assert_eq!(saved.get(0), Some("G0 X7"));
+
+    let (mut harness, _shared) = history_app(&file);
+    harness.key_press(egui::Key::ArrowUp);
+    harness.step();
+    let entry = harness.get_by_role_and_label(egui::accesskit::Role::TextInput, ENTRY);
+    assert_eq!(entry.value().as_deref(), Some("G0 X7"));
+}
+
+/// GTK's job-end lines: "Job Completed" when every line is acknowledged, then "Work
+/// completed in: m:ss" when the controller reports the program's end; "Job stopped:" with
+/// the lines done when a job ends early.
+#[test]
+fn test_console_logs_the_end_of_a_job() {
+    let (mut pane, tr) = console();
+    let progress = MachineEvent::StreamProgress {
+        sent: 1,
+        acked: 0,
+        total: 2,
+    };
+    pane.apply(
+        &[
+            progress.clone(),
+            MachineEvent::StreamFinished { lines: 2 },
+            received("[MSG:Pgm End]"),
+        ],
+        &tr,
+    );
+    assert_eq!(
+        pane.lines(),
+        vec![
+            "Job Completed".to_string(),
+            "[MSG:Pgm End]".to_string(),
+            "\u{2705} Work completed in: 0:00".to_string(),
+        ]
+    );
+    pane.apply(
+        &[
+            progress,
+            MachineEvent::StreamStopped { acked: 1, total: 2 },
+            received("[MSG:Program End]"),
+        ],
+        &tr,
+    );
+    let lines = pane.lines();
+    assert_eq!(lines[3], "Job stopped: 1 / 2");
+    assert_eq!(
+        lines.len(),
+        5,
+        "no work time after a stopped job: {lines:?}"
+    );
+    assert_eq!(
+        gcodekit5_ui_egui::panes::console::work_time(std::time::Duration::from_secs(125)),
+        "2:05"
+    );
+}
+
+/// Clear console empties the log: its "Error: ALARM:1" line goes (Machine Control may still
+/// show the alarm itself).
+#[test]
+fn test_console_clear_empties_the_log() {
+    let (mut harness, shared) = pane_app(Duration::from_millis(1), true);
+    shared.inject("ALARM:1\n");
+    let deadline = std::time::Instant::now() + crate::machine_support::EVENTUALLY;
+    while harness.query_by_label("Error: ALARM:1").is_none() && std::time::Instant::now() < deadline
+    {
+        harness.step();
+        std::thread::sleep(Duration::from_millis(2));
+    }
+    assert!(
+        harness.query_by_label("Error: ALARM:1").is_some(),
+        "never logged"
+    );
+    harness.get_by_label("Clear console").click();
+    harness.step();
+    harness.step();
+    assert!(
+        harness.query_by_label("Error: ALARM:1").is_none(),
+        "log cleared"
+    );
+}
+
+/// GRBL 1.1 and grblHAL report M2/M30 as `[MSG:Pgm End]`; GTK's `Program End` is matched
+/// too. A line typed after the job forgets its start; a realtime byte does not.
+#[test]
+fn test_console_program_end_lines_and_a_later_manual_m2() {
+    use gcodekit5_ui_egui::panes::console::is_program_end;
+    assert!(is_program_end("[MSG:Pgm End]"));
+    assert!(is_program_end("[MSG:Program End]"));
+    assert!(!is_program_end("ok"));
+    let (mut pane, tr) = console();
+    let progress = MachineEvent::StreamProgress {
+        sent: 1,
+        acked: 0,
+        total: 1,
+    };
+    pane.apply(
+        &[
+            progress.clone(),
+            MachineEvent::StreamFinished { lines: 1 },
+            MachineEvent::Sent("! (Feed hold)".to_string()),
+            MachineEvent::Sent("~ (Cycle start)".to_string()),
+            received("[MSG:Pgm End]"),
+        ],
+        &tr,
+    );
+    assert!(
+        pane.lines()
+            .last()
+            .is_some_and(|l| l.contains("Work completed in:")),
+        "a realtime byte keeps the job: {:?}",
+        pane.lines()
+    );
+    pane.apply(
+        &[
+            progress,
+            MachineEvent::StreamFinished { lines: 1 },
+            MachineEvent::Sent("M2".to_string()),
+            received("[MSG:Pgm End]"),
+        ],
+        &tr,
+    );
+    assert_eq!(
+        pane.lines().last().map(String::as_str),
+        Some("[MSG:Pgm End]"),
+        "a typed M2 after the job reports no stale time"
+    );
+}

@@ -31,7 +31,8 @@ pub use setup::{Camera, CameraType, Color, Light, LightType, Renderer, Scene, Ve
 pub use stock_removal_3d::{
     HeightMap, MAX_MESH_FLOATS, MAX_STOCK_CELLS, StockSimulator3D, StockXyReference,
     StockZeroReference, ToolpathSegment, ToolpathSegmentType, detect_stock_zero_reference,
-    generate_surface_mesh, generate_surface_mesh_within, toolpath_from_commands,
+    generate_surface_mesh, generate_surface_mesh_within, grid_face_count_within,
+    toolpath_from_commands,
 };
 pub use toolpath_cache::ToolpathCache;
 pub use toolpath_rendering::{

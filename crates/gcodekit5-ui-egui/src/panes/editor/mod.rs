@@ -18,9 +18,20 @@
 //! for the File commands and hands the text to the machine as the program to stream
 //! ([`EditorPane::program_stale`], [`EditorPane::program_fed`]).
 //!
-//! Ported from the GTK `ui/gtk/editor.rs` (GtkSourceView). Not ported: replace and replace
-//! all, and the line-counter tooltip; the GTK find box's match index ("2 of 5") is shown as
-//! the match count only.
+//! Clear editor (GTK's button in the Machine Control editor header) sits at the end of the
+//! find row: it is disabled, and refused, while a job runs (the text is read-only then), and
+//! asks first when the editor holds any G-code, as GTK did; the question is asked again at
+//! Yes, which is refused if a job started meanwhile.
+//!
+//! Under the find row, GTK's replace row: "Replace with ...", Replace (the current match,
+//! then on to the next; with no current match it moves to the first) and Replace All. Both
+//! are enabled, as in GTK, when the query has matches and the replacement is not empty, and
+//! are disabled, and refused, while a job runs or a large file is shown read-only. Each is
+//! one step of the text field's undo: the text before it is recorded as an undo point (see
+//! [`EditorPane::pending_undo`]) before the field draws the new text.
+//!
+//! Ported from the GTK `ui/gtk/editor.rs` (GtkSourceView). Not ported: the line-counter
+//! tooltip; the GTK find box's match index ("2 of 5") is shown as the match count only.
 //!
 //! Dependencies: `egui`, `anyhow`, `gcodekit5-app` (machine events, translations).
 
@@ -44,6 +55,8 @@ use gcodekit5_app::machine::MachineEvent;
 pub use buffer::EditorBuffer;
 use highlight::HighlightStyle;
 
+use crate::dialogs::{ConfirmChoice, ConfirmRequest};
+use crate::icons::{Icon, icon_only_button};
 use crate::workspace::{Pane, PaneContext, PaneId};
 
 /// Files with more lines than this open read-only in the virtualised view.
@@ -57,6 +70,9 @@ const SCROLL_TRIES: u8 = 2;
 
 /// Font size of the editor's text.
 const FONT_SIZE: f32 = 13.0;
+
+/// Shown while a job runs: the text cannot be changed.
+const READ_ONLY_DURING_JOB: &str = n_!("Read-only while a job is running.");
 
 /// The msgids the pane shows, for the translation check.
 pub fn msgids() -> Vec<&'static str> {
@@ -73,7 +89,12 @@ pub fn msgids() -> Vec<&'static str> {
         n_!("Stop the running job before opening a file."),
         n_!("Could not save file"),
         n_!("Cannot stream this program"),
-        n_!("Read-only while a job is running."),
+        READ_ONLY_DURING_JOB,
+        n_!("Clear editor"),
+        n_!("Save G-code"),
+        n_!("Replace with ..."),
+        n_!("Replace"),
+        n_!("Replace All"),
     ]
 }
 
@@ -100,6 +121,11 @@ pub struct EditorPane {
     select_match: bool,
     /// Match count of `(query, generation)`, so it is not recounted every frame.
     find_count: Option<(String, u64, usize)>,
+    /// What Replace and Replace All put in place of a match.
+    replace_text: String,
+    /// The text before a replace, to record as the text field's undo point before the field
+    /// next draws (so the replace is one undo step).
+    pending_undo: Option<String>,
     /// A line to scroll into view, and the frames left to try (the scroll area clamps an
     /// offset to the previous frame's content, so the first try can fall short).
     scroll_to: Option<(usize, u8)>,
@@ -118,6 +144,8 @@ pub struct EditorPane {
     last_cursor: Option<usize>,
     /// An error to show under the text until the next file operation.
     notice: Option<String>,
+    /// A confirmation the app is to ask for (Clear editor).
+    confirm: Option<ConfirmRequest>,
 }
 
 impl Default for EditorPane {
@@ -137,6 +165,8 @@ impl EditorPane {
             find_match: None,
             select_match: false,
             find_count: None,
+            replace_text: String::new(),
+            pending_undo: None,
             scroll_to: None,
             longest: None,
             visible: 0..0,
@@ -147,6 +177,7 @@ impl EditorPane {
             stream_map: Vec::new(),
             last_cursor: None,
             notice: None,
+            confirm: None,
         }
     }
 
@@ -162,6 +193,7 @@ impl EditorPane {
         *self = Self {
             buffer,
             find_query: std::mem::take(&mut self.find_query),
+            replace_text: std::mem::take(&mut self.replace_text),
             fed: None,
             scroll_to: Some((0, SCROLL_TRIES)),
             ..Self::new()
@@ -223,6 +255,82 @@ impl EditorPane {
         self.show_match(found);
     }
 
+    /// Sets what Replace and Replace All put in place of a match.
+    ///
+    /// # Arguments
+    /// * `text` - The replacement.
+    pub fn set_replace_text(&mut self, text: &str) {
+        text.clone_into(&mut self.replace_text);
+    }
+
+    /// Whether the text may be changed: no job runs and no large file is shown read-only.
+    fn editable(&self) -> bool {
+        !self.locked && (self.edit_large || !self.is_large())
+    }
+
+    /// Whether a replace is refused; while a job runs the notice says why.
+    fn replace_refused(&mut self, tr: &Translator) -> bool {
+        if self.locked {
+            self.notice = Some(tr.tr(READ_ONLY_DURING_JOB).into_owned());
+        }
+        !self.editable() || self.find_query.is_empty() || self.replace_text.is_empty()
+    }
+
+    /// Replace: the current match becomes the replacement and the next match is selected;
+    /// with no current match the next one is selected. Refused while a job runs.
+    ///
+    /// # Arguments
+    /// * `tr` - Translator for the refusal.
+    pub fn replace(&mut self, tr: &Translator) {
+        if self.replace_refused(tr) {
+            return;
+        }
+        let text = self.buffer.text();
+        let current = self.find_match.clone().filter(|range| {
+            text.get(range.clone())
+                .is_some_and(|m| m.eq_ignore_ascii_case(&self.find_query))
+        });
+        let Some(range) = current else {
+            self.find_next();
+            return;
+        };
+        let mut new = String::with_capacity(text.len());
+        new.push_str(&text[..range.start]);
+        new.push_str(&self.replace_text);
+        new.push_str(&text[range.end..]);
+        let after = range.start + self.replace_text.len();
+        self.set_replaced(new);
+        let found = find::find_next(self.buffer.text(), &self.find_query, after);
+        self.show_match(found);
+    }
+
+    /// Replace All: every match becomes the replacement, as one edit and one undo step.
+    /// Refused while a job runs.
+    ///
+    /// # Arguments
+    /// * `tr` - Translator for the refusal.
+    pub fn replace_all(&mut self, tr: &Translator) {
+        if self.replace_refused(tr) {
+            return;
+        }
+        let (new, replaced) =
+            find::replace_all(self.buffer.text(), &self.find_query, &self.replace_text);
+        if replaced > 0 {
+            self.set_replaced(new);
+            self.find_match = None;
+            self.select_match = false;
+        }
+    }
+
+    /// Puts `text` in place of the old as an edit, keeping the old for the undo point.
+    fn set_replaced(&mut self, text: String) {
+        let old = std::mem::replace(self.buffer.text_mut(), text);
+        self.buffer.mark_edited();
+        // An earlier replace not yet drawn keeps its own text as the undo point.
+        self.pending_undo.get_or_insert(old);
+        self.last_edit = Some(Instant::now());
+    }
+
     fn show_match(&mut self, found: Option<Range<usize>>) {
         if let Some(range) = &found {
             let line = self.buffer.line_of_byte(range.start);
@@ -282,6 +390,34 @@ impl EditorPane {
         self.notice = Some(notice);
     }
 
+    /// Clear editor: refused while a job runs; with only whitespace (or nothing) the text is
+    /// cleared at once, otherwise the app is asked to confirm first (as GTK did).
+    ///
+    /// # Arguments
+    /// * `tr` - Translator for the refusal.
+    pub fn request_clear(&mut self, tr: &Translator) {
+        if self.locked {
+            self.notice = Some(tr.tr(READ_ONLY_DURING_JOB).into_owned());
+            return;
+        }
+        if self.buffer.text().trim().is_empty() {
+            if !self.buffer.text().is_empty() {
+                self.clear();
+            }
+            return;
+        }
+        self.confirm = Some(ConfirmRequest::ClearEditor);
+    }
+
+    /// Removes all text: an edit, so the file is unsaved and the program is handed over again.
+    fn clear(&mut self) {
+        self.buffer.set_text(String::new());
+        self.find_match = None;
+        self.select_match = false;
+        self.last_edit = Some(Instant::now());
+        self.scroll_to = Some((0, SCROLL_TRIES));
+    }
+
     /// Follows the streaming job: the line in progress becomes the current line.
     fn follow_stream(&mut self, acked: usize, total: usize) {
         // Only while the streamed program is the one this editor handed over.
@@ -302,13 +438,21 @@ impl EditorPane {
         )
     }
 
-    /// The find row: query, previous and next, match count.
-    fn show_find(&mut self, ui: &mut egui::Ui, tr: &Translator) {
+    /// The find row: query, previous and next (chevron icon buttons named "Previous Match"
+    /// and "Next Match"), match count, then GTK's Clear editor and Save G-code buttons. The
+    /// query takes the room the rest leaves, so the row fits a narrow editor column.
+    ///
+    /// # Returns
+    /// Whether Save G-code was clicked (File > Save for the editor).
+    fn show_find(&mut self, ui: &mut egui::Ui, tr: &Translator) -> bool {
+        let mut save = false;
         ui.horizontal(|ui| {
             let hint = tr.tr("Search...");
+            // Four icon buttons and the match count.
+            let rest = 4.0 * 36.0 + 110.0;
             let edit = egui::TextEdit::singleline(&mut self.find_query)
                 .hint_text(hint.as_ref())
-                .desired_width(200.0);
+                .desired_width((ui.available_width() - rest).clamp(80.0, 200.0));
             let response = ui.add(edit);
             response.widget_info(|| {
                 let mut info = egui::WidgetInfo::text_edit(
@@ -324,26 +468,83 @@ impl EditorPane {
                 self.find_match = None;
             }
             let enter = response.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter));
-            if ui.button(tr.tr("Previous Match")).clicked() {
+            if icon_only_button(ui, Icon::JogUp, &tr.tr("Previous Match")).clicked() {
                 self.find_previous();
             }
-            if ui.button(tr.tr("Next Match")).clicked() || enter {
+            if icon_only_button(ui, Icon::JogDown, &tr.tr("Next Match")).clicked() || enter {
                 self.find_next();
             }
             if enter {
                 response.request_focus();
             }
             if !self.find_query.is_empty() {
-                let generation = self.buffer.generation();
-                let count = match &self.find_count {
-                    Some((query, g, n)) if *query == self.find_query && *g == generation => *n,
-                    _ => {
-                        let n = find::count(self.buffer.text(), &self.find_query);
-                        self.find_count = Some((self.find_query.clone(), generation, n));
-                        n
-                    }
-                };
+                let count = self.match_count();
                 ui.label(format!("{} {count}", tr.tr("Matches:")));
+            }
+            let clear = ui
+                .add_enabled_ui(!self.locked, |ui| {
+                    icon_only_button(ui, Icon::Clear, &tr.tr("Clear editor"))
+                })
+                .inner;
+            if clear.clicked() {
+                self.request_clear(tr);
+            }
+            save = icon_only_button(ui, Icon::Save, &tr.tr("Save G-code")).clicked();
+        });
+        self.show_replace(ui, tr);
+        save
+    }
+
+    /// The number of matches of the find query, counted once per query and edit.
+    fn match_count(&mut self) -> usize {
+        let generation = self.buffer.generation();
+        match &self.find_count {
+            Some((query, g, n)) if *query == self.find_query && *g == generation => *n,
+            _ => {
+                let n = find::count(self.buffer.text(), &self.find_query);
+                self.find_count = Some((self.find_query.clone(), generation, n));
+                n
+            }
+        }
+    }
+
+    /// GTK's replace row: "Replace with ...", Replace and Replace All (icon buttons), enabled
+    /// when the query has matches, the replacement is not empty and the text may be changed.
+    fn show_replace(&mut self, ui: &mut egui::Ui, tr: &Translator) {
+        ui.horizontal(|ui| {
+            let hint = tr.tr("Replace with ...");
+            let rest = 2.0 * 36.0;
+            let edit = egui::TextEdit::singleline(&mut self.replace_text)
+                .hint_text(hint.as_ref())
+                .desired_width((ui.available_width() - rest).clamp(80.0, 200.0));
+            let response = ui.add(edit);
+            response.widget_info(|| {
+                let mut info = egui::WidgetInfo::text_edit(
+                    true,
+                    &self.replace_text,
+                    &self.replace_text,
+                    hint.as_ref(),
+                );
+                info.label = Some(hint.clone().into_owned());
+                info
+            });
+            let enabled = self.editable()
+                && !self.find_query.is_empty()
+                && !self.replace_text.is_empty()
+                && self.match_count() > 0;
+            let (replace, replace_all) = ui
+                .add_enabled_ui(enabled, |ui| {
+                    (
+                        icon_only_button(ui, Icon::Replace, &tr.tr("Replace")).clicked(),
+                        icon_only_button(ui, Icon::Exchange, &tr.tr("Replace All")).clicked(),
+                    )
+                })
+                .inner;
+            if replace {
+                self.replace(tr);
+            }
+            if replace_all {
+                self.replace_all(tr);
             }
         });
     }
@@ -367,12 +568,12 @@ impl EditorPane {
             ));
             if self.locked {
                 ui.separator();
-                ui.label(tr.tr("Read-only while a job is running."));
+                ui.label(tr.tr(READ_ONLY_DURING_JOB));
             }
             if self.is_large() {
                 ui.separator();
                 ui.label(tr.tr("Large file: shown read-only to stay fast."));
-                ui.checkbox(&mut self.edit_large, tr.tr("Edit anyway"));
+                crate::theme::checkbox(ui, &mut self.edit_large, tr.tr("Edit anyway"));
             }
         });
         if let Some(notice) = &self.notice {
@@ -393,9 +594,14 @@ impl Pane for EditorPane {
     fn ui(&mut self, ui: &mut egui::Ui, ctx: &mut PaneContext) {
         let tr = ctx.tr;
         self.locked = ctx.machine().is_some_and(|m| m.job_running());
-        egui::Panel::top("gcodekit5-editor-find")
+        let save = egui::Panel::top("gcodekit5-editor-find")
             .show_separator_line(false)
-            .show(ui, |ui| self.show_find(ui, tr));
+            .show(ui, |ui| self.show_find(ui, tr))
+            .inner;
+        // GTK's editor header Save button: File > Save for the editor.
+        if save {
+            ctx.request(crate::commands::Command::FileSave);
+        }
         egui::Panel::bottom("gcodekit5-editor-status")
             .show_separator_line(false)
             .show(ui, |ui| self.show_status(ui, tr));
@@ -408,6 +614,30 @@ impl Pane for EditorPane {
             self.show_text_edit(ui, &style, row_height, &label);
         }
         self.settle_scroll();
+    }
+
+    fn take_confirm(&mut self) -> Option<ConfirmRequest> {
+        self.confirm.take()
+    }
+
+    fn confirmed(
+        &mut self,
+        request: ConfirmRequest,
+        choice: ConfirmChoice,
+        ctx: &mut PaneContext,
+    ) -> bool {
+        if request != ConfirmRequest::ClearEditor {
+            return false;
+        }
+        if choice == ConfirmChoice::Yes {
+            // Checked again: a job may have started while the question was open.
+            if ctx.machine().is_some_and(|m| m.job_running()) {
+                self.notice = Some(ctx.tr.tr(READ_ONLY_DURING_JOB).into_owned());
+            } else {
+                self.clear();
+            }
+        }
+        true
     }
 
     fn machine_events(&mut self, events: &[MachineEvent], _tr: &Translator) {
@@ -424,6 +654,7 @@ impl Pane for EditorPane {
                 | MachineEvent::Error(_)
                 | MachineEvent::StreamFinished { .. }
                 | MachineEvent::StreamHalted { .. }
+                | MachineEvent::ProtocolMismatch { .. }
                 | MachineEvent::StreamStopped { .. } => {}
             }
         }
@@ -455,6 +686,28 @@ impl Pane for SharedEditor {
         match self.0.try_borrow_mut() {
             Ok(mut pane) => pane.machine_events(events, tr),
             Err(error) => tracing::warn!(%error, "editor busy; machine events dropped"),
+        }
+    }
+
+    fn take_confirm(&mut self) -> Option<ConfirmRequest> {
+        self.0
+            .try_borrow_mut()
+            .ok()
+            .and_then(|mut pane| pane.take_confirm())
+    }
+
+    fn confirmed(
+        &mut self,
+        request: ConfirmRequest,
+        choice: ConfirmChoice,
+        ctx: &mut PaneContext,
+    ) -> bool {
+        match self.0.try_borrow_mut() {
+            Ok(mut pane) => pane.confirmed(request, choice, ctx),
+            Err(error) => {
+                tracing::warn!(%error, "editor busy; confirmation dropped");
+                false
+            }
         }
     }
 }

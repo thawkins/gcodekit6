@@ -12,7 +12,7 @@ use glam::Vec2;
 use crate::test_designer_canvas::selected;
 
 /// The app's designer, with the Designer tab shown.
-fn app_with_designer() -> Harness<'static, gcodekit5_ui_egui::GcodeKitApp> {
+pub fn app_with_designer() -> Harness<'static, gcodekit5_ui_egui::GcodeKitApp> {
     use gcodekit5_settings::SettingsManager;
     use gcodekit5_settings::config::Config;
     use gcodekit5_ui_egui::{AppState, GcodeKitApp};
@@ -21,19 +21,13 @@ fn app_with_designer() -> Harness<'static, gcodekit5_ui_egui::GcodeKitApp> {
         crate::test_smoke::native_decision(),
     ));
     let mut h = crate::machine_support::app_harness(app);
-    let shown = h
-        .state_mut()
-        .workspace_mut()
-        .apply(craft_ui::docking::Action::Activate {
-            panel: PaneId::Designer,
-        });
-    assert!(shown.is_ok(), "{shown:?}");
+    h.state_mut().workspace_mut().show_pane(PaneId::Designer);
     h.run();
     h
 }
 
 /// Clicks `pos` in the app with the real pointer events.
-fn app_click(h: &mut Harness<'_, gcodekit5_ui_egui::GcodeKitApp>, pos: Pos2) {
+pub fn app_click(h: &mut Harness<'_, gcodekit5_ui_egui::GcodeKitApp>, pos: Pos2) {
     h.event(egui::Event::PointerMoved(pos));
     h.step();
     h.event(egui::Event::PointerButton {
@@ -103,17 +97,69 @@ fn test_canvas_keys_do_not_fire_while_typing() {
         .world_to_screen(Vec2::new(40.0, 40.0));
     app_click(&mut h, p);
     assert_eq!(selected(&designer.borrow()).len(), 1);
-    // Give a text field the keyboard: Delete, Escape and Cmd+Z belong to it now.
-    let field = h
-        .get_all_by_role(egui::accesskit::Role::TextInput)
-        .next()
-        .expect("a text field");
+    // Give a text field (the inspector's X) the keyboard: Delete, Cmd+Z and Escape belong
+    // to it now. Each key is its own frame, as typed: Escape ends the field's focus at the
+    // start of its frame, so a Cmd+Z in that same frame would no longer be the field's.
+    let field = h.get_by_role_and_label(egui::accesskit::Role::TextInput, "X:");
     field.focus();
     h.run();
     h.key_press(egui::Key::Delete);
-    h.key_press(egui::Key::Escape);
+    h.run();
     h.key_press_modifiers(Modifiers::COMMAND, egui::Key::Z);
+    h.run();
+    h.key_press(egui::Key::Escape);
     h.run();
     assert_eq!(designer.borrow().state().canvas.shape_count(), 1);
     assert_eq!(selected(&designer.borrow()).len(), 1);
+}
+
+/// GTK's empty state: with no shapes the canvas shows "No shapes yet" and the open and
+/// import buttons; Load Design opens a design, each Import opens the import dialog, Import
+/// STL shows only with STL import on, Import Image is disabled in CNC mode, and the empty
+/// state goes once a shape is drawn.
+#[test]
+fn test_empty_design_shows_gtks_open_and_import_buttons() {
+    let mut h = app_with_designer();
+    let _ = h.get_by_label("No shapes yet");
+    assert!(
+        h.query_by_label("Import STL").is_none(),
+        "STL import is off"
+    );
+    for (label, command) in [
+        ("Load Design", Command::FileOpen),
+        ("Import SVG", Command::FileImport),
+        ("Import DXF", Command::FileImport),
+        ("Import Image", Command::FileImportImage),
+    ] {
+        h.get_by_label(label).click();
+        h.run();
+        assert_eq!(h.state().last_dispatched(), Some(command), "{label}");
+    }
+    let mut config = h.state().state().config().clone();
+    config.ui.enable_stl_import = true;
+    h.state_mut().workspace_mut().configure(&config);
+    h.run();
+    h.get_by_label("Import STL").click();
+    h.run();
+    assert_eq!(h.state().last_dispatched(), Some(Command::FileImport));
+    let designer = std::rc::Rc::clone(h.state().designer());
+    designer
+        .borrow_mut()
+        .state_mut()
+        .set_machine_mode(gcodekit5_designer::designer_state::MachineMode::Cnc3D);
+    h.run();
+    {
+        use egui_kittest::kittest::NodeT;
+        assert!(
+            h.get_by_label("Import Image")
+                .accesskit_node()
+                .is_disabled()
+        );
+    }
+    designer
+        .borrow_mut()
+        .state_mut()
+        .add_shape_with_undo(Shape::Rectangle(DesignRectangle::new(0.0, 0.0, 10.0, 10.0)));
+    h.run();
+    assert!(h.query_by_label("No shapes yet").is_none());
 }

@@ -15,12 +15,17 @@
 //! `gcodekit5-communication` (status report types).
 
 use std::sync::{Arc, Mutex, PoisonError};
+use std::time::Instant;
 
 use gcodekit5_app::i18n::Translator;
-use gcodekit5_app::machine::grbl_stream::{MAX_LINE_LENGTH, prepare_program};
-use gcodekit5_app::machine::{MachineController, MachineEvent, worker_text};
+use gcodekit5_app::machine::grbl_stream::{
+    GrblResponseLine, MAX_LINE_LENGTH, classify_response, prepare_program,
+};
+use gcodekit5_app::machine::{MachineController, MachineEvent, REPETIER_ESTOP_LABEL, worker_text};
+use gcodekit5_app::work_zero::{Wcs, WcsWord, parser_state_wcs, wcs_in_line};
+use gcodekit5_communication::firmware::ControllerProtocol;
 use gcodekit5_communication::firmware::grbl::status_parser::{
-    FullStatus, WorkCoordinateOffset, parse_probe_report_in,
+    FullStatus, OverrideState, WorkCoordinateOffset, parse_probe_report_in,
 };
 use gcodekit5_core::ProbeResult;
 
@@ -53,12 +58,18 @@ pub struct MachineStatus {
     pub streaming: bool,
     /// The latest stream progress, kept after the stream ends.
     pub progress: Option<Progress>,
+    /// When the running stream started (its first progress report); `None` when no stream
+    /// runs. The status bar's elapsed and remaining times count from it.
+    pub stream_started: Option<Instant>,
     /// How the last stream ended, if one did.
     pub stream_end: Option<StreamEnd>,
     /// The latest status report.
     pub report: Option<FullStatus>,
     /// The latest work coordinate offset (GRBL sends it only every few reports).
     pub wco: Option<WorkCoordinateOffset>,
+    /// The latest override percentages (GRBL sends `Ov:` only every few reports and on a
+    /// change).
+    pub overrides: Option<OverrideState>,
     /// The latest error reported by the controller or transport.
     pub last_error: Option<String>,
     /// X, Y and Z max travel in mm (`$130`-`$132`), once the controller reported them.
@@ -66,6 +77,20 @@ pub struct MachineStatus {
     /// Whether the controller reports positions in inches (`$13=1`). Until a `$$` line says
     /// so, reports are taken as mm, GRBL's default (as the GTK front end does).
     pub report_inches: bool,
+    /// The active work coordinate system: from the controller's parser state (`[GC:...]`)
+    /// or a G54-G59 line sent since. `None` until known, and again after a controller reset
+    /// (which restores the default) until the controller reports it. A stream's program may
+    /// change it too; the Machine Control pane asks the controller again after one.
+    pub active_wcs: Option<Wcs>,
+    /// Whether the controller reported its parser state on this connection; until it does,
+    /// a front end may fall back to the system the user last selected.
+    pub wcs_reported: bool,
+    /// The Repetier emergency stop (`M112`) was sent: the firmware is halted until it
+    /// restarts (its `start` line) or the connection is opened again, so motion is disabled.
+    pub estopped: bool,
+    /// Whether the active system is outside G54-G59 (`G59.1`, `G54.1`), as reported or sent;
+    /// [`MachineStatus::active_wcs`] is then `None`. Cleared by a G54-G59 report or line.
+    pub wcs_outside: bool,
 }
 
 /// X, Y and Z in millimetres.
@@ -110,10 +135,12 @@ impl MachineStatus {
     /// a report, or in any other state (Home, Alarm, Hold, Check, Run, Door, ...), a `$J`
     /// would wait in the controller's buffer and run later from a stale position.
     pub fn jog_allowed(&self) -> bool {
-        self.report
-            .as_ref()
-            .and_then(|r| r.machine_state.as_deref())
-            .is_some_and(|state| state.starts_with("Idle") || state.starts_with("Jog"))
+        !self.estopped
+            && self
+                .report
+                .as_ref()
+                .and_then(|r| r.machine_state.as_deref())
+                .is_some_and(|state| state.starts_with("Idle") || state.starts_with("Jog"))
     }
 
     /// The machine position (`MPos`) of the latest report, or `WPos + WCO` when the report
@@ -138,6 +165,75 @@ impl MachineStatus {
         })
     }
 
+    /// Which of A, B and C the latest report carries (in `MPos` or `WPos`): the rotary axes
+    /// the machine has, whose readout rows are shown.
+    pub fn rotary_reported(&self) -> [bool; 3] {
+        let Some(report) = self.report.as_ref() else {
+            return [false; 3];
+        };
+        let m = report.mpos.map_or([None; 3], |p| [p.a, p.b, p.c]);
+        let w = report.wpos.map_or([None; 3], |p| [p.a, p.b, p.c]);
+        [0, 1, 2].map(|i| m[i].is_some() || w[i].is_some())
+    }
+
+    /// The work position of A, B and C in degrees, for each rotary axis the latest report
+    /// carries (`WPos`, or `MPos - WCO`); `None` for an axis it does not.
+    pub fn work_rotary(&self) -> [Option<f32>; 3] {
+        let Some(report) = self.report.as_ref() else {
+            return [None; 3];
+        };
+        let off = |o: Option<f64>| o.unwrap_or(0.0);
+        if let Some(w) = report.wpos {
+            return [w.a, w.b, w.c].map(|v| v.map(|v| v as f32));
+        }
+        match (report.mpos, self.wco) {
+            (Some(m), Some(o)) => {
+                [(m.a, o.a), (m.b, o.b), (m.c, o.c)].map(|(v, o)| v.map(|v| (v - off(o)) as f32))
+            }
+            (Some(_) | None, _) => [None; 3],
+        }
+    }
+
+    /// The machine position of A, B and C in degrees, for each rotary axis the latest
+    /// report carries (`MPos`, or `WPos + WCO`); `None` for an axis it does not.
+    pub fn machine_rotary(&self) -> [Option<f32>; 3] {
+        let Some(report) = self.report.as_ref() else {
+            return [None; 3];
+        };
+        let off = |o: Option<f64>| o.unwrap_or(0.0);
+        if let Some(m) = report.mpos {
+            return [m.a, m.b, m.c].map(|v| v.map(|v| v as f32));
+        }
+        match (report.wpos, self.wco) {
+            (Some(w), Some(o)) => {
+                [(w.a, o.a), (w.b, o.b), (w.c, o.c)].map(|(v, o)| v.map(|v| (v + off(o)) as f32))
+            }
+            (Some(_) | None, _) => [None; 3],
+        }
+    }
+
+    /// The planner blocks and RX bytes free of the latest report's `Bf:` field, as
+    /// `plan/rx` (GTK's "Buffer:" readout); `None` when the controller does not send it.
+    pub fn buffer_text(&self) -> Option<String> {
+        let buffer = self.report.as_ref()?.buffer?;
+        Some(format!("{}/{}", buffer.plan, buffer.rx))
+    }
+
+    /// Takes `word` as the active system: a G54-G59 one, or one outside them (then unknown
+    /// to the zero commands).
+    fn set_wcs(&mut self, word: WcsWord) {
+        match word {
+            WcsWord::Known(wcs) => {
+                self.active_wcs = Some(wcs);
+                self.wcs_outside = false;
+            }
+            WcsWord::Other => {
+                self.active_wcs = None;
+                self.wcs_outside = true;
+            }
+        }
+    }
+
     /// Folds `events` (oldest first) into the status.
     ///
     /// # Arguments
@@ -148,17 +244,24 @@ impl MachineStatus {
                 MachineEvent::Connected => {
                     self.connected = true;
                     self.last_error = None;
+                    self.estopped = false;
                 }
                 MachineEvent::Disconnected => {
                     if self.streaming {
                         self.stream_end = Some(StreamEnd::Stopped);
                     }
                     self.connected = false;
+                    self.estopped = false;
                     self.streaming = false;
+                    self.stream_started = None;
                     self.report = None;
                     self.wco = None;
+                    self.overrides = None;
                     self.grbl_travel = [None; 3];
                     self.report_inches = false;
+                    self.active_wcs = None;
+                    self.wcs_reported = false;
+                    self.wcs_outside = false;
                 }
                 MachineEvent::StatusReport(report) => {
                     // Positions, offsets and feed are kept in mm whatever `$13` says.
@@ -166,9 +269,26 @@ impl MachineStatus {
                     if let Some(wco) = report.wco {
                         self.wco = Some(wco);
                     }
+                    if let Some(overrides) = report.overrides {
+                        self.overrides = Some(overrides);
+                    }
                     self.report = Some(report);
                 }
                 MachineEvent::Received(line) => {
+                    if line.trim().eq_ignore_ascii_case("start") {
+                        // A Repetier firmware restarted: an emergency stop is over.
+                        self.estopped = false;
+                    }
+                    if let Some(word) = parser_state_wcs(line) {
+                        self.set_wcs(word);
+                        self.wcs_reported = true;
+                    } else if matches!(classify_response(line), GrblResponseLine::Reset(_)) {
+                        // A reset restores the default system: unknown until reported
+                        // again (without reports the last one stays as the fallback).
+                        if self.wcs_reported {
+                            self.active_wcs = None;
+                        }
+                    }
                     if let Some((index, travel)) = parse_travel(line) {
                         self.grbl_travel[index] = Some(travel);
                     }
@@ -185,6 +305,7 @@ impl MachineStatus {
                 MachineEvent::StreamProgress { sent, acked, total } => {
                     if !self.streaming {
                         self.stream_end = None;
+                        self.stream_started = Some(Instant::now());
                     }
                     self.streaming = true;
                     self.progress = Some(Progress {
@@ -195,6 +316,7 @@ impl MachineStatus {
                 }
                 MachineEvent::StreamFinished { lines } => {
                     self.streaming = false;
+                    self.stream_started = None;
                     self.stream_end = Some(StreamEnd::Finished);
                     self.progress = Some(Progress {
                         sent: *lines,
@@ -204,6 +326,7 @@ impl MachineStatus {
                 }
                 MachineEvent::StreamStopped { acked, total } => {
                     self.streaming = false;
+                    self.stream_started = None;
                     self.stream_end = Some(StreamEnd::Stopped);
                     let sent = self.progress.map_or(*acked, |p| p.sent.max(*acked));
                     self.progress = Some(Progress {
@@ -212,9 +335,18 @@ impl MachineStatus {
                         total: *total,
                     });
                 }
-                MachineEvent::Sent(_) => {}
+                MachineEvent::Sent(line) if line == REPETIER_ESTOP_LABEL => self.estopped = true,
+                MachineEvent::Sent(line) => {
+                    // Lines run in order, so a later `G10 L20` acts on this system.
+                    if let Some(word) = wcs_in_line(line) {
+                        self.set_wcs(word);
+                    }
+                }
                 MachineEvent::Error(message) => self.last_error = Some(message.clone()),
                 MachineEvent::StreamHalted { reason } => self.last_error = Some(reason.clone()),
+                // `Disconnected` follows; the panes word the rejection
+                // ([`protocol_mismatch_text`]).
+                MachineEvent::ProtocolMismatch { .. } => {}
             }
         }
     }
@@ -238,9 +370,35 @@ pub fn coalesce_progress(events: Vec<MachineEvent>) -> Vec<MachineEvent> {
         .collect()
 }
 
+/// GTK's notice when the controller identified as another firmware than the active machine's
+/// (`{}` the configured, then the detected protocol).
+pub const PROTOCOL_MISMATCH: &str = n_!(
+    "Connection rejected: active machine is configured as {} but the device responded as {}. Change the active machine in the Device Manager."
+);
+
+/// The notice for [`MachineEvent::ProtocolMismatch`], naming both protocols, as GTK's
+/// `protocol_mismatch` worded it.
+///
+/// # Arguments
+/// * `configured` - The protocol the connection was opened for.
+/// * `detected` - The protocol the controller identified as.
+/// * `tr` - Translator for the current UI language.
+pub fn protocol_mismatch_text(
+    configured: ControllerProtocol,
+    detected: ControllerProtocol,
+    tr: &Translator,
+) -> String {
+    tr.tr(PROTOCOL_MISMATCH)
+        .replacen("{}", configured.as_str(), 1)
+        .replacen("{}", detected.as_str(), 1)
+}
+
 /// The controller's own message texts, for the translation check.
 pub fn worker_msgids() -> Vec<&'static str> {
-    worker_text::ALL.to_vec()
+    worker_text::ALL
+        .into_iter()
+        .chain([PROTOCOL_MISMATCH])
+        .collect()
 }
 
 /// Translates `message` when it is one of `msgids`, alone or followed by `": "` and a
@@ -298,6 +456,10 @@ pub struct Machine {
     program: Option<Arc<[String]>>,
     /// Whether the controller's latest report was fresh when this frame polled it.
     report_fresh: bool,
+    /// Whether every line sent had been answered just before the last poll.
+    answered_at_poll: bool,
+    /// How many times [`Machine::poll`] ran.
+    polls: u64,
 }
 
 impl Machine {
@@ -313,6 +475,8 @@ impl Machine {
             pending: Vec::new(),
             program: None,
             report_fresh: true,
+            answered_at_poll: true,
+            polls: 0,
         }
     }
 
@@ -342,22 +506,41 @@ impl Machine {
     /// Takes the controller's events, replacing the previous frame's, and updates the status.
     /// Call once per frame. Never blocks on I/O.
     pub fn poll(&mut self) {
-        let (fresh, events) = {
+        let (fresh, answered, events) = {
             let mut controller = lock(&self.controller);
             // Freshness first: the worker marks a report fresh after sending it, so a fresh
-            // report is already among the events polled next.
-            (controller.report_fresh(), controller.poll())
+            // report is already among the events polled next. Likewise a line's reply text
+            // (`[GC:...]`) is read before its `ok`.
+            (
+                controller.report_fresh(),
+                controller.lines_answered(),
+                controller.poll(),
+            )
         };
         self.report_fresh = fresh;
+        self.answered_at_poll = answered;
+        self.polls += 1;
         self.events = coalesce_progress(events);
         self.status.apply(&self.events);
         self.pending.extend(self.events.iter().cloned());
     }
 
+    /// How many times [`Machine::poll`] ran; with [`Machine::lines_answered_at_poll`] a
+    /// consumer tells whether a line it sent had its reply before a later poll.
+    pub fn polls(&self) -> u64 {
+        self.polls
+    }
+
+    /// Whether every line sent had been answered (see `MachineController::lines_answered`)
+    /// just before the last poll, so the replies' text lines are among the events it took.
+    pub fn lines_answered_at_poll(&self) -> bool {
+        self.answered_at_poll
+    }
+
     /// Takes the events that no observer has taken yet: those of [`Machine::poll`] and
     /// [`Machine::absorb`] since the last call. The app calls this at every point events may
     /// have arrived and hands them to every pane, drawn or not, so a pane that keeps a log
-    /// (the console) misses nothing while its tab is hidden.
+    /// (the console) misses nothing while its page is hidden.
     pub fn take_pending(&mut self) -> Vec<MachineEvent> {
         std::mem::take(&mut self.pending)
     }

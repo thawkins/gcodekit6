@@ -209,6 +209,45 @@ impl DesignerState {
         self.push_command(cmd);
     }
 
+    /// Duplicates the selected shapes `offset` mm right and up (GTK's Ctrl+D: 10 mm) as one
+    /// undo step: the copies get new ids and their own group ids, and become the selection.
+    /// The originals are left as they are. Does nothing without a selection.
+    ///
+    /// # Arguments
+    /// * `offset` - How far the copies are moved on X and Y, in mm.
+    pub fn duplicate_selected(&mut self, offset: f64) {
+        let selected: Vec<DrawingObject> = self
+            .canvas
+            .shapes()
+            .filter(|s| s.selected)
+            .cloned()
+            .collect();
+        if selected.is_empty() {
+            return;
+        }
+        self.canvas.deselect_all();
+        let mut group_map = std::collections::HashMap::new();
+        let mut ids = Vec::with_capacity(selected.len());
+        let mut objects = Vec::with_capacity(selected.len());
+        for mut obj in selected {
+            obj.id = self.canvas.generate_id();
+            if let Some(gid) = obj.group_id {
+                let new_gid = *group_map
+                    .entry(gid)
+                    .or_insert_with(|| self.canvas.generate_id());
+                obj.group_id = Some(new_gid);
+            }
+            obj.shape.translate(offset, offset);
+            obj.selected = true;
+            ids.push(obj.id);
+            objects.push(Some(obj));
+        }
+        if let Some(last_id) = ids.last() {
+            self.canvas.set_selected_id(Some(*last_id));
+        }
+        self.push_command(DesignerCommand::PasteShapes(PasteShapes { ids, objects }));
+    }
+
     /// Groups the selected shapes.
     pub fn group_selected(&mut self) {
         let ids: Vec<u64> = self

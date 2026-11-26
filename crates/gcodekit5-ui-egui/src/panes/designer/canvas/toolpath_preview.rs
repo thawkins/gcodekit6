@@ -16,10 +16,16 @@
 //! Rapid moves are dashed in the warning colour at 50%; cuts and arcs are in the success
 //! colour at 70% (GTK's colours).
 //!
-//! Not ported: GTK's status-bar progress and cancel button for the build.
+//! While a build runs, the toolbox's View Controls show GTK's spinner with the share of
+//! shapes done and a Cancel button ([`ToolpathPreview::progress`], [`ToolpathPreview::cancel`]):
+//! the worker stops at the next shape, the preview is cleared (GTK kept a stale one) and no
+//! build starts again until the design changes. GTK also showed the progress in the status
+//! bar; egui shows it only beside Show Toolpaths.
 //!
 //! Dependencies: `egui`, `gcodekit5-designer` (toolpath generator, model).
 
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::mpsc::{Receiver, TryRecvError, channel};
 
 use egui::{Painter, Pos2, Shape as EguiShape, Stroke};
@@ -175,16 +181,44 @@ fn shape_toolpaths(
 }
 
 /// Builds the toolpaths of `shapes`.
-fn build(shapes: &[DrawingObject], settings: &PreviewSettings) -> Vec<Toolpath> {
+///
+/// # Returns
+/// The toolpaths, or `None` when `cancel` was set before the last shape was done.
+fn build(
+    shapes: &[DrawingObject],
+    settings: &PreviewSettings,
+    cancel: &AtomicBool,
+    done: &AtomicUsize,
+) -> Option<Vec<Toolpath>> {
     let mut generator = ToolpathGenerator::new();
     generator.set_feed_rate(settings.feed_rate);
     generator.set_spindle_speed(settings.spindle_speed);
     generator.set_tool_diameter(settings.tool_diameter);
     generator.set_step_in(settings.tool_diameter * 0.4);
-    shapes
-        .iter()
-        .flat_map(|shape| shape_toolpaths(&mut generator, settings, shape))
-        .collect()
+    let mut toolpaths = Vec::new();
+    for shape in shapes {
+        if cancel.load(Ordering::Relaxed) {
+            return None;
+        }
+        toolpaths.extend(shape_toolpaths(&mut generator, settings, shape));
+        done.fetch_add(1, Ordering::Relaxed);
+    }
+    Some(toolpaths)
+}
+
+/// A build on the worker thread.
+#[derive(Debug)]
+struct Running {
+    /// The design revision it builds for.
+    revision: u64,
+    /// Its result; `None` when it was cancelled.
+    receiver: Receiver<Option<Vec<Toolpath>>>,
+    /// Set to stop it at the next shape.
+    cancel: Arc<AtomicBool>,
+    /// The shapes done so far.
+    done: Arc<AtomicUsize>,
+    /// The shapes it builds.
+    total: usize,
 }
 
 /// The visible shapes of `state`, in draw order.
@@ -203,13 +237,16 @@ pub struct ToolpathPreview {
     toolpaths: Vec<Toolpath>,
     /// The design revision `toolpaths` were built for.
     built_for: Option<u64>,
-    /// The build on the worker thread and the revision it builds for (at most one).
-    running: Option<(u64, Receiver<Vec<Toolpath>>)>,
+    /// The build on the worker thread (at most one).
+    running: Option<Running>,
     /// How many builds were started (for tests).
     started: u64,
     /// Test hook: builds panic while set.
     #[cfg(any(test, feature = "test-support"))]
     panic_builds: bool,
+    /// Test hook: each build waits this long before its first shape.
+    #[cfg(any(test, feature = "test-support"))]
+    build_delay: Option<std::time::Duration>,
 }
 
 impl ToolpathPreview {
@@ -236,6 +273,38 @@ impl ToolpathPreview {
     /// Builds started so far.
     pub fn started(&self) -> u64 {
         self.started
+    }
+
+    /// The share of shapes the running build has done (0.0 to 1.0), or `None` when no build
+    /// runs.
+    pub fn progress(&self) -> Option<f32> {
+        self.running.as_ref().map(|r| {
+            let done = r.done.load(Ordering::Relaxed).min(r.total);
+            done as f32 / r.total.max(1) as f32
+        })
+    }
+
+    /// GTK's Cancel: stops the running build at its next shape and clears the preview; no
+    /// build starts again until the design changes from `revision`. Does nothing when no
+    /// build runs.
+    ///
+    /// # Arguments
+    /// * `revision` - The design's current revision, which counts as previewed (empty).
+    pub fn cancel(&mut self, revision: u64) {
+        if let Some(running) = self.running.take() {
+            running.cancel.store(true, Ordering::Relaxed);
+            self.built_for = Some(revision);
+            self.toolpaths.clear();
+        }
+    }
+
+    /// Test hook: each build waits `delay` before its first shape, so a test sees it run.
+    ///
+    /// # Arguments
+    /// * `delay` - The wait, or `None` for none.
+    #[cfg(any(test, feature = "test-support"))]
+    pub fn set_build_delay(&mut self, delay: Option<std::time::Duration>) {
+        self.build_delay = delay;
     }
 
     /// Test hook: while `on`, every build panics on its worker thread.
@@ -268,17 +337,27 @@ impl ToolpathPreview {
         dragging: bool,
     ) {
         if !state.show_toolpaths {
-            self.running = None;
+            // The build's work is no longer wanted: stop it at its next shape.
+            if let Some(running) = self.running.take() {
+                running.cancel.store(true, Ordering::Relaxed);
+            }
             self.built_for = None;
             return;
         }
-        if let Some((key, receiver)) = &self.running {
+        if let Some(Running {
+            revision: key,
+            receiver,
+            ..
+        }) = &self.running
+        {
             match receiver.try_recv() {
-                Ok(toolpaths) => {
+                Ok(Some(toolpaths)) => {
                     self.toolpaths = toolpaths;
                     self.built_for = Some(*key);
                     self.running = None;
                 }
+                // Cancelled: `cancel` already took the build; nothing else cancels one.
+                Ok(None) => self.running = None,
                 Err(TryRecvError::Empty) => {}
                 Err(TryRecvError::Disconnected) => {
                     // The build panicked. Retrying the same design would panic again, every
@@ -297,9 +376,13 @@ impl ToolpathPreview {
         if self.running.is_none() && !dragging && self.built_for != Some(revision) {
             let (sender, receiver) = channel();
             let shapes = visible(state, flags);
+            let total = shapes.len();
             let settings = PreviewSettings::of(state);
+            let cancel = Arc::new(AtomicBool::new(false));
+            let done = Arc::new(AtomicUsize::new(0));
+            let (worker_cancel, worker_done) = (Arc::clone(&cancel), Arc::clone(&done));
             #[cfg(any(test, feature = "test-support"))]
-            let panic_build = self.panic_builds;
+            let (panic_build, delay) = (self.panic_builds, self.build_delay);
             let spawned = std::thread::Builder::new()
                 .name("designer-toolpath-preview".into())
                 .spawn(move || {
@@ -307,12 +390,23 @@ impl ToolpathPreview {
                     if panic_build {
                         panic!("toolpath preview build panic requested by test hook");
                     }
-                    // The receiver is gone when the preview was switched off meanwhile.
-                    let _ = sender.send(build(&shapes, &settings));
+                    #[cfg(any(test, feature = "test-support"))]
+                    if let Some(delay) = delay {
+                        std::thread::sleep(delay);
+                    }
+                    // The receiver is gone when the preview was switched off or the build
+                    // cancelled meanwhile.
+                    let _ = sender.send(build(&shapes, &settings, &worker_cancel, &worker_done));
                 });
             match spawned {
                 Ok(_) => {
-                    self.running = Some((revision, receiver));
+                    self.running = Some(Running {
+                        revision,
+                        receiver,
+                        cancel,
+                        done,
+                        total,
+                    });
                     self.started += 1;
                 }
                 Err(error) => tracing::warn!(%error, "toolpath preview not built"),

@@ -2013,7 +2013,7 @@ See [FIRMWARE_CAPABILITIES_DATABASE.md](docs/FIRMWARE_CAPABILITIES_DATABASE.md) 
 - **Limits**: Up to 2^27 cells (512 MiB), enough for a full 1220 x 2440 mm sheet; larger stock is refused with a message before allocating.
 - **Rendering**: Surface mesh with coplanar faces and walls merged into large quads, drawn in a single shaded steel-grey colour with back-face culling.
 - **Performance**: Simulation and mesh building run on a background thread with progress and cancel; each run has its own cancel token. Loading or editing G-code clears the result.
-- **Integration**: Fully integrated into the GTK4 Visualizer widget with toggle controls.
+- **Integration**: Drawn in the egui Visualizer with the same view-projection as the toolpath, so the stock top sits at Z0 (Top reference) or at the thickness (Bottom reference) and the toolpath lies in its grooves; toggled from the Visualizer sidebar.
 
 ### 3D View Improvements
 - **Camera**: Added gimbal lock prevention (pitch clamped to +/- 89.9 degrees).

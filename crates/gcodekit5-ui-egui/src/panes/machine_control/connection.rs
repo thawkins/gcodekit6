@@ -8,6 +8,7 @@
 use gcodekit5_app::i18n::Translator;
 use gcodekit5_settings::{ConnectionSettings, ConnectionType};
 
+use crate::icons::{Icon, icon_only_button};
 use crate::machine::MachineStatus;
 
 /// The msgids this section shows.
@@ -83,15 +84,15 @@ impl ConnectionForm {
         self.ports = Some(ports);
     }
 
-    /// Draws the section.
-    pub(super) fn show(
-        &mut self,
-        ui: &mut egui::Ui,
-        tr: &Translator,
-        status: &MachineStatus,
-    ) -> Option<Action> {
+    /// Whether a connect is under way.
+    pub(super) fn connecting(&self) -> bool {
+        self.connecting
+    }
+
+    /// Draws the status strip (port or host, baud rate, state) above the section, as GTK's
+    /// sidebar starts with it.
+    pub(super) fn show_strip(&self, ui: &mut egui::Ui, tr: &Translator, status: &MachineStatus) {
         let network = !matches!(self.settings.connection_type, ConnectionType::Serial);
-        ui.strong(tr.tr("Connection"));
         ui.horizontal_wrapped(|ui| {
             if network {
                 ui.weak(format!(
@@ -104,15 +105,20 @@ impl ConnectionForm {
                 ui.weak(format!("{} {}", tr.tr("Port:"), self.settings.port));
                 ui.weak(format!("{} {}", tr.tr("Baud:"), self.settings.baud_rate));
             }
-            let state = if status.connected {
-                tr.tr("Connected")
-            } else if self.connecting {
-                tr.tr("Connecting…")
-            } else {
-                tr.tr("Disconnected")
-            };
-            ui.label(state);
+            ui.label(state_text(tr, status, self.connecting));
         });
+    }
+
+    /// Draws the section: the port list (or host and TCP port), then Connect or Disconnect
+    /// with the refresh button beside it.
+    pub(super) fn show(
+        &mut self,
+        ui: &mut egui::Ui,
+        tr: &Translator,
+        status: &MachineStatus,
+    ) -> Option<Action> {
+        let network = !matches!(self.settings.connection_type, ConnectionType::Serial);
+        crate::theme::section_heading(ui, &tr.tr("Connection"));
         let editable = !status.connected && !self.connecting;
         ui.add_enabled_ui(editable, |ui| {
             if network {
@@ -121,20 +127,40 @@ impl ConnectionForm {
                 self.show_ports(ui, tr);
             }
         });
-        let (label, action) = if status.connected || self.connecting {
-            (tr.tr("Disconnect"), Action::Disconnect)
-        } else {
-            (tr.tr("Connect"), Action::Connect)
-        };
-        let button = egui::Button::new(label).min_size(egui::vec2(ui.available_width(), 0.0));
-        ui.add(button).clicked().then_some(action)
+        let mut action = None;
+        ui.horizontal(|ui| {
+            let refresh = if network { 0.0 } else { 40.0 };
+            let size = egui::vec2(ui.available_width() - refresh, 0.0);
+            let button = if status.connected || self.connecting {
+                let label = tr.tr("Disconnect");
+                egui::Button::image_and_text(Icon::Disconnected.themed(ui), label).min_size(size)
+            } else {
+                crate::theme::primary_icon_button(Icon::Network.themed(ui), tr.tr("Connect"))
+                    .min_size(size)
+            };
+            if ui.add(button).clicked() {
+                action = Some(if status.connected || self.connecting {
+                    Action::Disconnect
+                } else {
+                    Action::Connect
+                });
+            }
+            if !network {
+                ui.add_enabled_ui(editable, |ui| {
+                    if icon_only_button(ui, Icon::Refresh, &tr.tr("Refresh ports")).clicked() {
+                        self.refresh_ports();
+                    }
+                });
+            }
+        });
+        action
     }
 
     /// The host and TCP port of a network connection.
     fn show_host(&mut self, ui: &mut egui::Ui, tr: &Translator) {
-        ui.horizontal(|ui| {
+        ui.horizontal_wrapped(|ui| {
             let host = ui.label(tr.tr("Host:"));
-            ui.add(egui::TextEdit::singleline(&mut self.settings.port).desired_width(120.0))
+            ui.add(egui::TextEdit::singleline(&mut self.settings.port).desired_width(90.0))
                 .labelled_by(host.id);
             let port = ui.label(tr.tr("Port:"));
             ui.add(egui::DragValue::new(&mut self.settings.tcp_port).range(1..=65535))
@@ -142,32 +168,44 @@ impl ConnectionForm {
         });
     }
 
-    /// The serial port list and its refresh button.
+    /// The serial port list, as wide as the column; named "Port:" for assistive technology
+    /// (the strip above shows the port).
     fn show_ports(&mut self, ui: &mut egui::Ui, tr: &Translator) {
         if self.ports.is_none() {
             self.refresh_ports();
         }
-        ui.horizontal(|ui| {
-            let ports = self.ports.as_deref().unwrap_or_default();
-            let selected = if ports.is_empty() && self.settings.port.trim().is_empty() {
-                tr.tr("No ports available").into_owned()
-            } else {
-                self.settings.port.clone()
-            };
-            let label = ui.label(tr.tr("Port:"));
-            egui::ComboBox::from_id_salt("machine-control-port")
-                .selected_text(selected)
-                .width(160.0)
-                .show_ui(ui, |ui| {
-                    for port in ports {
-                        ui.selectable_value(&mut self.settings.port, port.clone(), port);
-                    }
-                })
-                .response
-                .labelled_by(label.id);
-            if ui.button(tr.tr("Refresh ports")).clicked() {
-                self.refresh_ports();
-            }
-        });
+        let ports = self.ports.as_deref().unwrap_or_default();
+        let selected = if ports.is_empty() && self.settings.port.trim().is_empty() {
+            tr.tr("No ports available").into_owned()
+        } else {
+            self.settings.port.clone()
+        };
+        let response = egui::ComboBox::from_id_salt("machine-control-port")
+            .selected_text(selected)
+            .width(ui.available_width())
+            .show_ui(ui, |ui| {
+                for port in ports {
+                    ui.selectable_value(&mut self.settings.port, port.clone(), port);
+                }
+            })
+            .response;
+        let name = tr.tr("Port:");
+        let enabled = ui.is_enabled();
+        response.widget_info(|| egui::WidgetInfo::labeled(egui::Role::ComboBox, enabled, &name));
+    }
+}
+
+/// The connection state as text: Connected, Connecting… or Disconnected.
+pub(super) fn state_text(
+    tr: &Translator,
+    status: &MachineStatus,
+    connecting: bool,
+) -> std::borrow::Cow<'static, str> {
+    if status.connected {
+        tr.tr("Connected")
+    } else if connecting {
+        tr.tr("Connecting…")
+    } else {
+        tr.tr("Disconnected")
     }
 }

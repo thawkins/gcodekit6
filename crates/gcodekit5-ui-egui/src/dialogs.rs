@@ -14,13 +14,14 @@
 //! (translations).
 
 use std::collections::VecDeque;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use craft_dialogs::{
     Answer, FileDialog, Message, MessageButtons, MessageLevel, MessageResult, Override, Wake,
 };
 use gcodekit5_app::UnsavedChangesChoice;
 use gcodekit5_app::i18n::Translator;
+use gcodekit5_app::work_zero::Wcs;
 use raw_window_handle::{HasDisplayHandle, HasWindowHandle};
 
 /// What a file dialog is for; its answer comes back with it.
@@ -86,6 +87,31 @@ impl FilePurpose {
         }
     }
 
+    /// Whether a file chosen for this purpose becomes the folder the next file dialog starts
+    /// in: the editor's and the designer's files, as GTK remembered them; not presets,
+    /// firmware settings, tool catalogs or the Gerber and engraving inputs.
+    pub fn remembers_folder(self) -> bool {
+        match self {
+            Self::OpenGcode
+            | Self::SaveGcode
+            | Self::OpenDesign
+            | Self::SaveDesign
+            | Self::ImportDesign
+            | Self::ImportImage
+            | Self::ExportGcode
+            | Self::ExportSvg => true,
+            Self::LoadCamPreset
+            | Self::SaveCamPreset
+            | Self::OpenGerberFolder
+            | Self::OpenEngravingImage
+            | Self::ExportFirmwareSettings
+            | Self::ImportFirmwareSettings
+            | Self::ImportGtcPackage
+            | Self::ImportGtcJson
+            | Self::ExportCustomTools => false,
+        }
+    }
+
     /// The file types the dialog offers, the first one selected: an Open dialog offers its
     /// type and All Files, or nothing (every file) where All Files cannot be a filter
     /// ([`FileFilter::all_files`]); a Save dialog offers its own type. Import offers the
@@ -101,11 +127,7 @@ impl FilePurpose {
             Self::OpenDesign => open(FileFilter::DESIGN),
             Self::SaveGcode => vec![FileFilter::GCODE],
             Self::SaveDesign => vec![FileFilter::DESIGN],
-            Self::ImportDesign => {
-                let mut filters = vec![FileFilter::IMPORT, FileFilter::SVG, FileFilter::DXF];
-                filters.extend(FileFilter::all_files());
-                filters
-            }
+            Self::ImportDesign => import_design_filters(false),
             Self::ImportImage => vec![FileFilter::IMAGE],
             Self::ExportGcode => vec![FileFilter::GCODE_EXPORT],
             Self::ExportSvg => vec![FileFilter::SVG],
@@ -122,6 +144,26 @@ impl FilePurpose {
             Self::ExportCustomTools => vec![FileFilter::JSON],
         }
     }
+}
+
+/// The file types the designer's Import dialog offers, as GTK's: the supported files, SVG,
+/// DXF and, when Settings' "STL File Import" is on, STL; then All Files.
+///
+/// # Arguments
+/// * `stl_import` - Whether STL import is switched on (`ui.enable_stl_import`).
+pub fn import_design_filters(stl_import: bool) -> Vec<FileFilter> {
+    let mut filters = if stl_import {
+        vec![
+            FileFilter::IMPORT_WITH_STL,
+            FileFilter::SVG,
+            FileFilter::DXF,
+            FileFilter::STL,
+        ]
+    } else {
+        vec![FileFilter::IMPORT, FileFilter::SVG, FileFilter::DXF]
+    };
+    filters.extend(FileFilter::all_files());
+    filters
 }
 
 /// A file type a dialog offers: the English msgid of its name and its extensions.
@@ -149,6 +191,16 @@ impl FileFilter {
     pub const IMPORT: Self = Self {
         name_msgid: n_!("Supported Files"),
         extensions: &["svg", "dxf"],
+    };
+    /// GTK's "Supported Files" with STL import switched on in the settings.
+    pub const IMPORT_WITH_STL: Self = Self {
+        name_msgid: n_!("Supported Files"),
+        extensions: &["svg", "dxf", "stl"],
+    };
+    /// STL models (imported as their shadow, when the settings allow it).
+    pub const STL: Self = Self {
+        name_msgid: n_!("STL Files"),
+        extensions: &["stl"],
     };
     /// SVG drawings.
     pub const SVG: Self = Self {
@@ -235,6 +287,12 @@ pub enum ConfirmRequest {
     Restart,
     /// A job is running while the user quits: stop it and quit (Yes) or keep running (No).
     StopJob,
+    /// Zero All Axes: set the current X/Y/Z as 0 of the work coordinate system it names,
+    /// the active one when asked (Yes), or not (No). `None`: a controller without systems
+    /// (Repetier), whose zero sets the position with `G92`.
+    ZeroAllAxes(Option<Wcs>),
+    /// Clear editor: remove all G-code from the editor (Yes), or keep it (No).
+    ClearEditor,
 }
 
 impl ConfirmRequest {
@@ -269,6 +327,18 @@ impl ConfirmRequest {
             Self::StopJob => (
                 n_!("Stop job and quit?"),
                 n_!("A job is running. Quitting stops it and closes the machine connection."),
+            ),
+            Self::ClearEditor => (
+                n_!("Clear the editor?"),
+                n_!("All G-code in the editor will be removed."),
+            ),
+            Self::ZeroAllAxes(Some(_)) => (
+                n_!("Zero all work axes?"),
+                n_!("This sets work coordinate system {wcs} so the current X/Y/Z becomes 0."),
+            ),
+            Self::ZeroAllAxes(None) => (
+                n_!("Zero all work axes?"),
+                n_!("This sets the work position (G92) so the current X/Y/Z becomes 0."),
             ),
         }
     }
@@ -368,6 +438,11 @@ pub struct Dialogs {
     inner: craft_dialogs::Dialogs<Then>,
     translator: Translator,
     answers: VecDeque<DialogAnswer>,
+    /// Preferences > General's default folder, as last seen ([`Dialogs::follow_folder`]).
+    configured_folder: PathBuf,
+    /// The folder of the last file opened or saved since the default folder last changed
+    /// ([`Dialogs::remember_folder`]).
+    last_folder: Option<PathBuf>,
 }
 
 impl std::fmt::Debug for Dialogs {
@@ -391,6 +466,51 @@ impl Dialogs {
             inner: craft_dialogs::Dialogs::new(wake),
             translator,
             answers: VecDeque::new(),
+            configured_folder: PathBuf::new(),
+            last_folder: None,
+        }
+    }
+
+    /// Follows Preferences > General's default folder
+    /// (`file_processing.output_directory`): a change replaces the folder remembered from
+    /// the last file. Call it every frame.
+    ///
+    /// # Arguments
+    /// * `configured` - The folder in the settings (a file names its folder).
+    pub fn follow_folder(&mut self, configured: &Path) {
+        if self.configured_folder != configured {
+            self.configured_folder = configured.to_path_buf();
+            self.last_folder = None;
+        }
+    }
+
+    /// Remembers the folder of `file`, so the next file dialog starts there, as GTK's did.
+    ///
+    /// # Arguments
+    /// * `file` - A file just opened or saved.
+    ///
+    /// # Returns
+    /// The folder remembered, for the caller to keep in the settings; `None` for a path
+    /// without one.
+    pub fn remember_folder(&mut self, file: &Path) -> Option<PathBuf> {
+        let folder = file.parent().filter(|f| !f.as_os_str().is_empty())?;
+        self.last_folder = Some(folder.to_path_buf());
+        self.last_folder.clone()
+    }
+
+    /// The folder a file dialog starts in: the last file's, else the default folder (its
+    /// folder when it names a file); `None` without either.
+    pub fn start_folder(&self) -> Option<PathBuf> {
+        if let Some(last) = &self.last_folder {
+            return Some(last.clone());
+        }
+        let configured = &self.configured_folder;
+        if configured.as_os_str().is_empty() {
+            None
+        } else if configured.is_file() {
+            configured.parent().map(Path::to_path_buf)
+        } else {
+            Some(configured.clone())
         }
     }
 
@@ -436,6 +556,10 @@ impl Dialogs {
     }
 
     fn ask_file(&mut self, dialog: FileDialog, purpose: FilePurpose, filters: &[FileFilter]) {
+        let dialog = match self.start_folder() {
+            Some(folder) => dialog.directory(folder),
+            None => dialog,
+        };
         let tr = &self.translator;
         let dialog = filters.iter().fold(
             dialog.title(tr.tr(purpose.title_msgid())),
@@ -480,12 +604,27 @@ impl Dialogs {
                 ),
             ),
             ConfirmRequest::Restart => (MessageLevel::Info, MessageButtons::YesNo),
-            ConfirmRequest::StopJob => (MessageLevel::Warning, MessageButtons::YesNo),
+            ConfirmRequest::StopJob
+            | ConfirmRequest::ZeroAllAxes(_)
+            | ConfirmRequest::ClearEditor => (MessageLevel::Warning, MessageButtons::YesNo),
         };
         let message = Message {
             level,
             title: tr.tr(title).into_owned(),
-            description: tr.tr(description).into_owned(),
+            description: match request {
+                ConfirmRequest::ZeroAllAxes(Some(wcs)) => {
+                    tr.tr(description).replace("{wcs}", wcs.code())
+                }
+                ConfirmRequest::ZeroAllAxes(None) => tr.tr(description).into_owned(),
+                ConfirmRequest::UnsavedGcode
+                | ConfirmRequest::UnsavedDesign
+                | ConfirmRequest::UnsavedTool
+                | ConfirmRequest::UnsavedMaterial
+                | ConfirmRequest::UnsavedDevice
+                | ConfirmRequest::Restart
+                | ConfirmRequest::StopJob
+                | ConfirmRequest::ClearEditor => tr.tr(description).into_owned(),
+            },
             buttons,
         };
         self.inner.ask_message(
@@ -610,6 +749,7 @@ pub fn msgids() -> Vec<&'static str> {
         FileFilter::IMPORT,
         FileFilter::SVG,
         FileFilter::DXF,
+        FileFilter::STL,
         FileFilter::IMAGE,
         FileFilter::GTC_PACKAGE,
     ]
@@ -624,6 +764,9 @@ pub fn msgids() -> Vec<&'static str> {
         ConfirmRequest::UnsavedDevice,
         ConfirmRequest::Restart,
         ConfirmRequest::StopJob,
+        ConfirmRequest::ZeroAllAxes(Some(Wcs::G54)),
+        ConfirmRequest::ZeroAllAxes(None),
+        ConfirmRequest::ClearEditor,
     ]
     .into_iter()
     .flat_map(|request| {

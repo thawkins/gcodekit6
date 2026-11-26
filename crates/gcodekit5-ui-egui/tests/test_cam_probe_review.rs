@@ -39,6 +39,12 @@ fn test_cam_probe_error_holds_then_resets_in_the_controller() {
         p.auto_update = true;
     }
     frames(&mut h, 2);
+    // The Machine Control pane asks `$G` after the connect. Replies come in order, so while
+    // its `ok` (40 ms) is owed the injected `error:9` would answer `$G`, not a routine line.
+    until(&mut h, "the `$G` reply", |app| {
+        lines(&shared).iter().any(|l| l == "$G")
+            && lock(app.state().machine.controller()).lines_answered()
+    });
     let before = shared.log().len();
     click(&mut h, "Probe");
     until(&mut h, "the first lines", |_| lines(&shared).len() >= 3);

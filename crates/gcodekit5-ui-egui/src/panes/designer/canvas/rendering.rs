@@ -55,6 +55,7 @@ const FLATTEN_PT: f32 = 0.25;
 /// * `palette` - Theme colours.
 /// * `widths` - Grid line widths.
 /// * `preview` - The properties panel's live offset or chamfer preview, in the warning colour.
+/// * `work_area` - The device's work area (mm), outlined in GTK's device-bounds colour.
 #[allow(clippy::too_many_arguments)] // the frame's whole paint context, called once
 pub fn paint(
     painter: &Painter,
@@ -65,6 +66,7 @@ pub fn paint(
     palette: &Palette,
     widths: LineWidths,
     preview: &[Shape],
+    work_area: editing::Bounds,
 ) {
     painter.rect_filled(view.rect(), 0.0, palette.view_bg);
     if state.show_grid {
@@ -76,7 +78,7 @@ pub fn paint(
             widths,
         );
     }
-    let (x0, y0, x1, y1) = editing::work_area();
+    let (x0, y0, x1, y1) = work_area;
     let bounds = egui::Rect::from_two_pos(view.to_screen(x0, y0), view.to_screen(x1, y1));
     painter.rect_stroke(
         bounds,

@@ -92,9 +92,10 @@ pub fn start_held_stream(state: &mut AppState, shared: &LoopbackShared, lines: u
     );
 }
 
-/// The app in a harness that runs a frame the way eframe does (`logic`, then `ui`).
+/// The app in a harness that runs a frame the way eframe does (`logic`, then `ui`), with
+/// the theme installed as `GcodeKitApp::new` installs it.
 pub fn app_harness(app: GcodeKitApp) -> Harness<'static, GcodeKitApp> {
-    Harness::builder()
+    let harness = Harness::builder()
         .with_size(egui::vec2(1280.0, 800.0))
         .build_ui_state(
             |ui, app: &mut GcodeKitApp| {
@@ -102,7 +103,9 @@ pub fn app_harness(app: GcodeKitApp) -> Harness<'static, GcodeKitApp> {
                 app.ui(ui);
             },
             app,
-        )
+        );
+    gcodekit5_ui_egui::theme::install(&harness.ctx);
+    harness
 }
 
 /// Steps `harness` (one frame, then a short sleep) until `cond` holds or [`EVENTUALLY`]

@@ -1,5 +1,5 @@
 //! Application state and root UI of the egui front end: the window frame, the light/dark
-//! theme and the docking workspace.
+//! theme, the page tabs and the page shown ([`Workspace`]), and the status bar.
 //!
 //! Who draws the title bar is decided by `craft_window::policy` before the window opens and
 //! carried in [`AppState::decision`]; [`crate::frame`] draws what that decision leaves to the
@@ -13,7 +13,9 @@
 //!
 //! File dialogs and confirmations go through [`Dialogs`]: queued by a command, shown at the
 //! end of the frame and answered on a later one, so the event loop never blocks. The
-//! Preferences and About windows are drawn over the workspace while open.
+//! Preferences, About, Device Info and Help windows are drawn over the page while open. The
+//! manager pages (Device Manager, Device Config, CNC Tools, Materials) are drawn by the app
+//! ([`GcodeKitApp::show_page`] shows one); their unsaved forms are asked about on quit.
 //!
 //! The machine connection ([`AppState::machine`]) is polled once per frame, in
 //! [`GcodeKitApp::logic`] or, when only [`GcodeKitApp::ui`] runs, there; its events and status
@@ -59,7 +61,7 @@ use gcodekit5_app::machine::{MachineController, MachineEvent};
 use gcodekit5_settings::SettingsManager;
 use gcodekit5_settings::config::Config;
 
-use crate::commands::{self, Command};
+use crate::commands::Command;
 use crate::dialogs::{
     Asked, ConfirmChoice, ConfirmRequest, DialogAnswer, Dialogs, FileFilter, FilePurpose,
 };
@@ -75,10 +77,10 @@ use crate::panes::machine_control::MachineControlPane;
 use crate::panes::visualizer::VisualizerPane;
 use crate::theme;
 use crate::windows::{
-    AboutWindow, DeviceInfoWindow, DeviceManagerWindow, FirmwareSettingsWindow, HelpWindow,
+    AboutWindow, DeviceInfoPanel, DeviceManagerWindow, FirmwareSettingsWindow, HelpWindow,
     MaterialsManagerWindow, SettingsOutcome, SettingsWindow, ToolsManagerWindow, help,
 };
-use crate::workspace::{PaneContext, PaneId, Workspace};
+use crate::workspace::{JogKey, Page, PaneContext, PaneId, Workspace};
 use designer_files::{DesignFlow, DesignNext, EditorNext, OPEN_BEHIND_HANDOFF};
 use gcodekit5_app::materials_manager_backend::MATERIALS_FILE;
 use gcodekit5_app::tools_manager_backend::TOOLS_FILE;
@@ -126,6 +128,18 @@ pub struct DirtyState {
     pub designer: bool,
 }
 
+/// The msgids of the app's own startup notices, for the translation check.
+pub fn msgids() -> Vec<&'static str> {
+    vec![SETTINGS_PROBLEM_TITLE, SETTINGS_PROBLEM_TEXT]
+}
+
+/// GTK's title of the warning shown when the settings could not be loaded.
+const SETTINGS_PROBLEM_TITLE: &str = n_!("Settings could not be loaded");
+
+/// GTK's text of that warning, above the file and the problem.
+const SETTINGS_PROBLEM_TEXT: &str =
+    n_!("Default settings are in use. The settings file will be backed up before it is replaced.");
+
 /// State held by the egui front end.
 #[derive(Debug)]
 pub struct AppState {
@@ -159,6 +173,18 @@ pub struct AppState {
     /// settings folder); `None` without a settings folder. Replace it (with
     /// [`AppState::with_materials_file`]) before the app is built from the state.
     pub materials_file: Option<PathBuf>,
+    /// The console's command history file (the GTK build's `command_history.json` in the
+    /// legacy settings folder); `None` without a settings folder, which keeps the history
+    /// for the session. Replace it (with [`AppState::with_history_file`]) before the app is
+    /// built from the state.
+    pub history_file: Option<PathBuf>,
+    /// The Designer's stock and tool for the program it last generated, which the
+    /// visualizer's stock removal simulation takes (GTK's `sync_stock_from_designer`).
+    pub stock_seed: Option<crate::panes::visualizer::StockSeed>,
+    /// What went wrong loading the settings (the file and the problem), shown once at start
+    /// as GTK's "Settings could not be loaded" warning; set with
+    /// [`AppState::with_settings_problem`] before the app is built from the state.
+    pub settings_problem: Option<String>,
 }
 
 impl AppState {
@@ -172,6 +198,10 @@ impl AppState {
         let device_file = settings.dirs().map(|dirs| dirs.legacy.join(DEVICES_FILE));
         let tools_file = settings.dirs().map(|dirs| dirs.legacy.join(TOOLS_FILE));
         let materials_file = settings.dirs().map(|dirs| dirs.legacy.join(MATERIALS_FILE));
+        let history_file = settings.dirs().map(|dirs| {
+            dirs.legacy
+                .join(gcodekit5_app::command_history::HISTORY_FILE)
+        });
         Self {
             settings,
             translator,
@@ -182,7 +212,20 @@ impl AppState {
             device_file,
             tools_file,
             materials_file,
+            history_file,
+            stock_seed: None,
+            settings_problem: None,
         }
+    }
+
+    /// The same state with `problem`, the description of what went wrong loading the
+    /// settings, to show at start.
+    ///
+    /// # Arguments
+    /// * `problem` - The problem, or `None` when the settings loaded cleanly.
+    pub fn with_settings_problem(mut self, problem: Option<String>) -> Self {
+        self.settings_problem = problem;
+        self
     }
 
     /// The same state keeping its custom tools in `file` (a test folder, for example).
@@ -200,6 +243,16 @@ impl AppState {
     /// * `file` - The custom materials file.
     pub fn with_materials_file(mut self, file: PathBuf) -> Self {
         self.materials_file = Some(file);
+        self
+    }
+
+    /// The same state keeping the console's command history in `file` (a test folder, for
+    /// example).
+    ///
+    /// # Arguments
+    /// * `file` - The command history file.
+    pub fn with_history_file(mut self, file: PathBuf) -> Self {
+        self.history_file = Some(file);
         self
     }
 
@@ -233,18 +286,24 @@ impl AppState {
 
     /// The saved settings, or defaults that are never saved when there is no settings
     /// folder.
-    pub fn load_settings() -> SettingsManager {
+    ///
+    /// # Returns
+    /// The settings, and what went wrong loading them (the settings file and the problem),
+    /// for the warning at start.
+    pub fn load_settings() -> (SettingsManager, Option<String>) {
         match SettingsManager::config_dirs() {
             Ok(dirs) => {
+                let file = dirs.config.join("config.toml");
                 let (settings, problem) = SettingsManager::open(dirs);
-                if let Some(problem) = problem {
+                if let Some(problem) = &problem {
                     tracing::warn!(%problem, "settings loaded with problems");
                 }
-                settings
+                let problem = problem.map(|p| format!("{}\n\n{p}", file.display()));
+                (settings, problem)
             }
             Err(error) => {
                 tracing::warn!(%error, "no settings folder; using defaults");
-                SettingsManager::detached(Config::default())
+                (SettingsManager::detached(Config::default()), None)
             }
         }
     }
@@ -259,7 +318,7 @@ struct QuitFlow {
     stop_job: bool,
     /// The documents whose changes the user chose to discard for this quit.
     discarded: DirtyState,
-    /// The user chose to discard the CNC Tools window's unsaved tool for this quit.
+    /// The user chose to discard the CNC Tools page's unsaved tool for this quit.
     discarded_tool: bool,
     /// The user chose to discard the Materials Manager's unsaved material for this quit.
     discarded_material: bool,
@@ -296,6 +355,14 @@ pub struct GcodeKitApp {
     queue: Vec<Command>,
     /// Window commands the dispatched commands asked for, sent at the end of the frame.
     viewport_commands: Vec<egui::ViewportCommand>,
+    /// The text field the user was typing in, kept while a menu is up (a click on the menu
+    /// bar takes the focus from it) so Edit > Cut / Copy / Paste act on its text.
+    text_field: Option<egui::Id>,
+    /// Frames [`GcodeKitApp::text_field`] is kept after its field lost the focus with no menu
+    /// up: the press and release that open a menu.
+    text_field_grace: u8,
+    /// The text field to give the focus back to at the start of the next frame.
+    refocus: Option<egui::Id>,
     /// File dialogs and confirmations, answered on a later frame.
     dialogs: Dialogs,
     /// The context [`GcodeKitApp::dialogs`] wakes when an answer comes in, once known.
@@ -308,15 +375,19 @@ pub struct GcodeKitApp {
     about_window: AboutWindow,
     /// The help browser.
     help_window: HelpWindow,
-    /// The Firmware Settings window.
+    /// Saved shortcuts put back to their defaults at start, until the user closes the notice.
+    shortcut_notice: Option<String>,
+    /// GTK's "Settings could not be loaded" warning, shown at start until OK.
+    settings_notice: Option<String>,
+    /// The Device Config page's firmware settings.
     firmware_settings: FirmwareSettingsWindow,
-    /// The Device Info window.
-    device_info: DeviceInfoWindow,
-    /// The Device Manager window, which also holds the device profiles.
+    /// The Device Info panel (the left column of the Device Config page).
+    device_info: DeviceInfoPanel,
+    /// The Device Manager page, which also holds the device profiles.
     device_manager: DeviceManagerWindow,
-    /// The CNC Tools window, which also holds the tool library.
+    /// The CNC Tools page, which also holds the tool library.
     tools_manager: ToolsManagerWindow,
-    /// The Materials Manager window, which also holds the material library.
+    /// The Materials page, which also holds the material library.
     materials_manager: MaterialsManagerWindow,
     /// The last command dispatched.
     last_dispatched: Option<Command>,
@@ -341,6 +412,12 @@ pub struct GcodeKitApp {
     design: DesignFlow,
     /// The egui frame whose machine events were last polled.
     machine_polled: Option<u64>,
+    /// The key that ran each jog command of this frame's key presses (see
+    /// [`PaneContext::with_jog_key`]).
+    jog_keys: Vec<(Command, JogKey)>,
+    /// The hideable panels' visibility last saved (or found at start), so a change is saved
+    /// once (GTK's `panel_visibility`).
+    panel_visibility: Vec<(&'static str, bool)>,
     /// The `movable` flag last set on the macOS window (`title_bar::sync_movable`).
     #[cfg(target_os = "macos")]
     movable: Option<bool>,
@@ -372,6 +449,7 @@ impl GcodeKitApp {
     /// * `state` - The front end's state.
     pub fn new(cc: &eframe::CreationContext, state: AppState) -> Self {
         theme::install(&cc.egui_ctx);
+        crate::icons::install(&cc.egui_ctx);
         match &cc.wgpu_render_state {
             Some(render_state) => crate::panes::visualizer::install(render_state),
             None => tracing::warn!("no wgpu renderer; the visualizer shows no toolpath"),
@@ -391,7 +469,14 @@ impl GcodeKitApp {
     /// # Arguments
     /// * `state` - The front end's state.
     pub fn from_state(state: AppState) -> Self {
-        let keymap = commands::keymap();
+        let (keymap, dropped) = crate::shortcuts::keymap_from(&state.config().ui);
+        let shortcut_notice = crate::shortcuts::reset_notice(&state.translator, &dropped);
+        let settings_notice = state.settings_problem.as_ref().map(|details| {
+            format!(
+                "{}\n\n{details}",
+                state.translator.tr(SETTINGS_PROBLEM_TEXT)
+            )
+        });
         let menus = Menus::new(&state.translator, &keymap);
         let wake_ctx: Arc<OnceLock<egui::Context>> = Arc::new(OnceLock::new());
         let wake = {
@@ -402,7 +487,8 @@ impl GcodeKitApp {
                 }
             })
         };
-        let dialogs = Dialogs::new(state.translator, wake);
+        let mut dialogs = Dialogs::new(state.translator, wake);
+        dialogs.follow_folder(&state.config().file_processing.output_directory);
         let settings_window = SettingsWindow::new(
             crate::frame::title_bar_setting_applies(&state.decision),
             &state.config().ui,
@@ -411,11 +497,12 @@ impl GcodeKitApp {
         if state.config().ui.show_about_on_startup {
             about_window.open();
         }
-        let mut workspace = Workspace::default_layout();
+        let mut workspace = Workspace::new();
         workspace.set_pane(Box::new(machine_control_pane(&state)));
-        workspace.set_pane(Box::new(ConsolePane::new(Arc::clone(
-            state.machine.controller(),
-        ))));
+        workspace.set_pane(Box::new(
+            ConsolePane::new(Arc::clone(state.machine.controller()))
+                .with_history_file(state.history_file.clone()),
+        ));
         let editor = Rc::new(RefCell::new(EditorPane::new()));
         workspace.set_pane(Box::new(SharedEditor(Rc::clone(&editor))));
         workspace.set_pane(Box::new(VisualizerPane::new()));
@@ -434,6 +521,8 @@ impl GcodeKitApp {
         );
         workspace.set_pane(Box::new(SharedCamTools::new(Rc::clone(&cam_tools))));
         workspace.configure(state.config());
+        workspace.set_device(device_manager.active_profile().as_ref());
+        let panel_visibility = workspace.panel_visibility();
         {
             // Wake the event loop whenever the machine reports something.
             let wake_ctx = Arc::clone(&wake_ctx);
@@ -452,14 +541,19 @@ impl GcodeKitApp {
             menus,
             queue: Vec::new(),
             viewport_commands: Vec::new(),
+            text_field: None,
+            text_field_grace: 0,
+            refocus: None,
             dialogs,
             wake_ctx,
             last_dialog_answer: None,
             settings_window,
             about_window,
             help_window: HelpWindow::default(),
+            shortcut_notice,
+            settings_notice,
             firmware_settings: FirmwareSettingsWindow::default(),
-            device_info: DeviceInfoWindow::default(),
+            device_info: DeviceInfoPanel::default(),
             device_manager,
             tools_manager,
             materials_manager,
@@ -474,6 +568,8 @@ impl GcodeKitApp {
             editor_prompt: None,
             design: DesignFlow::default(),
             machine_polled: None,
+            jog_keys: Vec::new(),
+            panel_visibility,
             #[cfg(target_os = "macos")]
             movable: None,
         }
@@ -490,6 +586,14 @@ impl GcodeKitApp {
         let _ = self.wake_ctx.set(ctx.clone());
         self.poll_machine(ctx);
         self.cancel_holds_without_focus(ctx);
+        self.dialogs.follow_folder(
+            &self
+                .state
+                .settings
+                .config()
+                .file_processing
+                .output_directory,
+        );
         while let Some(answer) = self.dialogs.poll() {
             self.handle_answer(answer);
         }
@@ -602,7 +706,12 @@ impl GcodeKitApp {
             }
             (ConfirmRequest::UnsavedDevice, choice) => self.device_quit_answer(choice.as_unsaved()),
             // The quit flow never asks this; forget the quit rather than act on it.
-            (ConfirmRequest::Restart, _) => self.cancel_quit(),
+            (
+                ConfirmRequest::Restart
+                | ConfirmRequest::ZeroAllAxes(_)
+                | ConfirmRequest::ClearEditor,
+                _,
+            ) => self.cancel_quit(),
         }
     }
 
@@ -664,30 +773,73 @@ impl GcodeKitApp {
         let _ = self.wake_ctx.set(ctx.clone());
         self.poll_machine(&ctx);
         self.cancel_holds_without_focus(&ctx);
+        self.dialogs.follow_folder(
+            &self
+                .state
+                .settings
+                .config()
+                .file_processing
+                .output_directory,
+        );
         while let Some(answer) = self.dialogs.poll() {
             self.handle_answer(answer);
         }
+        self.workspace.begin_frame(&ctx);
+        if let Some(field) = self.refocus.take() {
+            ctx.memory_mut(|m| m.request_focus(field));
+        }
+        self.track_text_field(&ctx);
         self.dispatch_keys(&ctx);
+        self.update_firmware_settings(&ctx);
+        self.workspace.frame(&self.state.machine);
         let gate = Gate {
             text_editing: ctx.text_edit_focused(),
             ..Gate::default()
         };
         let mut queue = std::mem::take(&mut self.queue);
-        queue.extend(self.menus.take_native(&ctx, gate));
-        self.show_frame_and_menu(ui, gate, &mut queue);
+        let mut from_menu = self.menus.take_native(&ctx, gate);
+        self.show_frame_and_menu(ui, gate, &mut from_menu);
+        // A key equivalent of the macOS menu arrives as a menu choice, and the in-window bar
+        // can be driven from the keyboard (Alt+M, H) while a text field keeps it: both pass
+        // the same check as a key.
+        from_menu.retain(|command| command.may_run(gate.text_editing));
+        for command in from_menu {
+            if !self.edit_text_from_menu(command) {
+                queue.push(command);
+            }
+        }
+        let tab = egui::Panel::top("gcodekit5-page-tabs")
+            .show(ui, |ui| {
+                self.workspace.show_tabs(ui, &self.state.translator)
+            })
+            .inner;
+        if let Some(page) = tab {
+            self.show_page(page);
+        }
+        let profile = self.device_manager.active_profile();
         egui::Panel::bottom("gcodekit5-status-bar").show(ui, |ui| {
             if crate::status_bar::show(
                 ui,
                 &self.state.translator,
                 self.state.machine.status(),
                 self.state.config().ui.measurement_system,
+                self.state.config().ui.feed_rate_units,
+                profile.as_ref(),
             ) {
                 queue.push(Command::SoftReset);
             }
         });
-        let mut panes =
-            PaneContext::new(&self.state.translator, &mut queue).with_machine(&self.state.machine);
+        let mut panes = PaneContext::new(&self.state.translator, &mut queue)
+            .with_machine(&self.state.machine)
+            .with_stock_seed(self.state.stock_seed);
         self.workspace.show(ui, &mut panes);
+        self.store_panel_visibility();
+        if self.workspace.page().panes().is_empty() {
+            egui::CentralPanel::default().show(ui, |ui| self.show_manager_page(ui));
+        }
+        for request in self.workspace.take_confirms() {
+            self.dialogs.confirm(request);
+        }
         for command in queue.drain(..) {
             self.dispatch(command);
         }
@@ -714,34 +866,68 @@ impl GcodeKitApp {
     }
 
     /// Runs the frame's key presses through the keymap, before any widget reads them. While a
-    /// menu of the in-window bar is open, or the bar has the keyboard, the keys stay with it.
+    /// menu of the in-window bar is open, or the bar has the keyboard, the keys stay with it,
+    /// except the E-STOP (soft reset) and feed hold keys, which always run.
     fn dispatch_keys(&mut self, ctx: &egui::Context) {
         craft_menu::bar::leave_for_shortcut(ctx);
-        if craft_menu::bar::is_open(ctx) || craft_menu::bar::is_focused(ctx) {
-            return;
-        }
+        let menu_up = craft_menu::bar::is_open(ctx) || craft_menu::bar::is_focused(ctx);
         let active = Active {
             typing: ctx.text_edit_focused(),
             panel: self.keyboard_panel(ctx),
             ..Active::NONE
         };
-        let hits = ctx.input_mut(|input| self.dispatcher.dispatch(input, &self.keymap, &active));
-        self.queue.extend(
-            hits.iter()
-                .filter_map(|hit| Command::from_ref(&hit.command)),
-        );
+        // While Preferences records a key, or a menu of the bar is up, only the E-STOP and
+        // feed hold keys run; every other press is left for the window to record or for the
+        // menu. A command that moves the machine
+        // never runs while a text field has the keyboard, whatever its key (an F-key or a
+        // Ctrl chord would otherwise fire while typing); the press stays with the field.
+        let recording = self.settings_window.is_recording();
+        let typing = active.typing;
+        let (hits, modifiers) = ctx.input_mut(|input| {
+            let hits = self
+                .dispatcher
+                .dispatch_filtered(input, &self.keymap, &active, |hit| {
+                    let command = Command::from_ref(&hit.command);
+                    let safety = command.is_some_and(|c| crate::shortcuts::LOCKED.contains(&c));
+                    (!(recording || menu_up) || safety) && command.is_none_or(|c| c.may_run(typing))
+                });
+            (hits, input.modifiers)
+        });
+        // The key of each jog a key ran, so a continuous jog can last while it is held.
+        self.jog_keys.clear();
+        for command in hits.iter().filter_map(|hit| {
+            let command = Command::from_ref(&hit.command)?;
+            if command.is_jog() {
+                let key = hit.trigger.chord.key.to_egui();
+                self.jog_keys.push((command, JogKey { key, modifiers }));
+            }
+            Some(command)
+        }) {
+            self.queue.push(command);
+        }
     }
 
     /// The keymap scope of the pane that has the keyboard: the pane the user last pressed the
     /// pointer in, but only while no widget has keyboard focus and no popup (an open dropdown)
     /// is up, so a pane's keys never take a key from a focused widget.
     fn keyboard_panel(&self, ctx: &egui::Context) -> Option<&'static str> {
-        let widget_has_keys =
-            ctx.memory(|m| m.focused().is_some()) || egui::Popup::is_any_open(ctx);
+        // A window, popup or modal on screen (or closed only last frame) has the user's
+        // attention: no pane takes plain keys then.
+        // The designer canvas's focus is the Designer pane's own (its shape keys), not a
+        // widget's.
+        let canvas = crate::panes::designer::canvas::canvas_id();
+        let widget_has_keys = ctx.memory(|m| m.focused().is_some_and(|id| id != canvas))
+            || egui::Popup::is_any_open(ctx)
+            || !crate::workspace::overlay_layers(ctx).is_empty();
         if widget_has_keys {
             return None;
         }
-        self.workspace.focused_pane().and_then(PaneId::keymap_scope)
+        // Only a pane on the page shown, drawn last frame: a page change by any path (a tab,
+        // a command, a quit prompt's Cancel) leaves the keys with no hidden pane.
+        self.workspace
+            .focused_pane()
+            .filter(|id| self.workspace.has_keyboard(*id))
+            .and_then(PaneId::keymap_scope)
     }
 
     /// Takes the machine controller's events once per egui frame and fans them out
@@ -760,6 +946,15 @@ impl GcodeKitApp {
     /// due, the run gets an empty batch of events (which fires it); until then a repaint is
     /// requested for the moment it falls due.
     fn drive_probe_backstop(&mut self, ctx: &egui::Context) {
+        // A pane's run (Machine Control's quick probe) takes the empty batch through the
+        // workspace.
+        match self.workspace.wake_in() {
+            Some(wait) if wait.is_zero() => {
+                self.workspace.machine_events(&[], &self.state.translator);
+            }
+            Some(wait) => ctx.request_repaint_after(wait),
+            None => {}
+        }
         let Ok(mut cam) = self.cam_tools.try_borrow_mut() else {
             return;
         };
@@ -794,12 +989,75 @@ impl GcodeKitApp {
     /// Visualizer the view commands.
     fn route_pane_command(&mut self, cmd: Command) {
         let mut requested = Vec::new();
+        let key = self
+            .jog_keys
+            .iter()
+            .position(|(command, _)| *command == cmd)
+            .map(|i| self.jog_keys.remove(i).1);
         let mut ctx = PaneContext::new(&self.state.translator, &mut requested)
-            .with_machine(&self.state.machine);
+            .with_machine(&self.state.machine)
+            .with_jog_key(key);
         if !self.workspace.route(cmd, &mut ctx) {
             tracing::warn!(?cmd, "no pane runs this command");
         }
         self.queue.extend(requested);
+    }
+
+    /// Keeps [`GcodeKitApp::text_field`]: the text field with the keyboard, kept while a menu
+    /// of the bar is up and for the frames that open one.
+    fn track_text_field(&mut self, ctx: &egui::Context) {
+        let menu_up = craft_menu::bar::is_open(ctx) || craft_menu::bar::is_focused(ctx);
+        if ctx.text_edit_focused() {
+            self.text_field = ctx.memory(|m| m.focused());
+            self.text_field_grace = 2;
+        } else if menu_up {
+            self.text_field_grace = 2;
+        } else if self.text_field_grace > 0 {
+            self.text_field_grace -= 1;
+        } else {
+            self.text_field = None;
+        }
+    }
+
+    /// Edit > Cut / Copy / Paste chosen while a text field had the keyboard: gives the field
+    /// its focus back and asks egui for the clipboard event, so the text is cut, copied or
+    /// pasted, never the designer's shapes. (The keys never get here while typing: the
+    /// keymap leaves them to the field.)
+    ///
+    /// # Returns
+    /// Whether `command` was such an edit and was handled.
+    fn edit_text_from_menu(&mut self, command: Command) -> bool {
+        let request = match command {
+            Command::Cut => egui::ViewportCommand::RequestCut,
+            Command::Copy => egui::ViewportCommand::RequestCopy,
+            Command::Paste => egui::ViewportCommand::RequestPaste,
+            _ => return false,
+        };
+        let Some(field) = self.text_field else {
+            return false;
+        };
+        // The press on the menu is still being handled this frame: the field takes the focus
+        // back at the start of the next one, when egui delivers the clipboard event.
+        self.refocus = Some(field);
+        self.viewport_commands.push(request);
+        true
+    }
+
+    /// Hands `cmd` to the designer when the Designer page is shown, as GTK routed its Edit
+    /// actions by page.
+    ///
+    /// # Returns
+    /// Whether the designer ran it.
+    fn route_to_designer_page(&mut self, cmd: Command) -> bool {
+        if self.workspace.page() != Page::Designer {
+            return false;
+        }
+        let mut requested = Vec::new();
+        let mut ctx = PaneContext::new(&self.state.translator, &mut requested)
+            .with_machine(&self.state.machine);
+        let ran = self.workspace.route_to(PaneId::Designer, cmd, &mut ctx);
+        self.queue.extend(requested);
+        ran
     }
 
     /// Hands `cmd` to the designer when it is the pane the user works in
@@ -873,21 +1131,26 @@ impl GcodeKitApp {
                 self.after_save = None;
                 self.ask_save_gcode();
             }
-            Command::OpenSettings => self.settings_window.open(&self.state.settings),
+            Command::OpenSettings => self
+                .settings_window
+                .open(&self.state.settings, &self.keymap),
             Command::About => self.about_window.open(),
-            Command::OpenFirmwareSettings => self.firmware_settings.open(),
-            Command::OpenDeviceInfo => self.device_info.open(),
-            Command::OpenDeviceManager => self.device_manager.open(&self.state.translator),
+            Command::OpenFirmwareSettings => self.show_page(Page::DeviceConfig),
+            Command::OpenDeviceInfo => self.show_page(Page::DeviceConfig),
+            Command::OpenDeviceManager => self.show_page(Page::DeviceManager),
             Command::Quit => self.request_quit(QuitSource::MenuQuit),
-            Command::Cut => self
-                .viewport_commands
-                .push(egui::ViewportCommand::RequestCut),
-            Command::Copy => self
-                .viewport_commands
-                .push(egui::ViewportCommand::RequestCopy),
-            Command::Paste => self
-                .viewport_commands
-                .push(egui::ViewportCommand::RequestPaste),
+            // GTK's Edit actions: shapes on the Designer page (the design's own clipboard),
+            // text elsewhere. A text field's own edits are handled before this
+            // (`edit_text_from_menu`, the keymap's typing rule).
+            Command::Cut | Command::Copy | Command::Paste => {
+                if !self.route_to_designer_page(cmd) {
+                    self.viewport_commands.push(match cmd {
+                        Command::Cut => egui::ViewportCommand::RequestCut,
+                        Command::Copy => egui::ViewportCommand::RequestCopy,
+                        _ => egui::ViewportCommand::RequestPaste,
+                    });
+                }
+            }
             // Run by `dispatch_design` above.
             Command::FileNew
             | Command::FileNew3d
@@ -895,10 +1158,36 @@ impl GcodeKitApp {
             | Command::FileImportImage
             | Command::FileExportGcode
             | Command::FileExportSvg => {}
-            Command::FileRun => tracing::debug!(?cmd, "document command not available yet"),
+            // GTK's Run: the Visualizer's run preview of the program, which sends nothing.
+            Command::FileRun => {
+                // GTK ran the editor's text: hand an edit still in its typing pause to the
+                // machine first.
+                self.sync_editor(true);
+                self.show_page(Page::Visualizer);
+                let mut requested = Vec::new();
+                let mut ctx = PaneContext::new(&self.state.translator, &mut requested)
+                    .with_machine(&self.state.machine);
+                self.workspace
+                    .route_to(PaneId::Visualizer, Command::FileRun, &mut ctx);
+                self.queue.extend(requested);
+            }
             Command::Undo | Command::Redo => {
                 if !self.route_to_active_designer(cmd) {
                     tracing::debug!(?cmd, "no document to undo in");
+                }
+            }
+            Command::AlignLeft
+            | Command::AlignRight
+            | Command::AlignTop
+            | Command::AlignBottom
+            | Command::AlignCenterX
+            | Command::AlignCenterY
+            | Command::Group
+            | Command::Ungroup
+            | Command::Duplicate
+            | Command::FitDevice => {
+                if !self.route_to_active_designer(cmd) {
+                    tracing::debug!(?cmd, "no design to edit");
                 }
             }
             Command::StreamStart => {
@@ -932,18 +1221,23 @@ impl GcodeKitApp {
                     self.route_pane_command(cmd);
                 }
             }
-            Command::OpenToolsManager => self.tools_manager.open(&self.state.translator),
-            Command::OpenMaterialsManager => self.materials_manager.open(&self.state.translator),
+            Command::OpenToolsManager => self.show_page(Page::CncTools),
+            Command::OpenMaterialsManager => self.show_page(Page::Materials),
             Command::OpenHelp => self.help_window.open(help::HelpTopic::Index),
         }
     }
 
-    /// Draws the Preferences, About, machine, library and help windows while they are
-    /// open, acts on what Preferences decided and opens the topic a help button asked for.
+    /// Draws the Preferences, About, Device Info and help windows while they are open,
+    /// runs the manager pages' per-frame work, acts on what Preferences decided and opens
+    /// the topic a help button asked for.
     fn show_windows(&mut self, ctx: &egui::Context) {
         let outcome =
             self.settings_window
                 .show(ctx, &mut self.state.settings, &self.state.translator);
+        if let Some(keymap) = self.settings_window.take_applied_keymap() {
+            self.keymap = keymap;
+            self.menus.set_keymap(&self.state.translator, &self.keymap);
+        }
         match outcome {
             SettingsOutcome::Applied { restart } => {
                 self.workspace.configure(self.state.config());
@@ -957,17 +1251,68 @@ impl GcodeKitApp {
             | SettingsOutcome::Failed(_) => {}
         }
         self.about_window.show(ctx, &self.state.translator);
+        self.show_shortcut_notice(ctx);
+        self.show_settings_notice(ctx);
         self.show_machine_windows(ctx);
-        self.show_library_windows(ctx);
+        self.show_library_windows();
         if let Some(topic) = help::take_request(ctx) {
             self.help_window.open(topic);
         }
         self.help_window.show(ctx, &self.state.translator);
     }
 
+    /// Tells the user which saved shortcuts were put back to their defaults at start, until OK.
+    fn show_shortcut_notice(&mut self, ctx: &egui::Context) {
+        let Some(message) = &self.shortcut_notice else {
+            return;
+        };
+        let tr = &self.state.translator;
+        let mut close = false;
+        egui::Window::new(tr.tr(n_!("Shortcuts")))
+            .id(egui::Id::unique("gcodekit5-shortcut-notice"))
+            .collapsible(false)
+            .resizable(false)
+            .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
+            .show(ctx, |ui| {
+                ui.set_max_width(420.0);
+                ui.label(message.as_str());
+                close = ui.button(tr.tr(n_!("OK"))).clicked();
+            });
+        if close {
+            self.shortcut_notice = None;
+        }
+    }
+
+    /// GTK's warning that the settings could not be loaded and defaults are in use, until OK.
+    fn show_settings_notice(&mut self, ctx: &egui::Context) {
+        let Some(message) = &self.settings_notice else {
+            return;
+        };
+        let tr = &self.state.translator;
+        let mut close = false;
+        egui::Window::new(tr.tr(SETTINGS_PROBLEM_TITLE))
+            .id(egui::Id::unique("gcodekit5-settings-notice"))
+            .collapsible(false)
+            .resizable(false)
+            .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
+            .show(ctx, |ui| {
+                ui.set_max_width(480.0);
+                ui.label(message.as_str());
+                close = ui.button(tr.tr(n_!("OK"))).clicked();
+            });
+        if close {
+            self.settings_notice = None;
+        }
+    }
+
     /// Acts on a dialog's answer; every answer is also kept in
     /// [`GcodeKitApp::last_dialog_answer`].
     fn handle_answer(&mut self, answer: DialogAnswer) {
+        if let DialogAnswer::File { purpose, path } = &answer
+            && purpose.remembers_folder()
+        {
+            self.remember_folder(path);
+        }
         if self.handle_design_answer(&answer)
             || self.handle_cam_preset_answer(&answer)
             || self.handle_firmware_settings_answer(&answer)
@@ -1034,6 +1379,16 @@ impl GcodeKitApp {
                 // next quit asks again.
                 tracing::warn!(?request, %reason, "quit prompt unavailable; quit cancelled");
                 self.cancel_quit();
+            }
+            DialogAnswer::Confirm {
+                request: request @ (ConfirmRequest::ZeroAllAxes(_) | ConfirmRequest::ClearEditor),
+                choice,
+            } => {
+                let mut queue = Vec::new();
+                let mut panes = PaneContext::new(&self.state.translator, &mut queue)
+                    .with_machine(&self.state.machine);
+                self.workspace.confirmed(*request, *choice, &mut panes);
+                self.queue.extend(queue);
             }
             DialogAnswer::Unavailable { reason, .. } => {
                 tracing::warn!(%reason, "dialog unavailable");
@@ -1269,14 +1624,99 @@ impl GcodeKitApp {
         &mut self.state
     }
 
-    /// The docking workspace, for tests.
+    /// The pages and their panes, for tests.
     pub fn workspace(&self) -> &Workspace {
         &self.workspace
     }
 
-    /// The docking workspace, for layout changes and tests.
+    /// The pages and their panes, for tests.
     pub fn workspace_mut(&mut self) -> &mut Workspace {
         &mut self.workspace
+    }
+
+    /// The page shown.
+    pub fn page(&self) -> Page {
+        self.workspace.page()
+    }
+
+    /// Shows `page`. A manager page that was not shown is prepared first (it tells why its
+    /// file could not be read, CNC Tools reopens the last tool), as opening its window did.
+    ///
+    /// # Arguments
+    /// * `page` - The page to show.
+    pub fn show_page(&mut self, page: Page) {
+        if self.workspace.page() == page {
+            return;
+        }
+        self.workspace.set_page(page);
+        let tr = &self.state.translator;
+        match page {
+            Page::DeviceManager => self.device_manager.open(tr),
+            Page::CncTools => self.tools_manager.open(tr),
+            Page::Materials => self.materials_manager.open(tr),
+            Page::Designer
+            | Page::Visualizer
+            | Page::MachineControl
+            | Page::CamTools
+            | Page::DeviceConfig => {}
+        }
+    }
+
+    /// Makes the folder of `file` the one the next file dialog starts in, and keeps it as
+    /// Preferences > General's default folder, as GTK did (a failed write leaves it for
+    /// this run only).
+    fn remember_folder(&mut self, file: &std::path::Path) {
+        let Some(folder) = self.dialogs.remember_folder(file) else {
+            return;
+        };
+        let mut config = self.state.settings.config().clone();
+        config.file_processing.output_directory = folder;
+        if let Err(error) = self.state.settings.apply(config) {
+            tracing::debug!(%error, "last folder not kept in the settings");
+        }
+        let configured = &self
+            .state
+            .settings
+            .config()
+            .file_processing
+            .output_directory;
+        self.dialogs.follow_folder(configured);
+    }
+
+    /// Saves the hideable panels' visibility (the Visualizer sidebar, the Designer inspector)
+    /// in the settings when a Hide or Show changed it, so it is kept between runs as GTK kept
+    /// the sidebar's (a failed write is not retried until it changes again).
+    fn store_panel_visibility(&mut self) {
+        let now = self.workspace.panel_visibility();
+        if now == self.panel_visibility {
+            return;
+        }
+        let mut config = self.state.settings.config().clone();
+        for (key, shown) in &now {
+            config
+                .ui
+                .panel_visibility
+                .insert((*key).to_string(), *shown);
+        }
+        self.panel_visibility = now;
+        if let Err(error) = self.state.settings.apply(config) {
+            tracing::debug!(%error, "panel visibility not kept");
+        }
+    }
+
+    /// Draws the manager page shown into `ui`.
+    fn show_manager_page(&mut self, ui: &mut egui::Ui) {
+        let tr = &self.state.translator;
+        match self.workspace.page() {
+            Page::DeviceManager => {
+                self.device_manager
+                    .show(ui, &self.state.machine, self.state.settings.config(), tr);
+            }
+            Page::DeviceConfig => self.show_firmware_settings(ui),
+            Page::CncTools => self.tools_manager.show(ui, tr),
+            Page::Materials => self.materials_manager.show(ui, tr),
+            Page::Designer | Page::Visualizer | Page::MachineControl | Page::CamTools => {}
+        }
     }
 
     /// The keymap, for the user's shortcut overrides and for tests.
@@ -1300,6 +1740,12 @@ impl GcodeKitApp {
         {
             tracing::error!(%error, "could not restart GCodeKit5");
         }
+    }
+
+    /// The Preferences window (tests: whether it is open or recording a key).
+    #[doc(hidden)]
+    pub fn settings_window(&self) -> &SettingsWindow {
+        &self.settings_window
     }
 
     /// The last command [`GcodeKitApp::dispatch`] ran.

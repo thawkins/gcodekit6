@@ -192,6 +192,46 @@ fn test_feed_override_plus_10() {
     );
 }
 
+/// Every spindle and rapid override button writes its realtime byte.
+#[test]
+fn test_spindle_and_rapid_override_buttons() {
+    let (mut harness, shared) = pane_app(Duration::from_millis(1), true);
+    for (label, command) in [
+        (
+            "Decrease spindle speed by 10%",
+            RealtimeCommand::SpindleOverrideMinus10,
+        ),
+        (
+            "Decrease spindle speed by 1%",
+            RealtimeCommand::SpindleOverrideMinus1,
+        ),
+        (
+            "Reset spindle speed to 100%",
+            RealtimeCommand::SpindleOverrideReset,
+        ),
+        ("Stop spindle", RealtimeCommand::SpindleStop),
+        (
+            "Increase spindle speed by 1%",
+            RealtimeCommand::SpindleOverridePlus1,
+        ),
+        (
+            "Increase spindle speed by 10%",
+            RealtimeCommand::SpindleOverridePlus10,
+        ),
+        ("Rapid: 25%", RealtimeCommand::RapidOverride25),
+        ("Rapid: 50%", RealtimeCommand::RapidOverride50),
+        ("Rapid: 100%", RealtimeCommand::RapidOverride100),
+    ] {
+        harness.get_by_label(label).click();
+        harness.step();
+        assert!(
+            wait_until(|| wrote_realtime(&shared, command)),
+            "{label} not written: {:?}",
+            shared.log()
+        );
+    }
+}
+
 /// Review Focus 1: with the Preferences window open over the workspace, the stream keeps
 /// reporting progress and the pane keeps showing it.
 #[test]
@@ -292,6 +332,69 @@ fn test_safety_chords_work_in_text_field() {
     );
 }
 
+/// Presses the feed hold chord, then the E-STOP (soft reset) chord, and checks each runs and
+/// reaches the controller.
+fn safety_chords_run(harness: &mut Harness<'_, GcodeKitApp>, shared: &LoopbackShared, at: &str) {
+    let cmd_shift = egui::Modifiers::COMMAND | egui::Modifiers::SHIFT;
+    for (key, command, realtime) in [
+        (egui::Key::H, Command::FeedHold, RealtimeCommand::FeedHold),
+        (egui::Key::K, Command::SoftReset, RealtimeCommand::SoftReset),
+    ] {
+        harness.key_press_modifiers(cmd_shift, key);
+        harness.step();
+        assert_eq!(
+            harness.state().last_dispatched(),
+            Some(command),
+            "{command:?} with {at}"
+        );
+        assert!(
+            wait_until(|| wrote_realtime(shared, realtime)),
+            "{command:?} not written with {at}: {:?}",
+            shared.log()
+        );
+    }
+}
+
+/// The E-STOP and feed hold keys run while a menu of the in-window bar is open (opened by a
+/// click), which otherwise keeps the keys for itself.
+#[test]
+fn test_safety_chords_work_while_a_menu_is_open() {
+    let (mut harness, shared) = pane_app(Duration::from_millis(1), true);
+    harness
+        .get_by_role_and_label(Role::MenuItem, "Machine")
+        .click();
+    harness.run();
+    assert!(
+        craft_menu::bar::is_open(&harness.ctx),
+        "the Machine menu is not open"
+    );
+    safety_chords_run(&mut harness, &shared, "a menu open");
+}
+
+/// The same while the bar has the keyboard (F10, no menu open yet).
+#[test]
+fn test_safety_chords_work_while_the_menu_bar_has_the_keyboard() {
+    let (mut harness, shared) = pane_app(Duration::from_millis(1), true);
+    harness.key_press(egui::Key::F10);
+    harness.step();
+    harness.step();
+    assert!(
+        craft_menu::bar::is_focused(&harness.ctx),
+        "the bar does not have the keyboard"
+    );
+    safety_chords_run(&mut harness, &shared, "the bar focused");
+}
+
+/// The same while a window (Preferences) is open over the page.
+#[test]
+fn test_safety_chords_work_while_a_window_is_open() {
+    let (mut harness, shared) = pane_app(Duration::from_millis(1), true);
+    harness.state_mut().dispatch(Command::OpenSettings);
+    harness.run();
+    let _ = harness.get_by_label("Measurement System");
+    safety_chords_run(&mut harness, &shared, "Preferences open");
+}
+
 /// Bare Escape runs nothing anywhere, also with the pane holding the keyboard.
 #[test]
 fn test_escape_is_unbound() {
@@ -380,4 +483,196 @@ fn test_coalesce_progress_keeps_latest() {
             MachineEvent::StreamFinished { lines: 10 },
         ]
     );
+}
+
+/// A connect made, and then lost, while another page is shown leaves Machine Control showing
+/// the real state on return, not "Connecting…": the pane follows the machine's events while
+/// it is hidden.
+#[test]
+fn test_connection_state_follows_events_while_hidden() {
+    let (mut harness, _shared) = pane_app(Duration::from_millis(1), false);
+    harness
+        .state_mut()
+        .show_page(gcodekit5_ui_egui::workspace::Page::Visualizer);
+    harness.step();
+    harness.state_mut().dispatch(Command::Connect);
+    assert!(
+        step_until(&mut harness, |app| app.state().machine.status().connected),
+        "never connected"
+    );
+    gcodekit5_ui_egui::machine::lock(harness.state().state().machine.controller()).disconnect();
+    assert!(
+        step_until(&mut harness, |app| !app.state().machine.status().connected),
+        "never disconnected"
+    );
+    harness
+        .state_mut()
+        .show_page(gcodekit5_ui_egui::workspace::Page::MachineControl);
+    harness.step();
+    harness.step();
+    assert!(
+        harness.query_by_label("Connecting…").is_none(),
+        "stale connecting state"
+    );
+    assert!(
+        harness
+            .query_by_role_and_label(Role::Button, "Connect")
+            .is_some(),
+        "no Connect button"
+    );
+}
+
+/// The work zero `$G` query after a connect goes out while Machine Control is hidden, so
+/// the active system is known before the page is shown.
+#[test]
+fn test_work_zero_query_runs_while_hidden() {
+    let (mut harness, shared) = pane_app(Duration::from_millis(1), false);
+    harness
+        .state_mut()
+        .show_page(gcodekit5_ui_egui::workspace::Page::Designer);
+    harness.step();
+    harness.state_mut().dispatch(Command::Connect);
+    assert!(
+        step_until(&mut harness, |_| shared
+            .log()
+            .contains(&Wrote::Line("$G".to_string()))),
+        "no $G while hidden: {:?}",
+        shared.log()
+    );
+    assert!(
+        !harness
+            .state()
+            .workspace()
+            .is_drawn(gcodekit5_ui_egui::workspace::PaneId::MachineControl)
+    );
+}
+
+/// GTK's Unlock: enabled only in ALARM, where "ALARM: Unlock required." says why, and a click
+/// sends `$X`.
+#[test]
+fn test_unlock_only_in_alarm_and_sends_dollar_x() {
+    use egui_kittest::kittest::NodeT;
+    let (mut harness, shared) = pane_app(Duration::from_millis(1), true);
+    report_state(
+        &mut harness,
+        &shared,
+        "<Idle|MPos:0.000,0.000,0.000|FS:0,0>",
+        "Idle",
+    );
+    harness.run();
+    assert!(
+        harness
+            .get_by_label("Unlock")
+            .accesskit_node()
+            .is_disabled()
+    );
+    assert!(harness.query_by_label("ALARM: Unlock required.").is_none());
+    report_state(
+        &mut harness,
+        &shared,
+        "<Alarm|MPos:0.000,0.000,0.000|FS:0,0>",
+        "Alarm",
+    );
+    harness.run();
+    let _ = harness.get_by_label("ALARM: Unlock required.");
+    harness.get_by_label("Unlock").click();
+    harness.run();
+    assert!(
+        wait_until(|| shared.log().contains(&Wrote::Line("$X".to_string()))),
+        "{:?}",
+        shared.log()
+    );
+}
+
+/// GTK's override limit marker: " MAX" at 200 %, " MIN" at the feed's 10 % and the
+/// spindle's 50 %, none in between and none on the rapid override.
+#[test]
+fn test_override_readout_marks_the_limits() {
+    let (mut harness, shared) = pane_app(Duration::from_millis(1), true);
+    report_state(
+        &mut harness,
+        &shared,
+        "<Idle|MPos:0.000,0.000,0.000|FS:0,0|Ov:200,25,50>",
+        "Idle",
+    );
+    harness.run();
+    let _ = harness.get_by_label("200% MAX");
+    let _ = harness.get_by_label("50% MIN");
+    let _ = harness.get_by_label("25%");
+    report_state(
+        &mut harness,
+        &shared,
+        "<Run|MPos:0.000,0.000,0.000|FS:0,0|Ov:10,100,120>",
+        "Run",
+    );
+    harness.run();
+    let _ = harness.get_by_label("10% MIN");
+    let _ = harness.get_by_label("120%");
+    assert!(harness.query_by_label_contains("MAX").is_none());
+}
+
+/// While a menu of the in-window bar is open, only the E-STOP and feed hold keys run: a
+/// Ctrl chord (File > Open) and a jog digit in an armed Machine Control stay with the menu.
+#[test]
+fn test_other_keys_do_not_run_while_a_menu_is_open() {
+    let (mut harness, shared) = pane_app(Duration::from_millis(1), true);
+    report_state(
+        &mut harness,
+        &shared,
+        "<Idle|MPos:0.000,0.000,0.000|FS:0,0>",
+        "Idle",
+    );
+    harness.get_by_label("Machine State").click();
+    harness.step();
+    harness.step();
+    harness
+        .get_by_role_and_label(Role::MenuItem, "Machine")
+        .click();
+    harness.run();
+    assert!(craft_menu::bar::is_open(&harness.ctx));
+    let before = harness.state().last_dispatched();
+    harness.key_press_modifiers(egui::Modifiers::COMMAND, egui::Key::O);
+    harness.step();
+    harness.key_press(egui::Key::Num6);
+    harness.step();
+    harness.step();
+    assert_eq!(harness.state().last_dispatched(), before);
+    std::thread::sleep(Duration::from_millis(30));
+    assert!(
+        !shared
+            .log()
+            .iter()
+            .any(|w| matches!(w, Wrote::Line(l) if l.starts_with("$J="))),
+        "{:?}",
+        shared.log()
+    );
+}
+
+/// Machine > Unlock and Cmd+U follow the button: refused outside ALARM with a notice, `$X`
+/// in ALARM.
+#[test]
+fn test_unlock_command_only_in_alarm() {
+    let (mut harness, shared) = pane_app(Duration::from_millis(1), true);
+    report_state(
+        &mut harness,
+        &shared,
+        "<Idle|MPos:0.000,0.000,0.000|FS:0,0>",
+        "Idle",
+    );
+    harness.state_mut().dispatch(Command::Unlock);
+    harness.run();
+    let _ = harness.get_by_label("Unlock ignored: the machine is not in ALARM.");
+    std::thread::sleep(Duration::from_millis(30));
+    assert!(!shared.log().contains(&Wrote::Line("$X".to_string())));
+    report_state(
+        &mut harness,
+        &shared,
+        "<Alarm|MPos:0.000,0.000,0.000|FS:0,0>",
+        "Alarm",
+    );
+    harness.state_mut().dispatch(Command::Unlock);
+    harness.run();
+    assert!(wait_until(|| shared
+        .log()
+        .contains(&Wrote::Line("$X".to_string()))));
 }

@@ -136,13 +136,17 @@ fn test_firmware_settings_write_sends_exactly_the_line() {
     let before = shared.log().len();
     h.get_by_label("Apply").click();
     h.run_steps(2);
-    assert!(
-        wait_until(|| shared.log().len() > before),
-        "nothing was written"
-    );
+    // The first line written since `before` (the status poll's realtime `?` is no line).
+    let first_line = || {
+        shared.log()[before..]
+            .iter()
+            .find(|w| matches!(w, Wrote::Line(_)))
+            .cloned()
+    };
+    assert!(wait_until(|| first_line().is_some()), "nothing was written");
     assert_eq!(
-        shared.log()[before],
-        Wrote::Line("$110=5000".to_string()),
+        first_line(),
+        Some(Wrote::Line("$110=5000".to_string())),
         "the first line written is the setting"
     );
 
@@ -260,11 +264,20 @@ fn test_firmware_settings_refuses_writes_while_disconnected() {
 fn test_firmware_settings_retrieve_sends_dump_and_identity_queries() {
     let (mut h, shared) = open_window(|_| {});
     let before = shared.log().len();
+    // The lines written since `before`: the status poll's realtime `?` can land among them
+    // under load and is not part of the retrieve.
+    let lines = || -> Vec<Wrote> {
+        shared.log()[before..]
+            .iter()
+            .filter(|w| matches!(w, Wrote::Line(_)))
+            .cloned()
+            .collect()
+    };
     h.get_by_label("Retrieve").click();
     h.run_steps(2);
-    assert!(wait_until(|| shared.log().len() >= before + 2));
+    assert!(wait_until(|| lines().len() >= 2));
     assert_eq!(
-        shared.log()[before..before + 2],
+        lines()[..2],
         [Wrote::Line("$$".to_string()), Wrote::Line("$I".to_string())]
     );
     shared.inject("$0=10\n$110=750.000\n[VER:1.1h.20190825:]\n");

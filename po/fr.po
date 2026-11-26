@@ -4593,3 +4593,171 @@ msgstr "enregistré"
 
 msgid "The device profile has unsaved changes. Save them before continuing?"
 msgstr "Le profil de l'appareil contient des modifications non enregistrées. Les enregistrer avant de continuer ?"
+
+msgid "Go to Work Zero refused: the machine is not idle."
+msgstr "Aller au zéro pièce refusé : la machine n'est pas au repos."
+
+msgid "Waiting for the controller to report the active work coordinate system."
+msgstr "En attente du système de coordonnées pièce actif signalé par le contrôleur."
+
+msgid "Active work coordinate system is not G54-G59."
+msgstr "Le système de coordonnées pièce actif n'est pas G54-G59."
+
+msgid "Work zero needs a GRBL-family controller (set in the device profile)."
+msgstr "Le zéro pièce nécessite un contrôleur de la famille GRBL (défini dans le profil de l'appareil)."
+
+msgid "Zero refused: the machine is not idle."
+msgstr "Mise à zéro refusée : la machine n'est pas au repos."
+
+msgid "Zero All refused: the work coordinate system changed."
+msgstr "Tout mettre à zéro refusé : le système de coordonnées pièce a changé."
+
+msgid "This sets work coordinate system {wcs} so the current X/Y/Z becomes 0."
+msgstr "Cela règle le système de coordonnées pièce {wcs} pour que les X/Y/Z actuels deviennent 0."
+
+msgid "Cannot simulate stock removal: {reason}"
+msgstr "Impossible de simuler l'enlèvement de matière : {reason}"
+
+msgid "Nothing to simulate: the program has no moves."
+msgstr "Rien à simuler : le programme ne contient aucun mouvement."
+
+msgid "Stock removal simulation failed."
+msgstr "La simulation d'enlèvement de matière a échoué."
+
+msgid "Stock removal too large to display on this GPU."
+msgstr "Enlèvement de matière trop volumineux pour être affiché sur ce GPU."
+
+msgid "The controller did not confirm the override change."
+msgstr "Le contrôleur n'a pas confirmé la modification de la correction."
+
+msgid "Rotary calibration is not a number: check Preferences > Machine."
+msgstr "L'étalonnage de l'axe rotatif n'est pas un nombre : vérifiez Préférences > Machine."
+
+msgid "not sent: the controller was reset"
+msgstr "non envoyé : le contrôleur a été réinitialisé"
+
+msgid "Toggle Grid"
+msgstr "Afficher/masquer la grille"
+
+msgid "Toggle Machine Bounds"
+msgstr "Afficher/masquer les limites de la machine"
+
+msgid "Toggle Rapid Moves"
+msgstr "Afficher/masquer les déplacements rapides"
+
+msgid "Toggle Cutting Moves"
+msgstr "Afficher/masquer les mouvements de coupe"
+
+msgid "Align"
+msgstr "Aligner"
+
+msgid "Convert to Path"
+msgstr "Convertir en chemin"
+
+msgid "Convert to Rectangle"
+msgstr "Convertir en rectangle"
+
+msgid "Reset All"
+msgstr "Tout réinitialiser"
+
+msgid "Command"
+msgstr "Commande"
+
+msgid "Where"
+msgstr "Où"
+
+msgid "Shortcut"
+msgstr "Raccourci"
+
+msgid "Everywhere"
+msgstr "Partout"
+
+msgid "Press a key (Escape cancels)"
+msgstr "Appuyez sur une touche (Échap annule)"
+
+msgid "Change"
+msgstr "Modifier"
+
+msgid "The E-STOP and feed hold keys cannot be changed"
+msgstr "Les touches d'ARRÊT D'URGENCE et de suspension d'avance ne peuvent pas être modifiées"
+
+msgid "{key} is kept for {command}"
+msgstr "{key} est réservée à {command}"
+
+msgid "A command that moves the machine cannot use the letter of the E-STOP or feed hold key"
+msgstr "Une commande qui déplace la machine ne peut pas utiliser la lettre de la touche d'ARRÊT D'URGENCE ou de suspension d'avance"
+
+msgid "A jog key must be a letter, digit or symbol key without Ctrl or Alt, so it never jogs while you type"
+msgstr "Une touche de déplacement doit être une lettre, un chiffre ou un symbole sans Ctrl ni Alt, pour ne jamais déplacer la machine pendant la saisie"
+
+msgid "{key} opens a menu"
+msgstr "{key} ouvre un menu"
+
+msgid "{key} is already used by {command}"
+msgstr "{key} est déjà utilisée par {command}"
+
+msgid "{key} is reserved by the system"
+msgstr "{key} est réservée par le système"
+
+msgid "Double presses are not supported"
+msgstr "Les doubles pressions ne sont pas prises en charge"
+
+msgid "{key} works in the wrong place"
+msgstr "{key} agit au mauvais endroit"
+
+msgid "Outside Machine Control a command that moves the machine needs Ctrl, Alt or a function key"
+msgstr "En dehors du Contrôle machine, une commande qui déplace la machine nécessite Ctrl, Alt ou une touche de fonction"
+
+msgid "Too many shortcuts are changed"
+msgstr "Trop de raccourcis sont modifiés"
+
+msgid "These saved shortcuts broke a shortcut rule and use their default keys again: {commands}"
+msgstr "Ces raccourcis enregistrés enfreignaient une règle et reprennent leurs touches par défaut : {commands}"
+
+msgid "Duplicate"
+msgstr "Dupliquer"
+
+msgid "Unlock ignored: the machine is not in ALARM."
+msgstr "Déverrouillage ignoré : la machine n’est pas en ALARME."
+
+msgid "not supported by Repetier firmware"
+msgstr "non pris en charge par le micrologiciel Repetier"
+
+msgid "skipped: no Repetier equivalent"
+msgstr "ignoré : aucun équivalent Repetier"
+
+msgid "resend request could not be honoured; reconnect to the controller"
+msgstr "la demande de renvoi n'a pas pu être satisfaite ; reconnectez-vous au contrôleur"
+
+msgid "Emergency stop (M112, {shortcut})"
+msgstr "Arrêt d'urgence (M112, {shortcut})"
+
+msgid "Overrides need GRBL's real-time commands; Repetier firmware has none."
+msgstr "Les ajustements nécessitent les commandes temps réel de GRBL ; le micrologiciel Repetier n'en a pas."
+
+msgid "Continuous jog needs GRBL's jog cancel; Repetier firmware has none."
+msgstr "Le jog continu nécessite l'annulation de jog de GRBL ; le micrologiciel Repetier n'en a pas."
+
+msgid "Probing is not available on Repetier firmware."
+msgstr "Le palpage n'est pas disponible avec le micrologiciel Repetier."
+
+msgid "Work zero is not available for this controller type (set in the device profile)."
+msgstr "Le zéro pièce n'est pas disponible pour ce type de contrôleur (défini dans le profil de l'appareil)."
+
+msgid "Repetier firmware has no work coordinate systems; Zero sets the position with G92."
+msgstr "Le micrologiciel Repetier n'a pas de systèmes de coordonnées pièce ; Zéro définit la position avec G92."
+
+msgid "This sets the work position (G92) so the current X/Y/Z becomes 0."
+msgstr "Ceci définit la position pièce (G92) pour que la position X/Y/Z actuelle devienne 0."
+
+msgid "Emergency stop (M112): reset the controller or reconnect to continue."
+msgstr "Arrêt d'urgence (M112) : réinitialisez le contrôleur ou reconnectez-vous pour continuer."
+
+msgid "the controller is emergency-stopped (M112): reset it or reconnect"
+msgstr "le contrôleur est en arrêt d'urgence (M112) : réinitialisez-le ou reconnectez-vous"
+
+msgid "Select the active work coordinate system: the program may have changed it."
+msgstr "Sélectionnez le système de coordonnées pièce actif : le programme l'a peut-être changé."
+
+msgid "the command line is empty"
+msgstr "la ligne de commande est vide"

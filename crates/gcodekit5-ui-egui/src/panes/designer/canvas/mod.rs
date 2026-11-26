@@ -21,6 +21,7 @@ pub mod array_dialog;
 pub mod editing;
 pub mod flags;
 pub mod input;
+pub mod overlay;
 pub mod picking;
 pub mod rendering;
 pub mod text_outline;
@@ -33,6 +34,13 @@ use glam::Vec2;
 
 pub use flags::ShapeFlags;
 pub use input::CanvasInput;
+
+/// The canvas widget's id. The canvas takes the keyboard focus when pressed, for its own
+/// keys (Delete, Escape, Enter); the app's keymap treats that focus as the Designer pane
+/// having the keyboard, unlike a text field's.
+pub fn canvas_id() -> egui::Id {
+    egui::Id::unique("gcodekit5-designer-canvas")
+}
 
 /// The tool the canvas's primary button uses.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
@@ -80,6 +88,24 @@ impl DesignerTool {
         DesignerTool::Polyline,
         DesignerTool::Text,
     ];
+
+    /// The app SVG (in `resources/icons/`) on the tool's toolbox button, as GTK.
+    pub fn icon(self) -> &'static str {
+        match self {
+            DesignerTool::Select => "select.svg",
+            DesignerTool::Pan => "grab.svg",
+            DesignerTool::Rectangle => "rectangle.svg",
+            DesignerTool::Circle => "circle.svg",
+            DesignerTool::Line => "line.svg",
+            DesignerTool::Ellipse => "ellipse.svg",
+            DesignerTool::Triangle => "triangle.svg",
+            DesignerTool::Polygon => "poligon.svg",
+            DesignerTool::Gear => "gear.svg",
+            DesignerTool::Sprocket => "sprocket.svg",
+            DesignerTool::Polyline => "polyline.svg",
+            DesignerTool::Text => "text.svg",
+        }
+    }
 
     /// The English msgid of the tool's name, as listed in `po/gcodekit5.pot`.
     pub fn label_msgid(self) -> &'static str {

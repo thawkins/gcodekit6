@@ -27,6 +27,9 @@ pub struct EditorBuffer {
     current_line: usize,
     /// Bumped on every change of the text.
     generation: u64,
+    /// The text was replaced as a whole (a file opened, the editor cleared, a program
+    /// generated): the text field's undo history belongs to the old text and must go.
+    new_content: bool,
 }
 
 impl Default for EditorBuffer {
@@ -38,6 +41,7 @@ impl Default for EditorBuffer {
             line_starts: vec![0],
             current_line: 0,
             generation: 0,
+            new_content: false,
         }
     }
 }
@@ -64,6 +68,7 @@ impl EditorBuffer {
             line_starts: line_starts(&text),
             text,
             path: Some(path.to_path_buf()),
+            new_content: true,
             ..Self::default()
         })
     }
@@ -100,12 +105,14 @@ impl EditorBuffer {
         &self.text
     }
 
-    /// Replaces the text as an edit: the buffer becomes dirty.
+    /// Replaces the text as an edit: the buffer becomes dirty, and the text field starts a
+    /// new undo history.
     ///
     /// # Arguments
     /// * `text` - The new text.
     pub fn set_text(&mut self, text: String) {
         self.text = text;
+        self.new_content = true;
         self.mark_edited();
     }
 
@@ -118,7 +125,14 @@ impl EditorBuffer {
     pub fn replace_with_generated(&mut self, text: String) {
         self.text = text;
         self.path = None;
+        self.new_content = true;
         self.mark_edited();
+    }
+
+    /// Whether the text was replaced as a whole since the last call (see
+    /// [`EditorBuffer::set_text`]); the flag is cleared.
+    pub(crate) fn take_new_content(&mut self) -> bool {
+        std::mem::take(&mut self.new_content)
     }
 
     /// The text for a widget to edit in place; call [`EditorBuffer::mark_edited`] after it

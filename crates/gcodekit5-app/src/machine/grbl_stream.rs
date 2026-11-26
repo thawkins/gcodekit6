@@ -483,7 +483,40 @@ pub fn rotary_jog_command(axis: char, delta: f32, feed_mm_per_min: f32) -> Strin
 /// `feed_mm_min`, without a trailing newline, e.g. `$J=G91 G21 X1.00 F1000`.
 /// `G21` is stated so a program left in `G20` cannot turn it into inches.
 pub fn linear_jog_command(axis: char, distance_mm: f32, feed_mm_min: f32) -> String {
-    format!("$J=G91 G21 {axis}{distance_mm:.2} F{feed_mm_min}")
+    format!(
+        "$J=G91 G21 {axis}{} F{feed_mm_min}",
+        jog_value_text(distance_mm, LINEAR_JOG_DECIMALS)
+    )
+}
+
+/// The `$J=` jog for a rotary axis as the controller sends it: `delta_deg` (relative, 3
+/// decimal places, as a rotary Zero writes its value) at `feed`, without a trailing
+/// newline, e.g. `$J=G91 G21 A0.125 F1000`. `G21` has no effect on a rotary axis.
+pub fn rotary_jog_line(axis: char, delta_deg: f32, feed: f32) -> String {
+    format!(
+        "$J=G91 G21 {axis}{} F{feed}",
+        jog_value_text(delta_deg, ROTARY_JOG_DECIMALS)
+    )
+}
+
+/// Decimals a linear jog distance (mm) is written with.
+pub const LINEAR_JOG_DECIMALS: usize = 2;
+/// Decimals a rotary jog distance (degrees) is written with.
+pub const ROTARY_JOG_DECIMALS: usize = 3;
+
+/// A jog distance as a jog line writes it, with `decimals` decimals. The one formatter of
+/// every jog line, so [`jog_writes_zero`] judges exactly the text that is sent.
+pub fn jog_value_text(distance: f32, decimals: usize) -> String {
+    format!("{distance:.decimals$}")
+}
+
+/// Whether a jog of `distance` would be written as zero (`0.00`, `-0.00`) with `decimals`
+/// decimals: a zero-length move that must not be sent. Judged on the written text, so it
+/// rounds exactly as the line does (`0.005_f32` is really 0.00499999 and writes `0.00`).
+pub fn jog_writes_zero(distance: f32, decimals: usize) -> bool {
+    jog_value_text(distance, decimals)
+        .parse::<f32>()
+        .map_or(true, |written| written == 0.0)
 }
 
 /// The steps-per-degree value to send for Preferences text `value`, or

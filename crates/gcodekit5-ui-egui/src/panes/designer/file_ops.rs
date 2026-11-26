@@ -10,11 +10,12 @@
 //!   non-positive step down becomes 0.1 mm and the ids continue after the loaded shapes;
 //!   a stored zoom that is not usable fits the view instead.
 //! - Save writes through the model's serialization to a temporary file beside the target,
-//!   then renames it ([`crate::files`]): a read-only target is refused and a failed save
+//!   then renames it (`crate::files`): a read-only target is refused and a failed save
 //!   leaves the design modified.
-//! - Import adds the shapes of an SVG or DXF file as one undo step, applies a
-//!   DXF entity's elevation and thickness, switches to CNC mode when any shape has depth,
-//!   fits the view and reports discarded solids and replaced numbers. An image becomes a
+//! - Import adds the shapes of an SVG or DXF file, or the shadow of an STL model when
+//!   Settings' "STL File Import" is on (GTK's switch; refused otherwise), as one undo step,
+//!   applies a DXF entity's elevation and thickness, switches to CNC mode when any shape has
+//!   depth, fits the view and reports discarded solids and replaced numbers. An image becomes a
 //!   raster shape, in laser mode only. Files over [`MAX_IMPORT_BYTES`] are refused before
 //!   they are read.
 //!
@@ -22,8 +23,7 @@
 //! keyed by shape id, and ids repeat between documents. The outcome is shown as the pane's
 //! notice ([`DesignerPane::notice`]), GTK's status label and warning dialogs.
 //!
-//! Not ported: STL import (Settings' "enable STL import"), remembering the last folder in
-//! the settings, the window title's file name.
+//! Not ported: remembering the last folder in the settings, the window title's file name.
 //!
 //! Dependencies: `gcodekit5-designer` (serialization, importers), `gcodekit5-app`
 //! (translations), `anyhow`.
@@ -35,7 +35,7 @@ use gcodekit5_designer::DesignerState;
 use gcodekit5_designer::commands::{DesignerCommand, PasteShapes};
 use gcodekit5_designer::designer_state::MachineMode;
 use gcodekit5_designer::image_importer::ImageImporter;
-use gcodekit5_designer::import::{DxfImporter, ImportedDesign, SvgImporter};
+use gcodekit5_designer::import::{DxfImporter, ImportedDesign, StlImporter, SvgImporter};
 
 use super::DesignerPane;
 use super::canvas::editing;
@@ -145,7 +145,8 @@ impl DesignerPane {
         self.forget_view_state();
         let zoom = self.state.canvas.zoom();
         if !(zoom.is_finite() && zoom > 0.0001) && self.state.canvas.shape_count() > 0 {
-            editing::zoom_fit(&mut self.state);
+            let area = self.work_area();
+            editing::zoom_fit(&mut self.state, area);
         }
         self.notice = Some(format!("{} {}", tr.tr("Loaded:"), path.display()));
         true
@@ -217,6 +218,15 @@ impl DesignerPane {
                 .map_err(|e| anyhow::anyhow!("Failed to read file: {e}"))
                 .and_then(|content| SvgImporter::new(1.0, 0.0, 0.0).import_string(&content)),
             Some("dxf") => DxfImporter::new(1.0, 0.0, 0.0).import_file(&path.to_string_lossy()),
+            // GTK: the model's shadow, unscaled and where the model is, only when the
+            // settings allow STL import.
+            Some("stl") if self.stl_import => StlImporter::new()
+                .with_scale(1.0)
+                .with_centering(false)
+                .import_file(&path.to_string_lossy()),
+            Some("stl") => Err(anyhow::anyhow!(
+                "STL import requires the STL import feature to be enabled in settings"
+            )),
             Some(_) => Err(anyhow::anyhow!("Unsupported file format")),
             None => Err(anyhow::anyhow!("Unknown file extension")),
         };
@@ -316,7 +326,8 @@ impl DesignerPane {
                 tr.tr("values in this DXF file were not numbers and were replaced by defaults, so some geometry may be wrong.")
             ));
         }
-        editing::zoom_fit(&mut self.state);
+        let area = self.work_area();
+        editing::zoom_fit(&mut self.state, area);
         messages
     }
 

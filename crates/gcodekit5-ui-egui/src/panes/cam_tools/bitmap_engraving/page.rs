@@ -87,117 +87,125 @@ pub fn show(
     busy: bool,
     tr: &Translator,
 ) -> CamAction {
-    let mut action = CamAction::None;
-    ui.label(tr.tr(DESCRIPTION));
     let mut errors = params.parameters().err().unwrap_or_default();
     errors.extend(image_size.and_then(|size| params.size_problem(size)));
-    let unit = units::get_unit_label(params.units);
-    heading(ui, tr, n_!("Image File"));
-    ui.horizontal(|ui| {
-        let name = ui.label(tr.tr(IMAGE_PATH));
-        let shown = params.image().map_or_else(
-            || tr.tr(NO_IMAGE_SELECTED).into_owned(),
-            |p| p.display().to_string(),
-        );
-        ui.add(egui::Label::new(shown).truncate())
-            .labelled_by(name.id);
-        if ui.button(tr.tr("Browse...")).clicked() {
-            action = CamAction::ChooseImage;
-        }
-    });
-    if let Some(texture) = preview {
-        ui.add(
-            egui::Image::new(texture)
-                .max_height(240.0)
-                .max_width(ui.available_width()),
-        );
-    }
-    heading(ui, tr, n_!("Output Settings"));
-    grid(ui, "cam-bitmap-output", |ui| {
-        field_row(ui, tr, WIDTH, &mut params.width, unit, &errors);
-        field_row(ui, tr, FEED_RATE, &mut params.feed_rate, "", &errors);
-        field_row(ui, tr, TRAVEL_RATE, &mut params.travel_rate, "", &errors);
-    });
-    heading(ui, tr, n_!("Laser Power"));
-    grid(ui, "cam-bitmap-power", |ui| {
-        field_row(ui, tr, MIN_POWER, &mut params.min_power, "", &errors);
-        field_row(ui, tr, MAX_POWER, &mut params.max_power, "", &errors);
-        field_row(ui, tr, POWER_SCALE, &mut params.power_scale, "", &errors);
-    });
-    heading(ui, tr, n_!("Scanning"));
-    grid(ui, "cam-bitmap-scan", |ui| {
-        combo_row(
-            ui,
-            tr,
-            "cam-bitmap-scan-direction",
-            SCAN_DIRECTION,
-            &mut params.scan_direction,
-            &SCANS,
-        );
-        field_row(
-            ui,
-            tr,
-            PIXELS_PER_MM,
-            &mut params.pixels_per_mm,
-            "",
-            &errors,
-        );
-        field_row(ui, tr, LINE_SPACING, &mut params.line_spacing, "", &errors);
-        check_row(ui, tr, BIDIRECTIONAL, &mut params.bidirectional);
-    });
-    heading(ui, tr, n_!("Image Transformations"));
-    grid(ui, "cam-bitmap-transform", |ui| {
-        let name = ui.label(tr.tr(INVERT));
-        ui.checkbox(&mut params.invert, tr.tr(INVERT_HELP))
-            .labelled_by(name.id);
-        ui.end_row();
-        check_row(ui, tr, MIRROR_X, &mut params.mirror_x);
-        check_row(ui, tr, MIRROR_Y, &mut params.mirror_y);
-        combo_row(
-            ui,
-            tr,
-            "cam-bitmap-rotation",
-            ROTATION,
-            &mut params.rotation,
-            &ROTATIONS,
-        );
-    });
-    heading(ui, tr, n_!("Halftoning"));
-    grid(ui, "cam-bitmap-halftone", |ui| {
-        combo_row(
-            ui,
-            tr,
-            "cam-bitmap-halftone",
-            METHOD,
-            &mut params.halftone,
-            &HALFTONES,
-        );
-        field_row(ui, tr, DOT_SIZE, &mut params.halftone_dot_size, "", &errors);
-        field_row(
-            ui,
-            tr,
-            THRESHOLD,
-            &mut params.halftone_threshold,
-            "",
-            &errors,
-        );
-    });
-    heading(ui, tr, n_!("Work Offsets"));
-    grid(ui, "cam-bitmap-offsets", |ui| {
-        field_row(ui, tr, OFFSET_X, &mut params.offset_x, unit, &errors);
-        field_row(ui, tr, OFFSET_Y, &mut params.offset_y, unit, &errors);
-        check_row(
-            ui,
-            tr,
-            n_!("Home Device Before Start"),
-            &mut params.home_before,
-        );
-    });
-    ui.weak(tr.tr(HOME_HELP));
-    common::page_errors(ui, tr, &errors);
-    let pressed = common::gcode_actions(ui, tr, errors.is_empty() && !busy);
-    if pressed != CamAction::None {
-        action = pressed;
-    }
-    action
+    common::cam_page(
+        ui,
+        common::SIDEBAR_SHARE,
+        params,
+        |ui, _| {
+            ui.label(tr.tr(DESCRIPTION));
+        },
+        |ui, params| {
+            let mut action = CamAction::None;
+            let unit = units::get_unit_label(params.units);
+            heading(ui, tr, n_!("Image File"));
+            ui.horizontal(|ui| {
+                let name = ui.label(tr.tr(IMAGE_PATH));
+                let shown = params.image().map_or_else(
+                    || tr.tr(NO_IMAGE_SELECTED).into_owned(),
+                    |p| p.display().to_string(),
+                );
+                ui.add(egui::Label::new(shown).truncate())
+                    .labelled_by(name.id);
+                if crate::icons::icon_button(ui, crate::icons::Icon::Open, &tr.tr("Browse..."))
+                    .clicked()
+                {
+                    action = CamAction::ChooseImage;
+                }
+            });
+            if let Some(texture) = preview {
+                ui.add(
+                    egui::Image::new(texture)
+                        .max_height(240.0)
+                        .max_width(ui.available_width()),
+                );
+            }
+            heading(ui, tr, n_!("Output Settings"));
+            grid(ui, "cam-bitmap-output", |ui| {
+                field_row(ui, tr, WIDTH, &mut params.width, unit, &errors);
+                field_row(ui, tr, FEED_RATE, &mut params.feed_rate, "", &errors);
+                field_row(ui, tr, TRAVEL_RATE, &mut params.travel_rate, "", &errors);
+            });
+            heading(ui, tr, n_!("Laser Power"));
+            grid(ui, "cam-bitmap-power", |ui| {
+                field_row(ui, tr, MIN_POWER, &mut params.min_power, "", &errors);
+                field_row(ui, tr, MAX_POWER, &mut params.max_power, "", &errors);
+                field_row(ui, tr, POWER_SCALE, &mut params.power_scale, "", &errors);
+            });
+            heading(ui, tr, n_!("Scanning"));
+            grid(ui, "cam-bitmap-scan", |ui| {
+                combo_row(
+                    ui,
+                    tr,
+                    "cam-bitmap-scan-direction",
+                    SCAN_DIRECTION,
+                    &mut params.scan_direction,
+                    &SCANS,
+                );
+                field_row(
+                    ui,
+                    tr,
+                    PIXELS_PER_MM,
+                    &mut params.pixels_per_mm,
+                    "",
+                    &errors,
+                );
+                field_row(ui, tr, LINE_SPACING, &mut params.line_spacing, "", &errors);
+                check_row(ui, tr, BIDIRECTIONAL, &mut params.bidirectional);
+            });
+            heading(ui, tr, n_!("Image Transformations"));
+            grid(ui, "cam-bitmap-transform", |ui| {
+                let name = ui.label(tr.tr(INVERT));
+                crate::theme::checkbox(ui, &mut params.invert, tr.tr(INVERT_HELP))
+                    .labelled_by(name.id);
+                ui.end_row();
+                check_row(ui, tr, MIRROR_X, &mut params.mirror_x);
+                check_row(ui, tr, MIRROR_Y, &mut params.mirror_y);
+                combo_row(
+                    ui,
+                    tr,
+                    "cam-bitmap-rotation",
+                    ROTATION,
+                    &mut params.rotation,
+                    &ROTATIONS,
+                );
+            });
+            heading(ui, tr, n_!("Halftoning"));
+            grid(ui, "cam-bitmap-halftone", |ui| {
+                combo_row(
+                    ui,
+                    tr,
+                    "cam-bitmap-halftone",
+                    METHOD,
+                    &mut params.halftone,
+                    &HALFTONES,
+                );
+                field_row(ui, tr, DOT_SIZE, &mut params.halftone_dot_size, "", &errors);
+                field_row(
+                    ui,
+                    tr,
+                    THRESHOLD,
+                    &mut params.halftone_threshold,
+                    "",
+                    &errors,
+                );
+            });
+            heading(ui, tr, n_!("Work Offsets"));
+            grid(ui, "cam-bitmap-offsets", |ui| {
+                field_row(ui, tr, OFFSET_X, &mut params.offset_x, unit, &errors);
+                field_row(ui, tr, OFFSET_Y, &mut params.offset_y, unit, &errors);
+                check_row(
+                    ui,
+                    tr,
+                    n_!("Home Device Before Start"),
+                    &mut params.home_before,
+                );
+            });
+            ui.weak(tr.tr(HOME_HELP));
+            common::page_errors(ui, tr, &errors);
+            action
+        },
+        |ui, _| common::gcode_actions(ui, tr, errors.is_empty() && !busy),
+    )
 }

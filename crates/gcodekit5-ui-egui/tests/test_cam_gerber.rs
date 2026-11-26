@@ -3,6 +3,11 @@
 //! page and disables the actions, the program is exactly what the GTK page made from the same
 //! small Gerber files (fixtures from `capture_cam_fixtures`), and presets in GTK's file format
 //! load and save.
+//!
+//! The fixtures in `tests/fixtures/cam/` are frozen references: `capture_cam_fixtures`, which
+//! wrote them from the GTK pages, was in the GTK crate deleted in `26740e3` (its source is at
+//! `6841d84`). Change a fixture only deliberately, by hand, in the commit that changes the
+//! generator's output and says why.
 
 use std::path::{Path, PathBuf};
 

@@ -27,7 +27,9 @@ pub fn harness(pane: DesignerPane) -> Harness<'static, DesignerPane> {
 pub fn harness_at(pane: DesignerPane, ppp: f32) -> Harness<'static, DesignerPane> {
     let tr = Translator::new("en");
     let mut harness = Harness::builder()
-        .with_size(egui::vec2(640.0, 480.0))
+        // As tall as the app's 1280x800 window: GTK's toolbox (tools, machine mode,
+        // settings, Generate G-Code, view controls) needs the height without scrolling.
+        .with_size(egui::vec2(640.0, 800.0))
         .with_pixels_per_point(ppp)
         // Real frame times, so two clicks a few frames apart make a double-click.
         .with_step_dt(STEP_DT)

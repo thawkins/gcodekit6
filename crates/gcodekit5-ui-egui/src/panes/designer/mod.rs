@@ -12,10 +12,10 @@
 //! the Add Text dialog ([`canvas::text_tool`]). The toolbox's "Shape Gallery…" opens
 //! [`shape_gallery`]; the shape it arms is placed by the next canvas click. New, Open, Save
 //! and Import are [`file_ops`]; the shapes a CAM page generates are added by
-//! [`DesignerPane::add_generated_paths`]; G-code and SVG output (Export, the toolbox's Generate G-Code
-//! and Frame) are [`export`], the outcome shown as the pane's notice. Not ported here:
-//! scrollbars, the device's work area (the default 250 x 250 mm is shown), and the context
-//! menu's other entries.
+//! [`DesignerPane::add_generated_paths`]; G-code and SVG output (Export, the toolbox's
+//! Generate G-Code and Frame) are [`export`], the outcome shown as the pane's notice. The
+//! canvas outlines the active device profile's work area ([`DesignerPane::work_area`]). Not
+//! ported here: scrollbars.
 //!
 //! Dependencies: `egui`, `gcodekit5-designer` (model), `gcodekit5-app` (translations),
 //! `gcodekit5-settings` (grid line widths, display units), `gcodekit5-core` (units).
@@ -39,9 +39,11 @@ use gcodekit5_core::units::MeasurementSystem;
 use gcodekit5_designer::DesignerState;
 use gcodekit5_designer::gcode_gen::MachineLimits;
 use gcodekit5_designer::model::{Point, Shape};
+use gcodekit5_devicedb::DeviceProfile;
 use gcodekit5_settings::config::Config;
 
 use canvas::array_dialog::{self, ArrayDialog};
+use canvas::overlay::{self, ViewAction};
 use canvas::rendering::{self, LineWidths};
 use canvas::text_tool::{self, TextTool};
 use canvas::toolpath_preview::ToolpathPreview;
@@ -51,10 +53,14 @@ use shape_gallery::ShapeGallery;
 use crate::commands::Command;
 use crate::workspace::{Pane, PaneContext, PaneId};
 
+/// How far Duplicate moves the copies right and up, in mm (GTK's Ctrl+D offset).
+pub const DUPLICATE_OFFSET_MM: f64 = 10.0;
+
 /// The msgids the pane shows, for the translation check.
 pub fn msgids() -> Vec<&'static str> {
     let mut ids = toolbox::msgids();
     ids.extend(canvas::input::msgids());
+    ids.extend(canvas::overlay::msgids());
     ids.extend(layers::msgids());
     ids.extend(properties::msgids());
     ids.extend(text_tool::msgids());
@@ -93,12 +99,21 @@ pub struct DesignerPane {
     notice: Option<String>,
     /// G-code for the editor (Generate G-Code, Frame), until the app takes it.
     editor_gcode: Option<String>,
-    /// The machine's working area from the settings, for the out-of-limits check.
+    /// The machine's working area for the out-of-limits check: the device profile's, else
+    /// the Preferences limits ([`DesignerPane::machine_limits`]).
     limits: Option<MachineLimits>,
+    /// The Preferences limits, used while no device profile is active.
+    config_limits: Option<MachineLimits>,
+    /// The active device profile's X/Y area (mm), if any.
+    device: Option<editing::Bounds>,
+    /// Whether Import reads STL files (Settings' "STL File Import").
+    stl_import: bool,
     /// The toolbox asked for G-code for the editor; the app runs it.
     editor_request: Option<ToEditor>,
     /// Counts changes to the design ([`DesignerPane::revision`]).
     revision: u64,
+    /// The last world point under the pointer, for the status line.
+    cursor: (f64, f64),
 }
 
 impl std::fmt::Debug for DesignerPane {
@@ -115,6 +130,17 @@ impl Default for DesignerPane {
     fn default() -> Self {
         Self::new()
     }
+}
+
+/// An Edit action on the design's own clipboard ([`DesignerPane::clipboard`]).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ClipboardOp {
+    /// Copy the selection, then delete it.
+    Cut,
+    /// Copy the selection.
+    Copy,
+    /// Paste the copies at the pointer.
+    Paste,
 }
 
 impl DesignerPane {
@@ -137,8 +163,12 @@ impl DesignerPane {
             notice: None,
             editor_gcode: None,
             limits: None,
+            config_limits: None,
+            device: None,
+            stl_import: false,
             editor_request: None,
             revision: 0,
+            cursor: (0.0, 0.0),
         }
     }
 
@@ -240,6 +270,16 @@ impl DesignerPane {
         self.toolpaths.set_build_panics(on);
     }
 
+    /// Test hook: each toolpath preview build waits `delay` before its first shape.
+    ///
+    /// # Arguments
+    /// * `delay` - The wait, or `None` for none.
+    #[doc(hidden)]
+    #[cfg(any(test, feature = "test-support"))]
+    pub fn set_toolpath_build_delay(&mut self, delay: Option<std::time::Duration>) {
+        self.toolpaths.set_build_delay(delay);
+    }
+
     /// Toolpath preview builds started so far.
     #[doc(hidden)]
     pub fn toolpath_builds_started(&self) -> u64 {
@@ -319,6 +359,31 @@ impl DesignerPane {
         }
     }
 
+    /// The work area outlined on the canvas and fitted by Fit to Device: the active device
+    /// profile's X/Y limits (GTK's `compute_device_bbox`), else GTK's 250 x 250 mm.
+    pub fn work_area(&self) -> editing::Bounds {
+        self.device.unwrap_or_else(editing::default_work_area)
+    }
+
+    /// The XY limits exported G-code is checked against: the active device profile's, else
+    /// Preferences > Machine's X/Y limits from 0 (GTK's `designer_machine_limits`), if set.
+    pub fn machine_limits(&self) -> Option<&MachineLimits> {
+        self.limits.as_ref()
+    }
+
+    /// Recomputes [`DesignerPane::machine_limits`] from the device and the settings.
+    fn update_limits(&mut self) {
+        self.limits = match self.device {
+            Some((x_min, y_min, x_max, y_max)) => Some(MachineLimits {
+                x_min,
+                x_max,
+                y_min,
+                y_max,
+            }),
+            None => self.config_limits.clone(),
+        };
+    }
+
     /// The canvas's view on the last frame: maps screen points to world millimetres.
     pub fn view(&self) -> CanvasView {
         self.view
@@ -370,15 +435,57 @@ impl DesignerPane {
         editing::rotate_selected_by(&mut self.state, degrees);
     }
 
+    /// Runs a shape operation from a key (Align, Group, Ungroup) and records the change, so
+    /// the toolpath preview follows it ([`DesignerPane::revision`]). Ignored during a canvas
+    /// drag, which still holds the shapes it started from.
+    ///
+    /// # Arguments
+    /// * `op` - The model's operation on the selection.
+    fn edit(&mut self, op: fn(&mut DesignerState)) {
+        if self.dragging() {
+            tracing::debug!("shape edit ignored during a canvas drag");
+            return;
+        }
+        op(&mut self.state);
+        self.touch();
+    }
+
+    /// Cut, Copy or Paste of shapes through the design's own clipboard, as GTK's Edit
+    /// actions on the Designer page: Paste centres the copies on the pointer's last point
+    /// on the canvas, with new ids, as one undo step. Ignored during a canvas drag.
+    ///
+    /// # Arguments
+    /// * `op` - Cut, Copy or Paste.
+    fn clipboard(&mut self, op: ClipboardOp) {
+        if self.dragging() {
+            tracing::debug!(?op, "clipboard ignored during a canvas drag");
+            return;
+        }
+        match op {
+            ClipboardOp::Cut => editing::cut_selected(&mut self.state),
+            ClipboardOp::Copy => self.state.copy_selected(),
+            ClipboardOp::Paste => {
+                let (x, y) = self.input.hover.unwrap_or(self.cursor);
+                self.state.paste_at_location(x, y);
+            }
+        }
+        self.touch();
+    }
+
     /// The canvas: input, then painting with the view the input left.
-    fn show_canvas(&mut self, ui: &mut egui::Ui, tr: &Translator) {
+    ///
+    /// # Returns
+    /// The command of the empty state's button clicked this frame, if any.
+    fn show_canvas(&mut self, ui: &mut egui::Ui, tr: &Translator) -> Option<Command> {
         let rect = ui.available_rect_before_wrap();
-        let response = ui.allocate_rect(rect, egui::Sense::click_and_drag());
+        ui.advance_cursor_after_rect(rect);
+        let response = ui.interact(rect, canvas::canvas_id(), egui::Sense::click_and_drag());
         self.state
             .canvas
             .set_canvas_size(f64::from(rect.width()), f64::from(rect.height()));
         if !self.fitted && rect.width() > 0.0 && rect.height() > 0.0 {
-            editing::fit_work_area(&mut self.state);
+            let area = self.work_area();
+            editing::fit_work_area(&mut self.state, area);
             self.fitted = true;
         }
         let view = CanvasView::new(rect, self.state.canvas.viewport());
@@ -418,6 +525,7 @@ impl DesignerPane {
             palette,
             self.widths,
             &self.preview,
+            self.work_area(),
         );
         self.toolpaths
             .paint(&painter, &self.view, &self.state, palette);
@@ -426,7 +534,56 @@ impl DesignerPane {
             rendering::paint_ghost(&painter, &self.view, ghost.as_ref(), palette.accent);
             hint(ui, rect, &tr.tr("Click to position shape"));
         }
+        self.overlays(ui, rect, tr);
+        let empty = if self.state.canvas.shape_store.is_empty() && self.gallery.pending().is_none()
+        {
+            let laser =
+                self.state.machine_mode() != gcodekit5_designer::designer_state::MachineMode::Cnc3D;
+            overlay::empty_state(ui, rect, tr, self.stl_import, laser)
+        } else {
+            None
+        };
         self.gallery.show(ui.ctx(), tr);
+        empty
+    }
+
+    /// The floating toolbar (applied at once) and the status line over the canvas `rect`.
+    fn overlays(&mut self, ui: &mut egui::Ui, rect: egui::Rect, tr: &Translator) {
+        if let Some(action) = overlay::toolbar(ui, rect, tr) {
+            self.apply_view(action);
+        }
+        if let Some(at) = self.input.hover {
+            self.cursor = at;
+        }
+        let center = self.view.screen_to_world(rect.center());
+        let status = overlay::Status {
+            zoom: self.state.canvas.zoom(),
+            center: (f64::from(center.x), f64::from(center.y)),
+            cursor: self.cursor,
+            snap: self.state.snap_enabled,
+            constraint: ui.input(|i| i.modifiers.shift),
+            units: self.units,
+        };
+        overlay::status_line(ui, rect, &status, tr);
+    }
+
+    /// Applies a view change from the canvas toolbar or the View commands.
+    ///
+    /// # Arguments
+    /// * `action` - The change.
+    pub fn apply_view(&mut self, action: ViewAction) {
+        let area = self.work_area();
+        match action {
+            ViewAction::ZoomIn => self.state.zoom_in(),
+            ViewAction::ZoomOut => self.state.zoom_out(),
+            ViewAction::FitContent => editing::zoom_fit(&mut self.state, area),
+            ViewAction::FitWorkArea => editing::fit_work_area(&mut self.state, area),
+            // GTK's reset: 100% with the origin at the canvas's bottom-left corner.
+            ViewAction::FitViewport => {
+                self.state.canvas.set_zoom(1.0);
+                self.state.canvas.set_pan(0.0, 0.0);
+            }
+        }
     }
 
     /// The canvas while a gallery shape is armed: the pointer moves its ghost, a primary
@@ -462,7 +619,7 @@ impl DesignerPane {
 /// not take the pointer.
 fn hint(ui: &mut egui::Ui, rect: egui::Rect, text: &str) {
     let strip = egui::Rect::from_min_size(
-        rect.min + egui::vec2(0.0, 12.0),
+        rect.min + egui::vec2(0.0, overlay::TOOLBAR_HEIGHT + 4.0),
         egui::vec2(rect.width(), 40.0),
     );
     ui.scope_builder(
@@ -489,9 +646,10 @@ impl Pane for DesignerPane {
     fn ui(&mut self, ui: &mut egui::Ui, ctx: &mut PaneContext) {
         let tr = ctx.tr;
         let out = egui::Panel::left("gcodekit5-designer-toolbox")
-            .default_size(190.0)
+            .default_size(250.0)
             .show(ui, |ui| {
-                toolbox::show(ui, &mut self.state, self.tool, self.units, tr)
+                let preview = self.toolpaths.progress();
+                toolbox::show(ui, &mut self.state, self.tool, self.units, preview, tr)
             })
             .inner;
         if let Some(tool) = out.tool {
@@ -521,22 +679,37 @@ impl Pane for DesignerPane {
         if acted {
             self.touch();
         }
+        // After the click's touch, so the design as it is now counts as previewed.
+        if out.cancel_preview {
+            self.toolpaths.cancel(self.revision);
+        }
         self.show_notice(ui, tr);
-        self.show_canvas(ui, tr);
+        if let Some(command) = self.show_canvas(ui, tr) {
+            ctx.request(command);
+        }
     }
 
     fn command(&mut self, command: Command, _ctx: &mut PaneContext) -> bool {
         match command {
             Command::Undo => self.undo(),
             Command::Redo => self.redo(),
-            Command::ZoomIn => self.state.zoom_in(),
-            Command::ZoomOut => self.state.zoom_out(),
-            Command::ZoomFit => editing::zoom_fit(&mut self.state),
-            // GTK's reset: 100% with the origin at the canvas's bottom-left corner.
-            Command::ResetView => {
-                self.state.canvas.set_zoom(1.0);
-                self.state.canvas.set_pan(0.0, 0.0);
-            }
+            Command::ZoomIn => self.apply_view(ViewAction::ZoomIn),
+            Command::ZoomOut => self.apply_view(ViewAction::ZoomOut),
+            Command::ZoomFit => self.apply_view(ViewAction::FitContent),
+            Command::ResetView => self.apply_view(ViewAction::FitViewport),
+            Command::Cut => self.clipboard(ClipboardOp::Cut),
+            Command::Copy => self.clipboard(ClipboardOp::Copy),
+            Command::Paste => self.clipboard(ClipboardOp::Paste),
+            Command::AlignLeft => self.edit(DesignerState::align_selected_horizontal_left),
+            Command::AlignRight => self.edit(DesignerState::align_selected_horizontal_right),
+            Command::AlignTop => self.edit(DesignerState::align_selected_vertical_top),
+            Command::AlignBottom => self.edit(DesignerState::align_selected_vertical_bottom),
+            Command::AlignCenterX => self.edit(DesignerState::align_selected_horizontal_center),
+            Command::AlignCenterY => self.edit(DesignerState::align_selected_vertical_center),
+            Command::Group => self.edit(DesignerState::group_selected),
+            Command::Ungroup => self.edit(DesignerState::ungroup_selected),
+            Command::Duplicate => self.edit(|state| state.duplicate_selected(DUPLICATE_OFFSET_MM)),
+            Command::FitDevice => self.apply_view(ViewAction::FitWorkArea),
             Command::FileNew
             | Command::FileNew3d
             | Command::FileOpen
@@ -548,9 +721,6 @@ impl Pane for DesignerPane {
             | Command::FileExportSvg
             | Command::FileRun
             | Command::Quit
-            | Command::Cut
-            | Command::Copy
-            | Command::Paste
             | Command::Connect
             | Command::Disconnect
             | Command::StreamStart
@@ -582,16 +752,32 @@ impl Pane for DesignerPane {
         true
     }
 
+    fn set_device(&mut self, profile: Option<&DeviceProfile>) {
+        self.device = profile.map(|p| {
+            let (x, y) = (&p.x_axis, &p.y_axis);
+            (
+                x.min.min(x.max),
+                y.min.min(y.max),
+                x.min.max(x.max),
+                y.min.max(y.max),
+            )
+        });
+        self.update_limits();
+    }
+
     fn configure(&mut self, config: &Config) {
         self.units = config.ui.measurement_system;
+        self.stl_import = config.ui.enable_stl_import;
         // GTK's fallback when no device profile is active: the Preferences limits.
         let machine = &config.machine;
-        self.limits = (machine.x_limit > 0.0 && machine.y_limit > 0.0).then_some(MachineLimits {
-            x_min: 0.0,
-            x_max: machine.x_limit,
-            y_min: 0.0,
-            y_max: machine.y_limit,
-        });
+        self.config_limits =
+            (machine.x_limit > 0.0 && machine.y_limit > 0.0).then_some(MachineLimits {
+                x_min: 0.0,
+                x_max: machine.x_limit,
+                y_min: 0.0,
+                y_max: machine.y_limit,
+            });
+        self.update_limits();
         self.widths = LineWidths {
             grid_major: config.ui.grid_major_line_width as f32,
             grid_minor: config.ui.grid_minor_line_width as f32,

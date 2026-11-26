@@ -752,14 +752,11 @@ fn test_editor_read_only_while_job_runs() {
         .borrow_mut()
         .buffer_mut()
         .set_text("G1 X1\n".to_string());
-    // The Editor tab is behind the Visualizer: show it.
-    let shown = harness
+    // Show the editor's page (Machine Control).
+    harness
         .state_mut()
         .workspace_mut()
-        .apply(craft_ui::docking::Action::Activate {
-            panel: gcodekit5_ui_egui::workspace::PaneId::Editor,
-        });
-    assert!(shown.is_ok(), "{shown:?}");
+        .show_pane(gcodekit5_ui_egui::workspace::PaneId::Editor);
     harness.step();
     harness.step();
     assert!(harness.state().editor().borrow().is_locked());
@@ -790,4 +787,385 @@ fn test_notice_cleared_by_success() {
     assert!(pane.notice().is_some());
     pane.program_fed();
     assert_eq!(pane.notice(), None);
+}
+
+/// Answers every message dialog with Yes, or No when `yes` is false.
+fn answer_messages(app: &mut GcodeKitApp, yes: bool) {
+    app.dialogs_mut()
+        .set_override(Some(Box::new(move |_: &Request| {
+            Answer::Message(if yes {
+                craft_dialogs::MessageResult::Yes
+            } else {
+                craft_dialogs::MessageResult::No
+            })
+        })));
+}
+
+/// Clear editor asks first when the editor holds G-code: No keeps the text, Yes removes it
+/// (an edit, so the file is unsaved).
+#[test]
+fn test_clear_editor_asks_then_clears() {
+    let mut harness = app_harness();
+    harness
+        .state()
+        .editor()
+        .borrow_mut()
+        .buffer_mut()
+        .set_text("G1 X1\n".to_string());
+    harness.step();
+    harness.get_by_label("Clear editor").click();
+    harness.step();
+    assert_eq!(harness.state().dialogs().waiting(), 1, "no question asked");
+    answer_messages(harness.state_mut(), false);
+    app_frame(&mut harness);
+    app_frame(&mut harness);
+    assert_eq!(harness.state().editor().borrow().buffer().text(), "G1 X1\n");
+
+    harness.get_by_label("Clear editor").click();
+    harness.step();
+    answer_messages(harness.state_mut(), true);
+    app_frame(&mut harness);
+    app_frame(&mut harness);
+    let editor = harness.state().editor();
+    let editor = editor.borrow();
+    assert_eq!(editor.buffer().text(), "");
+    assert!(editor.buffer().is_dirty());
+}
+
+/// An empty editor is cleared without a question.
+#[test]
+fn test_clear_editor_without_text_asks_nothing() {
+    let mut harness = app_harness();
+    harness
+        .state()
+        .editor()
+        .borrow_mut()
+        .buffer_mut()
+        .set_text("  \n".to_string());
+    harness.step();
+    harness.get_by_label("Clear editor").click();
+    harness.step();
+    harness.step();
+    assert_eq!(harness.state().dialogs().waiting(), 0);
+    assert_eq!(harness.state().editor().borrow().buffer().text(), "");
+}
+
+/// While a job runs Clear editor is disabled and refused; a Yes given after a job started
+/// leaves the text as it is.
+#[test]
+fn test_clear_editor_refused_while_job_runs() {
+    let mut harness = crate::machine_support::app_harness(app_with_running_job("G1 X1\n"));
+    harness.step();
+    harness.step();
+    use egui_kittest::kittest::NodeT;
+    assert!(
+        harness
+            .get_by_label("Clear editor")
+            .accesskit_node()
+            .is_disabled(),
+        "Clear editor enabled during a job"
+    );
+    let tr = Translator::new("en");
+    harness.state().editor().borrow_mut().request_clear(&tr);
+    harness.step();
+    assert_eq!(harness.state().dialogs().waiting(), 0, "asked during a job");
+    assert_eq!(harness.state().editor().borrow().buffer().text(), "G1 X1\n");
+
+    // A question answered Yes after the job started does not clear either.
+    let mut requested = Vec::new();
+    let machine = &harness.state().state().machine;
+    let mut ctx = PaneContext::new(&tr, &mut requested).with_machine(machine);
+    let editor = harness.state().editor();
+    let took = editor.borrow_mut().confirmed(
+        gcodekit5_ui_egui::dialogs::ConfirmRequest::ClearEditor,
+        gcodekit5_ui_egui::dialogs::ConfirmChoice::Yes,
+        &mut ctx,
+    );
+    assert!(took);
+    assert_eq!(editor.borrow().buffer().text(), "G1 X1\n");
+}
+
+/// Replace All replaces every match, ignoring ASCII case as find does, left to right
+/// without overlaps.
+#[test]
+fn test_find_replace_all_text() {
+    assert_eq!(
+        find::replace_all("G1 x10\nG1 X10 Y1\n", "X10", "X20"),
+        ("G1 X20\nG1 X20 Y1\n".to_string(), 2)
+    );
+    assert_eq!(find::replace_all("aaaa", "aa", "b"), ("bb".to_string(), 2));
+    assert_eq!(find::replace_all("G0", "", "X"), ("G0".to_string(), 0));
+    assert_eq!(find::replace_all("G0", "Z", "X"), ("G0".to_string(), 0));
+}
+
+/// Replace replaces the current match and moves to the next one; with no current match it
+/// moves to the first.
+#[test]
+fn test_editor_replace_current_match() {
+    let tr = Translator::new("en");
+    let mut pane = EditorPane::new();
+    pane.buffer_mut()
+        .set_text("G1 X10\nG1 Y5\nG1 x10\n".to_string());
+    pane.set_find_query("X10");
+    pane.set_replace_text("X30");
+    pane.replace(&tr);
+    assert_eq!(
+        pane.buffer().text(),
+        "G1 X10\nG1 Y5\nG1 x10\n",
+        "nothing selected"
+    );
+    assert_eq!(pane.buffer().current_line(), 0);
+    pane.replace(&tr);
+    assert_eq!(pane.buffer().text(), "G1 X30\nG1 Y5\nG1 x10\n");
+    assert_eq!(pane.buffer().current_line(), 2, "moved to the next match");
+    pane.replace(&tr);
+    assert_eq!(pane.buffer().text(), "G1 X30\nG1 Y5\nG1 X30\n");
+}
+
+/// The editor pane in the app, with `text`, on the Machine Control page.
+fn editor_app(text: &str) -> Harness<'static, GcodeKitApp> {
+    let mut harness = app_harness();
+    harness
+        .state()
+        .editor()
+        .borrow_mut()
+        .buffer_mut()
+        .set_text(text.to_string());
+    harness
+        .state_mut()
+        .workspace_mut()
+        .show_pane(gcodekit5_ui_egui::workspace::PaneId::Editor);
+    harness.step();
+    harness.step();
+    harness
+}
+
+/// Types `text` into the field labelled `label`.
+fn type_into(harness: &mut Harness<'_, GcodeKitApp>, label: &str, text: &str) {
+    harness
+        .get_by_role_and_label(egui::accesskit::Role::TextInput, label)
+        .click();
+    harness.step();
+    harness
+        .get_by_role_and_label(egui::accesskit::Role::TextInput, label)
+        .type_text(text);
+    harness.step();
+}
+
+/// Replace All in the find row replaces every match, the count follows, and one undo in the
+/// text field brings the whole text back.
+#[test]
+fn test_editor_replace_all_is_one_undo_step() {
+    let original = "G1 X10\nG1 x10 Y2\nG0 X10\n";
+    let mut harness = editor_app(original);
+    type_into(&mut harness, "Search...", "X10");
+    assert!(harness.query_by_label("Matches: 3").is_some());
+    type_into(&mut harness, "Replace with ...", "X40");
+    harness.get_by_label("Replace All").click();
+    harness.step();
+    harness.step();
+    let editor = std::rc::Rc::clone(harness.state().editor());
+    assert_eq!(
+        editor.borrow().buffer().text(),
+        "G1 X40\nG1 X40 Y2\nG0 X40\n"
+    );
+    assert!(editor.borrow().buffer().is_dirty());
+    assert!(harness.query_by_label("Matches: 0").is_some());
+
+    harness
+        .get_by_role_and_label(egui::accesskit::Role::TextInput, "G-Code Editor")
+        .click();
+    harness.step();
+    harness.key_press_modifiers(egui::Modifiers::COMMAND, egui::Key::Z);
+    harness.step();
+    harness.step();
+    assert_eq!(editor.borrow().buffer().text(), original, "one undo");
+}
+
+/// Replace and Replace All are disabled while a job runs, and refused if asked anyway.
+#[test]
+fn test_editor_replace_refused_while_job_runs() {
+    use egui_kittest::kittest::NodeT;
+    let mut harness = crate::machine_support::app_harness(app_with_running_job("G1 X1\n"));
+    harness.step();
+    harness.step();
+    let tr = Translator::new("en");
+    {
+        let editor = harness.state().editor();
+        let mut editor = editor.borrow_mut();
+        editor.set_find_query("X1");
+        editor.set_replace_text("X2");
+    }
+    harness.step();
+    for label in ["Replace", "Replace All"] {
+        assert!(
+            harness.get_by_label(label).accesskit_node().is_disabled(),
+            "{label} enabled during a job"
+        );
+    }
+    let editor = harness.state().editor();
+    editor.borrow_mut().replace_all(&tr);
+    editor.borrow_mut().find_next();
+    editor.borrow_mut().replace(&tr);
+    assert_eq!(editor.borrow().buffer().text(), "G1 X1\n");
+    assert_eq!(
+        editor.borrow().notice(),
+        Some("Read-only while a job is running.")
+    );
+}
+
+/// The replace row fits the editor column of a 1280 px window.
+#[test]
+fn test_editor_replace_row_fits_at_1280() {
+    let harness = editor_app("G1 X1\n");
+    // The column starts at the find row's first widget.
+    let left = harness.get_by_label("Search...").rect().left();
+    for label in ["Replace with ...", "Replace", "Replace All", "Clear editor"] {
+        let rect = harness.get_by_label(label).rect();
+        assert!(
+            rect.right() <= 1280.0 && rect.left() >= left,
+            "{label} at {rect:?} outside the editor column (from {left})"
+        );
+    }
+}
+
+/// Types `text` into the editor's text field, then presses Ctrl+Z there.
+fn edit_then_undo(harness: &mut Harness<'_, GcodeKitApp>, text: Option<&str>) {
+    harness
+        .get_by_role_and_label(egui::accesskit::Role::TextInput, "G-Code Editor")
+        .click();
+    harness.step();
+    if let Some(text) = text {
+        harness
+            .get_by_role_and_label(egui::accesskit::Role::TextInput, "G-Code Editor")
+            .type_text(text);
+        harness.step();
+        harness.step();
+    } else {
+        harness.key_press_modifiers(egui::Modifiers::COMMAND, egui::Key::Z);
+        harness.step();
+        harness.step();
+    }
+}
+
+/// Opening another file starts a fresh undo history: Ctrl+Z cannot bring back the first
+/// file's text into the second.
+#[test]
+fn test_editor_open_resets_undo() -> TestResult {
+    let dir = scratch("undo_open")?;
+    let a = write(&dir, "a.gcode", "G0 X1\n")?;
+    let b = write(&dir, "b.gcode", "G0 Y2\n")?;
+    let mut harness = editor_app("");
+    harness.state().editor().borrow_mut().load(&a)?;
+    harness.step();
+    edit_then_undo(&mut harness, Some("M3 "));
+    harness.state().editor().borrow_mut().load(&b)?;
+    harness.step();
+    edit_then_undo(&mut harness, None);
+    assert_eq!(harness.state().editor().borrow().buffer().text(), "G0 Y2\n");
+    Ok(())
+}
+
+/// Clear editor starts a fresh undo history too.
+#[test]
+fn test_editor_clear_resets_undo() {
+    let mut harness = editor_app("G1 X1\n");
+    edit_then_undo(&mut harness, Some("M3 "));
+    harness.get_by_label("Clear editor").click();
+    harness.step();
+    answer_messages(harness.state_mut(), true);
+    app_frame(&mut harness);
+    app_frame(&mut harness);
+    assert_eq!(harness.state().editor().borrow().buffer().text(), "");
+    edit_then_undo(&mut harness, None);
+    assert_eq!(harness.state().editor().borrow().buffer().text(), "");
+}
+
+/// Generated G-code handed to the editor starts a fresh undo history.
+#[test]
+fn test_editor_generated_program_resets_undo() {
+    let mut harness = editor_app("G1 X1\n");
+    edit_then_undo(&mut harness, Some("M3 "));
+    harness
+        .state()
+        .editor()
+        .borrow_mut()
+        .buffer_mut()
+        .replace_with_generated("G0 Z5\n".to_string());
+    harness.step();
+    edit_then_undo(&mut harness, None);
+    assert_eq!(harness.state().editor().borrow().buffer().text(), "G0 Z5\n");
+}
+
+/// GTK's Save G-code button beside Clear editor saves the editor's file, as File > Save.
+#[test]
+fn test_save_gcode_button_saves_the_editor_file() -> TestResult {
+    use egui_kittest::kittest::Queryable;
+    let dir = scratch("save_button")?;
+    let path = write(&dir, "part.nc", "G0 X1\n")?;
+    let mut app = GcodeKitApp::from_state(AppState::new(
+        SettingsManager::detached(Config::default()),
+        crate::test_smoke::native_decision(),
+    ));
+    app.open_startup_files(std::slice::from_ref(&path));
+    let editor = std::rc::Rc::clone(app.editor());
+    editor
+        .borrow_mut()
+        .buffer_mut()
+        .set_text("G0 X2\n".to_string());
+    let mut h = crate::machine_support::app_harness(app);
+    h.run();
+    h.get_by_label("Save G-code").click();
+    h.run();
+    assert_eq!(h.state().last_dispatched(), Some(Command::FileSave));
+    assert_eq!(std::fs::read_to_string(&path)?, "G0 X2\n");
+    Ok(())
+}
+
+/// Answers every file dialog with `path`, recording the folder each one started in.
+fn answer_files_from(
+    app: &mut GcodeKitApp,
+    path: PathBuf,
+) -> std::sync::Arc<std::sync::Mutex<Vec<Option<PathBuf>>>> {
+    let started = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+    let seen = std::sync::Arc::clone(&started);
+    app.dialogs_mut()
+        .set_override(Some(Box::new(move |request: &Request| match request {
+            Request::File(file) => {
+                if let Ok(mut seen) = seen.lock() {
+                    seen.push(file.directory.clone());
+                }
+                Answer::Paths(vec![path.clone()])
+            }
+            Request::Message(_) => Answer::Cancelled,
+        })));
+    started
+}
+
+#[test]
+fn test_file_dialogs_start_in_the_remembered_folder() -> TestResult {
+    let first = scratch("start_folder_first")?;
+    let second = scratch("start_folder_second")?;
+    let path = write(&second, "part.gcode", "G21\n")?;
+    let mut config = Config::default();
+    config.file_processing.output_directory = first.clone();
+    let state = AppState::new(
+        SettingsManager::detached(config),
+        crate::test_smoke::native_decision(),
+    );
+    let mut harness = crate::machine_support::app_harness(GcodeKitApp::from_state(state));
+    let started = answer_files_from(harness.state_mut(), path.clone());
+    harness.state_mut().dispatch(Command::FileOpen);
+    for _ in 0..3 {
+        app_frame(&mut harness);
+    }
+    // The next dialog starts where the last file was opened (kept in the settings too when
+    // they can be saved; these detached settings cannot).
+    harness.state_mut().dispatch(Command::FileSaveAs);
+    for _ in 0..3 {
+        app_frame(&mut harness);
+    }
+    let started = started.lock().map(|s| s.clone()).unwrap_or_default();
+    assert_eq!(started, [Some(first), Some(second)]);
+    Ok(())
 }

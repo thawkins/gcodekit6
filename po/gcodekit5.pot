@@ -4510,3 +4510,171 @@ msgstr ""
 
 msgid "The device profile has unsaved changes. Save them before continuing?"
 msgstr ""
+
+msgid "Go to Work Zero refused: the machine is not idle."
+msgstr ""
+
+msgid "Waiting for the controller to report the active work coordinate system."
+msgstr ""
+
+msgid "Active work coordinate system is not G54-G59."
+msgstr ""
+
+msgid "Work zero needs a GRBL-family controller (set in the device profile)."
+msgstr ""
+
+msgid "Zero refused: the machine is not idle."
+msgstr ""
+
+msgid "Zero All refused: the work coordinate system changed."
+msgstr ""
+
+msgid "This sets work coordinate system {wcs} so the current X/Y/Z becomes 0."
+msgstr ""
+
+msgid "Cannot simulate stock removal: {reason}"
+msgstr ""
+
+msgid "Nothing to simulate: the program has no moves."
+msgstr ""
+
+msgid "Stock removal simulation failed."
+msgstr ""
+
+msgid "Stock removal too large to display on this GPU."
+msgstr ""
+
+msgid "The controller did not confirm the override change."
+msgstr ""
+
+msgid "Rotary calibration is not a number: check Preferences > Machine."
+msgstr ""
+
+msgid "not sent: the controller was reset"
+msgstr ""
+
+msgid "Align"
+msgstr ""
+
+msgid "Convert to Path"
+msgstr ""
+
+msgid "Convert to Rectangle"
+msgstr ""
+
+msgid "Reset All"
+msgstr ""
+
+msgid "Command"
+msgstr ""
+
+msgid "Where"
+msgstr ""
+
+msgid "Shortcut"
+msgstr ""
+
+msgid "Everywhere"
+msgstr ""
+
+msgid "Press a key (Escape cancels)"
+msgstr ""
+
+msgid "Change"
+msgstr ""
+
+msgid "The E-STOP and feed hold keys cannot be changed"
+msgstr ""
+
+msgid "{key} is kept for {command}"
+msgstr ""
+
+msgid "A command that moves the machine cannot use the letter of the E-STOP or feed hold key"
+msgstr ""
+
+msgid "A jog key must be a letter, digit or symbol key without Ctrl or Alt, so it never jogs while you type"
+msgstr ""
+
+msgid "{key} opens a menu"
+msgstr ""
+
+msgid "{key} is already used by {command}"
+msgstr ""
+
+msgid "{key} is reserved by the system"
+msgstr ""
+
+msgid "Double presses are not supported"
+msgstr ""
+
+msgid "{key} works in the wrong place"
+msgstr ""
+
+msgid "Outside Machine Control a command that moves the machine needs Ctrl, Alt or a function key"
+msgstr ""
+
+msgid "Too many shortcuts are changed"
+msgstr ""
+
+msgid "These saved shortcuts broke a shortcut rule and use their default keys again: {commands}"
+msgstr ""
+
+msgid "Duplicate"
+msgstr ""
+
+msgid "Toggle Grid"
+msgstr ""
+
+msgid "Toggle Machine Bounds"
+msgstr ""
+
+msgid "Toggle Rapid Moves"
+msgstr ""
+
+msgid "Toggle Cutting Moves"
+msgstr ""
+
+msgid "Unlock ignored: the machine is not in ALARM."
+msgstr ""
+
+msgid "not supported by Repetier firmware"
+msgstr ""
+
+msgid "skipped: no Repetier equivalent"
+msgstr ""
+
+msgid "resend request could not be honoured; reconnect to the controller"
+msgstr ""
+
+msgid "Emergency stop (M112, {shortcut})"
+msgstr ""
+
+msgid "Overrides need GRBL's real-time commands; Repetier firmware has none."
+msgstr ""
+
+msgid "Continuous jog needs GRBL's jog cancel; Repetier firmware has none."
+msgstr ""
+
+msgid "Probing is not available on Repetier firmware."
+msgstr ""
+
+msgid "Work zero is not available for this controller type (set in the device profile)."
+msgstr ""
+
+msgid "Repetier firmware has no work coordinate systems; Zero sets the position with G92."
+msgstr ""
+
+msgid "This sets the work position (G92) so the current X/Y/Z becomes 0."
+msgstr ""
+
+msgid "Emergency stop (M112): reset the controller or reconnect to continue."
+msgstr ""
+
+msgid "the controller is emergency-stopped (M112): reset it or reconnect"
+msgstr ""
+
+msgid "Select the active work coordinate system: the program may have changed it."
+msgstr ""
+
+msgid "the command line is empty"
+msgstr ""

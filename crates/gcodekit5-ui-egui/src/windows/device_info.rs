@@ -1,8 +1,9 @@
-//! The Device Info window (GTK's Device Info panel): what the controller reports about
-//! itself (name, firmware, version, build date, compile options), its capabilities (homing
-//! `$22`, laser mode `$32`), and the device type selector that writes `$32`.
+//! The Device Info panel, the left column of the Device Config page as in GTK: what the
+//! controller reports about itself (name, firmware, version, build date, compile options),
+//! its capabilities (homing `$22`, laser mode `$32`), and the device type selector that
+//! writes `$32`.
 //!
-//! - The identity follows the controller's lines whether the window is open or not: the
+//! - The identity follows the controller's lines whether the page is shown or not: the
 //!   startup banner, the `$I` reply (`[VER:...]`, `[OPT:...]`), Repetier's `M115` reply and
 //!   `$22`/`$32` from a `$$` dump. A disconnect forgets it.
 //! - **Refresh device info** sends `$I` then `$$`; **Copy device info** copies the name,
@@ -19,6 +20,7 @@ use gcodekit5_app::i18n::Translator;
 use gcodekit5_app::machine::MachineEvent;
 
 use super::setting_write::{self, PendingWrite, WriteOutcome};
+use crate::icons::{Icon, icon_only_button};
 use crate::machine::{Machine, worker_message};
 
 /// A device type write waiting for the controller's answer.
@@ -29,10 +31,9 @@ struct TypeWrite {
     previous: DeviceType,
 }
 
-/// The Device Info window.
+/// The Device Info panel.
 #[derive(Debug, Default)]
-pub struct DeviceInfoWindow {
-    open: bool,
+pub struct DeviceInfoPanel {
     identity: DeviceIdentity,
     device_type: DeviceType,
     /// Whether the selection already followed `$32` on this connection.
@@ -42,17 +43,7 @@ pub struct DeviceInfoWindow {
     write: Option<TypeWrite>,
 }
 
-impl DeviceInfoWindow {
-    /// Opens the window.
-    pub fn open(&mut self) {
-        self.open = true;
-    }
-
-    /// Whether the window is open.
-    pub fn is_open(&self) -> bool {
-        self.open
-    }
-
+impl DeviceInfoPanel {
     /// What the controller reported about itself.
     pub fn identity(&self) -> &DeviceIdentity {
         &self.identity
@@ -68,7 +59,7 @@ impl DeviceInfoWindow {
         self.notice.as_ref().map(|(text, _)| text.as_str())
     }
 
-    /// Takes the controller's events, in order, whether the window is open or not.
+    /// Takes the controller's events, in order, whether the page is shown or not.
     ///
     /// # Arguments
     /// * `events` - Events no observer has seen yet.
@@ -92,6 +83,7 @@ impl DeviceInfoWindow {
                 | MachineEvent::StatusReport(_)
                 | MachineEvent::StreamProgress { .. }
                 | MachineEvent::StreamHalted { .. }
+                | MachineEvent::ProtocolMismatch { .. }
                 | MachineEvent::StreamFinished { .. }
                 | MachineEvent::StreamStopped { .. }
                 | MachineEvent::Sent(_)
@@ -199,32 +191,35 @@ impl DeviceInfoWindow {
         )
     }
 
-    /// Draws the window while it is open.
+    /// Keeps a device type write going; the app calls this once every frame, whatever page
+    /// is shown.
     ///
     /// # Arguments
     /// * `ctx` - The egui context.
-    /// * `machine` - The app's machine connection.
-    /// * `tr` - Translates the labels.
-    pub fn show(&mut self, ctx: &egui::Context, machine: &Machine, tr: &Translator) {
+    /// * `tr` - Translates the notices.
+    pub fn update(&mut self, ctx: &egui::Context, tr: &Translator) {
         self.tick(tr);
         if let Some(write) = &self.write {
             ctx.request_repaint_after(write.pending.time_left());
         }
-        if !self.open {
-            return;
-        }
-        let mut open = self.open;
-        egui::Window::new(tr.tr(n_!("Device Info")))
-            .id(egui::Id::unique("gcodekit5-device-info"))
-            .open(&mut open)
-            .default_width(360.0)
-            .show(ctx, |ui| self.contents(ui, machine, tr));
-        self.open = open;
+    }
+
+    /// Draws the panel into the Device Config page's left column.
+    ///
+    /// # Arguments
+    /// * `ui` - The column's `Ui`.
+    /// * `machine` - The app's machine connection.
+    /// * `tr` - Translates the labels.
+    pub fn show(&mut self, ui: &mut egui::Ui, machine: &Machine, tr: &Translator) {
+        egui::ScrollArea::vertical()
+            .id_salt("gcodekit5-device-info")
+            .auto_shrink([false, false])
+            .show(ui, |ui| self.contents(ui, machine, tr));
     }
 
     fn contents(&mut self, ui: &mut egui::Ui, machine: &Machine, tr: &Translator) {
         let connected = machine.status().connected;
-        ui.strong(tr.tr(n_!("Device Type")));
+        crate::theme::section_heading(ui, &tr.tr(n_!("Device Type")));
         let choices = [
             (
                 DeviceType::Cnc,
@@ -266,22 +261,33 @@ impl DeviceInfoWindow {
             None => {}
         }
         ui.separator();
+        // GTK's header: the connection icon, "Device", and the refresh and copy buttons.
         ui.horizontal(|ui| {
-            let state = if connected {
-                n_!("Connected")
+            // The icon shows the state, as in GTK. Its tooltip and accessible name say it as
+            // "Device: Not connected", not the bare state the page's status line names.
+            let (icon, state) = if connected {
+                (Icon::Transfer, n_!("Connected"))
             } else {
-                n_!("Not connected")
+                (Icon::Disconnected, n_!("Not connected"))
             };
-            ui.strong(tr.tr(state));
-        });
-        ui.horizontal(|ui| {
-            ui.add_enabled_ui(connected, |ui| {
-                if ui.button(tr.tr(n_!("Refresh device info"))).clicked() {
-                    self.refresh(machine, tr);
-                }
-                if ui.button(tr.tr(n_!("Copy device info"))).clicked() {
-                    ui.ctx().copy_text(self.copy_text(tr));
-                }
+            let name = format!("{} {}", tr.tr(n_!("Device:")), tr.tr(state));
+            let (rect, response) =
+                ui.allocate_exact_size(egui::Vec2::splat(18.0), egui::Sense::hover());
+            icon.themed(ui).paint_at(ui, rect);
+            response.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Image, true, &name));
+            response.on_hover_text(&name);
+            crate::theme::section_heading(ui, &tr.tr(n_!("Device")));
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                ui.add_enabled_ui(connected, |ui| {
+                    let copy = tr.tr(n_!("Copy device info"));
+                    if icon_only_button(ui, Icon::Copy, &copy).clicked() {
+                        ui.ctx().copy_text(self.copy_text(tr));
+                    }
+                    let refresh = tr.tr(n_!("Refresh device info"));
+                    if icon_only_button(ui, Icon::Refresh, &refresh).clicked() {
+                        self.refresh(machine, tr);
+                    }
+                });
             });
         });
         self.details(ui, connected, tr);
@@ -351,10 +357,11 @@ impl DeviceInfoWindow {
     }
 }
 
-/// The English msgids this window shows, for the translation test.
+/// The English msgids this panel shows, for the translation test.
 pub fn msgids() -> Vec<&'static str> {
     let mut ids = vec![
         n_!("Device Info"),
+        n_!("Device"),
         n_!("Device Type"),
         n_!("CNC"),
         n_!("Laser"),

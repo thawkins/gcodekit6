@@ -7,11 +7,20 @@
 //! overrides under, so they must not change once released.
 //!
 //! Most bindings work anywhere in the window; the visualizer's view keys work only while the
-//! Visualizer has the keyboard. For machine safety, the jog commands have no default keys and
-//! Escape is bound to nothing: GTK never registered Escape or the arrow keys (the
-//! accelerators.rs constants were unused), an Escape or arrow key meant for a widget must never
-//! move or reset the machine, and craft-keymap cannot tell GTK's numeric-keypad jog keys from
-//! the top-row digits. Jogging stays in the Machine Control pane.
+//! Visualizer has the keyboard, and the designer's shape keys (GTK's Alt+L/R/T/V align, with
+//! Alt+O and Alt+C for GTK's Alt+B and Alt+H, which are menu mnemonics of the in-window bar;
+//! Ctrl+G group and Ctrl+Shift+G ungroup) only while the Designer canvas has it, never while
+//! a text field does. GTK's other ungroup key, Ctrl+U, stays Unlock everywhere.
+//!
+//! The jog keys are GTK's numeric keypad digits (8/2 Y+/Y-, 4/6 X-/X+, 9/3 Z+/Z-), bound in
+//! the Machine Control scope only: they run only after the user pressed in that pane, never
+//! while a widget (a text field, an open dropdown) has the keyboard. egui reports the keypad
+//! digits as the top-row digits, so those jog too, as they did in GTK, which matched the typed
+//! character. A held key jogs continuously in Continuous
+//! mode, until it is released (see `panes::machine_control`). For machine safety Escape and
+//! the arrow keys are bound to nothing: GTK never registered them (the accelerators.rs
+//! constants were unused), and an Escape or arrow key meant for a widget must never move or
+//! reset the machine.
 //!
 //! Feed hold and soft reset each have a modifier chord, `Cmd+Shift+H` and `Cmd+Shift+K` (Ctrl
 //! off macOS), that works anywhere in the window, also while a text field has the keyboard:
@@ -29,6 +38,8 @@ use craft_keymap::{Bindable, Binding, CommandRef, Keymap, Platform, Scope, Scope
 pub const MACHINE_CONTROL_SCOPE: &str = "MachineControl";
 /// The scope of the bindings that work only while the Visualizer has the keyboard.
 pub const VISUALIZER_SCOPE: &str = "Visualizer";
+/// The scope of the bindings that work only while the Designer canvas has the keyboard.
+pub const DESIGNER_SCOPE: &str = "Designer";
 
 /// One action the user can run from a key, a menu or a pane.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -127,6 +138,26 @@ pub enum Command {
     OpenHelp,
     /// Show the About window.
     About,
+    /// Align the designer selection by its left edges.
+    AlignLeft,
+    /// Align the designer selection by its right edges.
+    AlignRight,
+    /// Align the designer selection by its top edges.
+    AlignTop,
+    /// Align the designer selection by its bottom edges.
+    AlignBottom,
+    /// Align the designer selection on its horizontal centre.
+    AlignCenterX,
+    /// Align the designer selection on its vertical centre.
+    AlignCenterY,
+    /// Group the designer selection.
+    Group,
+    /// Ungroup the designer selection.
+    Ungroup,
+    /// Duplicate the designer selection 10 mm right and up (GTK's canvas Ctrl+D).
+    Duplicate,
+    /// Fit the device work area into the designer view (GTK's canvas D).
+    FitDevice,
 }
 
 /// Where a default binding works.
@@ -148,7 +179,7 @@ struct Spec {
 
 impl Command {
     /// Every command, in menu order.
-    pub const ALL: [Command; 47] = [
+    pub const ALL: [Command; 57] = [
         Command::FileNew,
         Command::FileNew3d,
         Command::FileOpen,
@@ -196,6 +227,16 @@ impl Command {
         Command::OpenDeviceInfo,
         Command::OpenHelp,
         Command::About,
+        Command::AlignLeft,
+        Command::AlignRight,
+        Command::AlignTop,
+        Command::AlignBottom,
+        Command::AlignCenterX,
+        Command::AlignCenterY,
+        Command::Group,
+        Command::Ungroup,
+        Command::Duplicate,
+        Command::FitDevice,
     ];
 
     /// The command's catalog entry.
@@ -203,6 +244,7 @@ impl Command {
         use Home::{App, Panel};
         const MC: Home = Panel(MACHINE_CONTROL_SCOPE);
         const VIS: Home = Panel(VISUALIZER_SCOPE);
+        const DES: Home = Panel(DESIGNER_SCOPE);
         let (id, label, home, keys): (_, _, _, &'static [&'static str]) = match self {
             Command::FileNew => ("file.new", n_!("New 2D"), App, &["Cmd+N"]),
             Command::FileNew3d => ("file.new_3d", n_!("New 3D"), App, &[]),
@@ -210,11 +252,12 @@ impl Command {
             Command::FileSave => ("file.save", n_!("Save"), App, &["Cmd+S"]),
             Command::FileSaveAs => ("file.save_as", n_!("Save As..."), App, &["Cmd+Shift+S"]),
             Command::FileImport => ("file.import", n_!("Import"), App, &[]),
+            // GTK's app key, and Ctrl+I on the designer canvas (`designer/ui_builders.rs`).
             Command::FileImportImage => (
                 "file.import_image",
                 n_!("Import Image..."),
                 App,
-                &["Cmd+Shift+I"],
+                &["Cmd+Shift+I", "Designer: Cmd+I"],
             ),
             Command::FileExportGcode => ("file.export_gcode", n_!("Export G-Code..."), App, &[]),
             Command::FileExportSvg => ("file.export_svg", n_!("Export SVG..."), App, &[]),
@@ -238,23 +281,43 @@ impl Command {
             ),
             // craft-keymap has no `~` key. Shift+` types `~` only on US-style layouts; on others
             // (German, French, ...) this chord is a different key from the one typing `~`.
-            Command::CycleStart => ("machine.cycle_start", n_!("Cycle Start"), App, &["Shift+`"]),
+            // GTK bound it app-wide; a bare key that resumes a held job runs here only while
+            // Machine Control has the keyboard (its arming rules), never from a stray press on
+            // another page.
+            Command::CycleStart => ("machine.cycle_start", n_!("Cycle Start"), MC, &["Shift+`"]),
             // Never a bare Escape: it would reset the controller when closing a dropdown.
             Command::SoftReset => ("machine.soft_reset", n_!("Reset"), App, &["Cmd+Shift+K"]),
             Command::Home => ("machine.home", n_!("Home"), App, &["Cmd+Home"]),
             Command::Unlock => ("machine.unlock", n_!("Unlock"), App, &["Cmd+U"]),
-            // No default keys: GTK jogs from the numeric keypad (8/2/4/6/9/3), which
-            // craft-keymap folds into the top-row digits, and arrows move between widgets.
-            Command::JogXPos => ("jog.x_pos", n_!("Jog X+"), MC, &[]),
-            Command::JogXNeg => ("jog.x_neg", n_!("Jog X-"), MC, &[]),
-            Command::JogYPos => ("jog.y_pos", n_!("Jog Y+"), MC, &[]),
-            Command::JogYNeg => ("jog.y_neg", n_!("Jog Y-"), MC, &[]),
-            Command::JogZPos => ("jog.z_pos", n_!("Jog Z+"), MC, &[]),
-            Command::JogZNeg => ("jog.z_neg", n_!("Jog Z-"), MC, &[]),
-            Command::ZoomFit => ("view.zoom_fit", n_!("Zoom to Fit"), VIS, &["F"]),
-            Command::ZoomIn => ("view.zoom_in", n_!("Zoom In"), VIS, &["+"]),
-            Command::ZoomOut => ("view.zoom_out", n_!("Zoom Out"), VIS, &["-"]),
-            Command::ResetView => ("view.reset", n_!("Reset View"), VIS, &["Cmd+0"]),
+            // GTK's numeric keypad keys (egui folds them into the top-row digits), in the
+            // Machine Control scope only; arrows move between widgets.
+            Command::JogXPos => ("jog.x_pos", n_!("Jog X+"), MC, &["6"]),
+            Command::JogXNeg => ("jog.x_neg", n_!("Jog X-"), MC, &["4"]),
+            Command::JogYPos => ("jog.y_pos", n_!("Jog Y+"), MC, &["8"]),
+            Command::JogYNeg => ("jog.y_neg", n_!("Jog Y-"), MC, &["2"]),
+            Command::JogZPos => ("jog.z_pos", n_!("Jog Z+"), MC, &["9"]),
+            Command::JogZNeg => ("jog.z_neg", n_!("Jog Z-"), MC, &["3"]),
+            // GTK's view keys of the visualizer, and of the designer canvas
+            // (`designer/ui_builders.rs`: + and = zoom in, - out, F fits, R resets).
+            Command::ZoomFit => (
+                "view.zoom_fit",
+                n_!("Zoom to Fit"),
+                VIS,
+                &["F", "Designer: F"],
+            ),
+            Command::ZoomIn => (
+                "view.zoom_in",
+                n_!("Zoom In"),
+                VIS,
+                &["+", "Designer: +", "Designer: ="],
+            ),
+            Command::ZoomOut => ("view.zoom_out", n_!("Zoom Out"), VIS, &["-", "Designer: -"]),
+            Command::ResetView => (
+                "view.reset",
+                n_!("Reset View"),
+                VIS,
+                &["Cmd+0", "Designer: R"],
+            ),
             Command::ViewTop => ("view.top", n_!("Top"), App, &[]),
             Command::ViewFront => ("view.front", n_!("Front"), App, &[]),
             Command::ViewIso => ("view.iso", n_!("Isometric"), App, &[]),
@@ -276,6 +339,39 @@ impl Command {
             Command::OpenDeviceInfo => ("tools.device_info", n_!("Device Info"), App, &[]),
             Command::OpenHelp => ("help.docs", n_!("Documentation"), App, &["F1"]),
             Command::About => ("help.about", n_!("About"), App, &[]),
+            // GTK's designer keys (`designer/ui_builders.rs`), on the canvas only.
+            Command::AlignLeft => ("designer.align_left", n_!("Align Left"), DES, &["Alt+L"]),
+            Command::AlignRight => ("designer.align_right", n_!("Align Right"), DES, &["Alt+R"]),
+            Command::AlignTop => ("designer.align_top", n_!("Align Top"), DES, &["Alt+T"]),
+            Command::AlignBottom => (
+                "designer.align_bottom",
+                n_!("Align Bottom"),
+                DES,
+                // GTK's Alt+B is the German Edit menu's ("Bearbeiten") mnemonic here.
+                &["Alt+O"],
+            ),
+            Command::AlignCenterX => (
+                "designer.align_center_x",
+                n_!("Align Center X"),
+                DES,
+                // GTK's Alt+H is the Help menu's mnemonic in the in-window bar.
+                &["Alt+C"],
+            ),
+            Command::AlignCenterY => (
+                "designer.align_center_y",
+                n_!("Align Center Y"),
+                DES,
+                &["Alt+V"],
+            ),
+            Command::Group => ("designer.group", n_!("Group"), DES, &["Cmd+G"]),
+            Command::Ungroup => ("designer.ungroup", n_!("Ungroup"), DES, &["Cmd+Shift+G"]),
+            Command::Duplicate => ("designer.duplicate", n_!("Duplicate"), DES, &["Cmd+D"]),
+            Command::FitDevice => (
+                "designer.fit_device",
+                n_!("Fit to Device Working Area"),
+                DES,
+                &["D"],
+            ),
         };
         Spec {
             id,
@@ -311,6 +407,23 @@ impl Command {
         Command::ALL.into_iter().find(|c| c.id() == command.id)
     }
 
+    /// Whether this is a designer shape command: run from the canvas's keys and context menu,
+    /// not from the menu bar (GTK's menus had none of them).
+    pub fn is_designer_shape_op(self) -> bool {
+        matches!(
+            self,
+            Command::AlignLeft
+                | Command::AlignRight
+                | Command::AlignTop
+                | Command::AlignBottom
+                | Command::AlignCenterX
+                | Command::AlignCenterY
+                | Command::Group
+                | Command::Ungroup
+                | Command::Duplicate
+        )
+    }
+
     /// Whether this is a jog command (bound to keys, never shown in the menus).
     pub fn is_jog(self) -> bool {
         matches!(
@@ -322,6 +435,31 @@ impl Command {
                 | Command::JogZPos
                 | Command::JogZNeg
         )
+    }
+
+    /// Whether the command moves the machine or starts or continues a job: a jog, homing, a
+    /// stream start or a cycle start (resume). Its keys never run while a text field has the
+    /// keyboard, stay off the feed hold and soft reset keys and, outside Machine Control, need
+    /// a modifier or a function key (`crate::shortcuts`). File > Run only previews the
+    /// program in the Visualizer and sends nothing, so it is not one. Go to Work Zero, the
+    /// quick probes and Zero have no keys (pane buttons only).
+    pub fn starts_motion(self) -> bool {
+        self.is_jog()
+            || matches!(
+                self,
+                Command::StreamStart | Command::CycleStart | Command::Home
+            )
+    }
+
+    /// Whether the command may run now, by any route it can arrive by: a key, the macOS menu
+    /// (its key equivalents included) or the in-window menu bar (its keyboard navigation
+    /// included). A command that moves the machine never runs while a text field has the
+    /// keyboard: the key was meant for the text.
+    ///
+    /// # Arguments
+    /// * `text_field_has_keyboard` - Whether a text field has the keyboard this frame.
+    pub fn may_run(self, text_field_has_keyboard: bool) -> bool {
+        !(text_field_has_keyboard && self.starts_motion())
     }
 
     /// The command's catalog entry for craft-keymap.
@@ -351,6 +489,7 @@ pub fn keymap() -> Keymap {
     let scopes = Scopes::new()
         .with_panel(MACHINE_CONTROL_SCOPE)
         .with_panel(VISUALIZER_SCOPE)
+        .with_panel(DESIGNER_SCOPE)
         // A panel's keys never run while another panel, or none, has the keyboard.
         .with_panel_fallthrough(false);
     let catalog = Command::ALL.into_iter().map(Command::bindable).collect();
