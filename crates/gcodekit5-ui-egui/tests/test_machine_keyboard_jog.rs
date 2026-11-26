@@ -393,3 +393,55 @@ fn test_keys_never_jog_after_return_while_typing() {
         shared.log()
     );
 }
+
+/// Hovers, then clicks, the text field `label` (role TextInput) and checks it has focus.
+fn focus_text(harness: &mut Harness<'_, GcodeKitApp>, label: &str) {
+    harness
+        .get_by_role_and_label(egui::accesskit::Role::TextInput, label)
+        .hover();
+    harness.step();
+    harness
+        .get_by_role_and_label(egui::accesskit::Role::TextInput, label)
+        .click();
+    harness.step();
+    harness.step();
+    assert!(
+        harness
+            .get_by_role_and_label(egui::accesskit::Role::TextInput, label)
+            .is_focused(),
+        "{label} not focused"
+    );
+}
+
+/// Review Focus 1: typing in a text field of the Machine Control page, then leaving the
+/// page and coming back, never turns a typed digit into a jog: the text field's focus is
+/// lost while the page is hidden, and the keyboard is not handed to Machine Control.
+#[test]
+fn test_digit_typed_after_return_from_a_text_field_never_jogs() {
+    for field in [
+        "G-Code Editor",
+        "Type a command and press Enter...",
+        "Enter G-code command...",
+    ] {
+        let (mut harness, shared) = keyboard_app(false);
+        focus_text(&mut harness, field);
+        tab(&mut harness, "Visualizer");
+        tab(&mut harness, "Machine Control");
+        tap(&mut harness, egui::Key::Num6);
+        assert!(
+            settled_jogs(&harness, &shared).is_empty(),
+            "{field}: {:?}",
+            shared.log()
+        );
+        // A press in the pane gives the keys back.
+        harness.get_by_label("Machine State").click();
+        harness.step();
+        harness.step();
+        tap(&mut harness, egui::Key::Num6);
+        assert!(
+            wait_until(|| jogs(&shared).len() == 1),
+            "{field}: {:?}",
+            shared.log()
+        );
+    }
+}

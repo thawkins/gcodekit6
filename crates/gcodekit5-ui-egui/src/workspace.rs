@@ -488,6 +488,12 @@ pub struct Workspace {
     drawn: Drawn,
     /// Whether the Designer page's inspector column is hidden.
     inspector_hidden: bool,
+    /// For each page left, the pane that had the keyboard there, restored on return; none
+    /// when a widget (a text field) had it, since its focus does not survive the hidden page.
+    page_keyboard: Vec<(Page, Option<PaneId>)>,
+    /// Whether a widget had the keyboard at the end of the last frame without a press
+    /// outside every pane (the press on a page tab does not count).
+    widget_focused: bool,
 }
 
 /// The panes whose bodies a frame drew; the others have their holds cancelled
@@ -528,6 +534,8 @@ impl Workspace {
             active: None,
             drawn: Drawn::new(),
             inspector_hidden: false,
+            page_keyboard: Vec::new(),
+            widget_focused: false,
         }
     }
 
@@ -543,15 +551,21 @@ impl Workspace {
     pub fn set_page(&mut self, page: Page) {
         if page != self.page {
             // Leaving a page ends its keyboard and pointer holds at once, and its panes lose
-            // the keyboard. The new page's main pane takes it, when it has keys (Machine
-            // Control, the Visualizer), as in GTK, where the page's keys worked once it was
-            // shown; a focused text field still keeps every plain key from it.
+            // the keyboard. The pane that had it is remembered and gets it back on return, as
+            // in GTK, where a page's keys worked again once it was shown, but not when a text
+            // field had the keyboard there: that focus is lost while the page is hidden, and a
+            // digit typed on return must not jog. A press in the pane gives it back then.
             self.cancel_holds();
-            self.focused = page
-                .panes()
-                .first()
-                .copied()
-                .filter(|pane| pane.keymap_scope().is_some());
+            let left = self
+                .active
+                .filter(|pane| self.page.panes().contains(pane) && !self.widget_focused);
+            self.page_keyboard.retain(|(p, _)| *p != self.page);
+            self.page_keyboard.push((self.page, left));
+            self.focused = self
+                .page_keyboard
+                .iter()
+                .find(|(p, _)| *p == page)
+                .and_then(|(_, pane)| *pane);
         }
         self.page = page;
     }
@@ -822,6 +836,9 @@ impl Workspace {
         if press.is_some() {
             self.focused = frame.pressed_in;
             self.active = frame.pressed_in.or(self.active);
+        }
+        if press.is_none() || self.focused.is_some() {
+            self.widget_focused = ui.ctx().memory(|m| m.focused().is_some());
         }
         self.drawn = frame.drawn;
         for pane in self
