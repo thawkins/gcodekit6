@@ -67,6 +67,7 @@ M6 completes the cut-over: the egui front end got GTK's look back (Tabler icons,
 ### Fixed
 - **Work zero after a profile change while connected in egui**: activating or saving another device profile while connected no longer changes how Zero works on the controller already connected (a Repetier profile over a GRBL connection sent `G10 L20 P1`, which GRBL writes into G54 whatever system is active); while connected, work zero follows the connection's protocol
 - **File dialogs start in the remembered folder in egui**: every file dialog starts in Preferences > General's default folder, and opening or saving an editor or designer file makes its folder the new default, as in GTK
+- **Repetier pen mode in egui**: the device profile's Pen Mode is applied again when a program streams on a Repetier connection, as GTK's `RepetierSender` did: `M3`/`M4` become `G0 Z0` (pen down), `M5` becomes `G0 Z5` (pen up), and a command repeating the pen's state is skipped
 - **Status bar eStop size in egui**: the status bar's eStop keeps a minimum size of 72 x 28 px
 - **Real-time echoes in the egui console**: a feed hold (`! (Feed hold)`) or cycle start (`~ (Cycle start)`) after a job no longer ends its "Work completed in" tracking; only the `0x18`/`0x85` echoes were recognised before
 - **E-STOP and feed hold keys while a menu is open in egui**: on Linux and Windows the in-window menu bar kept every key while one of its menus was open or it had the keyboard, so the soft reset (`Cmd+Shift+K`) and feed hold (`Cmd+Shift+H`) keys did nothing then; they now always run, as they do while a text field or a window has the keyboard
@@ -76,7 +77,6 @@ M6 completes the cut-over: the egui front end got GTK's look back (Tabler icons,
 
 ### Known gaps
 - The parity checklist's Manual checks (real controllers, TCP/WebSocket, Windows and macOS, native speakers) have not been run
-- **Repetier pen mode**: the device profile's Pen Mode is saved but not applied when streaming (GTK's `RepetierSender` turned `M3`/`M5` into pen Z moves); listed as a Gap in the parity checklist
 
 ## [Unreleased] - 2026-11-26 (egui + craft-libs migration, milestone M5: managers and help)
 

@@ -1278,6 +1278,13 @@ impl Pane for MachineControlPane {
         });
     }
 
+    fn set_device(&mut self, profile: Option<&gcodekit5_devicedb::DeviceProfile>) {
+        // Read by the controller when a Repetier program streams, as GTK read the active
+        // profile's pen mode at job start.
+        let pen_mode = profile.is_some_and(|p| p.pen_mode);
+        self.with_controller(|c| c.set_pen_mode(pen_mode));
+    }
+
     fn take_confirm(&mut self) -> Option<ConfirmRequest> {
         self.confirm.take()
     }

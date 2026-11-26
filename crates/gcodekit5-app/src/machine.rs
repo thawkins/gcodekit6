@@ -449,6 +449,9 @@ pub struct MachineController {
     /// Shared with the worker, per connection: set by a Repetier `M112`, cleared by the
     /// firmware's `start`; see [`MachineController::is_halted`].
     halted: Arc<AtomicBool>,
+    /// Repetier pen mode, shared with every worker; see
+    /// [`MachineController::set_pen_mode`].
+    pen_mode: Arc<AtomicBool>,
     repaint: SharedHook,
     streaming: Arc<AtomicBool>,
     /// Sequence number of the last command line sent with [`send_line`](Self::send_line).
@@ -503,6 +506,7 @@ impl MachineController {
             last_connection: None,
             protocol: ControllerProtocol::Unknown,
             halted: Arc::new(AtomicBool::new(false)),
+            pen_mode: Arc::new(AtomicBool::new(false)),
             streamed: None,
             repaint: Arc::new(Mutex::new(None)),
             streaming: Arc::new(AtomicBool::new(false)),
@@ -589,7 +593,7 @@ impl MachineController {
             self.fresh.clone(),
             [self.answered.clone(), self.jogs_answered.clone()],
         )
-        .with_protocol(protocol, self.halted.clone());
+        .with_protocol(protocol, self.halted.clone(), self.pen_mode.clone());
         let handle = std::thread::Builder::new()
             .name("machine-controller".to_string())
             .spawn(move || state.run(&params))
@@ -603,6 +607,18 @@ impl MachineController {
         self.last_connection = Some(cfg.clone());
         self.protocol = protocol;
         Ok(())
+    }
+
+    /// Turns Repetier pen mode on or off (the active device profile's Pen Mode), as GTK's
+    /// `RepetierSender` applied it: on a Repetier connection, a program streamed from then on
+    /// has `M3`/`M4` written as `G0 Z0` (pen down) and `M5` as `G0 Z5` (pen up), and a
+    /// command that repeats the pen's state is skipped. Manual lines are sent as typed; other
+    /// protocols ignore it.
+    ///
+    /// # Arguments
+    /// * `on` - Whether pen mode is on.
+    pub fn set_pen_mode(&self, on: bool) {
+        self.pen_mode.store(on, Ordering::Relaxed);
     }
 
     /// The protocol of the last connection started ([`connect_with`](Self::connect_with)),
@@ -1119,12 +1135,19 @@ struct RepetierLink {
     /// Lines the worker sends itself: the protocol's start-up commands (`M110`, `M115`) at
     /// connect and after the controller restarts.
     internal: VecDeque<&'static str>,
+    /// Pen mode ([`MachineController::set_pen_mode`]), read per program line.
+    pen_mode: Arc<AtomicBool>,
+    /// In pen mode, whether the pen is up; down at the start of each program, so its first
+    /// `M5` lifts it, as GTK's `apply_pen_mode` started.
+    pen_up: bool,
 }
 
 impl RepetierLink {
     /// A link that starts with the protocol's start-up commands.
-    fn new() -> Self {
+    fn new(pen_mode: Arc<AtomicBool>) -> Self {
         Self {
+            pen_mode,
+            pen_up: false,
             processor: RepetierProcessor::new(),
             acks_due: 0,
             internal_in_flight: false,
@@ -1470,6 +1493,9 @@ impl WorkerState {
             }
             Command::Stream(program, mode, _) => {
                 self.paused = false;
+                if let Some(link) = self.repetier.as_mut() {
+                    link.pen_up = false;
+                }
                 self.stream = Some(Stream {
                     program,
                     sent: 0,
@@ -1943,10 +1969,16 @@ impl WorkerState {
     /// The same worker on a connection opened for `configured`: Repetier's flow control on a
     /// Repetier connection, and the identity check for a known protocol. `halted` is the
     /// controller's flag for a Repetier `M112`.
-    fn with_protocol(mut self, configured: ControllerProtocol, halted: Arc<AtomicBool>) -> Self {
+    fn with_protocol(
+        mut self,
+        configured: ControllerProtocol,
+        halted: Arc<AtomicBool>,
+        pen_mode: Arc<AtomicBool>,
+    ) -> Self {
         self.configured = configured;
         self.halted = halted;
-        self.repetier = (configured == ControllerProtocol::Repetier).then(RepetierLink::new);
+        self.repetier =
+            (configured == ControllerProtocol::Repetier).then(|| RepetierLink::new(pen_mode));
         self
     }
 
@@ -2135,6 +2167,21 @@ impl WorkerState {
             else {
                 return Ok(());
             };
+            let Some(line) = self.pen_mode_line(line) else {
+                // A pen command repeating the pen's state: skipped, done.
+                if let Some(stream) = self.stream.as_mut() {
+                    stream.sent += 1;
+                    stream.acked += 1;
+                    let event = MachineEvent::StreamProgress {
+                        sent: stream.sent,
+                        acked: stream.acked,
+                        total: stream.program.len(),
+                    };
+                    self.sink.emit(event);
+                }
+                self.finish_if_done();
+                continue;
+            };
             let written = self.write_repetier(&line)?;
             match written {
                 Some(count) => {
@@ -2164,6 +2211,33 @@ impl WorkerState {
             }
         }
         Ok(())
+    }
+
+    /// The program line `line` as pen mode writes it (GTK's `apply_pen_mode`): `M3`/`M4`
+    /// lower the pen (`G0 Z0`), `M5` lifts it (`G0 Z5`), and `None` for one that repeats the
+    /// pen's state. Without pen mode, `line` unchanged.
+    fn pen_mode_line(&mut self, line: String) -> Option<String> {
+        let Some(link) = self
+            .repetier
+            .as_mut()
+            .filter(|l| l.pen_mode.load(Ordering::Relaxed))
+        else {
+            return Some(line);
+        };
+        let upper = line.to_ascii_uppercase();
+        match upper.split_whitespace().next().unwrap_or("") {
+            "M3" | "M4" if !link.pen_up => None,
+            "M3" | "M4" => {
+                link.pen_up = false;
+                Some("G0 Z0".to_string())
+            }
+            "M5" if link.pen_up => None,
+            "M5" => {
+                link.pen_up = true;
+                Some("G0 Z5".to_string())
+            }
+            _ => Some(line),
+        }
     }
 
     /// Handles bytes read on a Repetier connection: acknowledgements and resend requests
@@ -2278,7 +2352,7 @@ impl WorkerState {
             // The firmware counts lines from the start again: number from scratch and send
             // the start-up lines once more.
             if let Some(link) = self.repetier.as_mut() {
-                *link = RepetierLink::new();
+                *link = RepetierLink::new(link.pen_mode.clone());
             }
             self.end_stream(false);
             return;

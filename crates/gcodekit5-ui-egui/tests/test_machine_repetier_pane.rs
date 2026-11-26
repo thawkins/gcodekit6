@@ -285,3 +285,56 @@ fn test_typed_m112_locks_out_every_route() {
     );
     assert_no_grbl_writes(&shared);
 }
+
+/// The active profile's Pen Mode reaches the Repetier stream: `M3`/`M5` go out as pen
+/// Z moves, as GTK's `RepetierSender` sent them.
+#[test]
+fn test_profile_pen_mode_turns_spindle_commands_into_z_moves() {
+    let (mut harness, shared) = pane_app(std::time::Duration::from_millis(1), false);
+    let profile = gcodekit5_devicedb::DeviceProfile {
+        controller_type: ControllerType::Repetier,
+        pen_mode: true,
+        ..gcodekit5_devicedb::DeviceProfile::default()
+    };
+    harness
+        .state_mut()
+        .workspace_mut()
+        .set_device(Some(&profile));
+    harness.step();
+    harness
+        .get_by_role_and_label(Role::Button, "Connect")
+        .click();
+    assert!(
+        step_until(&mut harness, |app| app.state().machine.status().connected),
+        "never connected"
+    );
+    let program: std::sync::Arc<[String]> = ["M5", "M3 S1000", "G1 X1 F100", "M5"]
+        .map(String::from)
+        .into();
+    lock(harness.state().state().machine.controller())
+        .start_stream(program)
+        .expect("start");
+    let wrote = |body: &str| {
+        shared.log().iter().any(|w| match w {
+            Wrote::Line(line) => line
+                .split_once(' ')
+                .and_then(|(_, rest)| rest.rsplit_once(" *"))
+                .is_some_and(|(b, _)| b == body),
+            Wrote::Realtime(_) => false,
+        })
+    };
+    assert!(
+        step_until(&mut harness, |_| wrote("G0 Z0.00")),
+        "pen down not written: {:?}",
+        shared.log()
+    );
+    assert!(wrote("G0 Z5"), "pen up not written: {:?}", shared.log());
+    assert!(
+        !shared
+            .log()
+            .iter()
+            .any(|w| matches!(w, Wrote::Line(l) if l.contains("M3") || l.contains(" M5"))),
+        "{:?}",
+        shared.log()
+    );
+}

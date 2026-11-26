@@ -659,3 +659,38 @@ fn repetier_hides_only_the_bare_wait_line() {
         "{seen:?}"
     );
 }
+
+/// Streams `lines` on a Repetier connection with pen mode `pen` and returns the commands
+/// written after the start-up lines.
+fn stream_pen(lines: &[&str], pen: bool) -> Vec<String> {
+    let shared = Arc::new(LoopbackShared::default());
+    let mut controller = connect_repetier(&shared);
+    controller.set_pen_mode(pen);
+    let program: Arc<[String]> = lines.iter().map(|l| l.to_string()).collect();
+    controller.start_stream(program).expect("start");
+    let mut seen = Vec::new();
+    assert!(
+        wait_for(&mut controller, &mut seen, |e| matches!(
+            e,
+            MachineEvent::StreamFinished { .. }
+        ))
+        .is_some(),
+        "stream did not finish: {seen:?}"
+    );
+    commands(&shared).split_off(2)
+}
+
+/// GTK's Repetier pen mode: `M3`/`M4` lower the pen (`G0 Z0`), `M5` lifts it (`G0 Z5`), a
+/// repeat of the pen's current state is dropped (the first `M5` lifts), and every program
+/// line still counts as done.
+#[test]
+fn repetier_pen_mode_turns_spindle_commands_into_z_moves() {
+    let program = ["M5", "M3 S1000", "G1 X1 F100", "M4 S500", "M5", "M5", "M3"];
+    assert_eq!(
+        stream_pen(&program, true),
+        ["G0 Z5", "G0 Z0.00", "G1 X1 F100", "G0 Z5", "G0 Z0.00"]
+    );
+    let plain = stream_pen(&program, false);
+    assert!(plain.iter().any(|l| l.starts_with("M3")), "{plain:?}");
+    assert!(!plain.iter().any(|l| l.contains("Z")), "{plain:?}");
+}
