@@ -143,3 +143,35 @@ fn test_lines_answered_after_a_reset_drops_jogs() {
     shared.inject("Grbl 1.1h ['$' for help]\n");
     assert!(wait(&mut controller, MachineController::lines_answered));
 }
+
+#[test]
+fn test_query_line_is_answered_but_keeps_the_report_fresh() {
+    let (mut controller, shared) = connected();
+    shared.hold_acks.store(true, Ordering::SeqCst);
+    controller.send_query("$G").expect("query");
+    // `$G` changes nothing on the machine: the last report still describes it.
+    assert!(controller.report_fresh());
+    assert!(!controller.lines_answered(), "queued, not answered");
+    assert!(wait(&mut controller, |_| written(&shared, "$G")));
+    shared.hold_acks.store(false, Ordering::SeqCst);
+    assert!(wait(&mut controller, MachineController::lines_answered));
+    assert!(controller.report_fresh());
+}
+
+#[test]
+fn test_query_line_has_send_line_checks() {
+    let mut offline = MachineController::new();
+    assert_eq!(
+        offline.send_query("$G"),
+        Err(gcodekit5_app::machine::MachineError::NotConnected)
+    );
+    let (mut controller, _shared) = connected();
+    assert_eq!(
+        controller.send_query(""),
+        Err(gcodekit5_app::machine::MachineError::EmptyLine)
+    );
+    assert_eq!(
+        controller.send_query("$G?"),
+        Err(gcodekit5_app::machine::MachineError::RealtimeCharacter('?'))
+    );
+}

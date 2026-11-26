@@ -350,8 +350,9 @@ enum Command {
     Pause,
     Resume,
     Stop,
-    /// A `$J=` jog line, answered through [`MachineController::lines_answered`]'s own jog
-    /// count rather than a state-line sequence number.
+    /// A line that does not change the machine state (a `$J=` jog, a `$G` query), answered
+    /// through [`MachineController::lines_answered`]'s own count rather than a state-line
+    /// sequence number, so it never makes the latest report stale.
     Line(String),
     /// A command line that may change the machine state, with its sequence number.
     StateLine(String, u64),
@@ -388,9 +389,10 @@ pub struct MachineController {
     /// The highest such sequence number whose reply (`ok` or `error:N`) was read, or which
     /// a reset dropped; see [`lines_answered`](Self::lines_answered).
     answered: Arc<AtomicU64>,
-    /// How many jogs were handed to the worker on this connection.
+    /// How many jogs and queries ([`send_query`](Self::send_query)) were handed to the worker
+    /// on this connection.
     jogs_requested: u64,
-    /// How many of those jogs were answered or dropped (never to run).
+    /// How many of those were answered or dropped (never to run).
     jogs_answered: Arc<AtomicU64>,
     worker: Option<Worker>,
     /// Workers told to shut down while still connecting; reaped once finished.
@@ -620,6 +622,27 @@ impl MachineController {
     /// [`MachineError::NotConnected`] without a connection, or
     /// [`MachineError::StreamInProgress`] while a program streams.
     pub fn send_line(&mut self, line: &str) -> Result<(), MachineError> {
+        let line = self.check_line(line)?;
+        self.requested += 1;
+        self.send(Command::StateLine(line.to_string(), self.requested))
+    }
+
+    /// Queues a line that only asks the controller something (`$G`), behind any manual line
+    /// still waiting. It is answered like a [`send_line`](Self::send_line) line (see
+    /// [`lines_answered`](Self::lines_answered)), but as it changes nothing on the machine it
+    /// does not make the latest report stale ([`report_fresh`](Self::report_fresh)).
+    ///
+    /// # Errors
+    /// As [`send_line`](Self::send_line).
+    pub fn send_query(&mut self, line: &str) -> Result<(), MachineError> {
+        let line = self.check_line(line)?;
+        self.send(Command::Line(line.to_string()))?;
+        self.jogs_requested += 1;
+        Ok(())
+    }
+
+    /// The checks of [`send_line`](Self::send_line); returns the line trimmed of spaces.
+    fn check_line<'a>(&self, line: &'a str) -> Result<&'a str, MachineError> {
         let line = line.trim_matches(' ');
         if line.is_empty() {
             return Err(MachineError::EmptyLine);
@@ -645,8 +668,7 @@ impl MachineController {
         if self.streaming.load(Ordering::SeqCst) {
             return Err(MachineError::StreamInProgress);
         }
-        self.requested += 1;
-        self.send(Command::StateLine(line.to_string(), self.requested))
+        Ok(line)
     }
 
     /// Queues `line` for the worker as [`send_line`](Self::send_line) would, without its
@@ -672,7 +694,8 @@ impl MachineController {
         self.last_connection.as_ref()
     }
 
-    /// Whether every line sent with [`send_line`](Self::send_line) or [`jog`](Self::jog) has
+    /// Whether every line sent with [`send_line`](Self::send_line), [`jog`](Self::jog) or
+    /// [`send_query`](Self::send_query) has
     /// had its reply (`ok` or `error:N`) or was dropped (by a reset, or a jog cancel for a
     /// queued jog). The controller reports no event for a manual line's `ok`, so a front end
     /// that tells a line's answer by the order of the replies (a setting write) must start
