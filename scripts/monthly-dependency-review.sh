@@ -155,6 +155,8 @@ cargo update
 
 ## Checklist
 
+- [ ] Check storytold/craft-libs for a new rev; bump rev and egui-family together
+  (dependabot cannot bump a git `rev`)
 - [ ] Security audit passed (no vulnerabilities)
 - [ ] Outdated dependencies reviewed
 - [ ] Major updates evaluated for breaking changes
@@ -182,6 +184,7 @@ echo "📄 Report saved to: $REPORT_FILE"
 echo ""
 echo "Next steps:"
 echo "  1. Review the report at $REPORT_FILE"
+echo "  1a. Check storytold/craft-libs for a new rev; bump rev and egui-family together"
 echo "  2. Address any security vulnerabilities immediately"
 echo "  3. Evaluate major version updates"
 echo "  4. Run: $0 --update (to apply safe updates)"

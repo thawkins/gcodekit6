@@ -1,12 +1,13 @@
 app-id: com.github.thawkins.gcodekit5
-runtime: org.gnome.Platform
-runtime-version: '50'
-sdk: org.gnome.Sdk
+runtime: org.freedesktop.Platform
+runtime-version: '25.08'
+sdk: org.freedesktop.Sdk
 command: gcodekit5
 finish-args:
   - --share=ipc
   - --socket=fallback-x11
   - --socket=wayland
+  - --device=dri
   - --device=all
   - --share=network
 modules:

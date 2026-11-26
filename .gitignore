@@ -30,3 +30,6 @@ tmp/
 /crates/*/tests/snapshots/*.new.png
 /crates/*/tests/snapshots/*.diff.png
 /crates/*/tests/snapshots/*.old.png
+crates/gcodekit5-ui-egui/tests/snapshots/**/*.new.png
+crates/gcodekit5-ui-egui/tests/snapshots/**/*.diff.png
+crates/gcodekit5-ui-egui/tests/snapshots/**/*.old.png

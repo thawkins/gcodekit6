@@ -32,7 +32,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgtk-4-dev libadwaita-1-dev libgtksourceview-5-dev libudev-dev libxkbcommon-dev libwayland-dev libx11-dev libxcursor-dev libxrandr-dev libxi-dev libvulkan1 mesa-vulkan-drivers gettext
+          sudo apt-get install -y libudev-dev pkg-config libxkbcommon-dev libwayland-dev libx11-dev libxcursor-dev libxrandr-dev libxi-dev libvulkan1 mesa-vulkan-drivers
 
       - name: Cache cargo registry
         uses: actions/cache@v6
@@ -41,9 +41,9 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             target
-          key: ${{ runner.os }}-cargo-msrv-${{ env.MSRV }}-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-cargo-msrv-v2-${{ env.MSRV }}-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
-            ${{ runner.os }}-cargo-msrv-${{ env.MSRV }}-
+            ${{ runner.os }}-cargo-msrv-v2-${{ env.MSRV }}-
 
       - name: Verify Rust version
         run: |
@@ -58,9 +58,19 @@ jobs:
         uses: taiki-e/install-action@nextest
 
       - name: Run tests on MSRV
-        run: cargo nextest run --workspace
+        run: cargo nextest run --workspace --profile ci
         env:
           WGPU_BACKEND: vulkan
+
+      - name: Upload kittest snapshot diffs
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: kittest-snapshot-diffs
+          path: |
+            crates/gcodekit5-ui-egui/tests/snapshots/**/*.diff.png
+            crates/gcodekit5-ui-egui/tests/snapshots/**/*.new.png
+          if-no-files-found: ignore
 
       - name: Run doc tests on MSRV
         run: cargo test --workspace --doc

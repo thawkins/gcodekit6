@@ -35,7 +35,7 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgtk-4-dev libadwaita-1-dev libudev-dev libxkbcommon-dev libwayland-dev libx11-dev libxcursor-dev libxrandr-dev libxi-dev libvulkan1 mesa-vulkan-drivers
+          sudo apt-get install -y libudev-dev pkg-config
 
       - name: Cache cargo registry
         uses: actions/cache@v6
@@ -44,9 +44,9 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             target
-          key: ${{ runner.os }}-mutation-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-mutation-v2-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
-            ${{ runner.os }}-mutation-
+            ${{ runner.os }}-mutation-v2-
 
       - name: Install cargo-mutants
         run: cargo install cargo-mutants

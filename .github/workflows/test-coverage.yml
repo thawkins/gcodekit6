@@ -35,7 +35,7 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgtk-4-dev libadwaita-1-dev libgtksourceview-5-dev libudev-dev libxkbcommon-dev libwayland-dev libx11-dev libxcursor-dev libxrandr-dev libxi-dev libvulkan1 mesa-vulkan-drivers
+          sudo apt-get install -y libudev-dev pkg-config
 
       - name: Cache cargo registry
         uses: actions/cache@v6
@@ -44,9 +44,9 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             target
-          key: ${{ runner.os }}-${{ matrix.arch }}-cargo-coverage-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-${{ matrix.arch }}-cargo-coverage-v2-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
-            ${{ runner.os }}-${{ matrix.arch }}-cargo-coverage-
+            ${{ runner.os }}-${{ matrix.arch }}-cargo-coverage-v2-
 
       - name: Install cargo-tarpaulin
         run: cargo install cargo-tarpaulin --locked
@@ -117,7 +117,7 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgtk-4-dev libadwaita-1-dev libgtksourceview-5-dev libudev-dev libxkbcommon-dev libwayland-dev libx11-dev libxcursor-dev libxrandr-dev libxi-dev libvulkan1 mesa-vulkan-drivers
+          sudo apt-get install -y libudev-dev pkg-config libxkbcommon-dev libwayland-dev libx11-dev libxcursor-dev libxrandr-dev libxi-dev libvulkan1 mesa-vulkan-drivers
 
       - name: Cache cargo registry
         uses: actions/cache@v6
@@ -126,18 +126,21 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             target
-          key: ${{ runner.os }}-cargo-isolation-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-cargo-isolation-v2-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Install cargo-nextest
+        uses: taiki-e/install-action@nextest
 
       - name: Run tests in parallel (isolation check)
         run: |
           # Running tests with multiple threads verifies test isolation
-          cargo test --workspace --lib -- --test-threads=4
+          cargo nextest run --workspace --lib -j 4
           echo "✅ All tests pass with parallel execution" >> $GITHUB_STEP_SUMMARY
 
       - name: Run tests twice (idempotency check)
         run: |
-          cargo test --workspace --lib --quiet
-          cargo test --workspace --lib --quiet
+          cargo nextest run --workspace --lib
+          cargo nextest run --workspace --lib
           echo "✅ Tests are idempotent (pass on second run)" >> $GITHUB_STEP_SUMMARY
 
   benchmarks:
@@ -152,7 +155,7 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgtk-4-dev libadwaita-1-dev libgtksourceview-5-dev libudev-dev libxkbcommon-dev libwayland-dev libx11-dev libxcursor-dev libxrandr-dev libxi-dev libvulkan1 mesa-vulkan-drivers
+          sudo apt-get install -y libudev-dev pkg-config libxkbcommon-dev libwayland-dev libx11-dev libxcursor-dev libxrandr-dev libxi-dev libvulkan1 mesa-vulkan-drivers
 
       - name: Cache cargo registry
         uses: actions/cache@v6
@@ -161,7 +164,7 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             target
-          key: ${{ runner.os }}-cargo-bench-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-cargo-bench-v2-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Verify benchmarks compile and run
         run: |
