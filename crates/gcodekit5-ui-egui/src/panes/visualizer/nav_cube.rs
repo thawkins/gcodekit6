@@ -5,14 +5,16 @@
 //! The layout is GTK's: isometric corners around Top, Left, Front, Right and Bottom, then
 //! Zoom Out, Fit and Zoom In. Each button's accessible name is its tooltip. The one-letter
 //! view labels (T, F, L, R, B) stay untranslated, as in GTK; the isometric corners draw an
-//! arrow toward their corner, as GTK's icons do. GTK's Toggle Scrollbars and Fit to Device
-//! Working Area buttons are left out: the egui visualizer has neither feature.
+//! arrow toward their corner, as GTK's icons do. The floating column under the cube has GTK's
+//! Top View, Fit to Device Working Area and Mouse Controls buttons; its Toggle Scrollbars is
+//! left out (the egui view has no scrollbars).
 //!
 //! Dependencies: `egui`, `gcodekit5-app` (translations).
 
 use gcodekit5_app::i18n::Translator;
 
 use super::camera::StdView;
+use crate::icons::Icon;
 
 /// What a nav cube button asks for.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -25,6 +27,8 @@ pub enum NavAction {
     ZoomOut,
     /// Fit the toolpath into the view.
     Fit,
+    /// Fit the active device's work area into the view.
+    FitDevice,
 }
 
 /// The msgids the nav cube shows, for the translation check.
@@ -43,6 +47,7 @@ pub fn msgids() -> Vec<&'static str> {
         n_!("Zoom Out"),
         n_!("Fit to Content"),
         n_!("Fit"),
+        n_!("Fit to Device Working Area"),
         n_!("Mouse Controls"),
         n_!("Left Button+Drag: Orbit"),
         n_!("Shift+Left button+Drag: Pan"),
@@ -187,6 +192,17 @@ fn show_buttons(ui: &mut egui::Ui, rect: egui::Rect, tr: &Translator) -> Option<
     if response.clicked() {
         action = Some(NavAction::View(StdView::Top));
     }
+    let device = tr.tr("Fit to Device Working Area");
+    let image = Icon::Display
+        .themed(ui)
+        .fit_to_exact_size(egui::Vec2::splat(BUTTON * 0.6));
+    let response = ui
+        .put(cell(column, 5, 2), framed(ui, egui::Button::image(image)))
+        .on_hover_text(device.as_ref());
+    response.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, device.as_ref()));
+    if response.clicked() {
+        action = Some(NavAction::FitDevice);
+    }
     let help = [
         tr.tr("Left Button+Drag: Orbit").into_owned(),
         tr.tr("Shift+Left button+Drag: Pan").into_owned(),
@@ -196,7 +212,7 @@ fn show_buttons(ui: &mut egui::Ui, rect: egui::Rect, tr: &Translator) -> Option<
     let name = tr.tr("Mouse Controls").into_owned();
     let text = egui::RichText::new("?").small().strong();
     let response = ui
-        .put(cell(column, 5, 2), framed(ui, egui::Button::new(text)))
+        .put(cell(column, 6, 2), framed(ui, egui::Button::new(text)))
         .on_hover_text(format!("{name}\n{help}"));
     response.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, &name));
     action

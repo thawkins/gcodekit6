@@ -70,6 +70,7 @@ fn test_display_starts_as_gtk() {
             marker: true,
             grid: true,
             grid_spacing: 50.0,
+            bounds: true,
         }
     );
     assert_eq!(GRID_SPACINGS, [1.0, 5.0, 10.0, 25.0, 50.0]);
@@ -84,12 +85,14 @@ fn test_sidebar_toggles_change_the_display() {
         "Show Cutting Moves",
         "Show Laser/Spindle",
         "Show Grid",
+        "Show Machine Bounds",
     ] {
         harness.get_by_label(label).click();
         harness.run();
     }
     let display = harness.state().display();
     assert!(!display.rapids && !display.cuts && !display.marker && !display.grid);
+    assert!(!display.bounds);
     harness.get_by_label("Grid spacing").click();
     harness.run();
     harness.get_by_label("10.00 mm").click();

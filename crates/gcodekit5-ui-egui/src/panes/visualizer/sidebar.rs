@@ -1,13 +1,14 @@
 //! The visualizer's left sidebar, laid out as the GTK one: a toolbar (Fit to Content,
-//! Reset View and Hide) above collapsible sections: Toolpath (Show Rapid Moves, Show
-//! Cutting Moves, Show Laser/Spindle), Guides (Show Grid, Grid spacing), Simulation and the
+//! Reset View, Fit to Device Working Area and Hide) above collapsible sections: Toolpath
+//! (Show Rapid Moves, Show Cutting Moves, Show Laser/Spindle), Guides (Show Grid, Grid
+//! spacing, Show Machine Bounds), Simulation and the
 //! Inspector with the program's bounds. The toggles are [`Display`], which the pane hands to
 //! the renderer; they start on, with a 50 mm grid, as in GTK.
 //!
 //! Ported from the GTK `ui/gtk/visualizer/mod.rs` sidebar. GTK's Fit to Viewport button
 //! (`view-restore`) is Reset View here, which `Cmd+0` also runs. Left out, because the
-//! egui visualizer lacks the features: Fit to Device Working Area, the 2D/3D switch, Show
-//! Machine Bounds and the inspector's S-value statistics.
+//! egui visualizer lacks the features: the 2D/3D switch and the inspector's S-value
+//! statistics.
 //!
 //! The Simulation section ("Show Stock Removal", and the stock, tool and zero references
 //! while it is checked) is shown only while the `enable_stock_removal_3d` setting is on, as
@@ -44,6 +45,8 @@ pub fn msgids() -> Vec<&'static str> {
         n_!("Guides"),
         n_!("Show Grid"),
         n_!("Grid spacing"),
+        n_!("Show Machine Bounds"),
+        n_!("Fit to Device Working Area"),
         n_!("Reset View"),
         n_!("Hide"),
         n_!("Hide Sidebar"),
@@ -85,6 +88,8 @@ pub struct Display {
     pub grid: bool,
     /// Grid spacing in mm, one of [`GRID_SPACINGS`].
     pub grid_spacing: f32,
+    /// Show Machine Bounds: the active device's work area.
+    pub bounds: bool,
 }
 
 impl Default for Display {
@@ -96,6 +101,7 @@ impl Default for Display {
             marker: true,
             grid: true,
             grid_spacing: super::pipeline::DEFAULT_GRID_SPACING,
+            bounds: true,
         }
     }
 }
@@ -130,6 +136,7 @@ fn display(ui: &mut egui::Ui, display: &mut Display, units: MeasurementSystem, t
                     .on_hover_text(tr.tr("Grid spacing"))
                     .labelled_by(label.id);
             });
+            crate::theme::checkbox(ui, &mut display.bounds, tr.tr("Show Machine Bounds"));
         });
 }
 
@@ -258,6 +265,8 @@ pub enum SidebarAction {
     Fit,
     /// Reset the camera and fit the toolpath.
     ResetView,
+    /// Fit the active device's work area into the view.
+    FitDevice,
     /// Hide the sidebar.
     Hide,
 }
@@ -303,6 +312,9 @@ pub fn show(
         }
         if icon_only_button(ui, Icon::Restore, &tr.tr("Reset View")).clicked() {
             action = Some(SidebarAction::ResetView);
+        }
+        if icon_only_button(ui, Icon::Display, &tr.tr("Fit to Device Working Area")).clicked() {
+            action = Some(SidebarAction::FitDevice);
         }
         if named_icon_button(ui, Icon::Hide, &tr.tr("Hide"), &tr.tr("Hide Sidebar")) {
             action = Some(SidebarAction::Hide);

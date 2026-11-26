@@ -22,7 +22,7 @@ const PROGRAM: &str = "G21\nG90\nG0 Z5\nG0 X60 Y80\nM3 S1000\nG1 Z-1 F300\nG1 X1
 G1 X60\nG1 Y80\nG0 Z5\nG0 X170 Y40\nG1 Z-1\nG2 X170 Y40 I-20 J0\nG0 Z5\nM5\n";
 
 /// The nav cube's and the sidebar's buttons, which must all be on screen.
-const CONTROLS: [&str; 16] = [
+const CONTROLS: [&str; 17] = [
     "Isometric (NW)",
     "Top View",
     "Isometric (NE)",
@@ -36,6 +36,7 @@ const CONTROLS: [&str; 16] = [
     "Fit to Content",
     "Zoom In",
     "Mouse Controls",
+    "Fit to Device Working Area",
     "Reset View",
     "Hide Sidebar",
     "Inspector",

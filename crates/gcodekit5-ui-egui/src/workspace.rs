@@ -29,7 +29,7 @@ use crate::commands::{Command, MACHINE_CONTROL_SCOPE, VISUALIZER_SCOPE};
 use crate::dialogs::{ConfirmChoice, ConfirmRequest};
 use crate::machine::Machine;
 use crate::panes::visualizer::StockSeed;
-use gcodekit5_devicedb::ControllerType;
+use gcodekit5_devicedb::{ControllerType, DeviceProfile};
 
 /// Identifies one pane of the main window.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -416,6 +416,15 @@ pub trait Pane {
         let _ = controller;
     }
 
+    /// Takes the active device profile (at start and when it changes), for a pane that uses
+    /// its work area.
+    ///
+    /// # Arguments
+    /// * `profile` - The active profile, if any.
+    fn set_device(&mut self, profile: Option<&DeviceProfile>) {
+        let _ = profile;
+    }
+
     /// Takes the confirmation the pane wants the app to ask for, if any.
     fn take_confirm(&mut self) -> Option<ConfirmRequest> {
         None
@@ -696,6 +705,18 @@ impl Workspace {
     pub fn set_controller(&mut self, controller: Option<&ControllerType>) {
         for pane in &mut self.panes {
             pane.set_controller(controller);
+        }
+    }
+
+    /// Hands the active device profile to every pane ([`Pane::set_controller`] with its
+    /// controller type, and [`Pane::set_device`]).
+    ///
+    /// # Arguments
+    /// * `profile` - The active profile, if any.
+    pub fn set_device(&mut self, profile: Option<&DeviceProfile>) {
+        self.set_controller(profile.map(|p| &p.controller_type));
+        for pane in &mut self.panes {
+            pane.set_device(profile);
         }
     }
 

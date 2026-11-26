@@ -465,8 +465,7 @@ impl GcodeKitApp {
         );
         workspace.set_pane(Box::new(SharedCamTools::new(Rc::clone(&cam_tools))));
         workspace.configure(state.config());
-        let profile = device_manager.active_profile();
-        workspace.set_controller(profile.as_ref().map(|p| &p.controller_type));
+        workspace.set_device(device_manager.active_profile().as_ref());
         {
             // Wake the event loop whenever the machine reports something.
             let wake_ctx = Arc::clone(&wake_ctx);

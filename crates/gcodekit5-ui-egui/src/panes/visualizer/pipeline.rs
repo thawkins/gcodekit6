@@ -8,7 +8,8 @@
 //! rebuilt only when its spacing changes. The upload takes the vertices out of
 //! their [`Upload`], freeing the CPU copy; a toolpath larger than the device's
 //! `max_buffer_size` is not uploaded ([`toolpath_fits`]) and the pane says so. Its `paint`
-//! draws, in order: the grid (when shown) and the origin axes, the toolpath (its travel and
+//! draws, in order: the grid (when shown), the origin axes, the machine bounds (when shown),
+//! the toolpath (its travel and
 //! its cuts each when shown, GTK's Show Rapid Moves and Show Cutting Moves), and the tool
 //! marker.
 //!
@@ -39,6 +40,7 @@ use glam::{Mat4, Vec3};
 
 use gcodekit5_visualizer::visualizer::stock_removal_3d::MESH_FLOATS_PER_VERTEX;
 
+use super::camera::Aabb;
 use super::stock::StockMesh;
 use super::toolpath::ToolpathVertex;
 
@@ -48,6 +50,10 @@ const GRID_SIZE: f32 = 4000.0;
 pub const DEFAULT_GRID_SPACING: f32 = 50.0;
 /// Grid colour (GTK's 30% grey).
 const GRID_COLOR: [u8; 4] = [77, 77, 77, 255];
+/// Machine bounds colour (GTK's bright blue).
+const BOUNDS_COLOR: [u8; 4] = [0, 128, 255, 255];
+/// Vertices of the machine bounds box: its 12 edges.
+const BOUNDS_VERTICES: usize = 24;
 /// Length of the origin axes in mm.
 const AXIS_LENGTH: f32 = 100.0;
 /// Tool marker colour: red at 40% opacity, as GTK draws it.
@@ -119,6 +125,8 @@ struct GpuResources {
     axes_count: u32,
     /// The tool marker, rewritten when the tool moves.
     marker: wgpu::Buffer,
+    /// The machine bounds box, rewritten each frame it is shown.
+    bounds: wgpu::Buffer,
     /// The uploaded toolpath: its generation, buffer and vertex count.
     toolpath: Option<(u64, Option<wgpu::Buffer>, u32)>,
     srgb_target: bool,
@@ -171,6 +179,34 @@ pub fn grid_vertices(step: f32) -> Vec<SceneVertex> {
             Vec3::new(p, half, 0.0),
             GRID_COLOR,
         );
+    }
+    v
+}
+
+/// The 12 edges of `bounds` (GTK's `generate_bounds_data`).
+///
+/// # Arguments
+/// * `bounds` - The machine's work area in mm.
+pub fn bounds_vertices(bounds: Aabb) -> Vec<SceneVertex> {
+    let c = bounds.corners();
+    // Corner index bits: 1 = max X, 2 = max Y, 4 = max Z.
+    let edges = [
+        (0, 1),
+        (1, 3),
+        (3, 2),
+        (2, 0),
+        (4, 5),
+        (5, 7),
+        (7, 6),
+        (6, 4),
+        (0, 4),
+        (1, 5),
+        (2, 6),
+        (3, 7),
+    ];
+    let mut v = Vec::with_capacity(BOUNDS_VERTICES);
+    for (a, b) in edges {
+        push_line(&mut v, c[a], c[b], BOUNDS_COLOR);
     }
     v
 }
@@ -452,6 +488,12 @@ pub fn install(render_state: &egui_wgpu::RenderState) {
             usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         }),
+        bounds: device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("gcodekit5_visualizer_bounds"),
+            size: (BOUNDS_VERTICES * std::mem::size_of::<SceneVertex>()) as u64,
+            usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        }),
         toolpath: None,
         srgb_target: format.is_srgb(),
     };
@@ -575,6 +617,8 @@ pub struct VisualizerCallback {
     pub show_cuts: bool,
     /// The grid's spacing in mm, or `None` to leave the grid out.
     pub grid: Option<f32>,
+    /// The machine's work area to outline, or `None` to leave it out.
+    pub machine_bounds: Option<Aabb>,
 }
 
 /// The view's size in physical pixels, as egui sets the callback's viewport (rounded per
@@ -798,6 +842,10 @@ impl egui_wgpu::CallbackTrait for VisualizerCallback {
                 (m.generation, buffer, count)
             });
         }
+        if let Some(bounds) = self.machine_bounds {
+            let vertices = bounds_vertices(bounds);
+            queue.write_buffer(&gpu.bounds, 0, bytemuck::cast_slice(&vertices));
+        }
         if let Some(tip) = self.tool {
             queue.write_buffer(&gpu.marker, 0, bytemuck::cast_slice(&marker_vertices(tip)));
         }
@@ -824,6 +872,10 @@ impl egui_wgpu::CallbackTrait for VisualizerCallback {
         }
         pass.set_vertex_buffer(0, gpu.axes.slice(..));
         pass.draw(0..gpu.axes_count, 0..1);
+        if self.machine_bounds.is_some() {
+            pass.set_vertex_buffer(0, gpu.bounds.slice(..));
+            pass.draw(0..BOUNDS_VERTICES as u32, 0..1);
+        }
         if gpu.stock_drawn()
             && let Some(offscreen) = &gpu.offscreen
         {

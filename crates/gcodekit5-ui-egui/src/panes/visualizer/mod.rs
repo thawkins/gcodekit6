@@ -12,8 +12,13 @@
 //! Mouse, as in GTK: left drag orbits, Shift + left drag pans, the wheel zooms. The nav cube
 //! ([`nav_cube`]) and the View commands switch to standard views, zoom and fit; the OSD
 //! ([`osd`]) shows the bounds and the tool position. The left sidebar ([`sidebar`]) has
-//! GTK's toolbar (Fit to Content, Reset View, Hide), its Toolpath and Guides toggles
-//! ([`Display`]: rapids, cuts, the tool marker, the grid and its spacing) and Inspector.
+//! GTK's toolbar (Fit to Content, Reset View, Fit to Device Working Area, Hide), its
+//! Toolpath and Guides toggles ([`Display`]: rapids, cuts, the tool marker, the grid and its
+//! spacing, the machine bounds) and Inspector.
+//!
+//! The machine bounds and Fit to Device Working Area use the active device profile's X, Y
+//! and Z limits ([`work_area_of`], handed in through [`Pane::set_device`]); with no profile,
+//! Fit to Device fits GTK's default 250 x 250 mm area and no bounds are drawn.
 //!
 //! With the `enable_stock_removal_3d` setting on, the sidebar's Simulation section shows
 //! GTK's "Show Stock Removal": the stock is cut by the program on a worker ([`stock`]) and
@@ -24,8 +29,8 @@
 //! in the sidebar hold until the next one.
 //!
 //! Ported from the GTK `ui/gtk/visualizer/mod.rs`, `renderer_3d.rs`, `shaders.rs` and
-//! `nav_cube.rs`. Not ported: the 2D mode, machine bounds and their toggle, run preview,
-//! scrollbars, fit to device, the zoom/centre/cursor status line and intensity statistics.
+//! `nav_cube.rs`. Not ported: the 2D mode, run preview, scrollbars, the zoom/centre/cursor
+//! status line and intensity statistics.
 //!
 //! [`Machine::program`]: crate::machine::Machine::program
 //!
@@ -45,7 +50,9 @@ use std::sync::Arc;
 
 use gcodekit5_app::i18n::Translator;
 use gcodekit5_app::machine::MachineEvent;
+use gcodekit5_core::constants::{DEFAULT_WORK_HEIGHT_MM, DEFAULT_WORK_WIDTH_MM};
 use gcodekit5_core::units::MeasurementSystem;
+use gcodekit5_devicedb::DeviceProfile;
 use gcodekit5_settings::config::Config;
 use glam::Vec3;
 
@@ -68,6 +75,34 @@ pub const ZOOM_STEP: f32 = 10.0;
 pub const STOCK_EDIT_DEBOUNCE: std::time::Duration = std::time::Duration::from_millis(250);
 /// Millimetres of zoom per point of wheel scroll (GTK: 5 mm per wheel notch).
 const ZOOM_PER_SCROLL_POINT: f32 = 0.1;
+
+/// The work area of `profile`: its X, Y and Z limits in mm (GTK's machine bounds).
+///
+/// # Arguments
+/// * `profile` - The device profile.
+pub fn work_area_of(profile: &DeviceProfile) -> Aabb {
+    let axis = |a: &gcodekit5_devicedb::AxisLimits| (a.min as f32, a.max as f32);
+    let [(x0, x1), (y0, y1), (z0, z1)] = [
+        axis(&profile.x_axis),
+        axis(&profile.y_axis),
+        axis(&profile.z_axis),
+    ];
+    let a = Vec3::new(x0, y0, z0);
+    let b = Vec3::new(x1, y1, z1);
+    Aabb::new(a.min(b), a.max(b))
+}
+
+/// GTK's work area when no device profile is active: 250 x 250 mm at the origin.
+pub fn default_work_area() -> Aabb {
+    Aabb::new(
+        Vec3::ZERO,
+        Vec3::new(
+            DEFAULT_WORK_WIDTH_MM as f32,
+            DEFAULT_WORK_HEIGHT_MM as f32,
+            0.0,
+        ),
+    )
+}
 
 /// The msgids the pane shows, for the translation check.
 pub fn msgids() -> Vec<&'static str> {
@@ -111,6 +146,8 @@ pub struct VisualizerPane {
     sidebar_hidden: bool,
     /// The sidebar's Toolpath and Guides toggles.
     display: Display,
+    /// The active device profile's work area, if a profile is active.
+    work_area: Option<Aabb>,
     /// The `enable_stock_removal_3d` setting.
     stock_enabled: bool,
     /// Whether "Show Stock Removal" is checked.
@@ -152,6 +189,7 @@ impl VisualizerPane {
             view_rect: egui::Rect::NOTHING,
             sidebar_hidden: false,
             display: Display::default(),
+            work_area: None,
             stock_enabled: false,
             show_stock: false,
             stock_setup: StockSetup::default(),
@@ -330,6 +368,18 @@ impl VisualizerPane {
         self.display
     }
 
+    /// The active device profile's work area, if a profile is active.
+    pub fn work_area(&self) -> Option<Aabb> {
+        self.work_area
+    }
+
+    /// Fits the active device's work area (else GTK's default area) into the view
+    /// (Fit to Device Working Area).
+    pub fn fit_device(&mut self) {
+        self.camera
+            .fit(self.work_area.unwrap_or_else(default_work_area));
+    }
+
     /// Sets the sidebar's Toolpath and Guides toggles.
     ///
     /// # Arguments
@@ -452,6 +502,7 @@ impl VisualizerPane {
             NavAction::ZoomIn => self.camera.zoom(ZOOM_STEP),
             NavAction::ZoomOut => self.camera.zoom(-ZOOM_STEP),
             NavAction::Fit => self.fit(),
+            NavAction::FitDevice => self.fit_device(),
         }
     }
 
@@ -539,6 +590,7 @@ impl Pane for VisualizerPane {
             match clicked {
                 Some(sidebar::SidebarAction::Fit) => self.fit(),
                 Some(sidebar::SidebarAction::ResetView) => self.reset_view(),
+                Some(sidebar::SidebarAction::FitDevice) => self.fit_device(),
                 Some(sidebar::SidebarAction::Hide) => self.sidebar_hidden = true,
                 None => {}
             }
@@ -581,6 +633,7 @@ impl Pane for VisualizerPane {
             show_travel: self.display.rapids,
             show_cuts: self.display.cuts,
             grid: self.display.grid.then_some(self.display.grid_spacing),
+            machine_bounds: self.work_area.filter(|_| self.display.bounds),
         };
         ui.painter()
             .add(egui_wgpu::Callback::new_paint_callback(rect, callback));
@@ -663,6 +716,10 @@ impl Pane for VisualizerPane {
         };
         self.apply(action);
         true
+    }
+
+    fn set_device(&mut self, profile: Option<&DeviceProfile>) {
+        self.work_area = profile.map(work_area_of);
     }
 
     fn configure(&mut self, config: &Config) {

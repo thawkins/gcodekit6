@@ -108,8 +108,7 @@ impl GcodeKitApp {
     fn sync_active_device(&mut self) {
         if self.device_manager.take_changed() {
             let profile = self.device_manager.active_profile();
-            self.workspace
-                .set_controller(profile.as_ref().map(|p| &p.controller_type));
+            self.workspace.set_device(profile.as_ref());
             self.cam_tools.borrow_mut().speeds_feeds_mut().device = profile;
         }
     }
