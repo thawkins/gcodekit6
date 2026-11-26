@@ -996,6 +996,9 @@ impl GcodeKitApp {
             | Command::FileExportSvg => {}
             // GTK's Run: the Visualizer's run preview of the program, which sends nothing.
             Command::FileRun => {
+                // GTK ran the editor's text: hand an edit still in its typing pause to the
+                // machine first.
+                self.sync_editor(true);
                 self.show_page(Page::Visualizer);
                 let mut requested = Vec::new();
                 let mut ctx = PaneContext::new(&self.state.translator, &mut requested)

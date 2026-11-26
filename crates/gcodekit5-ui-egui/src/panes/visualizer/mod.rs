@@ -177,6 +177,8 @@ pub struct VisualizerPane {
     preview: RunPreview,
     /// File > Run waits for the program's build to start the preview.
     preview_on_build: bool,
+    /// File > Run was chosen: the next frame loads the machine's program, then starts.
+    run_requested: bool,
     /// When the run preview last moved on, while it plays.
     preview_clock: Option<std::time::Instant>,
     /// The work-plane point under the pointer when the right-click menu opened.
@@ -229,6 +231,7 @@ impl VisualizerPane {
             work_area: None,
             preview: RunPreview::default(),
             preview_on_build: false,
+            run_requested: false,
             preview_clock: None,
             preview_notice: None,
             menu_cursor: None,
@@ -699,6 +702,9 @@ impl Pane for VisualizerPane {
         }
         self.restart_stock_if_due(ui.ctx());
         self.poll_build();
+        if std::mem::take(&mut self.run_requested) {
+            self.run_preview();
+        }
         self.stock.poll();
         let bounds = self.cut_bounds.or(self.bounds);
         if !self.sidebar_hidden {
@@ -825,10 +831,17 @@ impl Pane for VisualizerPane {
         );
     }
 
-    fn command(&mut self, command: Command, _ctx: &mut PaneContext) -> bool {
+    fn command(&mut self, command: Command, ctx: &mut PaneContext) -> bool {
         let action = match command {
             Command::FileRun => {
-                self.run_preview();
+                // With the app's machine, the program to preview is the one the machine
+                // holds now (the app syncs the editor first); the next frame loads it before
+                // starting, so a Run right after an edit previews the edited program.
+                if ctx.machine().is_some() {
+                    self.run_requested = true;
+                } else {
+                    self.run_preview();
+                }
                 return true;
             }
             Command::ZoomFit => NavAction::Fit,

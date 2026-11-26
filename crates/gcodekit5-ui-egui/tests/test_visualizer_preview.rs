@@ -327,3 +327,94 @@ fn test_preview_marker_drawn_unless_hidden() -> TestResult {
     );
     Ok(())
 }
+
+/// The pane drawn with the app's machine, as the app draws it.
+struct WithMachine {
+    pane: VisualizerPane,
+    machine: gcodekit5_ui_egui::machine::Machine,
+}
+
+#[test]
+fn test_file_run_right_after_an_edit_previews_the_edited_program() -> TestResult {
+    let state = gcodekit5_ui_egui::AppState::new(
+        gcodekit5_settings::SettingsManager::detached(gcodekit5_settings::config::Config::default()),
+        crate::test_smoke::native_decision(),
+    );
+    let tr = gcodekit5_app::i18n::Translator::new("en");
+    let mut harness = egui_kittest::Harness::builder()
+        .with_size(egui::vec2(730.0, 360.0))
+        .build_ui_state(
+            move |ui, s: &mut WithMachine| {
+                let mut requested = Vec::new();
+                let mut ctx = PaneContext::new(&tr, &mut requested).with_machine(&s.machine);
+                s.pane.ui(ui, &mut ctx);
+            },
+            WithMachine {
+                pane: VisualizerPane::new(),
+                machine: state.machine,
+            },
+        );
+    harness.state_mut().machine.set_program("G21\nG0 X5\n")?;
+    harness.run();
+    // The edited program reaches the machine and Run is pressed in the same frame, before
+    // the pane has seen it (the app syncs the editor, then routes Run).
+    harness
+        .state_mut()
+        .machine
+        .set_program("G21\nG0 X40 Y30\n")?;
+    {
+        let tr = gcodekit5_app::i18n::Translator::new("en");
+        let mut requested = Vec::new();
+        let s = harness.state_mut();
+        let mut ctx = PaneContext::new(&tr, &mut requested).with_machine(&s.machine);
+        assert!(s.pane.command(Command::FileRun, &mut ctx));
+    }
+    let deadline = std::time::Instant::now() + Duration::from_secs(10);
+    while harness.state().pane.preview().state() != PreviewState::Playing
+        && std::time::Instant::now() < deadline
+    {
+        harness.step();
+        std::thread::sleep(Duration::from_millis(2));
+    }
+    harness.state_mut().pane.preview_mut().pause();
+    let preview = harness.state().pane.preview();
+    assert_eq!(
+        preview.state(),
+        PreviewState::Paused,
+        "the Run was not lost"
+    );
+    // The path ends where the edited program ends.
+    let mut end = preview.clone();
+    end.set_speed(PreviewSpeed::Turbo);
+    end.play();
+    end.advance(TICK * 10_000);
+    assert_eq!(end.position(), Some(Vec3::new(40.0, 30.0, 0.0)));
+    Ok(())
+}
+
+#[test]
+fn test_app_file_run_hands_the_edit_to_the_machine_at_once() {
+    let mut harness = crate::machine_support::app_harness(GcodeKitApp::from_state(
+        gcodekit5_ui_egui::AppState::new(
+            gcodekit5_settings::SettingsManager::detached(
+                gcodekit5_settings::config::Config::default(),
+            ),
+            crate::test_smoke::native_decision(),
+        ),
+    ));
+    harness.state_mut().show_page(Page::MachineControl);
+    harness.run_steps(2);
+    harness.get_by_label("G-Code Editor").focus();
+    harness.step();
+    harness.get_by_label("G-Code Editor").type_text("G0 X12\n");
+    harness.step();
+    // F5 within the editor's typing pause.
+    harness.state_mut().dispatch(Command::FileRun);
+    let program = harness.state().state().machine.program().cloned();
+    assert_eq!(
+        program.as_deref().map(|p| p.join("\n")),
+        Some("G0 X12".to_string()),
+        "Run hands the editor's text to the machine first, as GTK ran the editor's text"
+    );
+    assert_eq!(harness.state().page(), Page::Visualizer);
+}
