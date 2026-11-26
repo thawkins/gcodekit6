@@ -37,6 +37,7 @@
 - **Device work area in the egui Designer**: the canvas outlines the active device profile's X/Y work area instead of the fixed 250 x 250 mm (GTK's fallback without a profile), Fit to Device and the empty-design Fit fit it, and exported G-code is checked against the profile's limits before the Preferences ones, as GTK did; the area follows a change of the active profile
 - **STL import in the egui Designer**: with GTK's Settings switch "STL File Import" on, File > Import offers STL files and adds the model's shadow (unscaled, where the model is, as one undo step), as GTK did; with it off, STL files are not offered and an STL file is refused with GTK's message
 - **Convert to Path and Convert to Rectangle in the egui Designer**: GTK's context menu entries, through the designer model's conversions: the selection is replaced by one new path through all its outlines, or by the rectangle of its bounds, as one undo step
+- **Preferences Controller page checked**: GTK's Preferences "Controller" tab has no rows (no setting is in that category; the connection settings are in the Device Manager), so the egui Preferences window has no Controller page; a settings test pins this
 
 ### Fixed
 - **Stock removal mesh memory**: the face list a stock mesh is built from stops as soon as it holds more faces than the mesh budget can take, so a stock near the vertex budget no longer holds a transient face list of up to about 1 GB before falling back to a coarser mesh (both front ends)

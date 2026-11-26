@@ -232,7 +232,7 @@ Status values:
 | Device type CNC / Laser ($32) | 70-settings | Ported | `test_device_info::device_info_laser_type_writes_32_and_refresh_asks_again` |
 | DRO decimals | 70-settings | Ported | Fixed: 2 for mm, 3 for inches, as GTK (`test_machine_pane::dro_shows_two_decimals`) |
 | Auto-connect on startup | 70-settings | Not applicable | Not in the GTK source |
-| Preferences "Controller" page | *(GTK)* | Gap | egui Preferences has General, Machine, User Interface, File Processing, Advanced |
+| Preferences "Controller" page | *(GTK)* | Not applicable | `settings/test_settings_dialog_pages::test_gtk_controller_page_has_no_rows` (GTK's Controller tab is empty: no setting is in that category since the connection rows moved to the Device Manager, so egui adds no empty page) |
 | Keyboard shortcut editor | 70-settings | Gap | GTK Preferences has a Shortcuts page; egui has no shortcut editor |
 | Firmware settings: retrieve, filter, write | 70-settings | Ported | `test_firmware_settings::firmware_settings_retrieve_sends_dump_and_identity_queries`, `test_firmware_settings::firmware_settings_write_sends_exactly_the_line` |
 | Firmware settings: export / import to file | 70-settings | Manual check needed | Save/Load buttons exist; no test |
@@ -262,7 +262,7 @@ Ranked by user impact. Sizes are rough estimates for one developer who knows the
 
 | Rank | Gap | User impact | Rough size |
 | --- | --- | --- | --- |
-| 11 | Preferences Controller page and shortcut editor | Low | 1-2 days |
+| 11 | Preferences shortcut editor | Low | 1-2 days |
 | 12 | Designer gallery icons | Low | 1 day |
 
 Manual checks still to run before GTK is deleted (no automated evidence): TCP and
