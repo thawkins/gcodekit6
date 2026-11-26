@@ -119,6 +119,8 @@ const Z_NEG: JogButton = jog_button(Command::JogZNeg, "Z-", Icon::JogDown, Axis:
 const PAD_BUTTON: f32 = 56.0;
 /// Gap between the pad's buttons (GTK: 5 px).
 const PAD_GAP: f32 = 5.0;
+/// Width of the X/Y pad, the gap, the Z column and the gap after it.
+pub(super) const PAD_ROW_WIDTH: f32 = 4.0 * PAD_BUTTON + 2.0 * PAD_GAP + 48.0 + 20.0 + 24.0;
 
 /// The signed jog distance for `axis` moved `distance_mm` in the direction the user asked
 /// for: negated when Preferences inverts the axis.

@@ -247,8 +247,8 @@ fn view_controls(
         if ui
             .add(
                 egui::DragValue::new(&mut shown)
-                    .range(0.0..=10.0)
-                    .speed(0.1)
+                    .range(0.0..=snap_threshold_max(system))
+                    .speed(0.1 / scale)
                     .max_decimals(2),
             )
             .on_hover_text(tr.tr("Snap threshold"))
@@ -273,4 +273,20 @@ fn machine_mode(ui: &mut egui::Ui, state: &mut DesignerState, tr: &Translator) {
             }
         }
     });
+}
+
+/// Largest snap threshold, in millimetres (GTK: 0 to 10 in the display unit; egui keeps
+/// imperial to the same 10 mm).
+pub const SNAP_THRESHOLD_MAX_MM: f64 = 10.0;
+
+/// The largest snap threshold in `system`'s display unit: 10 mm, or the same length in
+/// inches (about 0.39 in).
+///
+/// # Arguments
+/// * `system` - The user's measurement system.
+pub fn snap_threshold_max(system: MeasurementSystem) -> f64 {
+    match system {
+        MeasurementSystem::Metric => SNAP_THRESHOLD_MAX_MM,
+        MeasurementSystem::Imperial => SNAP_THRESHOLD_MAX_MM / 25.4,
+    }
 }

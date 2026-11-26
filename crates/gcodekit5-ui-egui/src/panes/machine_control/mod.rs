@@ -129,8 +129,21 @@ pub struct MachineControlPane {
 
 /// Share of the pane's width the sidebar (connection, state, work coordinates, job) takes.
 const SIDEBAR_SHARE: f32 = 0.29;
-/// Narrowest the sidebar gets, so its two-button rows keep their labels.
+/// Narrowest the sidebar gets while the centre column has room, so its two-button rows keep
+/// their labels.
 const SIDEBAR_MIN: f32 = 250.0;
+/// Narrowest the sidebar gets in a window too narrow for [`SIDEBAR_MIN`] beside the centre
+/// column.
+const SIDEBAR_FLOOR: f32 = 140.0;
+/// Width the override rows, and the readout with its zero actions, need side by side; a
+/// narrower column stacks them.
+const WIDE_ROWS: f32 = 450.0;
+/// Width of the centre column with every row side by side and the emergency stop beside the
+/// pad, with the panel's margins and scroll bar.
+const CONTROLS_COMFORT: f32 = WIDE_ROWS + 50.0;
+/// Width the page gives this pane before the editor column may grow over it: the sidebar
+/// and the centre column with the emergency stop beside the pad.
+pub(crate) const COMFORT_WIDTH: f32 = SIDEBAR_MIN + CONTROLS_COMFORT;
 /// Width of the centre column's content, centred in the column as GTK centres it.
 const CONTROLS_WIDTH: f32 = 560.0;
 /// Size of the emergency stop button (GTK: 112 x 80 plus its picture).
@@ -571,7 +584,8 @@ impl MachineControlPane {
     }
 
     /// The centre column: overrides, the work position with the zero actions beside it, the
-    /// machine position, then jogging with the emergency stop beside the pad.
+    /// machine position, then jogging with the emergency stop beside the pad. A narrow
+    /// column stacks the rows and puts the emergency stop at the top.
     fn show_controls(
         &mut self,
         ui: &mut egui::Ui,
@@ -579,7 +593,27 @@ impl MachineControlPane {
         machine: Option<&Machine>,
         status: &MachineStatus,
     ) {
-        if let Some(command) = overrides::show(ui, tr, status) {
+        // The visible width: rows wider than the column would run under the editor column.
+        let room = ui
+            .available_width()
+            .min(ui.clip_rect().right() - ui.cursor().left());
+        let stacked = room < WIDE_ROWS;
+        // A column too narrow for E-STOP beside the jog pad shows it at the top instead, so
+        // it is never pushed past the column's edge or below the fold.
+        let estop_on_top = stacked || room < jog::PAD_ROW_WIDTH + ESTOP_SIZE.x;
+        let texture = self.estop_texture(ui.ctx());
+        let estop_label = tr.tr("E-STOP");
+        let estop_hint = tr
+            .tr("Emergency stop (soft reset, {shortcut})")
+            .replace("{shortcut}", SOFT_RESET_CHORD);
+        let mut estop = false;
+        if estop_on_top {
+            estop = estop_button(ui, &estop_label, texture.as_ref(), status.connected)
+                .on_hover_text(&estop_hint)
+                .clicked();
+            ui.add_space(SECTION_GAP);
+        }
+        if let Some(command) = overrides::show(ui, tr, status, stacked) {
             self.with_controller(|c| c.realtime(command));
         }
         ui.add_space(SECTION_GAP);
@@ -593,8 +627,12 @@ impl MachineControlPane {
         };
         let units = self.units;
         let wcs = &mut self.wcs;
-        let (zeroed, wcs_action) = ui
-            .horizontal(|ui| {
+        let (zeroed, wcs_action) = if stacked {
+            let zeroed = dro::show_work(ui, status, units, &zero);
+            ui.add_space(6.0);
+            (zeroed, wcs.show_zero_actions(ui, tr, status))
+        } else {
+            ui.horizontal(|ui| {
                 let zeroed = ui
                     .vertical(|ui| dro::show_work(ui, status, units, &zero))
                     .inner;
@@ -608,7 +646,8 @@ impl MachineControlPane {
                     .inner;
                 (zeroed, action)
             })
-            .inner;
+            .inner
+        };
         if let Some(axis) = zeroed {
             self.zero_axes(machine, tr, &[axis], None);
         }
@@ -624,18 +663,15 @@ impl MachineControlPane {
         ui.add_space(SECTION_GAP);
         // Read now, after this frame's Home/Unlock buttons: a line they sent blocks it.
         let jog_allowed = machine.is_some_and(|m| m.jog_allowed());
-        let texture = self.estop_texture(ui.ctx());
-        let mut estop = false;
         let actions = self.jog.show(ui, tr, status, jog_allowed, |ui| {
-            ui.vertical(|ui| {
-                ui.add_space(((3.0 * 56.0 + 10.0) - ESTOP_SIZE.y).max(0.0) / 2.0);
-                let hint = tr
-                    .tr("Emergency stop (soft reset, {shortcut})")
-                    .replace("{shortcut}", SOFT_RESET_CHORD);
-                estop = estop_button(ui, &tr.tr("E-STOP"), texture.as_ref(), status.connected)
-                    .on_hover_text(hint)
-                    .clicked();
-            });
+            if !estop_on_top {
+                ui.vertical(|ui| {
+                    ui.add_space(((3.0 * 56.0 + 10.0) - ESTOP_SIZE.y).max(0.0) / 2.0);
+                    estop |= estop_button(ui, &estop_label, texture.as_ref(), status.connected)
+                        .on_hover_text(&estop_hint)
+                        .clicked();
+                });
+            }
         });
         if estop {
             self.emergency_stop();
@@ -748,11 +784,15 @@ impl Pane for MachineControlPane {
         let default_status = MachineStatus::default();
         let machine = ctx.machine();
         let status = machine.map_or(&default_status, |m| m.status());
+        // The sidebar never takes the centre column's room: E-STOP and the jog pad stay
+        // visible however wide it is dragged, and a narrow window narrows it first.
+        let room = ui.available_width() - CONTROLS_COMFORT;
+        let min = SIDEBAR_MIN.min(room).max(SIDEBAR_FLOOR);
         let sidebar = (ui.available_width() * SIDEBAR_SHARE).max(SIDEBAR_MIN);
         let request = egui::Panel::left("gcodekit5-machine-sidebar")
             .resizable(true)
             .default_size(sidebar)
-            .min_size(SIDEBAR_MIN)
+            .size_range(min..=room.max(min))
             .show(ui, |ui| {
                 egui::ScrollArea::vertical()
                     .id_salt("machine-control-sidebar")

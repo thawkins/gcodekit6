@@ -480,6 +480,9 @@ const TAB_HEIGHT: f32 = 26.0;
 /// and the Designer page's inspector column.
 const SIDE_COLUMN: f32 = 0.3;
 
+/// Narrowest the Machine Control page's editor and console column gets.
+const EDITOR_MIN: f32 = 160.0;
+
 impl Workspace {
     /// The pages with placeholder panes, showing Machine Control (GTK's default start page).
     pub fn new() -> Workspace {
@@ -735,9 +738,15 @@ impl Workspace {
                 }
             }
             Page::MachineControl => {
+                // The editor column shrinks first: it never covers the sidebar and the centre
+                // column's E-STOP, down to its own minimum.
+                let editor_max = (ui.available_width()
+                    - crate::panes::machine_control::COMFORT_WIDTH)
+                    .max(EDITOR_MIN);
                 egui::Panel::right("gcodekit5-machine-editor")
                     .resizable(true)
                     .default_size(side)
+                    .size_range(EDITOR_MIN..=editor_max)
                     .show(ui, |ui| {
                         let console = ui.available_height() * 0.3;
                         egui::Panel::bottom("gcodekit5-machine-console")

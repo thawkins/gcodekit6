@@ -160,11 +160,13 @@ fn percent(status: &MachineStatus, pick: impl Fn(u16, u16, u16) -> u16) -> Strin
 }
 
 /// Draws the section, one row per override (label, percentage, buttons); returns the
-/// override byte to send, if a button was clicked.
+/// override byte to send, if a button was clicked. When `stacked` (a narrow column) each
+/// row's buttons go under its label and percentage.
 pub(super) fn show(
     ui: &mut egui::Ui,
     tr: &Translator,
     status: &MachineStatus,
+    stacked: bool,
 ) -> Option<RealtimeCommand> {
     let enabled = status.connected;
     crate::theme::section_heading(ui, &tr.tr("Current Feed & Spindle"));
@@ -195,6 +197,16 @@ pub(super) fn show(
         (rapid.clone(), percent(status, |_, r, _| r), rapid_buttons),
     ];
     let mut clicked = None;
+    if stacked {
+        for (label, value, buttons) in rows {
+            ui.horizontal(|ui| {
+                ui.weak(label);
+                ui.label(value);
+            });
+            clicked = clicked.or(row(ui, enabled, buttons));
+        }
+        return clicked;
+    }
     egui::Grid::new("machine-control-overrides")
         .num_columns(3)
         .spacing([12.0, 6.0])

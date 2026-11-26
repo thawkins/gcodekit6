@@ -3,11 +3,11 @@
 //!
 //! Ported from the GTK `designer_layers.rs`, laid out as GTK's: the "Objects" heading with
 //! the Group and Ungroup icon buttons, rows of operation icon, position, kind and number,
-//! name and group badge, and the z-order icon buttons under the list. The pane shares the Designer's state
-//! ([`DesignerPane`]): clicking a row selects the shape on the canvas, and the canvas's
-//! selection shows in the rows. Every change to the design goes through the model's undo
-//! commands, one step per action: grouping, ungrouping, deleting, moving up and down, the
-//! position field, and renaming. Each marks the design modified.
+//! name and group badge, and the z-order icon buttons under the list. The pane shares the
+//! Designer's state ([`DesignerPane`]): clicking a row selects the shape on the canvas, and
+//! the canvas's selection shows in the rows. Every change to the design goes through the
+//! model's undo commands, one step per action: grouping, ungrouping, deleting, moving up
+//! and down, the position field, and renaming. Each marks the design modified.
 //!
 //! GTK has no visibility or lock; they are added here. They are view state of the Designer
 //! pane ([`ShapeFlags`](super::canvas::ShapeFlags)): not undoable, not saved, and a hidden or
@@ -15,8 +15,8 @@
 //!
 //! Rows run bottom to top in drawing order (position 1 is drawn first). A position field
 //! takes a number and Enter, as in GTK; a move that would split a group is refused with a
-//! notice (GTK's dialog). Keys: Delete removes the selection (not during a canvas drag) while the pointer is over the
-//! pane and no text field has focus.
+//! notice (GTK's dialog). Keys: Delete removes the selection (not during a canvas drag)
+//! while the pointer is over the pane and no text field has focus.
 //!
 //! Dependencies: `egui`, `gcodekit5-designer` (model and commands), `gcodekit5-app`
 //! (translations).
@@ -468,8 +468,8 @@ impl LayersPane {
 
     /// A single-line field showing `shown`, or the text being typed while it has focus.
     ///
-    /// `name` is the field's accessible name. Returns the response, and the finished text when editing ended this frame (Enter, or
-    /// focus lost).
+    /// `name` is the field's accessible name. Returns the response, and the finished text
+    /// when editing ended this frame (Enter, or focus lost).
     fn text_field(
         &mut self,
         ui: &mut egui::Ui,

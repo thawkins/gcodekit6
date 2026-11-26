@@ -319,7 +319,8 @@ impl WcsPanel {
         if zero_all.clicked() {
             action = Some(Action::ZeroAll);
         }
-        ui.horizontal(|ui| {
+        // Wraps Include Z under the button when the column is narrow.
+        ui.horizontal_wrapped(|ui| {
             // It rapids to the active system's zero: only while that is the one shown.
             let go = egui::Button::image_and_text(Icon::Jump.themed(ui), tr.tr("Go to Work Zero"));
             let go = ui.add_enabled(zero_enabled, go).on_hover_text(
