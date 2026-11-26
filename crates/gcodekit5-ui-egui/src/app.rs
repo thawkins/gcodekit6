@@ -814,7 +814,10 @@ impl GcodeKitApp {
     fn keyboard_panel(&self, ctx: &egui::Context) -> Option<&'static str> {
         // A window, popup or modal on screen (or closed only last frame) has the user's
         // attention: no pane takes plain keys then.
-        let widget_has_keys = ctx.memory(|m| m.focused().is_some())
+        // The designer canvas's focus is the Designer pane's own (its shape keys), not a
+        // widget's.
+        let canvas = crate::panes::designer::canvas::canvas_id();
+        let widget_has_keys = ctx.memory(|m| m.focused().is_some_and(|id| id != canvas))
             || egui::Popup::is_any_open(ctx)
             || !crate::workspace::overlay_layers(ctx).is_empty();
         if widget_has_keys {
@@ -1010,6 +1013,16 @@ impl GcodeKitApp {
             Command::Undo | Command::Redo => {
                 if !self.route_to_active_designer(cmd) {
                     tracing::debug!(?cmd, "no document to undo in");
+                }
+            }
+            Command::AlignLeft
+            | Command::AlignRight
+            | Command::AlignTop
+            | Command::AlignBottom
+            | Command::AlignCenterX
+            | Command::AlignCenterY => {
+                if !self.route_to_active_designer(cmd) {
+                    tracing::debug!(?cmd, "no design to edit");
                 }
             }
             Command::StreamStart => {

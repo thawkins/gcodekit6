@@ -77,6 +77,43 @@ const GTK_ACCELERATORS: &[(&str, &str, Command, Where)] = &[
     ),
     // Help
     ("F1", "F1", Command::OpenHelp, Where::App),
+    // Designer: `designer/ui_builders.rs`'s canvas keys, on the canvas only.
+    (
+        "<Alt>l",
+        "Alt+L",
+        Command::AlignLeft,
+        Where::Panel("Designer"),
+    ),
+    (
+        "<Alt>r",
+        "Alt+R",
+        Command::AlignRight,
+        Where::Panel("Designer"),
+    ),
+    (
+        "<Alt>t",
+        "Alt+T",
+        Command::AlignTop,
+        Where::Panel("Designer"),
+    ),
+    (
+        "<Alt>b",
+        "Alt+B",
+        Command::AlignBottom,
+        Where::Panel("Designer"),
+    ),
+    (
+        "<Alt>h",
+        "Alt+H",
+        Command::AlignCenterX,
+        Where::Panel("Designer"),
+    ),
+    (
+        "<Alt>v",
+        "Alt+V",
+        Command::AlignCenterY,
+        Where::Panel("Designer"),
+    ),
     // Jog: machine_control/mod.rs's numeric keypad keys (`key.to_unicode()`, so the top-row
     // digits jogged too; egui reports both as the digit), in Machine Control only.
     (
@@ -291,8 +328,20 @@ const PAGE_CONTROLS: &[(Command, Page, &str)] = &[
     (Command::ResetView, Page::Visualizer, "Reset View"),
 ];
 
-/// The menus hold every command but those with a page control ([`PAGE_CONTROLS`]) and
-/// those a page tab opens ([`Page::for_command`]), on every platform layout. No command is
+/// The designer shape commands, with the label of their entry in the canvas context menu
+/// (GTK's menus had none of them): the Align submenu's entries.
+const DESIGNER_MENU: &[(Command, &str)] = &[
+    (Command::AlignLeft, "Align Left"),
+    (Command::AlignRight, "Align Right"),
+    (Command::AlignTop, "Align Top"),
+    (Command::AlignBottom, "Align Bottom"),
+    (Command::AlignCenterX, "Align Center X"),
+    (Command::AlignCenterY, "Align Center Y"),
+];
+
+/// The menus hold every command but those with a page control ([`PAGE_CONTROLS`]), those a
+/// page tab opens ([`Page::for_command`]) and the designer's ([`DESIGNER_MENU`]), on every
+/// platform layout. No command is
 /// key-only since Reset View got its sidebar button (it keeps `Cmd+0`).
 #[test]
 fn test_menu_contains_every_command() {
@@ -303,7 +352,13 @@ fn test_menu_contains_every_command() {
         .map(|target| (target, craft_menu::layout(&bar, target, &options).bar));
     for command in Command::ALL {
         let elsewhere = Page::for_command(command).is_some()
-            || PAGE_CONTROLS.iter().any(|(c, _, _)| *c == command);
+            || PAGE_CONTROLS.iter().any(|(c, _, _)| *c == command)
+            || DESIGNER_MENU.iter().any(|(c, _)| *c == command);
+        assert_eq!(
+            command.is_designer_shape_op(),
+            DESIGNER_MENU.iter().any(|(c, _)| *c == command),
+            "{command:?}"
+        );
         let wanted = bar.find(&command.command_ref()).is_some();
         assert_eq!(wanted, !elsewhere, "{command:?} in the menu bar");
         for (target, bar) in &laid_out {
@@ -340,6 +395,17 @@ fn test_every_command_is_reachable() {
     let mut h = crate::machine_support::app_harness(GcodeKitApp::from_state(state));
     h.run_steps(2);
     for command in Command::ALL {
+        if let Some((_, label)) = DESIGNER_MENU.iter().find(|(c, _)| *c == command) {
+            assert!(
+                designer_menu_has(&mut h, label),
+                "{command:?}: no {label:?} in the designer's context menu"
+            );
+            assert!(
+                !keymap.bindings(&command.command_ref()).is_empty(),
+                "{command:?} keeps its GTK key"
+            );
+            continue;
+        }
         if let Some((_, page, label)) = PAGE_CONTROLS.iter().find(|(c, _, _)| *c == command) {
             h.state_mut().show_page(*page);
             h.run_steps(2);
@@ -365,6 +431,44 @@ fn test_every_command_is_reachable() {
             "{command:?} is in no menu, has no key and no page control"
         );
     }
+}
+
+/// Whether the designer's context menu, opened over two selected squares, has `label` (in
+/// its Align submenu when the label starts with "Align "). Closes the menu again.
+fn designer_menu_has(h: &mut Harness<'static, GcodeKitApp>, label: &str) -> bool {
+    use egui_kittest::kittest::Queryable;
+    use gcodekit5_designer::model::{DesignRectangle, Shape};
+    h.state_mut().show_page(Page::Designer);
+    h.run_steps(2);
+    let designer = std::rc::Rc::clone(h.state().designer());
+    if designer.borrow().state().canvas.shape_count() == 0 {
+        for x in [0.0, 30.0] {
+            designer
+                .borrow_mut()
+                .state_mut()
+                .add_shape_with_undo(Shape::Rectangle(DesignRectangle::new(x, 0.0, 10.0, 10.0)));
+        }
+    }
+    designer.borrow_mut().state_mut().select_all();
+    h.run_steps(2);
+    let p = designer
+        .borrow()
+        .view()
+        .world_to_screen(glam::Vec2::new(5.0, 5.0));
+    crate::test_designer_canvas::click_with(
+        h,
+        p,
+        egui::PointerButton::Secondary,
+        egui::Modifiers::NONE,
+    );
+    if label.starts_with("Align ") {
+        h.get_by_label("Align").click();
+        h.run();
+    }
+    let found = h.query_by_label(label).is_some();
+    h.key_press(egui::Key::Escape);
+    h.run();
+    found
 }
 
 /// A command that used to open a manager window now shows its page.

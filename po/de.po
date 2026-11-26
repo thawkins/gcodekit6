@@ -4640,3 +4640,6 @@ msgstr "Eilgangbewegungen ein/aus"
 
 msgid "Toggle Cutting Moves"
 msgstr "Schnittbewegungen ein/aus"
+
+msgid "Align"
+msgstr "Ausrichten"

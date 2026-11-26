@@ -4552,3 +4552,6 @@ msgstr ""
 
 msgid "not sent: the controller was reset"
 msgstr ""
+
+msgid "Align"
+msgstr ""

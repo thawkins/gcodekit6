@@ -633,7 +633,13 @@ impl MachineControlPane {
             | Command::OpenFirmwareSettings
             | Command::OpenDeviceInfo
             | Command::OpenHelp
-            | Command::About => return false,
+            | Command::About
+            | Command::AlignLeft
+            | Command::AlignRight
+            | Command::AlignTop
+            | Command::AlignBottom
+            | Command::AlignCenterX
+            | Command::AlignCenterY => return false,
         }
         true
     }

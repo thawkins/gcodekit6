@@ -4643,3 +4643,6 @@ msgstr "Mostra/nascondi movimenti rapidi"
 
 msgid "Toggle Cutting Moves"
 msgstr "Mostra/nascondi movimenti di taglio"
+
+msgid "Align"
+msgstr "Allinea"

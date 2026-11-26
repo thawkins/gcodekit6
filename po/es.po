@@ -4643,3 +4643,6 @@ msgstr "Alternar movimientos rápidos"
 
 msgid "Toggle Cutting Moves"
 msgstr "Alternar movimientos de corte"
+
+msgid "Align"
+msgstr "Alinear"

@@ -4647,3 +4647,6 @@ msgstr "Afficher/masquer les déplacements rapides"
 
 msgid "Toggle Cutting Moves"
 msgstr "Afficher/masquer les mouvements de coupe"
+
+msgid "Align"
+msgstr "Aligner"

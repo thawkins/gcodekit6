@@ -25,7 +25,7 @@ use gcodekit5_app::i18n::Translator;
 use gcodekit5_app::machine::MachineEvent;
 use gcodekit5_settings::config::Config;
 
-use crate::commands::{Command, MACHINE_CONTROL_SCOPE, VISUALIZER_SCOPE};
+use crate::commands::{Command, DESIGNER_SCOPE, MACHINE_CONTROL_SCOPE, VISUALIZER_SCOPE};
 use crate::dialogs::{ConfirmChoice, ConfirmRequest};
 use crate::machine::Machine;
 use crate::panes::visualizer::StockSeed;
@@ -85,9 +85,9 @@ impl PaneId {
         match self {
             PaneId::MachineControl => Some(MACHINE_CONTROL_SCOPE),
             PaneId::Visualizer => Some(VISUALIZER_SCOPE),
+            PaneId::Designer => Some(DESIGNER_SCOPE),
             PaneId::Console
             | PaneId::Editor
-            | PaneId::Designer
             | PaneId::DesignerLayers
             | PaneId::DesignerProperties
             | PaneId::CamTools => None,
@@ -226,7 +226,13 @@ impl Page {
             | Command::OpenSettings
             | Command::OpenDeviceInfo
             | Command::OpenHelp
-            | Command::About => None,
+            | Command::About
+            | Command::AlignLeft
+            | Command::AlignRight
+            | Command::AlignTop
+            | Command::AlignBottom
+            | Command::AlignCenterX
+            | Command::AlignCenterY => None,
         }
     }
 }
@@ -994,16 +1000,19 @@ impl Workspace {
 }
 
 /// The windows, popups and modals shown (this frame or the last): `Middle` and
-/// `Foreground` layers; tooltips do not count.
+/// `Foreground` layers; tooltips do not count, nor does the Designer canvas's floating
+/// toolbar, which is part of its pane.
 ///
 /// # Arguments
 /// * `ctx` - The egui context.
 pub fn overlay_layers(ctx: &egui::Context) -> Vec<egui::LayerId> {
+    let toolbar = crate::panes::designer::canvas::overlay::toolbar_id();
     ctx.memory(|m| {
         m.areas()
             .visible_layer_ids()
             .into_iter()
             .filter(|layer| matches!(layer.order, egui::Order::Middle | egui::Order::Foreground))
+            .filter(|layer| layer.id != toolbar)
             .collect()
     })
 }

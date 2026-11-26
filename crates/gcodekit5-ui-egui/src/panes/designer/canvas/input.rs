@@ -14,7 +14,8 @@
 //!   Escape cancels a polyline or deselects. A text field elsewhere owns the keyboard
 //!   instead, so these never fire while typing.
 //! - Right-click with a selection: GTK's context menu with Delete, Mirror on X / Y, Array...
-//!   (the pane opens the Array dialog) and Rotate.
+//!   (the pane opens the Array dialog), Rotate and Align. Align also has GTK's Alt keys,
+//!   through the app's keymap (`crate::commands`) while the canvas has the keyboard.
 //!
 //! Drawing tools and moves snap to the snap step; selection hit tests use the raw pointer.
 //!
@@ -498,6 +499,34 @@ const ROTATIONS: [(&str, f64); 5] = [
     (n_!("180°"), 180.0),
 ];
 
+/// A designer model operation on the selection.
+type SelectionOp = fn(&mut DesignerState);
+
+/// The Align submenu: label msgid and the model's operation, in GTK's order.
+const ALIGNMENTS: [(&str, SelectionOp); 6] = [
+    (
+        n_!("Align Left"),
+        DesignerState::align_selected_horizontal_left,
+    ),
+    (
+        n_!("Align Right"),
+        DesignerState::align_selected_horizontal_right,
+    ),
+    (n_!("Align Top"), DesignerState::align_selected_vertical_top),
+    (
+        n_!("Align Bottom"),
+        DesignerState::align_selected_vertical_bottom,
+    ),
+    (
+        n_!("Align Center X"),
+        DesignerState::align_selected_horizontal_center,
+    ),
+    (
+        n_!("Align Center Y"),
+        DesignerState::align_selected_vertical_center,
+    ),
+];
+
 /// The msgids of the context menu.
 pub fn msgids() -> Vec<&'static str> {
     let mut ids = vec![
@@ -506,13 +535,16 @@ pub fn msgids() -> Vec<&'static str> {
         n_!("Mirror on Y"),
         n_!("Rotate"),
         n_!("Array..."),
+        n_!("Align"),
     ];
     ids.extend(ROTATIONS.iter().map(|(label, _)| *label));
+    ids.extend(ALIGNMENTS.iter().map(|(label, _)| *label));
     ids
 }
 
 /// The right-click menu for the selection, in GTK's order: Delete, Mirror on X and Y,
-/// Array..., and Rotate by a fixed angle. Each edit is one undo step.
+/// Array..., Rotate by a fixed angle and, for two shapes or more, Align. Each edit is one
+/// undo step.
 ///
 /// # Returns
 /// Whether "Array..." was chosen.
@@ -542,5 +574,16 @@ fn context_menu(ui: &mut egui::Ui, state: &mut DesignerState, tr: &Translator) -
             }
         }
     });
+    // GTK offers Align for two shapes or more.
+    if state.selected_count() >= 2 {
+        ui.menu_button(tr.tr("Align"), |ui| {
+            for (label, align) in ALIGNMENTS {
+                if ui.button(tr.tr(label)).clicked() {
+                    align(state);
+                    ui.close();
+                }
+            }
+        });
+    }
     array
 }

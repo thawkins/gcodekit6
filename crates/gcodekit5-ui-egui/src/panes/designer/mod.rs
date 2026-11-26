@@ -378,7 +378,8 @@ impl DesignerPane {
     /// The canvas: input, then painting with the view the input left.
     fn show_canvas(&mut self, ui: &mut egui::Ui, tr: &Translator) {
         let rect = ui.available_rect_before_wrap();
-        let response = ui.allocate_rect(rect, egui::Sense::click_and_drag());
+        ui.advance_cursor_after_rect(rect);
+        let response = ui.interact(rect, canvas::canvas_id(), egui::Sense::click_and_drag());
         self.state
             .canvas
             .set_canvas_size(f64::from(rect.width()), f64::from(rect.height()));
@@ -576,6 +577,12 @@ impl Pane for DesignerPane {
             Command::ZoomOut => self.apply_view(ViewAction::ZoomOut),
             Command::ZoomFit => self.apply_view(ViewAction::FitContent),
             Command::ResetView => self.apply_view(ViewAction::FitViewport),
+            Command::AlignLeft => self.state.align_selected_horizontal_left(),
+            Command::AlignRight => self.state.align_selected_horizontal_right(),
+            Command::AlignTop => self.state.align_selected_vertical_top(),
+            Command::AlignBottom => self.state.align_selected_vertical_bottom(),
+            Command::AlignCenterX => self.state.align_selected_horizontal_center(),
+            Command::AlignCenterY => self.state.align_selected_vertical_center(),
             Command::FileNew
             | Command::FileNew3d
             | Command::FileOpen

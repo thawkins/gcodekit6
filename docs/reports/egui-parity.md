@@ -170,7 +170,7 @@ Status values:
 | Move, resize, rotate | 40-designer | Ported | `test_designer_editing::drag_moves_selection_and_undo_restores`, `test_designer_editing::resize_by_corner_handle_keeps_aspect`, `test_designer_editing::rotate_from_context_menu` |
 | Exact size, position, rotation | 40-designer | Ported | `test_designer_properties::property_edit_updates_shape`, `test_designer_properties::rotation_is_absolute_for_one_shape_and_locks_its_size` |
 | Mirror X / Y | 40-designer | Ported | `test_designer_shape_ops::test_mirror_x_and_y_from_context_menu_are_undoable` (context menu "Mirror on X" / "Mirror on Y", one undo step each) |
-| Align (left, right, top, bottom, centre) | 40-designer | Gap | GTK "Align" submenu; not in egui |
+| Align (left, right, top, bottom, centre) | 40-designer | Ported | `test_designer_shape_ops::test_align_submenu_aligns_the_selection_in_one_undo_step`, `test_designer_shape_ops::test_align_needs_two_shapes`, `test_designer_shape_ops::test_align_keys_run_on_the_canvas_but_not_while_typing`, `test_commands::test_every_gtk_accelerator_bound` (context menu Align submenu for 2+ shapes; GTK's Alt+L/R/T/B/H/V in the Designer keymap scope) |
 | Cut / copy / paste shapes | 90-shortcuts | Gap | GTK context menu and shortcuts; egui designer ignores them |
 | Boolean union / difference / intersection | *(GTK)* | Gap | GTK context menu; not in egui |
 | Linear, circular, grid arrays | 40-designer | Ported | `test_designer_array::array_dialog_creates_n_copies_as_one_undo_step`, `test_designer_array::array_dialog_grid_and_circular` |

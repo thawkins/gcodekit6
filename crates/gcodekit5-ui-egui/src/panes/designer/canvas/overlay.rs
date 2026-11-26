@@ -87,7 +87,7 @@ fn osd_frame(ui: &egui::Ui) -> egui::Frame {
 pub fn toolbar(ui: &mut egui::Ui, rect: egui::Rect, tr: &Translator) -> Option<ViewAction> {
     let mut clicked = None;
     // An area pivoted on its top centre is centred from its own size.
-    egui::Area::new(egui::Id::unique("gcodekit5-designer-canvas-toolbar"))
+    egui::Area::new(toolbar_id())
         .order(egui::Order::Middle)
         .fixed_pos(egui::pos2(rect.center().x, rect.top() + MARGIN))
         .pivot(egui::Align2::CENTER_TOP)
@@ -104,6 +104,12 @@ pub fn toolbar(ui: &mut egui::Ui, rect: egui::Rect, tr: &Translator) -> Option<V
             });
         });
     clicked
+}
+
+/// The id of the toolbar's area: part of the canvas, not a window or popup, so it does not
+/// take the keyboard from the panes (`crate::workspace::overlay_layers`).
+pub fn toolbar_id() -> egui::Id {
+    egui::Id::unique("gcodekit5-designer-canvas-toolbar")
 }
 
 /// What the status line shows.

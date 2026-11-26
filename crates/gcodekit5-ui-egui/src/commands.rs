@@ -7,7 +7,8 @@
 //! overrides under, so they must not change once released.
 //!
 //! Most bindings work anywhere in the window; the visualizer's view keys work only while the
-//! Visualizer has the keyboard. The jog keys are GTK's numeric keypad digits (8/2 Y+/Y-, 4/6
+//! Visualizer has the keyboard, and the designer's shape keys (GTK's Alt+L/R/T/B/H/V align)
+//! only while the Designer canvas has it, never while a text field does. The jog keys are GTK's numeric keypad digits (8/2 Y+/Y-, 4/6
 //! X-/X+, 9/3 Z+/Z-), bound in the Machine Control scope only: they run only after the user
 //! pressed in that pane, never while a widget (a text field, an open dropdown) has the
 //! keyboard. egui reports the keypad digits as the top-row digits, so those jog too, as they
@@ -33,6 +34,8 @@ use craft_keymap::{Bindable, Binding, CommandRef, Keymap, Platform, Scope, Scope
 pub const MACHINE_CONTROL_SCOPE: &str = "MachineControl";
 /// The scope of the bindings that work only while the Visualizer has the keyboard.
 pub const VISUALIZER_SCOPE: &str = "Visualizer";
+/// The scope of the bindings that work only while the Designer canvas has the keyboard.
+pub const DESIGNER_SCOPE: &str = "Designer";
 
 /// One action the user can run from a key, a menu or a pane.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -131,6 +134,18 @@ pub enum Command {
     OpenHelp,
     /// Show the About window.
     About,
+    /// Align the designer selection by its left edges.
+    AlignLeft,
+    /// Align the designer selection by its right edges.
+    AlignRight,
+    /// Align the designer selection by its top edges.
+    AlignTop,
+    /// Align the designer selection by its bottom edges.
+    AlignBottom,
+    /// Align the designer selection on its horizontal centre.
+    AlignCenterX,
+    /// Align the designer selection on its vertical centre.
+    AlignCenterY,
 }
 
 /// Where a default binding works.
@@ -152,7 +167,7 @@ struct Spec {
 
 impl Command {
     /// Every command, in menu order.
-    pub const ALL: [Command; 47] = [
+    pub const ALL: [Command; 53] = [
         Command::FileNew,
         Command::FileNew3d,
         Command::FileOpen,
@@ -200,6 +215,12 @@ impl Command {
         Command::OpenDeviceInfo,
         Command::OpenHelp,
         Command::About,
+        Command::AlignLeft,
+        Command::AlignRight,
+        Command::AlignTop,
+        Command::AlignBottom,
+        Command::AlignCenterX,
+        Command::AlignCenterY,
     ];
 
     /// The command's catalog entry.
@@ -207,6 +228,7 @@ impl Command {
         use Home::{App, Panel};
         const MC: Home = Panel(MACHINE_CONTROL_SCOPE);
         const VIS: Home = Panel(VISUALIZER_SCOPE);
+        const DES: Home = Panel(DESIGNER_SCOPE);
         let (id, label, home, keys): (_, _, _, &'static [&'static str]) = match self {
             Command::FileNew => ("file.new", n_!("New 2D"), App, &["Cmd+N"]),
             Command::FileNew3d => ("file.new_3d", n_!("New 3D"), App, &[]),
@@ -280,6 +302,28 @@ impl Command {
             Command::OpenDeviceInfo => ("tools.device_info", n_!("Device Info"), App, &[]),
             Command::OpenHelp => ("help.docs", n_!("Documentation"), App, &["F1"]),
             Command::About => ("help.about", n_!("About"), App, &[]),
+            // GTK's designer keys (`designer/ui_builders.rs`), on the canvas only.
+            Command::AlignLeft => ("designer.align_left", n_!("Align Left"), DES, &["Alt+L"]),
+            Command::AlignRight => ("designer.align_right", n_!("Align Right"), DES, &["Alt+R"]),
+            Command::AlignTop => ("designer.align_top", n_!("Align Top"), DES, &["Alt+T"]),
+            Command::AlignBottom => (
+                "designer.align_bottom",
+                n_!("Align Bottom"),
+                DES,
+                &["Alt+B"],
+            ),
+            Command::AlignCenterX => (
+                "designer.align_center_x",
+                n_!("Align Center X"),
+                DES,
+                &["Alt+H"],
+            ),
+            Command::AlignCenterY => (
+                "designer.align_center_y",
+                n_!("Align Center Y"),
+                DES,
+                &["Alt+V"],
+            ),
         };
         Spec {
             id,
@@ -313,6 +357,20 @@ impl Command {
             return None;
         }
         Command::ALL.into_iter().find(|c| c.id() == command.id)
+    }
+
+    /// Whether this is a designer shape command: run from the canvas's keys and context menu,
+    /// not from the menu bar (GTK's menus had none of them).
+    pub fn is_designer_shape_op(self) -> bool {
+        matches!(
+            self,
+            Command::AlignLeft
+                | Command::AlignRight
+                | Command::AlignTop
+                | Command::AlignBottom
+                | Command::AlignCenterX
+                | Command::AlignCenterY
+        )
     }
 
     /// Whether this is a jog command (bound to keys, never shown in the menus).
@@ -355,6 +413,7 @@ pub fn keymap() -> Keymap {
     let scopes = Scopes::new()
         .with_panel(MACHINE_CONTROL_SCOPE)
         .with_panel(VISUALIZER_SCOPE)
+        .with_panel(DESIGNER_SCOPE)
         // A panel's keys never run while another panel, or none, has the keyboard.
         .with_panel_fallthrough(false);
     let catalog = Command::ALL.into_iter().map(Command::bindable).collect();

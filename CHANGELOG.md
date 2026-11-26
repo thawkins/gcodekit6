@@ -30,6 +30,7 @@
 - **Hide kept between runs in egui**: the Visualizer sidebar's Hide / Show Sidebar is saved in the settings' `panel_visibility` under GTK's `visualizer_sidebar` key and restored at start, and so is the Designer inspector's Hide / Unhide (`designer_properties`, which GTK did not keep)
 - **Visualizer page snapshot with the whole sidebar**: `visualizer_page_full_sidebar.png` (1440x900 dark, stock removal on, Inspector open, a machine's bounds) checks every GTK sidebar section and the run preview bar fit on the page
 - **Mirror in the egui Designer**: the canvas context menu has GTK's Mirror on X and Mirror on Y, which flip the selection about its centre through the designer model's mirror operation, one undo step each
+- **Align in the egui Designer**: the canvas context menu has GTK's Align submenu (Left, Right, Top, Bottom, Center X, Center Y) for two shapes or more, one undo step each, and GTK's Alt+L/R/T/B/H/V keys run it while the canvas has the keyboard (a new Designer keymap scope; never while a text field has it)
 
 ### Fixed
 - **Stock removal mesh memory**: the face list a stock mesh is built from stops as soon as it holds more faces than the mesh budget can take, so a stock near the vertex budget no longer holds a transient face list of up to about 1 GB before falling back to a coarser mesh (both front ends)

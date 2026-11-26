@@ -35,6 +35,13 @@ use glam::Vec2;
 pub use flags::ShapeFlags;
 pub use input::CanvasInput;
 
+/// The canvas widget's id. The canvas takes the keyboard focus when pressed, for its own
+/// keys (Delete, Escape, Enter); the app's keymap treats that focus as the Designer pane
+/// having the keyboard, unlike a text field's.
+pub fn canvas_id() -> egui::Id {
+    egui::Id::unique("gcodekit5-designer-canvas")
+}
+
 /// The tool the canvas's primary button uses.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
 pub enum DesignerTool {

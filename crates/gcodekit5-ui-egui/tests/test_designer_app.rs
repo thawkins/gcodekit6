@@ -12,7 +12,7 @@ use glam::Vec2;
 use crate::test_designer_canvas::selected;
 
 /// The app's designer, with the Designer tab shown.
-fn app_with_designer() -> Harness<'static, gcodekit5_ui_egui::GcodeKitApp> {
+pub fn app_with_designer() -> Harness<'static, gcodekit5_ui_egui::GcodeKitApp> {
     use gcodekit5_settings::SettingsManager;
     use gcodekit5_settings::config::Config;
     use gcodekit5_ui_egui::{AppState, GcodeKitApp};
@@ -27,7 +27,7 @@ fn app_with_designer() -> Harness<'static, gcodekit5_ui_egui::GcodeKitApp> {
 }
 
 /// Clicks `pos` in the app with the real pointer events.
-fn app_click(h: &mut Harness<'_, gcodekit5_ui_egui::GcodeKitApp>, pos: Pos2) {
+pub fn app_click(h: &mut Harness<'_, gcodekit5_ui_egui::GcodeKitApp>, pos: Pos2) {
     h.event(egui::Event::PointerMoved(pos));
     h.step();
     h.event(egui::Event::PointerButton {
