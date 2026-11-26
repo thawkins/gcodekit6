@@ -137,6 +137,7 @@ Status values:
 | Executed-line tick marks | 20-gcode-editor | Not applicable | Not in the GTK source |
 | Undo / redo, clipboard, select all | 90-shortcuts | Manual check needed | Text field's own undo and clipboard; no test |
 | Read-only while a job runs | *(GTK)* | Ported | `test_editor::editor_read_only_while_job_runs` |
+| Save G-code button | *(GTK)* | Ported | `test_editor::test_save_gcode_button_saves_the_editor_file` (GTK's Machine Control editor header button; File > Save) |
 | Clear editor | *(GTK)* | Ported | `test_editor::clear_editor_asks_then_clears`, `test_editor::clear_editor_without_text_asks_nothing`, `test_editor::clear_editor_refused_while_job_runs` (asks whenever the editor holds G-code, as GTK did) |
 
 ## Visualizer
@@ -297,8 +298,8 @@ there is no screenshot of them. The lists below are what still differs.
 - Override rows show the percentage only (GTK: "0.0 mm/min (100%)"), and egui adds a Rapid
   row.
 - The readout shows "-" with no report, with two decimals (GTK: "0.000").
-- Machine State has no Buffer value. The editor has no "G-Code Editor" header, and no
-  clear or save buttons.
+- The editor has no "G-Code Editor" header; its Clear editor and Save G-code buttons sit at
+  the end of the find row.
 - The large state text is not bold. GTK's keyboard-jog hint and its Stop hint are left out.
 - In a window narrower than about 1000 pt, egui shrinks the editor column first, then the
   sidebar (down to 140 pt). Then the override rows and the readout stack, and E-STOP

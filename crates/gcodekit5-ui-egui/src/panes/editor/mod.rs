@@ -91,6 +91,7 @@ pub fn msgids() -> Vec<&'static str> {
         n_!("Cannot stream this program"),
         READ_ONLY_DURING_JOB,
         n_!("Clear editor"),
+        n_!("Save G-code"),
         n_!("Replace with ..."),
         n_!("Replace"),
         n_!("Replace All"),
@@ -438,13 +439,17 @@ impl EditorPane {
     }
 
     /// The find row: query, previous and next (chevron icon buttons named "Previous Match"
-    /// and "Next Match"), match count. The query takes the room the rest leaves, so the row
-    /// fits a narrow editor column.
-    fn show_find(&mut self, ui: &mut egui::Ui, tr: &Translator) {
+    /// and "Next Match"), match count, then GTK's Clear editor and Save G-code buttons. The
+    /// query takes the room the rest leaves, so the row fits a narrow editor column.
+    ///
+    /// # Returns
+    /// Whether Save G-code was clicked (File > Save for the editor).
+    fn show_find(&mut self, ui: &mut egui::Ui, tr: &Translator) -> bool {
+        let mut save = false;
         ui.horizontal(|ui| {
             let hint = tr.tr("Search...");
-            // Three icon buttons and the match count.
-            let rest = 3.0 * 36.0 + 110.0;
+            // Four icon buttons and the match count.
+            let rest = 4.0 * 36.0 + 110.0;
             let edit = egui::TextEdit::singleline(&mut self.find_query)
                 .hint_text(hint.as_ref())
                 .desired_width((ui.available_width() - rest).clamp(80.0, 200.0));
@@ -484,8 +489,10 @@ impl EditorPane {
             if clear.clicked() {
                 self.request_clear(tr);
             }
+            save = icon_only_button(ui, Icon::Save, &tr.tr("Save G-code")).clicked();
         });
         self.show_replace(ui, tr);
+        save
     }
 
     /// The number of matches of the find query, counted once per query and edit.
@@ -587,9 +594,14 @@ impl Pane for EditorPane {
     fn ui(&mut self, ui: &mut egui::Ui, ctx: &mut PaneContext) {
         let tr = ctx.tr;
         self.locked = ctx.machine().is_some_and(|m| m.job_running());
-        egui::Panel::top("gcodekit5-editor-find")
+        let save = egui::Panel::top("gcodekit5-editor-find")
             .show_separator_line(false)
-            .show(ui, |ui| self.show_find(ui, tr));
+            .show(ui, |ui| self.show_find(ui, tr))
+            .inner;
+        // GTK's editor header Save button: File > Save for the editor.
+        if save {
+            ctx.request(crate::commands::Command::FileSave);
+        }
         egui::Panel::bottom("gcodekit5-editor-status")
             .show_separator_line(false)
             .show(ui, |ui| self.show_status(ui, tr));

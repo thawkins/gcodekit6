@@ -1096,3 +1096,28 @@ fn test_editor_generated_program_resets_undo() {
     edit_then_undo(&mut harness, None);
     assert_eq!(harness.state().editor().borrow().buffer().text(), "G0 Z5\n");
 }
+
+/// GTK's Save G-code button beside Clear editor saves the editor's file, as File > Save.
+#[test]
+fn test_save_gcode_button_saves_the_editor_file() -> TestResult {
+    use egui_kittest::kittest::Queryable;
+    let dir = scratch("save_button")?;
+    let path = write(&dir, "part.nc", "G0 X1\n")?;
+    let mut app = GcodeKitApp::from_state(AppState::new(
+        SettingsManager::detached(Config::default()),
+        crate::test_smoke::native_decision(),
+    ));
+    app.open_startup_files(std::slice::from_ref(&path));
+    let editor = std::rc::Rc::clone(app.editor());
+    editor
+        .borrow_mut()
+        .buffer_mut()
+        .set_text("G0 X2\n".to_string());
+    let mut h = crate::machine_support::app_harness(app);
+    h.run();
+    h.get_by_label("Save G-code").click();
+    h.run();
+    assert_eq!(h.state().last_dispatched(), Some(Command::FileSave));
+    assert_eq!(std::fs::read_to_string(&path)?, "G0 X2\n");
+    Ok(())
+}
