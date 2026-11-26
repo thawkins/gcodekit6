@@ -140,6 +140,10 @@ fn test_lines_answered_after_a_reset_drops_jogs() {
         controller.jog(Axis::Y, 1.0, 1000.0);
     }
     assert!(wait(&mut controller, |_| jogs_written(&shared) > 0));
+    // Let the worker take every jog from its channel first: a jog still in the channel at
+    // the reset would be a new line after it, written and (acks held) never answered.
+    std::thread::sleep(Duration::from_millis(20));
+    controller.poll();
     shared.inject("Grbl 1.1h ['$' for help]\n");
     assert!(wait(&mut controller, MachineController::lines_answered));
 }
