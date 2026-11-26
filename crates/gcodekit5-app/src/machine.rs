@@ -2259,7 +2259,7 @@ impl WorkerState {
         }
         let line = line.trim();
         let lower = line.to_ascii_lowercase();
-        if line.is_empty() || lower.starts_with("ok") || lower.contains("wait") {
+        if line.is_empty() || lower.starts_with("ok") || lower == "wait" {
             return;
         }
         if line.starts_with('<') && line.ends_with('>') {

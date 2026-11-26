@@ -634,3 +634,28 @@ fn repetier_m112_in_any_form_is_the_emergency_stop() {
     assert!(wait_until(|| controller.lines_answered()));
     assert!(!controller.is_halted(), "{:?}", shared.log());
 }
+
+/// Only the bare `wait` acknowledgement is hidden: a firmware message that mentions
+/// waiting reaches the console.
+#[test]
+fn repetier_hides_only_the_bare_wait_line() {
+    let shared = Arc::new(LoopbackShared::default());
+    let mut controller = connect_repetier(&shared);
+    shared.inject("wait\n");
+    shared.inject("echo:waiting for the heater\n");
+    let mut seen = Vec::new();
+    assert!(
+        wait_for(&mut controller, &mut seen, |e| matches!(
+            e,
+            MachineEvent::Received(l) if l == "echo:waiting for the heater"
+        ))
+        .is_some(),
+        "the echo line was hidden: {seen:?}"
+    );
+    assert!(
+        !seen
+            .iter()
+            .any(|e| matches!(e, MachineEvent::Received(l) if l == "wait")),
+        "{seen:?}"
+    );
+}
