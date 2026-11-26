@@ -84,6 +84,8 @@ mod test_designer_properties_cam;
 mod test_designer_properties_commit;
 #[path = "test_designer_properties_shapes.rs"]
 mod test_designer_properties_shapes;
+#[path = "test_designer_shape_ops.rs"]
+mod test_designer_shape_ops;
 #[path = "test_designer_snapshots.rs"]
 mod test_designer_snapshots;
 #[path = "test_designer_text_tool.rs"]

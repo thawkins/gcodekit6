@@ -169,7 +169,7 @@ Status values:
 | Select all (Ctrl+A) | 40-designer | Manual check needed | No test |
 | Move, resize, rotate | 40-designer | Ported | `test_designer_editing::drag_moves_selection_and_undo_restores`, `test_designer_editing::resize_by_corner_handle_keeps_aspect`, `test_designer_editing::rotate_from_context_menu` |
 | Exact size, position, rotation | 40-designer | Ported | `test_designer_properties::property_edit_updates_shape`, `test_designer_properties::rotation_is_absolute_for_one_shape_and_locks_its_size` |
-| Mirror X / Y | 40-designer | Gap | GTK context menu; egui context menu has Delete, Rotate, Array only |
+| Mirror X / Y | 40-designer | Ported | `test_designer_shape_ops::test_mirror_x_and_y_from_context_menu_are_undoable` (context menu "Mirror on X" / "Mirror on Y", one undo step each) |
 | Align (left, right, top, bottom, centre) | 40-designer | Gap | GTK "Align" submenu; not in egui |
 | Cut / copy / paste shapes | 90-shortcuts | Gap | GTK context menu and shortcuts; egui designer ignores them |
 | Boolean union / difference / intersection | *(GTK)* | Gap | GTK context menu; not in egui |

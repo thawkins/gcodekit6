@@ -13,8 +13,8 @@
 //! - With the canvas focused (after a press in it): Delete/Backspace delete the selection,
 //!   Escape cancels a polyline or deselects. A text field elsewhere owns the keyboard
 //!   instead, so these never fire while typing.
-//! - Right-click with a selection: a context menu with Delete, Rotate and Array... (the pane
-//!   opens the Array dialog).
+//! - Right-click with a selection: GTK's context menu with Delete, Mirror on X / Y, Array...
+//!   (the pane opens the Array dialog) and Rotate.
 //!
 //! Drawing tools and moves snap to the snap step; selection hit tests use the raw pointer.
 //!
@@ -500,18 +500,38 @@ const ROTATIONS: [(&str, f64); 5] = [
 
 /// The msgids of the context menu.
 pub fn msgids() -> Vec<&'static str> {
-    let mut ids = vec![n_!("Delete"), n_!("Rotate"), n_!("Array...")];
+    let mut ids = vec![
+        n_!("Delete"),
+        n_!("Mirror on X"),
+        n_!("Mirror on Y"),
+        n_!("Rotate"),
+        n_!("Array..."),
+    ];
     ids.extend(ROTATIONS.iter().map(|(label, _)| *label));
     ids
 }
 
-/// The right-click menu for the selection: Delete, Rotate by a fixed angle, and Array...
+/// The right-click menu for the selection, in GTK's order: Delete, Mirror on X and Y,
+/// Array..., and Rotate by a fixed angle. Each edit is one undo step.
 ///
 /// # Returns
 /// Whether "Array..." was chosen.
 fn context_menu(ui: &mut egui::Ui, state: &mut DesignerState, tr: &Translator) -> bool {
     if ui.button(tr.tr("Delete")).clicked() {
         state.delete_selected();
+        ui.close();
+    }
+    ui.separator();
+    if ui.button(tr.tr("Mirror on X")).clicked() {
+        state.mirror_selected_x();
+        ui.close();
+    }
+    if ui.button(tr.tr("Mirror on Y")).clicked() {
+        state.mirror_selected_y();
+        ui.close();
+    }
+    let array = ui.button(tr.tr("Array...")).clicked();
+    if array {
         ui.close();
     }
     ui.menu_button(tr.tr("Rotate"), |ui| {
@@ -522,9 +542,5 @@ fn context_menu(ui: &mut egui::Ui, state: &mut DesignerState, tr: &Translator) -
             }
         }
     });
-    let array = ui.button(tr.tr("Array...")).clicked();
-    if array {
-        ui.close();
-    }
     array
 }
