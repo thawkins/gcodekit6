@@ -167,7 +167,7 @@ fn bounds_in(designer: &std::rc::Rc<std::cell::RefCell<DesignerPane>>, id: u64) 
 fn test_align_keys_run_on_the_canvas_but_not_while_typing() {
     let (mut h, designer) = app_with_two_selected();
     let [a, b] = [ids(&designer.borrow())[0], ids(&designer.borrow())[1]];
-    // GTK's Alt+L/R/T/B/H/V while the canvas has the keyboard.
+    // GTK's Alt+L/R/T/V (and Alt+O, Alt+C) while the canvas has the keyboard.
     h.key_press_modifiers(Modifiers::ALT, egui::Key::R);
     h.run();
     assert!(close4(bounds_in(&designer, a), (30.0, 0.0, 40.0, 10.0)));

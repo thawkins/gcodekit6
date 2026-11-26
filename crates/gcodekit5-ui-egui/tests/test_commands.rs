@@ -96,15 +96,18 @@ const GTK_ACCELERATORS: &[(&str, &str, Command, Where)] = &[
         Command::AlignTop,
         Where::Panel("Designer"),
     ),
+    // GTK's <Alt>b and <Alt>h are menu-title mnemonics of the in-window bar (German Edit,
+    // Help), so they moved to Alt+O and Alt+C
+    // (`test_designer_alt_keys_leave_the_menu_mnemonics`).
     (
         "<Alt>b",
-        "Alt+B",
+        "Alt+O",
         Command::AlignBottom,
         Where::Panel("Designer"),
     ),
     (
         "<Alt>h",
-        "Alt+H",
+        "Alt+C",
         Command::AlignCenterX,
         Where::Panel("Designer"),
     ),
@@ -659,4 +662,55 @@ fn test_menu_in_title_strip_when_app_draws_frame() {
         file.max.x <= close.min.x,
         "File title overlaps the captions"
     );
+}
+
+/// The access keys (mnemonics) the in-window menu bar gives its titles in `language`.
+fn title_mnemonics(language: &str) -> Vec<String> {
+    use egui_kittest::kittest::{NodeT, Queryable};
+    let mut config = Config::default();
+    config.ui.language = language.to_string();
+    let state = AppState::new(
+        SettingsManager::detached(config),
+        crate::test_smoke::native_decision(),
+    );
+    let mut h = crate::machine_support::app_harness(GcodeKitApp::from_state(state));
+    h.run_steps(2);
+    let tr = Translator::new(language);
+    menu::MENU_TITLES
+        .iter()
+        .filter_map(|title| {
+            let label = tr.tr(title).into_owned();
+            let node = h.get_by_role_and_label(egui::accesskit::Role::MenuItem, &label);
+            node.accesskit_node()
+                .data()
+                .access_key()
+                .map(str::to_lowercase)
+        })
+        .collect()
+}
+
+/// The designer's Alt keys never take a menu title's mnemonic from the in-window bar, in any
+/// shipped language (the keymap runs before the bar, so it would win while the canvas has the
+/// keyboard).
+#[test]
+fn test_designer_alt_keys_leave_the_menu_mnemonics() {
+    let keymap = commands::keymap();
+    let alt_letters: Vec<String> = Command::ALL
+        .into_iter()
+        .filter(|c| c.is_designer_shape_op())
+        .flat_map(|c| keymap.default_bindings(&c.command_ref()))
+        .map(|b| b.text(&craft_keymap::Scope::new("Designer").expect("scope")))
+        .filter_map(|text| text.strip_prefix("Alt+").map(str::to_lowercase))
+        .collect();
+    assert_eq!(alt_letters.len(), 6, "{alt_letters:?}");
+    for language in ["en", "de", "es", "fr", "it", "pt"] {
+        let mnemonics = title_mnemonics(language);
+        assert_eq!(mnemonics.len(), 4, "{language}: {mnemonics:?}");
+        for letter in &alt_letters {
+            assert!(
+                !mnemonics.contains(letter),
+                "{language}: Alt+{letter} is a menu mnemonic ({mnemonics:?})"
+            );
+        }
+    }
 }

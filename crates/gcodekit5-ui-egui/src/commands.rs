@@ -7,13 +7,16 @@
 //! overrides under, so they must not change once released.
 //!
 //! Most bindings work anywhere in the window; the visualizer's view keys work only while the
-//! Visualizer has the keyboard, and the designer's shape keys (GTK's Alt+L/R/T/B/H/V align,
+//! Visualizer has the keyboard, and the designer's shape keys (GTK's Alt+L/R/T/V align, with
+//! Alt+O and Alt+C for GTK's Alt+B and Alt+H, which are menu mnemonics of the in-window bar;
 //! Ctrl+G group and Ctrl+Shift+G ungroup) only while the Designer canvas has it, never while
-//! a text field does. GTK's other ungroup key, Ctrl+U, stays Unlock everywhere. The jog keys are GTK's numeric keypad digits (8/2 Y+/Y-, 4/6
-//! X-/X+, 9/3 Z+/Z-), bound in the Machine Control scope only: they run only after the user
-//! pressed in that pane, never while a widget (a text field, an open dropdown) has the
-//! keyboard. egui reports the keypad digits as the top-row digits, so those jog too, as they
-//! did in GTK, which matched the typed character. A held key jogs continuously in Continuous
+//! a text field does. GTK's other ungroup key, Ctrl+U, stays Unlock everywhere.
+//!
+//! The jog keys are GTK's numeric keypad digits (8/2 Y+/Y-, 4/6 X-/X+, 9/3 Z+/Z-), bound in
+//! the Machine Control scope only: they run only after the user pressed in that pane, never
+//! while a widget (a text field, an open dropdown) has the keyboard. egui reports the keypad
+//! digits as the top-row digits, so those jog too, as they did in GTK, which matched the typed
+//! character. A held key jogs continuously in Continuous
 //! mode, until it is released (see `panes::machine_control`). For machine safety Escape and
 //! the arrow keys are bound to nothing: GTK never registered them (the accelerators.rs
 //! constants were unused), and an Escape or arrow key meant for a widget must never move or
@@ -317,13 +320,15 @@ impl Command {
                 "designer.align_bottom",
                 n_!("Align Bottom"),
                 DES,
-                &["Alt+B"],
+                // GTK's Alt+B is the German Edit menu's ("Bearbeiten") mnemonic here.
+                &["Alt+O"],
             ),
             Command::AlignCenterX => (
                 "designer.align_center_x",
                 n_!("Align Center X"),
                 DES,
-                &["Alt+H"],
+                // GTK's Alt+H is the Help menu's mnemonic in the in-window bar.
+                &["Alt+C"],
             ),
             Command::AlignCenterY => (
                 "designer.align_center_y",
