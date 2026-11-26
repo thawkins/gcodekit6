@@ -174,14 +174,18 @@ impl CommandHistory {
         }
     }
 
-    /// Saves the history to `path` through the shared atomic writer.
+    /// Saves the history to `path` through the shared atomic writer, creating its folder
+    /// first when missing (as GTK's save did).
     ///
     /// # Arguments
     /// * `path` - The history file.
     ///
     /// # Errors
-    /// The JSON encoding or the write failed.
+    /// The folder could not be created, or the JSON encoding or the write failed.
     pub fn save_to(&self, path: &Path) -> std::io::Result<()> {
+        if let Some(dir) = path.parent().filter(|d| !d.as_os_str().is_empty()) {
+            fs::create_dir_all(dir)?;
+        }
         let json = serde_json::to_string_pretty(self).map_err(std::io::Error::other)?;
         gcodekit5_core::files::write_atomic(path, &json)
     }

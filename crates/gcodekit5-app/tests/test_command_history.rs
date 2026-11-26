@@ -113,3 +113,16 @@ fn test_history_file_missing_damaged_or_long() {
     assert_eq!(loaded.len(), MAX_HISTORY);
     assert_eq!(loaded.get(0), Some("cmd50"));
 }
+
+/// Saving creates a missing settings folder, as GTK's save did.
+#[test]
+fn test_history_save_creates_missing_folder() {
+    let file = scratch("missing_folder")
+        .join("legacy")
+        .join("gcodekit5")
+        .join(HISTORY_FILE);
+    let mut history = CommandHistory::new();
+    history.add("$H".to_string());
+    history.save_to(&file).expect("saved into a new folder");
+    assert_eq!(CommandHistory::load_from(&file).get(0), Some("$H"));
+}
