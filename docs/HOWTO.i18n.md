@@ -41,7 +41,7 @@ When you add or change strings, update the POT and merge the changes into all PO
 ./scripts/update-po.sh
 ```
 
-This runs `xgettext --keyword=tr --keyword=trn:1,2` (plus the `t!`, `n_!` and `gettext` keywords) over the tracked Rust sources, then `msgmerge` and `msginit` for the configured languages.
+This runs `xgettext --keyword=gettext --keyword=t! --keyword=t --keyword=n_! --keyword=tr! --keyword=trn!:1,2 --keyword=_` over the tracked Rust sources, then `msgmerge` and `msginit` for the configured languages.
 
 ### Requirements
 
