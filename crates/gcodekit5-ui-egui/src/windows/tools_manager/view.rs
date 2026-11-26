@@ -333,8 +333,8 @@ impl ToolsManagerWindow {
     }
 }
 
-/// Width of the library sidebar on the right (GTK: 280 px).
-const LIBRARY_WIDTH: f32 = 240.0;
+/// Width of the library sidebar on the right (GTK: `set_width_request(280)`).
+const LIBRARY_WIDTH: f32 = 280.0;
 
 /// A labelled single-line field in a grid row.
 fn field(ui: &mut egui::Ui, label: &str, text: &mut String, enabled: bool, hint: &str) {

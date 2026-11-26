@@ -13,9 +13,9 @@
 //! [`shape_gallery`]; the shape it arms is placed by the next canvas click. New, Open, Save
 //! and Import are [`file_ops`]; the shapes a CAM page generates are added by
 //! [`DesignerPane::add_generated_paths`]; G-code and SVG output (Export, the toolbox's
-//! Generate G-Code and Frame) are [`export`], the outcome shown as the pane's notice. Not ported here:
-//! scrollbars, the device's work area (the default 250 x 250 mm is shown), and the context
-//! menu's other entries.
+//! Generate G-Code and Frame) are [`export`], the outcome shown as the pane's notice. Not
+//! ported here: scrollbars, the device's work area (the default 250 x 250 mm is shown), and
+//! the context menu's other entries.
 //!
 //! Dependencies: `egui`, `gcodekit5-designer` (model), `gcodekit5-app` (translations),
 //! `gcodekit5-settings` (grid line widths, display units), `gcodekit5-core` (units).

@@ -101,7 +101,9 @@ impl MaterialsManagerWindow {
             .map(|m| m.id.0.clone());
         let listed = self.filter.apply(&materials);
         if listed.is_empty() {
+            // No empty frame under the message.
             ui.weak(tr.tr(n_!("No materials found")));
+            return;
         }
         let machinability = tr.tr(n_!("Machinability:"));
         let mut clicked = None;

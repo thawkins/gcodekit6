@@ -62,6 +62,10 @@ pub fn click(h: &mut Harness<'static, GcodeKitApp>, label: &str) {
             break;
         }
     }
+    assert!(
+        still >= 3,
+        "{label} still moving 20 frames after scrolling to it (now at {rect:?})"
+    );
     h.get_by_label(label).click();
     frames(h, 3);
 }

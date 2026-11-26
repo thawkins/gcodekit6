@@ -220,3 +220,53 @@ fn test_snapshot_manager_pages_dark() {
         snapshot(&mut harness, case.name);
     }
 }
+
+#[test]
+fn test_cam_tool_rows_hold_their_wrapped_descriptions_at_1280x800() {
+    use gcodekit5_ui_egui::panes::cam_tools::{CAPTION_SIZE, CamTool};
+    let harness = page_harness(
+        "cam_rows",
+        Page::CamTools,
+        egui::vec2(1280.0, 800.0),
+        1.0,
+        false,
+    );
+    let tr = harness.state().state().translator;
+    let body = egui::TextStyle::Body.resolve(&harness.ctx.global_style());
+    let mut previous_bottom: Option<f32> = None;
+    let mut grew = false;
+    for tool in CamTool::ALL {
+        let title = tr.tr(tool.title_msgid()).into_owned();
+        let row = harness.get_by_label(&title).rect();
+        // The row's text column: the row less its margins and the icon (12 + 24 + 12 + 12).
+        let wrap = row.width() - 60.0;
+        let (title_h, text_h) = harness.ctx.fonts_mut(|f| {
+            let mut layout = |text: String, font: egui::FontId| {
+                f.layout(text, font, egui::Color32::WHITE, wrap).size().y
+            };
+            (
+                layout(title.clone(), body.clone()),
+                layout(
+                    tr.tr(tool.description_msgid()).into_owned(),
+                    egui::FontId::proportional(CAPTION_SIZE),
+                ),
+            )
+        });
+        let needed = 10.0 + title_h + 4.0 + text_h + 10.0;
+        assert!(
+            row.height() + 0.5 >= needed,
+            "{title}: row {} pt tall, its text needs {needed}",
+            row.height()
+        );
+        grew |= text_h > CAPTION_SIZE * 1.6;
+        if let Some(bottom) = previous_bottom {
+            assert!(row.top() + 0.5 >= bottom, "{title} overlaps the row above");
+        }
+        previous_bottom = Some(row.bottom());
+    }
+    // At 1280 the Probe Tools caption wraps, so at least one row must have grown.
+    assert!(
+        grew,
+        "no description wrapped at 1280; the test checks nothing"
+    );
+}

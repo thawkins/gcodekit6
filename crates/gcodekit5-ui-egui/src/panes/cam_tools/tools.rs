@@ -308,20 +308,52 @@ impl CamToolsPane {
     }
 }
 
-/// Height of a row of the tool list: two lines with GTK's 10 pt margins.
-const ROW_HEIGHT: f32 = 58.0;
+/// Room around a row's contents (GTK: 10 px top and bottom, 12 px at the sides).
+const ROW_MARGIN: egui::Vec2 = egui::vec2(12.0, 10.0);
 /// Edge of a tool list icon (GTK: 24 px).
 const ROW_ICON: f32 = 24.0;
+/// Gap between a row's title and its description.
+const ROW_GAP: f32 = 4.0;
+/// Font size of a row's description (GTK's `caption`).
+pub const CAPTION_SIZE: f32 = 12.0;
 
-/// One row of the tool list: icon, bold title and the description under it. The title is
-/// the row's accessible name.
+/// One row of the tool list: icon, bold title and the description under it, the row as
+/// tall as its wrapped text. The title is the row's accessible name and the description
+/// its hint.
 fn tool_row(ui: &mut egui::Ui, tr: &Translator, tool: CamTool, chosen: bool) -> egui::Response {
     let title = tr.tr(tool.title_msgid()).into_owned();
-    let size = egui::vec2(ui.available_width(), ROW_HEIGHT);
-    let (rect, response) = ui.allocate_exact_size(size, egui::Sense::click());
-    response.widget_info(|| egui::WidgetInfo::selected(egui::Role::Button, true, chosen, &title));
+    let description = tr.tr(tool.description_msgid()).into_owned();
+    let visuals = ui.visuals().clone();
+    let text_color = if chosen {
+        visuals.selection.stroke.color
+    } else {
+        visuals.strong_text_color()
+    };
+    let weak = if chosen {
+        text_color
+    } else {
+        visuals.weak_text_color()
+    };
+    let width = ui.available_width();
+    let text_left = ROW_MARGIN.x + ROW_ICON + ROW_MARGIN.x;
+    let wrap = (width - text_left - ROW_MARGIN.x).max(40.0);
+    let title_font = egui::TextStyle::Body.resolve(ui.style());
+    let title_galley = ui
+        .painter()
+        .layout(title.clone(), title_font, text_color, wrap);
+    let caption = egui::FontId::proportional(CAPTION_SIZE);
+    let description_galley = ui
+        .painter()
+        .layout(description.clone(), caption, weak, wrap);
+    let text_height = title_galley.size().y + ROW_GAP + description_galley.size().y;
+    let height = 2.0 * ROW_MARGIN.y + text_height.max(ROW_ICON);
+    let (rect, response) = ui.allocate_exact_size(egui::vec2(width, height), egui::Sense::click());
+    response.widget_info(|| {
+        let mut info = egui::WidgetInfo::selected(egui::Role::Button, true, chosen, &title);
+        info.hint_text = Some(description.clone());
+        info
+    });
     if ui.is_rect_visible(rect) {
-        let visuals = ui.visuals();
         if chosen {
             ui.painter()
                 .rect_filled(rect, 0.0, visuals.selection.bg_fill);
@@ -329,42 +361,22 @@ fn tool_row(ui: &mut egui::Ui, tr: &Translator, tool: CamTool, chosen: bool) -> 
             ui.painter()
                 .rect_filled(rect, 0.0, visuals.widgets.hovered.weak_bg_fill);
         }
-        let text_color = if chosen {
-            visuals.selection.stroke.color
-        } else {
-            visuals.strong_text_color()
-        };
-        let left = rect.left() + 12.0;
+        let top = rect.top() + ROW_MARGIN.y;
         let icon_rect = egui::Rect::from_min_size(
-            egui::pos2(left, rect.top() + 10.0),
+            egui::pos2(rect.left() + ROW_MARGIN.x, top),
             egui::Vec2::splat(ROW_ICON),
         );
         tool.icon(ui, ROW_ICON).paint_at(ui, icon_rect);
-        let text_left = icon_rect.right() + 12.0;
-        let wrap = (rect.right() - 12.0 - text_left).max(40.0);
-        let title_font = egui::TextStyle::Body.resolve(ui.style());
-        let galley = ui
-            .painter()
-            .layout(title.clone(), title_font, text_color, wrap);
-        let title_pos = egui::pos2(text_left, rect.top() + 10.0);
+        let title_pos = egui::pos2(rect.left() + text_left, top);
         // Bold like GTK's `heading` rows: the same faux bold as `theme::section_heading`.
-        ui.painter().galley(title_pos, galley.clone(), text_color);
         ui.painter()
-            .galley(title_pos + egui::vec2(0.6, 0.0), galley, text_color);
-        let caption = egui::FontId::proportional(12.0);
-        let weak = if chosen {
-            text_color
-        } else {
-            visuals.weak_text_color()
-        };
-        let description = ui.painter().layout(
-            tr.tr(tool.description_msgid()).into_owned(),
-            caption,
-            weak,
-            wrap,
-        );
+            .galley(title_pos, title_galley.clone(), text_color);
+        let title_height = title_galley.size().y;
         ui.painter()
-            .galley(egui::pos2(text_left, rect.top() + 32.0), description, weak);
+            .galley(title_pos + egui::vec2(0.6, 0.0), title_galley, text_color);
+        let description_pos = title_pos + egui::vec2(0.0, title_height + ROW_GAP);
+        ui.painter()
+            .galley(description_pos, description_galley, weak);
     }
     response
 }

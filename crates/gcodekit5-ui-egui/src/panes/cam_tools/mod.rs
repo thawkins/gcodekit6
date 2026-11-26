@@ -56,7 +56,7 @@ use speeds_feeds::SpeedsFeedsParams;
 use spoilboard_grid::SpoilboardGridParams;
 use spoilboard_surfacing::SpoilboardSurfacingParams;
 use tabbed_box::TabbedBoxParams;
-pub use tools::{CamTool, Category};
+pub use tools::{CAPTION_SIZE, CamTool, Category};
 
 use crate::machine::Machine;
 use crate::windows::help;
