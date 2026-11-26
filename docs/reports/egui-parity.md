@@ -275,3 +275,93 @@ WebSocket connections, auto-reconnect, non-GRBL firmwares and the grblHAL simula
 and macOS builds, Unlock, spindle and rapid override buttons, console colours and
 auto-scroll, editor undo/clipboard, tool marker, designer Select All and adaptive pocketing,
 firmware settings export/import, probe defaults.
+
+## Visual
+
+Comparison of the egui pages with the GTK build, after the visual restore (tasks V1 to V7,
+2026-11-26). Renders: 1440x900 dark, from the page snapshots in
+`crates/gcodekit5-ui-egui/tests/snapshots/*_page_dark.png` (copies in
+`target/temp/v7-capture/`, untracked). Pages with a help image (`resources/help_images/`)
+were compared with it. The other pages were compared with the GTK source layout, because
+there is no screenshot of them. The lists below are what still differs.
+
+**All pages:**
+
+- GTK's page tabs have bold labels and a grey active tab; egui fills the active tab with
+  the accent blue.
+- Headings use a faux bold (the text is drawn twice), because no bold font is bundled.
+
+**Machine Control** (`machine_control.png`):
+
+- GTK centres the centre column vertically; egui starts it at the top.
+- Override rows show the percentage only (GTK: "0.0 mm/min (100%)"), and egui adds a Rapid
+  row.
+- The readout shows "-" with no report, with two decimals (GTK: "0.000").
+- Machine State has no Buffer value. The editor has no "G-Code Editor" header, and no
+  clear or save buttons.
+- The large state text is not bold. GTK's keyboard-jog hint and its Stop hint are left out.
+- In a window narrower than about 1000 pt, egui shrinks the editor column first, then the
+  sidebar (down to 140 pt). Then the override rows and the readout stack, and E-STOP
+  moves to the top of the centre column. GTK let E-STOP slide under the editor.
+
+**Designer** (`designer.png`):
+
+- Tool and Stock Settings are collapsible sections in egui; GTK uses two dialog buttons.
+  The toolbox is therefore taller: View Controls scroll at 900 pt.
+- The inspector takes 30% of the width (GTK: 20%), and the object rows carry hide and lock
+  toggles that GTK lacks.
+- The canvas toolbar has no scrollbar toggle and no "?" shortcut popover.
+- The lock toggle shows the open-lock icon in both states.
+- Labels differ: "Snap to grid" (GTK: "Snap"), and the "Active tool:" line is shown.
+
+**Visualizer** (`visualizer.png`; V6 has the full list):
+
+- The sidebar has no Toolpath, Guides or Simulation toggles, no 2D/3D switch and no Fit
+  to Device. These are features egui lacks (Gaps rank 4).
+- There is no Zoom/Center/Cursor status line, no run preview row, and no Toggle
+  Scrollbars.
+- Cuts are drawn yellow by power (GTK: green).
+
+**CAM Tools** (no help image; compared with `ui/gtk/cam_tools/`):
+
+- The tool list matches GTK: a boxed list with GTK's icons, a title and a caption, and
+  the details and Open beside it.
+- A tool page has GTK's header (back, title, help). Its fields sit in framed groups with
+  bold titles. Generate is the primary button, and Load and Save have icons.
+- Tool pages are one column. GTK splits each page into a description sidebar (40%) and the
+  form. egui shows the description above the form.
+- The action buttons sit under the form, inside the scroll area. GTK pins them, right
+  aligned, at the bottom of the form panel.
+- Fields are text fields with the unit beside them, not Adwaita action rows with suffix
+  widgets.
+
+**Device Manager** (no help image; compared with `ui/gtk/device_manager/`):
+
+- The layout matches GTK: a sidebar with a header, help, search, a boxed list with the
+  Active badge and Add Device. The form has the action bar, a centred tab switcher and a
+  framed form.
+- GTK's emoji button labels are replaced by icons.
+- The "Connected" badge is not shown: the egui list does not track the connected port.
+- The sidebar is a fixed 270 pt. GTK's paned starts at 20% and can be dragged.
+
+**Device Config** (no help image; compared with `ui/gtk/config_settings/`):
+
+- The toolbar, filter bar, list header (GTK's column widths), boxed list and status line
+  match GTK.
+- GTK's left Device Info panel (320 px) is not embedded. Device Info stays a window,
+  opened from the Machine menu.
+- Long units are truncated in the 80 pt Unit column; GTK's labels widen the column.
+
+**CNC Tools** (no help image; compared with `ui/gtk/tools_manager/`):
+
+- The layout matches GTK's three columns: the list sidebar (header, search, type and
+  material filters, framed Filters, boxed list), the form (action bar, tab switcher,
+  framed form), and the Library sidebar.
+- The Library sidebar is 240 pt wide (GTK: 280 px).
+- The diameter filters' hints read "Min diameter (mm)" (GTK: "Min Ø (mm)").
+
+**Materials** (no help image; compared with `ui/gtk/materials_manager.rs`):
+
+- The layout matches GTK: a sidebar with the boxed list and New Material under it, and
+  the form with its action bar and tab switcher.
+- No other difference was found in the source comparison.
