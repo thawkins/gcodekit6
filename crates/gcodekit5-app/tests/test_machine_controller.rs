@@ -224,19 +224,25 @@ fn test_rotary_jog_has_three_decimals_and_zero_jogs_are_refused() {
 #[test]
 fn test_jog_guard_and_formatter_round_alike() {
     use gcodekit5_app::machine::Axis;
-    use gcodekit5_app::machine::grbl_stream::{jog_value_text, jog_writes_zero};
-    for d in [0.005_f32, -0.005, 0.0049, 0.0051, 0.0005, 0.00049] {
-        let decimals = 2;
-        let text = jog_value_text(d, decimals);
+    use gcodekit5_app::machine::grbl_stream::{jog_writes_zero, linear_jog_command};
+    // The guard agrees with the line actually written: what it lets through writes a
+    // non-zero value, what it refuses would have written zero.
+    for (d, written) in [
+        (0.005_f32, "$J=G91 G21 X0.00 F1000"),
+        (-0.005, "$J=G91 G21 X-0.00 F1000"),
+        (0.0049, "$J=G91 G21 X0.00 F1000"),
+        (0.0051, "$J=G91 G21 X0.01 F1000"),
+        (-0.0051, "$J=G91 G21 X-0.01 F1000"),
+    ] {
+        assert_eq!(linear_jog_command('X', d, 1000.0), written, "{d}");
         assert_eq!(
-            jog_writes_zero(d, decimals),
-            text.parse::<f32>().map_or(true, |v| v == 0.0),
-            "{d}: {text}"
+            jog_writes_zero(d, 2),
+            written.contains("X0.00") || written.contains("X-0.00"),
+            "{d}: {written}"
         );
     }
-    assert!(jog_writes_zero(0.0049, 2));
-    assert!(!jog_writes_zero(0.0051, 2));
     assert!(jog_writes_zero(0.00049, 3));
+    assert!(!jog_writes_zero(0.0006, 3));
 
     let shared = Arc::new(LoopbackShared::default());
     let mut controller = loopback_controller(&shared, Duration::from_millis(1));
