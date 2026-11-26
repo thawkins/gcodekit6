@@ -32,11 +32,11 @@ use gcodekit5_app::machine::grbl_stream::jog_step_choices;
 use gcodekit5_core::units::{FeedRateUnits, MeasurementSystem};
 
 use crate::commands::Command;
+use crate::icons::Icon;
 use crate::machine::MachineStatus;
 
 /// The msgids this section shows (the button labels are the jog commands' labels).
 pub(super) const MSGIDS: &[&str] = &[
-    n_!("Jog"),
     n_!("Step"),
     n_!("Jog Feed:"),
     n_!("Continuous"),
@@ -77,6 +77,8 @@ struct JogButton {
     command: Command,
     /// The button's text.
     text: &'static str,
+    /// The chevron beside the text.
+    icon: Icon,
     axis: Axis,
     /// +1 or -1, before inversion.
     sign: f32,
@@ -84,7 +86,13 @@ struct JogButton {
     index: usize,
 }
 
-const fn jog_button(command: Command, text: &'static str, axis: Axis, sign: f32) -> JogButton {
+const fn jog_button(
+    command: Command,
+    text: &'static str,
+    icon: Icon,
+    axis: Axis,
+    sign: f32,
+) -> JogButton {
     let index = match axis {
         Axis::X => 0,
         Axis::Y => 1,
@@ -93,18 +101,24 @@ const fn jog_button(command: Command, text: &'static str, axis: Axis, sign: f32)
     JogButton {
         command,
         text,
+        icon,
         axis,
         sign,
         index,
     }
 }
 
-const Y_POS: JogButton = jog_button(Command::JogYPos, "Y+", Axis::Y, 1.0);
-const Y_NEG: JogButton = jog_button(Command::JogYNeg, "Y-", Axis::Y, -1.0);
-const X_POS: JogButton = jog_button(Command::JogXPos, "X+", Axis::X, 1.0);
-const X_NEG: JogButton = jog_button(Command::JogXNeg, "X-", Axis::X, -1.0);
-const Z_POS: JogButton = jog_button(Command::JogZPos, "Z+", Axis::Z, 1.0);
-const Z_NEG: JogButton = jog_button(Command::JogZNeg, "Z-", Axis::Z, -1.0);
+const Y_POS: JogButton = jog_button(Command::JogYPos, "Y+", Icon::JogUp, Axis::Y, 1.0);
+const Y_NEG: JogButton = jog_button(Command::JogYNeg, "Y-", Icon::JogDown, Axis::Y, -1.0);
+const X_POS: JogButton = jog_button(Command::JogXPos, "X+", Icon::JogRight, Axis::X, 1.0);
+const X_NEG: JogButton = jog_button(Command::JogXNeg, "X-", Icon::JogLeft, Axis::X, -1.0);
+const Z_POS: JogButton = jog_button(Command::JogZPos, "Z+", Icon::JogUp, Axis::Z, 1.0);
+const Z_NEG: JogButton = jog_button(Command::JogZNeg, "Z-", Icon::JogDown, Axis::Z, -1.0);
+
+/// Edge of a jog pad button (GTK: 56 px).
+const PAD_BUTTON: f32 = 56.0;
+/// Gap between the pad's buttons (GTK: 5 px).
+const PAD_GAP: f32 = 5.0;
 
 /// The signed jog distance for `axis` moved `distance_mm` in the direction the user asked
 /// for: negated when Preferences inverts the axis.
@@ -261,9 +275,12 @@ impl JogPanel {
         let label = tr.tr(button.command.label_msgid()).into_owned();
         // Click and drag: a press that moves stays with the button, so it never
         // drag-scrolls the pane.
-        let widget = egui::Button::new(egui::RichText::new(button.text).strong())
-            .min_size(egui::vec2(44.0, 36.0))
-            .sense(egui::Sense::click_and_drag());
+        let widget = egui::Button::image_and_text(
+            button.icon.themed(ui),
+            egui::RichText::new(button.text).strong(),
+        )
+        .min_size(egui::vec2(PAD_BUTTON, PAD_BUTTON))
+        .sense(egui::Sense::click_and_drag());
         let response = ui.add_enabled(enabled, widget).on_hover_text(label.clone());
         response.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, enabled, &label));
         if !self.continuous {
@@ -312,75 +329,89 @@ impl JogPanel {
 
     /// Draws the step chooser in the user's units.
     fn show_step(&mut self, ui: &mut egui::Ui, tr: &Translator) {
-        ui.horizontal(|ui| {
-            let label = ui.label(tr.tr("Step"));
-            let (choices, current) = jog_step_choices(self.units, self.step_mm);
-            let selected = choices
-                .get(current)
-                .map(|c| c.label.clone())
-                .unwrap_or_default();
-            egui::ComboBox::from_id_salt("machine-control-jog-step")
-                .selected_text(selected)
-                .show_ui(ui, |ui| {
-                    for choice in &choices {
-                        ui.selectable_value(&mut self.step_mm, choice.mm, &choice.label);
-                    }
-                })
-                .response
-                .labelled_by(label.id);
-        });
+        let label = ui.label(tr.tr("Step"));
+        let (choices, current) = jog_step_choices(self.units, self.step_mm);
+        let selected = choices
+            .get(current)
+            .map(|c| c.label.clone())
+            .unwrap_or_default();
+        egui::ComboBox::from_id_salt("machine-control-jog-step")
+            .selected_text(selected)
+            .width(110.0)
+            .show_ui(ui, |ui| {
+                for choice in &choices {
+                    ui.selectable_value(&mut self.step_mm, choice.mm, &choice.label);
+                }
+            })
+            .response
+            .labelled_by(label.id);
     }
 
     /// Draws the feed field in the user's feed units.
     fn show_feed(&mut self, ui: &mut egui::Ui, tr: &Translator) {
-        ui.horizontal(|ui| {
-            let label = ui.label(tr.tr("Jog Feed:"));
-            let mut shown = feed_to_display(self.feed_mm_min, self.feed_units);
-            let max = feed_to_display(100_000.0, self.feed_units);
-            let response = ui
-                .add(
-                    egui::DragValue::new(&mut shown)
-                        .range(0.01..=max)
-                        .max_decimals(2)
-                        .suffix(format!(" {}", self.feed_units)),
-                )
-                .labelled_by(label.id);
-            if response.changed() {
-                self.feed_mm_min = feed_from_display(shown, self.feed_units);
-            }
-        });
+        let label = ui.label(tr.tr("Jog Feed:"));
+        let mut shown = feed_to_display(self.feed_mm_min, self.feed_units);
+        let max = feed_to_display(100_000.0, self.feed_units);
+        let response = ui
+            .add(
+                egui::DragValue::new(&mut shown)
+                    .range(0.01..=max)
+                    .max_decimals(2)
+                    .suffix(format!(" {}", self.feed_units)),
+            )
+            .labelled_by(label.id);
+        if response.changed() {
+            self.feed_mm_min = feed_from_display(shown, self.feed_units);
+        }
     }
 
-    /// Draws the section.
+    /// Draws the step, feed and continuous switch in one row, then the X/Y pad and the Z
+    /// column, with `beside` drawn to the right of the Z column (the emergency stop).
+    ///
+    /// # Arguments
+    /// * `ui` - Where to draw.
+    /// * `tr` - Translator.
+    /// * `status` - The machine status.
+    /// * `allowed` - [`crate::machine::Machine::jog_allowed`], read after this frame's
+    ///   command buttons.
+    /// * `beside` - Draws what sits right of the pad.
     pub(super) fn show(
         &mut self,
         ui: &mut egui::Ui,
         tr: &Translator,
         status: &MachineStatus,
         allowed: bool,
+        beside: impl FnOnce(&mut egui::Ui),
     ) -> Vec<Action> {
         let mut actions = Vec::new();
         // Disabled outside Idle and Jog, and until a report read after the last command line
         // (`allowed`, from `Machine::jog_allowed`); a hold ends when its button disables.
         let enabled = status.connected && !status.streaming && allowed;
-        ui.strong(tr.tr("Jog"));
-        self.show_step(ui, tr);
-        self.show_feed(ui, tr);
-        let was_continuous = self.continuous;
-        crate::theme::checkbox(ui, &mut self.continuous, tr.tr("Continuous"));
-        if was_continuous && !self.continuous && self.take_hold() {
-            actions.push(Action::Cancel);
-        }
+        ui.horizontal_wrapped(|ui| {
+            self.show_step(ui, tr);
+            ui.add_space(8.0);
+            self.show_feed(ui, tr);
+            ui.add_space(8.0);
+            let was_continuous = self.continuous;
+            crate::theme::checkbox(ui, &mut self.continuous, tr.tr("Continuous"));
+            if was_continuous && !self.continuous && self.take_hold() {
+                actions.push(Action::Cancel);
+            }
+        });
+        ui.add_space(6.0);
+        let cell = egui::vec2(PAD_BUTTON, PAD_BUTTON);
         ui.horizontal(|ui| {
             egui::Grid::new("machine-control-jog-xy")
-                .spacing([4.0, 4.0])
+                .spacing([PAD_GAP, PAD_GAP])
+                .min_col_width(PAD_BUTTON)
+                .min_row_height(PAD_BUTTON)
                 .show(ui, |ui| {
                     ui.label("");
                     self.button(ui, tr, Y_POS, enabled, status, &mut actions);
                     ui.label("");
                     ui.end_row();
                     self.button(ui, tr, X_NEG, enabled, status, &mut actions);
-                    ui.label("");
+                    ui.add_sized(cell, egui::Label::new("XY"));
                     self.button(ui, tr, X_POS, enabled, status, &mut actions);
                     ui.end_row();
                     ui.label("");
@@ -388,11 +419,15 @@ impl JogPanel {
                     ui.label("");
                     ui.end_row();
                 });
-            ui.add_space(12.0);
+            ui.add_space(48.0);
             ui.vertical(|ui| {
+                ui.spacing_mut().item_spacing.y = PAD_GAP;
                 self.button(ui, tr, Z_POS, enabled, status, &mut actions);
+                ui.add_sized(cell, egui::Label::new("Z"));
                 self.button(ui, tr, Z_NEG, enabled, status, &mut actions);
             });
+            ui.add_space(20.0);
+            beside(ui);
         });
         actions
     }

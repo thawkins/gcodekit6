@@ -353,8 +353,51 @@ pub fn destructive_button(ui: &egui::Ui, text: impl Into<String>) -> egui::Butto
     filled_button(text, destructive_fill(mode_of(ui)))
 }
 
+/// An icon and a bold white label on `fill`, shaped like an Adwaita suggested or
+/// destructive button with an icon.
+fn filled_icon_button(
+    image: egui::Image<'static>,
+    text: impl Into<String>,
+    fill: Color32,
+) -> egui::Button<'static> {
+    egui::Button::image_and_text(
+        image.tint(Color32::WHITE),
+        RichText::new(text.into()).color(Color32::WHITE).strong(),
+    )
+    .fill(fill)
+    .corner_radius(CornerRadius::same(WIDGET_RADIUS))
+}
+
+/// A [`primary_button`] with an icon before the label (Connect, Send). The label is the
+/// accessible name.
+///
+/// # Arguments
+/// * `image` - The icon; it is drawn white.
+/// * `text` - The button label, already translated.
+pub fn primary_icon_button(
+    image: egui::Image<'static>,
+    text: impl Into<String>,
+) -> egui::Button<'static> {
+    filled_icon_button(image, text, ACCENT_BLUE)
+}
+
+/// A [`destructive_button`] with an icon before the label (Stop, Zero All Axes). The label
+/// is the accessible name.
+///
+/// # Arguments
+/// * `ui` - The ui the button goes into; its theme decides the red.
+/// * `image` - The icon; it is drawn white.
+/// * `text` - The button label, already translated.
+pub fn destructive_icon_button(
+    ui: &egui::Ui,
+    image: egui::Image<'static>,
+    text: impl Into<String>,
+) -> egui::Button<'static> {
+    filled_icon_button(image, text, destructive_fill(mode_of(ui)))
+}
+
 /// The light/dark mode `ui` is drawn in.
-fn mode_of(ui: &egui::Ui) -> egui::Theme {
+pub(crate) fn mode_of(ui: &egui::Ui) -> egui::Theme {
     if ui.visuals().dark_mode {
         egui::Theme::Dark
     } else {

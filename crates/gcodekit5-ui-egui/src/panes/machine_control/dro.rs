@@ -16,7 +16,8 @@ use gcodekit5_core::units::{FeedRateUnits, MeasurementSystem, get_unit_label};
 
 use super::jog::feed_to_display;
 
-use crate::machine::{MachineStatus, Xyz};
+use crate::icons::Icon;
+use crate::machine::MachineStatus;
 
 /// The msgids this section shows.
 pub(super) const MSGIDS: &[&str] = &[
@@ -56,30 +57,45 @@ pub(crate) fn format_length(value_mm: f32, units: MeasurementSystem) -> String {
     }
 }
 
-/// Draws one position block, with a Zero button per axis when `zero` is given; returns the
+/// The size of the work position readout's text (GTK's large DRO labels).
+const DRO_TEXT_SIZE: f32 = 22.0;
+
+/// The work position block's title with the length unit: "Work Coordinates (WPos) (mm)".
+pub(super) fn work_title(tr: &Translator, units: MeasurementSystem) -> String {
+    format!(
+        "{} ({})",
+        tr.tr("Work Coordinates (WPos)"),
+        get_unit_label(units)
+    )
+}
+
+/// Draws the work position rows (`WX 0.00 [Zero]`), each with its Zero button; returns the
 /// axis whose Zero was clicked.
-fn show_position(
+pub(super) fn show_work(
     ui: &mut egui::Ui,
-    title: &str,
-    id: &str,
-    position: Option<Xyz>,
+    status: &MachineStatus,
     units: MeasurementSystem,
-    zero: Option<&ZeroButtons>,
+    zero: &ZeroButtons,
 ) -> Option<Axis> {
-    ui.strong(format!("{title} ({})", get_unit_label(units)));
+    let position = status.work_position();
     let mut clicked = None;
-    egui::Grid::new(id)
-        .num_columns(if zero.is_some() { 3 } else { 2 })
-        .spacing([12.0, 2.0])
+    egui::Grid::new("dro-wpos")
+        .num_columns(3)
+        .spacing([12.0, 8.0])
         .show(ui, |ui| {
             for (axis, i) in [(Axis::X, 0), (Axis::Y, 1), (Axis::Z, 2)] {
                 let letter = axis.letter();
-                ui.label(letter.to_string());
+                ui.label(
+                    egui::RichText::new(format!("W{letter}"))
+                        .size(DRO_TEXT_SIZE)
+                        .strong(),
+                );
                 let text = position.map_or_else(|| "-".to_string(), |p| format_length(p[i], units));
-                ui.monospace(egui::RichText::new(text).size(18.0));
-                if let Some(zero) = zero
-                    && zero_button(ui, zero, letter)
-                {
+                ui.add_sized(
+                    [110.0, 32.0],
+                    egui::Label::new(egui::RichText::new(text).monospace().size(DRO_TEXT_SIZE)),
+                );
+                if zero_button(ui, zero, letter) {
                     clicked = Some(axis);
                 }
                 ui.end_row();
@@ -88,12 +104,34 @@ fn show_position(
     clicked
 }
 
+/// Draws the machine position block: its title and one `MX: 0.00  MY: 0.00  MZ: 0.00` line.
+pub(super) fn show_machine(
+    ui: &mut egui::Ui,
+    tr: &Translator,
+    status: &MachineStatus,
+    units: MeasurementSystem,
+) {
+    let title = tr.tr("Machine Coordinates (MPos)");
+    crate::theme::section_heading(ui, &format!("{title} ({})", get_unit_label(units)));
+    let position = status.machine_position();
+    ui.horizontal(|ui| {
+        for (letter, i) in [('X', 0), ('Y', 1), ('Z', 2)] {
+            let text = position.map_or_else(|| "-".to_string(), |p| format_length(p[i], units));
+            // The value is a label of its own, so it reads (and is found) as the number.
+            ui.label(format!("M{letter}:"));
+            ui.label(text);
+            ui.add_space(8.0);
+        }
+    });
+}
+
 /// Draws one axis's Zero button, named "Zero X" for assistive technology; returns whether
 /// it was clicked.
 fn zero_button(ui: &mut egui::Ui, zero: &ZeroButtons, letter: char) -> bool {
     let tr = zero.tr;
     let name = format!("{} {letter}", tr.tr("Zero"));
-    let response = ui.add_enabled(zero.enabled, egui::Button::new(tr.tr("Zero")));
+    let button = egui::Button::image_and_text(Icon::Zero.themed(ui), tr.tr("Zero"));
+    let response = ui.add_enabled(zero.enabled, button);
     response
         .widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, zero.enabled, name.clone()));
     let tip = format!("{} {letter}", tr.tr("Set work axis to zero"));
@@ -103,28 +141,23 @@ fn zero_button(ui: &mut egui::Ui, zero: &ZeroButtons, letter: char) -> bool {
         .clicked()
 }
 
-/// Draws the readout; returns the work axis whose Zero was clicked.
-pub(super) fn show(
+/// Draws the Machine State section's readout: the state in large text (the connection
+/// state while offline, as GTK shows "Disconnected"), then the feed rate and spindle speed.
+pub(super) fn show_state(
     ui: &mut egui::Ui,
     tr: &Translator,
     status: &MachineStatus,
-    units: MeasurementSystem,
+    connecting: bool,
     feed_units: FeedRateUnits,
-    zero: &ZeroButtons,
-) -> Option<Axis> {
+) {
     let report = status.report.as_ref();
-    ui.horizontal(|ui| {
-        ui.strong(tr.tr("Machine State"));
-        let state = report
-            .and_then(|r| r.machine_state.clone())
-            .unwrap_or_else(|| "-".to_string());
-        ui.label(state);
+    let state = match report.and_then(|r| r.machine_state.clone()) {
+        Some(state) if status.connected => state,
+        Some(_) | None => super::connection::state_text(tr, status, connecting).into_owned(),
+    };
+    ui.vertical_centered(|ui| {
+        ui.label(egui::RichText::new(state).size(20.0).strong());
     });
-    let (wpos, mpos) = (status.work_position(), status.machine_position());
-    let wpos_title = tr.tr("Work Coordinates (WPos)");
-    let zeroed = show_position(ui, &wpos_title, "dro-wpos", wpos, units, Some(zero));
-    let mpos_title = tr.tr("Machine Coordinates (MPos)");
-    show_position(ui, &mpos_title, "dro-mpos", mpos, units, None);
     ui.horizontal_wrapped(|ui| {
         let feed = report.and_then(|r| r.feed_rate).map_or_else(
             || "-".to_string(),
@@ -133,8 +166,7 @@ pub(super) fn show(
         let spindle = report
             .and_then(|r| r.spindle_speed)
             .map_or_else(|| "-".to_string(), |s| s.to_string());
-        ui.label(format!("{} {feed}", tr.tr("Feed:")));
-        ui.label(format!("{} {spindle}", tr.tr("Spindle:")));
+        ui.weak(format!("{} {feed}", tr.tr("Feed:")));
+        ui.weak(format!("{} {spindle}", tr.tr("Spindle:")));
     });
-    zeroed
 }

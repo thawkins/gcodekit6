@@ -3,6 +3,12 @@
 //! control with stream progress, jogging, feed/rapid/spindle overrides and a one-line command
 //! entry.
 //!
+//! Laid out as GTK's page: a sidebar (status strip, connection, machine state with homing,
+//! the G54-G59 selector, job control, the command entry and notices) and a centre column
+//! (overrides, the work readout with Zero All Axes and Go to Work Zero beside it, the
+//! machine position, then the jog row and pad with the E-STOP picture button). The page puts
+//! the editor and console to the right ([`crate::workspace`]).
+//!
 //! Every work zero control is disabled while disconnected and refused, with the reason shown,
 //! while a job runs ([`Machine::job_running`], which also covers a probe stream's halt). Go to
 //! Work Zero moves the machine, so it also needs the jog rule's fresh report, in `Idle`.
@@ -48,6 +54,7 @@ pub(crate) use dro::format_length;
 
 use crate::commands::Command;
 use crate::dialogs::{ConfirmChoice, ConfirmRequest};
+use crate::icons::Icon;
 use crate::machine::{Machine, MachineStatus, lock};
 use crate::workspace::{Pane, PaneContext, PaneId};
 
@@ -81,6 +88,7 @@ const MSGIDS: &[&str] = &[
     n_!("Home machine ($H)"),
     n_!("Unlock"),
     n_!("Unlock from ALARM ($X)"),
+    n_!("Connect to enable controls."),
     COMMAND_DURING_JOB,
     WCS_CHANGE_DURING_JOB,
     GO_TO_ZERO_NOT_IDLE,
@@ -114,7 +122,21 @@ pub struct MachineControlPane {
     feed_units: FeedRateUnits,
     /// A refusal of the pane's own (not the controller's), shown until the next action.
     notice: Option<String>,
+    /// The emergency stop picture (`images/eStop2.png`): `None` until first drawn, then the
+    /// texture, or `None` inside when it could not be decoded (the button shows its text).
+    estop_image: Option<Option<egui::TextureHandle>>,
 }
+
+/// Share of the pane's width the sidebar (connection, state, work coordinates, job) takes.
+const SIDEBAR_SHARE: f32 = 0.29;
+/// Narrowest the sidebar gets, so its two-button rows keep their labels.
+const SIDEBAR_MIN: f32 = 250.0;
+/// Width of the centre column's content, centred in the column as GTK centres it.
+const CONTROLS_WIDTH: f32 = 560.0;
+/// Size of the emergency stop button (GTK: 112 x 80 plus its picture).
+const ESTOP_SIZE: egui::Vec2 = egui::vec2(112.0, 96.0);
+/// Edge of the emergency stop picture.
+const ESTOP_IMAGE: f32 = 60.0;
 
 /// The soft reset chord as the user's platform names it (see [`crate::commands`]).
 pub(crate) const SOFT_RESET_CHORD: &str = if cfg!(target_os = "macos") {
@@ -149,6 +171,7 @@ impl MachineControlPane {
             units: MeasurementSystem::Metric,
             feed_units: FeedRateUnits::MmPerMin,
             notice: None,
+            estop_image: None,
         }
     }
 
@@ -451,33 +474,24 @@ impl MachineControlPane {
         }
     }
 
-    /// Draws the emergency stop and the homing buttons.
-    fn show_safety(&mut self, ui: &mut egui::Ui, tr: &Translator, status: &MachineStatus) {
-        let estop = egui::Button::new(
-            egui::RichText::new(tr.tr("E-STOP"))
-                .strong()
-                .color(egui::Color32::WHITE),
-        )
-        .fill(egui::Color32::from_rgb(0xc0, 0x1c, 0x28))
-        .min_size(egui::vec2(ui.available_width(), 36.0));
-        let response = ui.add_enabled(status.connected, estop).on_hover_text(
-            tr.tr("Emergency stop (soft reset, {shortcut})")
-                .replace("{shortcut}", SOFT_RESET_CHORD),
-        );
-        if response.clicked() {
-            self.emergency_stop();
-        }
+    /// Draws the homing buttons, side by side and of equal width.
+    fn show_homing(&mut self, ui: &mut egui::Ui, tr: &Translator, status: &MachineStatus) {
+        let idle = status.connected && !status.streaming;
+        let width = (ui.available_width() - ui.spacing().item_spacing.x) / 2.0;
         ui.horizontal(|ui| {
-            let idle = status.connected && !status.streaming;
+            let home = egui::Button::image_and_text(Icon::Home.themed(ui), tr.tr("Home"))
+                .min_size(egui::vec2(width, 0.0));
             if ui
-                .add_enabled(idle, egui::Button::new(tr.tr("Home")))
+                .add_enabled(idle, home)
                 .on_hover_text(tr.tr("Home machine ($H)"))
                 .clicked()
             {
                 self.send_line("$H");
             }
+            let unlock = egui::Button::image_and_text(Icon::Unlock.themed(ui), tr.tr("Unlock"))
+                .min_size(egui::vec2(width, 0.0));
             if ui
-                .add_enabled(idle, egui::Button::new(tr.tr("Unlock")))
+                .add_enabled(idle, unlock)
                 .on_hover_text(tr.tr("Unlock from ALARM ($X)"))
                 .clicked()
             {
@@ -485,6 +499,239 @@ impl MachineControlPane {
             }
         });
     }
+
+    /// The emergency stop picture, decoded on first use.
+    fn estop_texture(&mut self, ctx: &egui::Context) -> Option<egui::TextureHandle> {
+        self.estop_image
+            .get_or_insert_with(|| load_estop(ctx))
+            .clone()
+    }
+
+    /// The left column: connection, machine state, work coordinates, job control, then the
+    /// command entry and any notice. Returns the command to request (Send starts the
+    /// stream through the app).
+    fn show_sidebar(
+        &mut self,
+        ui: &mut egui::Ui,
+        tr: &Translator,
+        machine: Option<&Machine>,
+        status: &MachineStatus,
+    ) -> Option<Command> {
+        let has_program = machine.and_then(|m| m.program()).is_some();
+        let mut request = None;
+        self.connection.show_strip(ui, tr, status);
+        ui.add_space(SECTION_GAP);
+        match self.connection.show(ui, tr, status) {
+            Some(connection::Action::Connect) => self.connect(tr),
+            Some(connection::Action::Disconnect) => {
+                self.with_controller(MachineController::disconnect);
+                self.connection.set_connecting(false);
+            }
+            None => {}
+        }
+        ui.add_space(SECTION_GAP);
+        crate::theme::section_heading(ui, &tr.tr("Machine State"));
+        let connecting = self.connection.connecting();
+        dro::show_state(ui, tr, status, connecting, self.feed_units);
+        self.show_homing(ui, tr, status);
+        ui.add_space(SECTION_GAP);
+        match self.wcs.show_selector(ui, tr, status) {
+            Some(wcs::Action::Select(wcs)) => self.select_wcs(machine, tr, wcs),
+            Some(wcs::Action::ZeroAll | wcs::Action::GoToZero { .. }) | None => {}
+        }
+        ui.add_space(SECTION_GAP);
+        match stream::show(ui, tr, status, has_program) {
+            Some(stream::Action::Start) => request = Some(Command::StreamStart),
+            Some(stream::Action::Pause) => self.with_controller(MachineController::pause),
+            Some(stream::Action::Resume) => self.with_controller(MachineController::resume),
+            Some(stream::Action::Stop) => self.with_controller(MachineController::stop),
+            None => {}
+        }
+        ui.add_space(SECTION_GAP);
+        if let Some(line) = self.direct.show(ui, tr, status) {
+            self.send_line(&line);
+        }
+        if !status.connected {
+            ui.weak(tr.tr("Connect to enable controls."));
+        }
+        if let Some(notice) = &self.notice {
+            // A controller refusal is kept in English; translated here.
+            ui.colored_label(
+                ui.visuals().error_fg_color,
+                crate::machine::worker_message(notice, tr),
+            );
+        }
+        if let Some(error) = &status.last_error {
+            ui.colored_label(
+                ui.visuals().warn_fg_color,
+                crate::machine::worker_message(error, tr),
+            );
+        }
+        request
+    }
+
+    /// The centre column: overrides, the work position with the zero actions beside it, the
+    /// machine position, then jogging with the emergency stop beside the pad.
+    fn show_controls(
+        &mut self,
+        ui: &mut egui::Ui,
+        tr: &Translator,
+        machine: Option<&Machine>,
+        status: &MachineStatus,
+    ) {
+        if let Some(command) = overrides::show(ui, tr, status) {
+            self.with_controller(|c| c.realtime(command));
+        }
+        ui.add_space(SECTION_GAP);
+        crate::theme::section_heading(ui, &dro::work_title(tr, self.units));
+        let blocked = self.wcs.blocked(status);
+        let reason = blocked.map(|msgid| tr.tr(msgid));
+        let zero = dro::ZeroButtons {
+            tr,
+            enabled: status.connected && blocked.is_none(),
+            disabled_reason: reason.as_deref().filter(|_| status.connected),
+        };
+        let units = self.units;
+        let wcs = &mut self.wcs;
+        let (zeroed, wcs_action) = ui
+            .horizontal(|ui| {
+                let zeroed = ui
+                    .vertical(|ui| dro::show_work(ui, status, units, &zero))
+                    .inner;
+                ui.add_space(16.0);
+                let action = ui
+                    .vertical(|ui| {
+                        ui.set_width(ui.available_width().min(260.0));
+                        ui.add_space(24.0);
+                        wcs.show_zero_actions(ui, tr, status)
+                    })
+                    .inner;
+                (zeroed, action)
+            })
+            .inner;
+        if let Some(axis) = zeroed {
+            self.zero_axes(machine, tr, &[axis], None);
+        }
+        match wcs_action {
+            Some(wcs::Action::ZeroAll) => self.ask_zero_all(machine, tr),
+            Some(wcs::Action::GoToZero { include_z }) => {
+                self.go_to_work_zero(machine, tr, include_z);
+            }
+            Some(wcs::Action::Select(_)) | None => {}
+        }
+        ui.add_space(SECTION_GAP);
+        dro::show_machine(ui, tr, status, self.units);
+        ui.add_space(SECTION_GAP);
+        // Read now, after this frame's Home/Unlock buttons: a line they sent blocks it.
+        let jog_allowed = machine.is_some_and(|m| m.jog_allowed());
+        let texture = self.estop_texture(ui.ctx());
+        let mut estop = false;
+        let actions = self.jog.show(ui, tr, status, jog_allowed, |ui| {
+            ui.vertical(|ui| {
+                ui.add_space(((3.0 * 56.0 + 10.0) - ESTOP_SIZE.y).max(0.0) / 2.0);
+                let hint = tr
+                    .tr("Emergency stop (soft reset, {shortcut})")
+                    .replace("{shortcut}", SOFT_RESET_CHORD);
+                estop = estop_button(ui, &tr.tr("E-STOP"), texture.as_ref(), status.connected)
+                    .on_hover_text(hint)
+                    .clicked();
+            });
+        });
+        if estop {
+            self.emergency_stop();
+        }
+        for action in actions {
+            if !matches!(action, jog::Action::Refused(_)) {
+                self.notice = None;
+            }
+            match action {
+                jog::Action::Move {
+                    axis,
+                    distance_mm,
+                    feed_mm_min,
+                } => self.with_controller(|c| c.jog(axis, distance_mm, feed_mm_min)),
+                jog::Action::Cancel => {
+                    self.with_controller(|c| c.realtime(RealtimeCommand::JogCancel));
+                }
+                jog::Action::Refused(msgid) => self.notice = Some(tr.tr(msgid).into_owned()),
+            }
+        }
+    }
+}
+
+/// Vertical gap between the sections of a column.
+const SECTION_GAP: f32 = 12.0;
+
+/// Decodes the embedded emergency stop picture into a texture; `None` (logged) when it is
+/// missing or does not decode.
+fn load_estop(ctx: &egui::Context) -> Option<egui::TextureHandle> {
+    let Some(bytes) = crate::resources::image("eStop2.png") else {
+        tracing::warn!("eStop2.png not embedded");
+        return None;
+    };
+    match image::load_from_memory(bytes) {
+        Ok(decoded) => {
+            let rgba = decoded.to_rgba8();
+            let size = [rgba.width() as usize, rgba.height() as usize];
+            let pixels = egui::ColorImage::from_rgba_unmultiplied(size, rgba.as_raw());
+            Some(ctx.load_texture(
+                "machine-control-estop",
+                pixels,
+                egui::TextureOptions::LINEAR,
+            ))
+        }
+        Err(error) => {
+            tracing::warn!(%error, "eStop2.png could not be decoded");
+            None
+        }
+    }
+}
+
+/// The emergency stop button: the GTK picture above "E-STOP", on a raised card. Its
+/// accessible name is `label`.
+fn estop_button(
+    ui: &mut egui::Ui,
+    label: &str,
+    texture: Option<&egui::TextureHandle>,
+    enabled: bool,
+) -> egui::Response {
+    ui.add_enabled(enabled, |ui: &mut egui::Ui| {
+        let (rect, response) = ui.allocate_exact_size(ESTOP_SIZE, egui::Sense::click());
+        let enabled = ui.is_enabled();
+        response.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, enabled, label));
+        if ui.is_rect_visible(rect) {
+            let visuals = ui.style().interact(&response);
+            ui.painter().rect(
+                rect,
+                visuals.corner_radius,
+                visuals.weak_bg_fill,
+                visuals.bg_stroke,
+                egui::StrokeKind::Inside,
+            );
+            let font = egui::FontId::proportional(18.0);
+            let text_y = rect.bottom() - 18.0;
+            if let Some(texture) = texture {
+                let image = egui::Rect::from_center_size(
+                    egui::pos2(rect.center().x, rect.top() + 6.0 + ESTOP_IMAGE / 2.0),
+                    egui::vec2(ESTOP_IMAGE, ESTOP_IMAGE),
+                );
+                egui::Image::new((texture.id(), image.size())).paint_at(ui, image);
+            }
+            let colour = visuals.text_color();
+            let at = egui::pos2(rect.center().x, text_y);
+            ui.painter()
+                .text(at, egui::Align2::CENTER_CENTER, label, font.clone(), colour);
+            // Bold like GTK's title-4, painted twice as the theme's headings are.
+            ui.painter().text(
+                at + egui::vec2(0.6, 0.0),
+                egui::Align2::CENTER_CENTER,
+                label,
+                font,
+                colour,
+            );
+        }
+        response
+    })
 }
 
 impl Pane for MachineControlPane {
@@ -501,103 +748,48 @@ impl Pane for MachineControlPane {
         let default_status = MachineStatus::default();
         let machine = ctx.machine();
         let status = machine.map_or(&default_status, |m| m.status());
-        let has_program = machine.and_then(|m| m.program()).is_some();
-        egui::ScrollArea::vertical()
-            .auto_shrink([false, false])
-            // A drag off a held jog button must not scroll the pane under the pointer.
-            .scroll_source(if self.jog.is_holding() {
-                egui::scroll_area::ScrollSource {
-                    drag: egui::scroll_area::DragScroll::Never,
-                    ..egui::scroll_area::ScrollSource::default()
-                }
-            } else {
-                egui::scroll_area::ScrollSource::default()
-            })
+        let sidebar = (ui.available_width() * SIDEBAR_SHARE).max(SIDEBAR_MIN);
+        let request = egui::Panel::left("gcodekit5-machine-sidebar")
+            .resizable(true)
+            .default_size(sidebar)
+            .min_size(SIDEBAR_MIN)
             .show(ui, |ui| {
-                let controller = Arc::clone(&self.controller);
-                match self.connection.show(ui, tr, status) {
-                    Some(connection::Action::Connect) => self.connect(tr),
-                    Some(connection::Action::Disconnect) => {
-                        lock(&controller).disconnect();
-                        self.connection.set_connecting(false);
-                    }
-                    None => {}
-                }
-                if let Some(notice) = &self.notice {
-                    // A controller refusal is kept in English; translated here.
-                    ui.colored_label(
-                        ui.visuals().error_fg_color,
-                        crate::machine::worker_message(notice, tr),
-                    );
-                }
-                if let Some(error) = &status.last_error {
-                    ui.colored_label(
-                        ui.visuals().warn_fg_color,
-                        crate::machine::worker_message(error, tr),
-                    );
-                }
-                ui.separator();
-                self.show_safety(ui, tr, status);
-                ui.separator();
-                let blocked = self.wcs.blocked(status);
-                let reason = blocked.map(|msgid| tr.tr(msgid));
-                let zero = dro::ZeroButtons {
-                    tr,
-                    enabled: status.connected && blocked.is_none(),
-                    disabled_reason: reason.as_deref().filter(|_| status.connected),
-                };
-                if let Some(axis) = dro::show(ui, tr, status, self.units, self.feed_units, &zero) {
-                    self.zero_axes(machine, tr, &[axis], None);
-                }
-                ui.separator();
-                match stream::show(ui, tr, status, has_program) {
-                    Some(stream::Action::Start) => ctx.request(Command::StreamStart),
-                    Some(stream::Action::Pause) => lock(&controller).pause(),
-                    Some(stream::Action::Resume) => lock(&controller).resume(),
-                    Some(stream::Action::Stop) => lock(&controller).stop(),
-                    None => {}
-                }
-                ui.separator();
-                // Read now, after this frame's Home/Unlock buttons: a line they sent blocks it.
-                let jog_allowed = machine.is_some_and(|m| m.jog_allowed());
-                for action in self.jog.show(ui, tr, status, jog_allowed) {
-                    let mut controller = lock(&controller);
-                    if !matches!(action, jog::Action::Refused(_)) {
-                        self.notice = None;
-                    }
-                    match action {
-                        jog::Action::Move {
-                            axis,
-                            distance_mm,
-                            feed_mm_min,
-                        } => {
-                            controller.jog(axis, distance_mm, feed_mm_min);
-                        }
-                        jog::Action::Cancel => controller.realtime(RealtimeCommand::JogCancel),
-                        jog::Action::Refused(msgid) => {
-                            self.notice = Some(tr.tr(msgid).into_owned());
-                        }
-                    }
-                }
-                ui.separator();
-                if let Some(command) = overrides::show(ui, tr, status) {
-                    lock(&controller).realtime(command);
-                }
-                ui.separator();
-                // Below the long-standing sections, so their places in the pane stay put.
-                match self.wcs.show(ui, tr, status) {
-                    Some(wcs::Action::Select(wcs)) => self.select_wcs(machine, tr, wcs),
-                    Some(wcs::Action::ZeroAll) => self.ask_zero_all(machine, tr),
-                    Some(wcs::Action::GoToZero { include_z }) => {
-                        self.go_to_work_zero(machine, tr, include_z);
-                    }
-                    None => {}
-                }
-                ui.separator();
-                if let Some(line) = self.direct.show(ui, tr, status) {
-                    self.send_line(&line);
-                }
-            });
+                egui::ScrollArea::vertical()
+                    .id_salt("machine-control-sidebar")
+                    .auto_shrink([false, false])
+                    .show(ui, |ui| self.show_sidebar(ui, tr, machine, status))
+                    .inner
+            })
+            .inner;
+        // A drag off a held jog button must not scroll the column under the pointer.
+        let scroll_source = if self.jog.is_holding() {
+            egui::scroll_area::ScrollSource {
+                drag: egui::scroll_area::DragScroll::Never,
+                ..egui::scroll_area::ScrollSource::default()
+            }
+        } else {
+            egui::scroll_area::ScrollSource::default()
+        };
+        egui::CentralPanel::default().show(ui, |ui| {
+            egui::ScrollArea::vertical()
+                .id_salt("machine-control-controls")
+                .auto_shrink([false, false])
+                .scroll_source(scroll_source)
+                .show(ui, |ui| {
+                    let width = CONTROLS_WIDTH.min(ui.available_width());
+                    let margin = (ui.available_width() - width) / 2.0;
+                    ui.horizontal(|ui| {
+                        ui.add_space(margin);
+                        ui.vertical(|ui| {
+                            ui.set_width(width);
+                            self.show_controls(ui, tr, machine, status);
+                        });
+                    });
+                });
+        });
+        if let Some(command) = request {
+            ctx.request(command);
+        }
     }
 
     fn command(&mut self, command: Command, ctx: &mut PaneContext) -> bool {

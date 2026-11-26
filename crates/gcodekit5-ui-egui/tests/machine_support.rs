@@ -96,7 +96,7 @@ pub fn start_held_stream(state: &mut AppState, shared: &LoopbackShared, lines: u
 /// the theme installed as `GcodeKitApp::new` installs it.
 pub fn app_harness(app: GcodeKitApp) -> Harness<'static, GcodeKitApp> {
     let harness = Harness::builder()
-        .with_size(egui::vec2(1280.0, 1000.0))
+        .with_size(egui::vec2(1280.0, 800.0))
         .build_ui_state(
             |ui, app: &mut GcodeKitApp| {
                 app.logic(ui.ctx());

@@ -26,6 +26,7 @@ use gcodekit5_app::machine::grbl_stream::{GrblResponseLine, classify_response};
 use gcodekit5_app::machine::{MachineError, MachineEvent};
 use gcodekit5_app::work_zero::{PARSER_STATE_QUERY, Wcs, WcsWord, wcs_in_line};
 
+use crate::icons::Icon;
 use crate::machine::{Machine, MachineStatus, lock};
 
 /// The msgids this section shows.
@@ -143,8 +144,8 @@ impl WcsPanel {
         self.not_grbl = !grbl;
     }
 
-    /// Notes, once per frame (drawn or not) while a stream runs, whether its program may select a system:
-    /// the loaded program (the one Start streams) holds a G54-G59 word.
+    /// Notes, once per frame (drawn or not) while a stream runs, whether its program may
+    /// select a system: the loaded program (the one Start streams) holds a G54-G59 word.
     ///
     /// # Arguments
     /// * `machine` - The app's machine connection.
@@ -233,13 +234,65 @@ impl WcsPanel {
         }
     }
 
-    /// Draws the section; returns what the user asked for.
+    /// Draws the G54-G59 selector, three to a row; returns the system the user selected.
     ///
     /// # Arguments
     /// * `ui` - The pane's `Ui`.
     /// * `tr` - Translator for the current UI language.
     /// * `status` - The machine status.
-    pub(super) fn show(
+    pub(super) fn show_selector(
+        &mut self,
+        ui: &mut egui::Ui,
+        tr: &Translator,
+        status: &MachineStatus,
+    ) -> Option<Action> {
+        let connected = status.connected;
+        let selector_reason = self.not_grbl.then(|| tr.tr(NOT_GRBL));
+        let shown = self.shown(status);
+        let mut action = None;
+        crate::theme::section_heading(ui, &tr.tr("Work Coordinates"));
+        let spacing = 6.0;
+        let width = ((ui.available_width() - 2.0 * spacing) / 3.0).min(80.0);
+        ui.horizontal(|ui| {
+            // Centred, as GTK centres its grid.
+            ui.add_space((ui.available_width() - 3.0 * width - 2.0 * spacing).max(0.0) / 2.0);
+            egui::Grid::new("wcs-selector")
+                .num_columns(3)
+                .spacing([spacing, spacing])
+                .show(ui, |ui| {
+                    for (i, wcs) in Wcs::ALL.into_iter().enumerate() {
+                        let button = egui::Button::selectable(
+                            shown == Some(wcs),
+                            (Icon::BookmarkAdd.themed(ui), wcs.code()),
+                        )
+                        .min_size(egui::vec2(width, 0.0));
+                        let response = ui.add_enabled(connected && !self.not_grbl, button);
+                        let response = match &selector_reason {
+                            Some(reason) if connected => {
+                                response.on_disabled_hover_text(reason.as_ref())
+                            }
+                            Some(_) | None => response,
+                        };
+                        if response.clicked() && shown != Some(wcs) {
+                            action = Some(Action::Select(wcs));
+                        }
+                        if i % 3 == 2 {
+                            ui.end_row();
+                        }
+                    }
+                });
+        });
+        action
+    }
+
+    /// Draws Zero All Axes, and Go to Work Zero with its Include Z option beside it; returns
+    /// what the user asked for.
+    ///
+    /// # Arguments
+    /// * `ui` - The pane's `Ui`.
+    /// * `tr` - Translator for the current UI language.
+    /// * `status` - The machine status.
+    pub(super) fn show_zero_actions(
         &mut self,
         ui: &mut egui::Ui,
         tr: &Translator,
@@ -249,48 +302,29 @@ impl WcsPanel {
         let blocked = self.blocked(status);
         let zero_enabled = connected && blocked.is_none();
         let reason = blocked.map(|msgid| tr.tr(msgid));
-        let selector_reason = self.not_grbl.then(|| tr.tr(NOT_GRBL));
-        let shown = self.shown(status);
         let mut action = None;
-        ui.strong(tr.tr("Work Coordinates"));
-        egui::Grid::new("wcs-selector")
-            .num_columns(3)
-            .spacing([6.0, 6.0])
-            .show(ui, |ui| {
-                for (i, wcs) in Wcs::ALL.into_iter().enumerate() {
-                    let button = egui::Button::selectable(shown == Some(wcs), wcs.code());
-                    let response = ui.add_enabled(connected && !self.not_grbl, button);
-                    let response = match &selector_reason {
-                        Some(reason) if connected => {
-                            response.on_disabled_hover_text(reason.as_ref())
-                        }
-                        Some(_) | None => response,
-                    };
-                    if response.clicked() && shown != Some(wcs) {
-                        action = Some(Action::Select(wcs));
-                    }
-                    if i % 3 == 2 {
-                        ui.end_row();
-                    }
-                }
-            });
-        ui.horizontal_wrapped(|ui| {
-            let zero_all = ui
-                .add_enabled(zero_enabled, egui::Button::new(tr.tr("Zero All Axes")))
-                .on_hover_text(tr.tr("Set active work position to 0 for X/Y/Z"));
-            let zero_all = match &reason {
-                Some(reason) if connected => zero_all.on_disabled_hover_text(reason.as_ref()),
-                Some(_) | None => zero_all,
-            };
-            if zero_all.clicked() {
-                action = Some(Action::ZeroAll);
-            }
+        let zero_all = crate::theme::destructive_icon_button(
+            ui,
+            Icon::Clear.themed(ui),
+            tr.tr("Zero All Axes"),
+        )
+        .min_size(egui::vec2(ui.available_width(), 0.0));
+        let zero_all = ui
+            .add_enabled(zero_enabled, zero_all)
+            .on_hover_text(tr.tr("Set active work position to 0 for X/Y/Z"));
+        let zero_all = match &reason {
+            Some(reason) if connected => zero_all.on_disabled_hover_text(reason.as_ref()),
+            Some(_) | None => zero_all,
+        };
+        if zero_all.clicked() {
+            action = Some(Action::ZeroAll);
+        }
+        ui.horizontal(|ui| {
             // It rapids to the active system's zero: only while that is the one shown.
-            let go = ui
-                .add_enabled(zero_enabled, egui::Button::new(tr.tr("Go to Work Zero")))
-                .on_hover_text(
-                    tr.tr("Rapid move to work origin (X/Y, or X/Y/Z if Include Z is checked)"),
-                );
+            let go = egui::Button::image_and_text(Icon::Jump.themed(ui), tr.tr("Go to Work Zero"));
+            let go = ui.add_enabled(zero_enabled, go).on_hover_text(
+                tr.tr("Rapid move to work origin (X/Y, or X/Y/Z if Include Z is checked)"),
+            );
             let go = match &reason {
                 Some(reason) if connected => go.on_disabled_hover_text(reason.as_ref()),
                 Some(_) | None => go,
