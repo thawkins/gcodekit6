@@ -149,7 +149,7 @@ Status values:
 | 2D mode | SPEC (2D/3D toggle) | Gap | CHANGELOG M3 known gap |
 | Show/hide rapids, cuts, grid, tool marker; grid spacing | 30-visualizer | Gap | GTK sidebar; not ported |
 | Machine bounds, fit to device | *(GTK)* | Gap | CHANGELOG M3 known gap |
-| Stock removal simulation | 30-visualizer, SPEC | Gap | CHANGELOG M3 known gap |
+| Stock removal simulation | 30-visualizer, SPEC | Ported | `test_visualizer_stock::toggle_follows_the_setting`, `test_visualizer_stock::simulation_restarts_on_program_change`, `test_visualizer_stock::frame_returns_while_simulating`, `test_visualizer_stock::cut_floor_meets_the_toolpath_in_view_space`, `test_visualizer_stock::snapshot_stock_groove` |
 | Run preview (play/pause/speed) | *(GTK)* | Gap | CHANGELOG M3 known gap |
 | Copy cursor coordinates, intensity statistics | *(GTK)* | Gap | Visualizer module docs |
 
@@ -260,16 +260,15 @@ Ranked by user impact. Sizes are rough estimates for one developer who knows the
 | 1 | Editor Replace / Replace All | Medium | 0.5-1 day |
 | 2 | Quick Z-touch and edge probe in Machine Control | Medium: the Probe Routines page covers it with more clicks | 1 day (routines exist) |
 | 3 | Keyboard jog | Medium: deliberate safety choice; needs a decision on keypad keys | 0.5 day plus a decision |
-| 4 | Visualizer stock removal simulation | Medium | 3-5 days (wgpu height map) |
-| 5 | Visualizer 2D mode, display toggles, grid spacing, machine bounds, fit to device | Medium | 2-3 days |
-| 6 | DRO rotary axes A/B/C (and their Zero buttons) | Medium for 4-6 axis machines, none otherwise | 0.5 day |
-| 7 | Designer mirror, align, cut/copy/paste, boolean ops, Ctrl+G | Medium | 2-3 days (designer commands exist in `gcodekit5-designer`) |
-| 8 | Visualizer run preview (play/pause/speed) | Low | 1-2 days |
-| 9 | Import STL | Low: behind a Settings switch in GTK | 1 day |
-| 10 | Status bar elapsed/remaining time, feed/spindle readout | Low | 0.5 day |
-| 11 | Exact override percentage field | Low | 0.5 day |
-| 12 | Preferences Controller page and shortcut editor | Low | 1-2 days |
-| 13 | Persistent console history, Clear editor, machine limits/buffer readout, designer device work area, gallery icons | Low | 1-2 days together |
+| 4 | Visualizer 2D mode, display toggles, grid spacing, machine bounds, fit to device | Medium | 2-3 days |
+| 5 | DRO rotary axes A/B/C (and their Zero buttons) | Medium for 4-6 axis machines, none otherwise | 0.5 day |
+| 6 | Designer mirror, align, cut/copy/paste, boolean ops, Ctrl+G | Medium | 2-3 days (designer commands exist in `gcodekit5-designer`) |
+| 7 | Visualizer run preview (play/pause/speed) | Low | 1-2 days |
+| 8 | Import STL | Low: behind a Settings switch in GTK | 1 day |
+| 9 | Status bar elapsed/remaining time, feed/spindle readout | Low | 0.5 day |
+| 10 | Exact override percentage field | Low | 0.5 day |
+| 11 | Preferences Controller page and shortcut editor | Low | 1-2 days |
+| 12 | Persistent console history, Clear editor, machine limits/buffer readout, designer device work area, gallery icons | Low | 1-2 days together |
 
 Manual checks still to run before GTK is deleted (no automated evidence): TCP and
 WebSocket connections, auto-reconnect, non-GRBL firmwares and the grblHAL simulator, Windows
