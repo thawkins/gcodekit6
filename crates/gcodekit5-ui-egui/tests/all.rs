@@ -128,6 +128,8 @@ mod test_settings_window;
 mod test_smoke;
 #[path = "test_status_bar.rs"]
 mod test_status_bar;
+#[path = "test_theme.rs"]
+mod test_theme;
 #[path = "test_tools_manager.rs"]
 mod test_tools_manager;
 #[path = "test_translations.rs"]
