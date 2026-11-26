@@ -487,7 +487,8 @@ impl GcodeKitApp {
                 }
             })
         };
-        let dialogs = Dialogs::new(state.translator, wake);
+        let mut dialogs = Dialogs::new(state.translator, wake);
+        dialogs.follow_folder(&state.config().file_processing.output_directory);
         let settings_window = SettingsWindow::new(
             crate::frame::title_bar_setting_applies(&state.decision),
             &state.config().ui,
@@ -585,6 +586,14 @@ impl GcodeKitApp {
         let _ = self.wake_ctx.set(ctx.clone());
         self.poll_machine(ctx);
         self.cancel_holds_without_focus(ctx);
+        self.dialogs.follow_folder(
+            &self
+                .state
+                .settings
+                .config()
+                .file_processing
+                .output_directory,
+        );
         while let Some(answer) = self.dialogs.poll() {
             self.handle_answer(answer);
         }
@@ -764,6 +773,14 @@ impl GcodeKitApp {
         let _ = self.wake_ctx.set(ctx.clone());
         self.poll_machine(&ctx);
         self.cancel_holds_without_focus(&ctx);
+        self.dialogs.follow_folder(
+            &self
+                .state
+                .settings
+                .config()
+                .file_processing
+                .output_directory,
+        );
         while let Some(answer) = self.dialogs.poll() {
             self.handle_answer(answer);
         }
@@ -1291,6 +1308,11 @@ impl GcodeKitApp {
     /// Acts on a dialog's answer; every answer is also kept in
     /// [`GcodeKitApp::last_dialog_answer`].
     fn handle_answer(&mut self, answer: DialogAnswer) {
+        if let DialogAnswer::File { purpose, path } = &answer
+            && purpose.remembers_folder()
+        {
+            self.remember_folder(path);
+        }
         if self.handle_design_answer(&answer)
             || self.handle_cam_preset_answer(&answer)
             || self.handle_firmware_settings_answer(&answer)
@@ -1638,6 +1660,27 @@ impl GcodeKitApp {
             | Page::CamTools
             | Page::DeviceConfig => {}
         }
+    }
+
+    /// Makes the folder of `file` the one the next file dialog starts in, and keeps it as
+    /// Preferences > General's default folder, as GTK did (a failed write leaves it for
+    /// this run only).
+    fn remember_folder(&mut self, file: &std::path::Path) {
+        let Some(folder) = self.dialogs.remember_folder(file) else {
+            return;
+        };
+        let mut config = self.state.settings.config().clone();
+        config.file_processing.output_directory = folder;
+        if let Err(error) = self.state.settings.apply(config) {
+            tracing::debug!(%error, "last folder not kept in the settings");
+        }
+        let configured = &self
+            .state
+            .settings
+            .config()
+            .file_processing
+            .output_directory;
+        self.dialogs.follow_folder(configured);
     }
 
     /// Saves the hideable panels' visibility (the Visualizer sidebar, the Designer inspector)

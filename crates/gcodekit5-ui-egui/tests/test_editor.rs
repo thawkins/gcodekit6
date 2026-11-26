@@ -1121,3 +1121,51 @@ fn test_save_gcode_button_saves_the_editor_file() -> TestResult {
     assert_eq!(std::fs::read_to_string(&path)?, "G0 X2\n");
     Ok(())
 }
+
+/// Answers every file dialog with `path`, recording the folder each one started in.
+fn answer_files_from(
+    app: &mut GcodeKitApp,
+    path: PathBuf,
+) -> std::sync::Arc<std::sync::Mutex<Vec<Option<PathBuf>>>> {
+    let started = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+    let seen = std::sync::Arc::clone(&started);
+    app.dialogs_mut()
+        .set_override(Some(Box::new(move |request: &Request| match request {
+            Request::File(file) => {
+                if let Ok(mut seen) = seen.lock() {
+                    seen.push(file.directory.clone());
+                }
+                Answer::Paths(vec![path.clone()])
+            }
+            Request::Message(_) => Answer::Cancelled,
+        })));
+    started
+}
+
+#[test]
+fn test_file_dialogs_start_in_the_remembered_folder() -> TestResult {
+    let first = scratch("start_folder_first")?;
+    let second = scratch("start_folder_second")?;
+    let path = write(&second, "part.gcode", "G21\n")?;
+    let mut config = Config::default();
+    config.file_processing.output_directory = first.clone();
+    let state = AppState::new(
+        SettingsManager::detached(config),
+        crate::test_smoke::native_decision(),
+    );
+    let mut harness = crate::machine_support::app_harness(GcodeKitApp::from_state(state));
+    let started = answer_files_from(harness.state_mut(), path.clone());
+    harness.state_mut().dispatch(Command::FileOpen);
+    for _ in 0..3 {
+        app_frame(&mut harness);
+    }
+    // The next dialog starts where the last file was opened (kept in the settings too when
+    // they can be saved; these detached settings cannot).
+    harness.state_mut().dispatch(Command::FileSaveAs);
+    for _ in 0..3 {
+        app_frame(&mut harness);
+    }
+    let started = started.lock().map(|s| s.clone()).unwrap_or_default();
+    assert_eq!(started, [Some(first), Some(second)]);
+    Ok(())
+}

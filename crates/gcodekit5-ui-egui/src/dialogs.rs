@@ -14,7 +14,7 @@
 //! (translations).
 
 use std::collections::VecDeque;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use craft_dialogs::{
     Answer, FileDialog, Message, MessageButtons, MessageLevel, MessageResult, Override, Wake,
@@ -84,6 +84,31 @@ impl FilePurpose {
             Self::ImportGtcPackage => n_!("Import GTC Package"),
             Self::ImportGtcJson => n_!("Import GTC JSON"),
             Self::ExportCustomTools => n_!("Export Custom Tools"),
+        }
+    }
+
+    /// Whether a file chosen for this purpose becomes the folder the next file dialog starts
+    /// in: the editor's and the designer's files, as GTK remembered them; not presets,
+    /// firmware settings, tool catalogs or the Gerber and engraving inputs.
+    pub fn remembers_folder(self) -> bool {
+        match self {
+            Self::OpenGcode
+            | Self::SaveGcode
+            | Self::OpenDesign
+            | Self::SaveDesign
+            | Self::ImportDesign
+            | Self::ImportImage
+            | Self::ExportGcode
+            | Self::ExportSvg => true,
+            Self::LoadCamPreset
+            | Self::SaveCamPreset
+            | Self::OpenGerberFolder
+            | Self::OpenEngravingImage
+            | Self::ExportFirmwareSettings
+            | Self::ImportFirmwareSettings
+            | Self::ImportGtcPackage
+            | Self::ImportGtcJson
+            | Self::ExportCustomTools => false,
         }
     }
 
@@ -413,6 +438,11 @@ pub struct Dialogs {
     inner: craft_dialogs::Dialogs<Then>,
     translator: Translator,
     answers: VecDeque<DialogAnswer>,
+    /// Preferences > General's default folder, as last seen ([`Dialogs::follow_folder`]).
+    configured_folder: PathBuf,
+    /// The folder of the last file opened or saved since the default folder last changed
+    /// ([`Dialogs::remember_folder`]).
+    last_folder: Option<PathBuf>,
 }
 
 impl std::fmt::Debug for Dialogs {
@@ -436,6 +466,51 @@ impl Dialogs {
             inner: craft_dialogs::Dialogs::new(wake),
             translator,
             answers: VecDeque::new(),
+            configured_folder: PathBuf::new(),
+            last_folder: None,
+        }
+    }
+
+    /// Follows Preferences > General's default folder
+    /// (`file_processing.output_directory`): a change replaces the folder remembered from
+    /// the last file. Call it every frame.
+    ///
+    /// # Arguments
+    /// * `configured` - The folder in the settings (a file names its folder).
+    pub fn follow_folder(&mut self, configured: &Path) {
+        if self.configured_folder != configured {
+            self.configured_folder = configured.to_path_buf();
+            self.last_folder = None;
+        }
+    }
+
+    /// Remembers the folder of `file`, so the next file dialog starts there, as GTK's did.
+    ///
+    /// # Arguments
+    /// * `file` - A file just opened or saved.
+    ///
+    /// # Returns
+    /// The folder remembered, for the caller to keep in the settings; `None` for a path
+    /// without one.
+    pub fn remember_folder(&mut self, file: &Path) -> Option<PathBuf> {
+        let folder = file.parent().filter(|f| !f.as_os_str().is_empty())?;
+        self.last_folder = Some(folder.to_path_buf());
+        self.last_folder.clone()
+    }
+
+    /// The folder a file dialog starts in: the last file's, else the default folder (its
+    /// folder when it names a file); `None` without either.
+    pub fn start_folder(&self) -> Option<PathBuf> {
+        if let Some(last) = &self.last_folder {
+            return Some(last.clone());
+        }
+        let configured = &self.configured_folder;
+        if configured.as_os_str().is_empty() {
+            None
+        } else if configured.is_file() {
+            configured.parent().map(Path::to_path_buf)
+        } else {
+            Some(configured.clone())
         }
     }
 
@@ -481,6 +556,10 @@ impl Dialogs {
     }
 
     fn ask_file(&mut self, dialog: FileDialog, purpose: FilePurpose, filters: &[FileFilter]) {
+        let dialog = match self.start_folder() {
+            Some(folder) => dialog.directory(folder),
+            None => dialog,
+        };
         let tr = &self.translator;
         let dialog = filters.iter().fold(
             dialog.title(tr.tr(purpose.title_msgid())),

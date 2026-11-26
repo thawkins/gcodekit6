@@ -266,7 +266,7 @@ The two rules differ on purpose; both are pinned by tests
 | Tool catalog import/export (GTC) | *(GTK)* | Ported | `test_tools_manager::tools_manager_gtc_import_and_export` |
 | Materials: add, edit, delete, built-ins | 60-tool-library | Ported | `test_materials_manager::materials_manager_create_edit_delete`, `test_materials_manager::materials_manager_standard_material_edits_as_override` |
 | Tool change modes | 60-tool-library | Not applicable | Not in the GTK source |
-| Units, theme, language, default directory | 70-settings | Ported | `test_settings_window::units_toggle_persists`, `test_settings_window::every_edited_field_persists` |
+| Units, theme, language, default directory | 70-settings | Ported | `test_settings_window::units_toggle_persists`, `test_settings_window::every_edited_field_persists`, `test_editor::test_file_dialogs_start_in_the_remembered_folder` (file dialogs start in the default directory; opening or saving an editor or designer file makes its folder the new default, as GTK did) |
 | Device type CNC / Laser ($32) | 70-settings | Ported | `test_device_info::device_info_laser_type_writes_32_and_refresh_asks_again` |
 | DRO decimals | 70-settings | Ported | Fixed: 2 for mm, 3 for inches, as GTK (`test_machine_pane::dro_shows_two_decimals`) |
 | Auto-connect on startup | 70-settings | Not applicable | Not in the GTK source |
