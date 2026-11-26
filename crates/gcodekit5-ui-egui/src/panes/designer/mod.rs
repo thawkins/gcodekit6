@@ -529,6 +529,7 @@ impl DesignerPane {
             center: (f64::from(center.x), f64::from(center.y)),
             cursor: self.cursor,
             snap: self.state.snap_enabled,
+            constraint: ui.input(|i| i.modifiers.shift),
             units: self.units,
         };
         overlay::status_line(ui, rect, &status, tr);

@@ -173,6 +173,47 @@ fn test_designer_status_line_shows_zoom_and_units() {
     assert!(harness.query_by_label_contains("Cursor: X ").is_some());
 }
 
+/// GTK's "?" button on the canvas toolbar lists the canvas's keys in a popover.
+#[test]
+fn test_designer_shortcuts_popover_lists_the_canvas_keys() {
+    let mut harness = page_app(egui::vec2(1280.0, 800.0), 1.0, false);
+    assert!(harness.query_by_label("Designer shortcuts").is_none());
+    harness.get_by_label("?").click();
+    harness.run();
+    let _ = harness.get_by_label("Designer shortcuts");
+    let tr = gcodekit5_app::i18n::Translator::new("en");
+    for (keys, msgid) in gcodekit5_ui_egui::panes::designer::canvas::overlay::SHORTCUTS {
+        let line =
+            gcodekit5_ui_egui::panes::designer::canvas::overlay::shortcut_line(keys, msgid, &tr);
+        assert!(harness.query_by_label(&line).is_some(), "{line}");
+    }
+    let _ = harness.get_by_label("Right click for context menu");
+}
+
+/// GTK's status line names the snap and the Shift constraint: "Snap / Constraint".
+#[test]
+fn test_designer_status_line_names_snap_and_constraint() {
+    use gcodekit5_ui_egui::panes::designer::canvas::overlay::{Status, status_text};
+    let tr = gcodekit5_app::i18n::Translator::new("en");
+    let mut status = Status {
+        zoom: 1.0,
+        center: (0.0, 0.0),
+        cursor: (0.0, 0.0),
+        snap: true,
+        constraint: true,
+        units: gcodekit5_core::units::MeasurementSystem::Metric,
+    };
+    assert!(status_text(&status, &tr).contains("  Snap / Constraint  "));
+    status.snap = false;
+    let text = status_text(&status, &tr);
+    assert!(
+        text.contains("  Constraint  ") && !text.contains("Snap"),
+        "{text}"
+    );
+    status.constraint = false;
+    assert!(!status_text(&status, &tr).contains("Constraint"));
+}
+
 #[test]
 fn test_designer_inspector_hide_and_unhide() {
     let mut harness = page_app(egui::vec2(1280.0, 800.0), 1.0, false);

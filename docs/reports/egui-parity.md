@@ -174,6 +174,7 @@ Status values:
 | Cut / copy / paste shapes | 90-shortcuts | Ported | `test_designer_shape_ops::test_copy_and_paste_from_context_menu_make_new_shapes_at_the_pointer`, `test_designer_shape_ops::test_cut_removes_the_selection_and_paste_brings_it_back`, `test_designer_shape_ops::test_paste_gives_a_copied_group_its_own_group_id`, `test_designer_shape_ops::test_clipboard_keys_run_on_the_canvas_but_not_while_typing`, `test_designer_shape_ops::test_edit_menu_acts_on_a_focused_text_field_not_on_shapes`, `test_designer_shape_ops::test_edit_menu_and_keys_act_on_shapes_anywhere_on_the_designer_page` (routed by page as GTK; a focused text field keeps its text edits; the design's own clipboard, as GTK; Paste centres on the pointer with new ids, one undo step; with only a clipboard the whole menu opens, entries needing a selection disabled) |
 | Duplicate (Ctrl+D) | *(GTK)* | Ported | `test_designer_shape_ops::test_duplicate_key_copies_the_selection_10mm_away_in_one_undo_step`, `test_designer_shape_ops::test_duplicate_from_context_menu`, `test_commands::test_every_gtk_accelerator_bound` (GTK's canvas key: copies 10 mm right and up with new ids, one undo step; egui adds a Duplicate entry to the context menu, where every designer key has its place) |
 | Canvas view keys (+ / = / -, F, R, D) and Ctrl+I | *(GTK)* | Ported | `test_designer_shape_ops::test_view_keys_run_on_the_canvas_but_not_while_typing`, `test_commands::test_every_gtk_accelerator_bound` (Designer keymap scope; egui reports the keypad + and - as + and -; GTK's `_` (Shift+-) for zoom out is not bound; Ctrl+I runs Import Image) |
+| Keyboard-shortcut popover ("?") and the status line's Snap / Constraint | *(GTK)* | Ported | `test_designer_page_layout::test_designer_shortcuts_popover_lists_the_canvas_keys`, `test_designer_page_layout::test_designer_status_line_names_snap_and_constraint` (the popover lists the default keys, as GTK's did) |
 | Boolean union / difference / intersection | *(GTK)* | Ported | `test_designer_shape_ops::test_boolean_ops_replace_the_selection_by_one_new_shape_in_one_undo_step`, `test_designer_shape_ops::test_boolean_ops_need_two_shapes` (context menu Union, Diff, Inter for 2+ shapes: one new shape replaces the sources, one undo step) |
 | Convert to Path / Convert to Rectangle | *(GTK)* | Ported | `test_designer_shape_ops::test_convert_to_path_and_rectangle_replace_the_selection_in_one_undo_step` (context menu; one new shape replaces the selection, one undo step) |
 | Linear, circular, grid arrays | 40-designer | Ported | `test_designer_array::array_dialog_creates_n_copies_as_one_undo_step`, `test_designer_array::array_dialog_grid_and_circular` |
@@ -306,7 +307,7 @@ there is no screenshot of them. The lists below are what still differs.
   The toolbox is therefore taller: View Controls scroll at 900 pt.
 - The inspector takes 30% of the width (GTK: 20%), and the object rows carry hide and lock
   toggles that GTK lacks.
-- The canvas toolbar has no scrollbar toggle and no "?" shortcut popover.
+- The canvas toolbar has no scrollbar toggle (the egui canvas has no scrollbars).
 - The lock toggle shows the open-lock icon in both states.
 - Labels differ: "Snap to grid" (GTK: "Snap"), and the "Active tool:" line is shown.
 

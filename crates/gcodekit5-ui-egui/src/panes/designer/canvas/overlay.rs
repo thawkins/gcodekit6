@@ -1,9 +1,9 @@
 //! The canvas's floating controls, as GTK's on-screen display: the view toolbar at the top
-//! centre (zoom out, fit to content, fit to viewport, fit to the work area, zoom in) and the
-//! status line at the bottom left (zoom, view centre, cursor, snap, units).
+//! centre (zoom out, fit to content, fit to viewport, fit to the work area, GTK's "?"
+//! keyboard-shortcut popover, zoom in) and the status line at the bottom left (zoom, view
+//! centre, cursor, snap and constraint, units).
 //!
-//! Not ported: GTK's scrollbar toggle and keyboard-shortcut popover (the canvas has no
-//! scrollbars, and no shortcut list exists here).
+//! Not ported: GTK's scrollbar toggle (the canvas has no scrollbars).
 //!
 //! Dependencies: `egui`, `gcodekit5-core` (units), `gcodekit5-app` (translations).
 
@@ -24,8 +24,33 @@ pub fn msgids() -> Vec<&'static str> {
         n_!("Center"),
         n_!("Cursor"),
         n_!("Snap"),
+        n_!("Constraint"),
+        n_!("Keyboard Shortcuts"),
+        n_!("Designer shortcuts"),
+        n_!("Right click for context menu"),
+        n_!("Undo"),
+        n_!("Redo"),
+        n_!("Copy"),
+        n_!("Paste"),
+        n_!("Duplicate"),
+        n_!("Delete"),
     ]
 }
+
+/// The "?" popover's lines, as GTK's: the default keys (craft-keymap chord text) and the
+/// msgid of what each does on the canvas.
+pub const SHORTCUTS: [(&[&str], &str); 10] = [
+    (&["Cmd+Z"], n_!("Undo")),
+    (&["Cmd+Y"], n_!("Redo")),
+    (&["Cmd+C"], n_!("Copy")),
+    (&["Cmd+V"], n_!("Paste")),
+    (&["Cmd+D"], n_!("Duplicate")),
+    (&["Delete"], n_!("Delete")),
+    (&["+", "-"], n_!("Zoom")),
+    (&["F"], n_!("Fit to Content")),
+    (&["R"], n_!("Fit to Viewport")),
+    (&["D"], n_!("Fit to Device Working Area")),
+];
 
 /// A view change asked for on the toolbar.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -96,6 +121,10 @@ pub fn toolbar(ui: &mut egui::Ui, rect: egui::Rect, tr: &Translator) -> Option<V
             osd_frame(ui).show(ui, |ui| {
                 ui.horizontal(|ui| {
                     for (action, icon, msgid) in BUTTONS {
+                        // GTK's "?" sits just before Zoom In.
+                        if action == ViewAction::ZoomIn {
+                            shortcuts_button(ui, tr);
+                        }
                         if icons::icon_only_button(ui, icon, &tr.tr(msgid)).clicked() {
                             clicked = Some(action);
                         }
@@ -104,6 +133,38 @@ pub fn toolbar(ui: &mut egui::Ui, rect: egui::Rect, tr: &Translator) -> Option<V
             });
         });
     clicked
+}
+
+/// The text of one popover line: the keys on this platform, then what they do.
+///
+/// # Arguments
+/// * `keys` - craft-keymap chord texts.
+/// * `msgid` - What the keys do.
+/// * `tr` - Translator for the current UI language.
+pub fn shortcut_line(keys: &[&str], msgid: &str, tr: &Translator) -> String {
+    let platform = craft_keymap::Platform::current();
+    let keys: Vec<String> = keys
+        .iter()
+        .map(|text| match craft_keymap::Chord::parse(text) {
+            Ok(chord) => chord.display(platform),
+            Err(_) => (*text).to_owned(),
+        })
+        .collect();
+    format!("{}  -  {}", keys.join(" / "), tr.tr(msgid))
+}
+
+/// GTK's "?" button: a popover listing the canvas's keys.
+fn shortcuts_button(ui: &mut egui::Ui, tr: &Translator) {
+    let response = ui
+        .menu_button("?", |ui| {
+            ui.strong(tr.tr("Designer shortcuts"));
+            for (keys, msgid) in SHORTCUTS {
+                ui.label(shortcut_line(keys, msgid, tr));
+            }
+            ui.label(tr.tr("Right click for context menu"));
+        })
+        .response;
+    response.on_hover_text(tr.tr("Keyboard Shortcuts"));
 }
 
 /// The id of the toolbar's area: part of the canvas, not a window or popup, so it does not
@@ -123,6 +184,8 @@ pub struct Status {
     pub cursor: (f64, f64),
     /// Whether snapping is on.
     pub snap: bool,
+    /// Whether Shift is held, constraining the drawing or resizing (GTK's "Constraint").
+    pub constraint: bool,
     /// The display units.
     pub units: MeasurementSystem,
 }
@@ -155,8 +218,14 @@ pub fn status_text(status: &Status, tr: &Translator) -> String {
         length(status.cursor.0, u),
         length(status.cursor.1, u),
     );
-    if status.snap {
-        text.push_str(&format!("  {}", tr.tr("Snap")));
+    // GTK: "Snap", "Constraint" or "Snap / Constraint".
+    let flags: Vec<String> = [(status.snap, "Snap"), (status.constraint, "Constraint")]
+        .into_iter()
+        .filter(|(on, _)| *on)
+        .map(|(_, msgid)| tr.tr(msgid).into_owned())
+        .collect();
+    if !flags.is_empty() {
+        text.push_str(&format!("  {}", flags.join(" / ")));
     }
     text.push_str(&format!("  {}", units::get_unit_label(u)));
     text
