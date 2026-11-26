@@ -49,7 +49,9 @@ fn test_show_toolpaths_previews_the_design() {
     assert!(!h.state().state().show_toolpaths);
     assert!(h.state().preview_toolpaths().is_empty());
     h.get_by_label("Show Toolpaths").click();
-    h.run();
+    // Steps, not `run`: the build now running keeps the spinner repainting.
+    h.step();
+    h.step();
     assert!(h.state().state().show_toolpaths);
     wait_for_preview(&mut h);
     let points = cut_points(h.state());
@@ -71,8 +73,9 @@ fn test_show_toolpaths_previews_the_design() {
 #[test]
 fn test_hidden_shapes_are_not_previewed() {
     let mut pane = pane_with_rects(&[(20.0, 20.0, 40.0, 30.0), (100.0, 100.0, 20.0, 20.0)]);
-    pane.state_mut().show_toolpaths = true;
+    // Switched on after the harness's settling `run`: a running build keeps repainting.
     let mut h = harness(pane);
+    h.state_mut().state_mut().show_toolpaths = true;
     wait_for_preview(&mut h);
     let both = cut_points(h.state()).len();
     let hidden = h.state().state().canvas.shapes().nth(1).map(|o| o.id);
@@ -92,8 +95,9 @@ fn test_hidden_shapes_are_not_previewed() {
 #[test]
 fn test_exported_gcode_cuts_what_the_preview_shows() {
     let mut pane = pane_with_rects(&[(20.0, 20.0, 40.0, 30.0)]);
-    pane.state_mut().show_toolpaths = true;
+    // Switched on after the harness's settling `run`: a running build keeps repainting.
     let mut h = harness(pane);
+    h.state_mut().state_mut().show_toolpaths = true;
     wait_for_preview(&mut h);
     let gcode = h.state().generate_gcode(None);
     let points = cut_points(h.state());
@@ -117,8 +121,9 @@ fn test_exported_gcode_cuts_what_the_preview_shows() {
 #[test]
 fn test_rapid_changes_run_one_build_at_a_time_and_end_current() {
     let mut pane = pane_with_rects(&[(10.0, 10.0, 10.0, 10.0)]);
-    pane.state_mut().show_toolpaths = true;
+    // Switched on after the harness's settling `run`: a running build keeps repainting.
     let mut h = harness(pane);
+    h.state_mut().state_mut().show_toolpaths = true;
     for i in 0..20 {
         h.state_mut()
             .state_mut()
@@ -140,8 +145,8 @@ fn test_rapid_changes_run_one_build_at_a_time_and_end_current() {
     for obj in h.state().state().canvas.shapes() {
         fresh.state_mut().add_shape_with_undo(obj.shape.clone());
     }
-    fresh.state_mut().show_toolpaths = true;
     let mut f = harness(fresh);
+    f.state_mut().state_mut().show_toolpaths = true;
     wait_for_preview(&mut f);
     let mut a = rapid.clone();
     let mut b = cut_points(f.state());
@@ -156,8 +161,9 @@ fn test_no_preview_build_during_a_drag() {
     use crate::test_designer_canvas::{button, screen};
     use egui::{Modifiers, PointerButton};
     let mut pane = pane_with_rects(&[(20.0, 20.0, 40.0, 30.0)]);
-    pane.state_mut().show_toolpaths = true;
+    // Switched on after the harness's settling `run`: a running build keeps repainting.
     let mut h = harness(pane);
+    h.state_mut().state_mut().show_toolpaths = true;
     wait_for_preview(&mut h);
     let before = h.state().toolpath_builds_started();
     let from = screen(&h, 40.0, 35.0);
@@ -203,9 +209,9 @@ fn spin(h: &mut Harness<'_, DesignerPane>, n: usize) {
 #[test]
 fn test_panicking_preview_build_is_tried_once_per_revision() {
     let mut pane = pane_with_rects(&[(20.0, 20.0, 40.0, 30.0)]);
-    pane.state_mut().show_toolpaths = true;
     pane.set_toolpath_build_panics(true);
     let mut h = harness(pane);
+    h.state_mut().state_mut().show_toolpaths = true;
     spin(&mut h, 30);
     assert_eq!(
         h.state().toolpath_builds_started(),
