@@ -21,6 +21,7 @@ pub mod array_dialog;
 pub mod editing;
 pub mod flags;
 pub mod input;
+pub mod overlay;
 pub mod picking;
 pub mod rendering;
 pub mod text_outline;
@@ -80,6 +81,24 @@ impl DesignerTool {
         DesignerTool::Polyline,
         DesignerTool::Text,
     ];
+
+    /// The app SVG (in `resources/icons/`) on the tool's toolbox button, as GTK.
+    pub fn icon(self) -> &'static str {
+        match self {
+            DesignerTool::Select => "select.svg",
+            DesignerTool::Pan => "grab.svg",
+            DesignerTool::Rectangle => "rectangle.svg",
+            DesignerTool::Circle => "circle.svg",
+            DesignerTool::Line => "line.svg",
+            DesignerTool::Ellipse => "ellipse.svg",
+            DesignerTool::Triangle => "triangle.svg",
+            DesignerTool::Polygon => "poligon.svg",
+            DesignerTool::Gear => "gear.svg",
+            DesignerTool::Sprocket => "sprocket.svg",
+            DesignerTool::Polyline => "polyline.svg",
+            DesignerTool::Text => "text.svg",
+        }
+    }
 
     /// The English msgid of the tool's name, as listed in `po/gcodekit5.pot`.
     pub fn label_msgid(self) -> &'static str {

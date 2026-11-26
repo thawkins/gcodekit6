@@ -42,6 +42,7 @@ use gcodekit5_designer::model::{Point, Shape};
 use gcodekit5_settings::config::Config;
 
 use canvas::array_dialog::{self, ArrayDialog};
+use canvas::overlay::{self, ViewAction};
 use canvas::rendering::{self, LineWidths};
 use canvas::text_tool::{self, TextTool};
 use canvas::toolpath_preview::ToolpathPreview;
@@ -55,6 +56,7 @@ use crate::workspace::{Pane, PaneContext, PaneId};
 pub fn msgids() -> Vec<&'static str> {
     let mut ids = toolbox::msgids();
     ids.extend(canvas::input::msgids());
+    ids.extend(canvas::overlay::msgids());
     ids.extend(layers::msgids());
     ids.extend(properties::msgids());
     ids.extend(text_tool::msgids());
@@ -99,6 +101,8 @@ pub struct DesignerPane {
     editor_request: Option<ToEditor>,
     /// Counts changes to the design ([`DesignerPane::revision`]).
     revision: u64,
+    /// The last world point under the pointer, for the status line.
+    cursor: (f64, f64),
 }
 
 impl std::fmt::Debug for DesignerPane {
@@ -139,6 +143,7 @@ impl DesignerPane {
             limits: None,
             editor_request: None,
             revision: 0,
+            cursor: (0.0, 0.0),
         }
     }
 
@@ -426,7 +431,45 @@ impl DesignerPane {
             rendering::paint_ghost(&painter, &self.view, ghost.as_ref(), palette.accent);
             hint(ui, rect, &tr.tr("Click to position shape"));
         }
+        self.overlays(ui, rect, tr);
         self.gallery.show(ui.ctx(), tr);
+    }
+
+    /// The floating toolbar (applied at once) and the status line over the canvas `rect`.
+    fn overlays(&mut self, ui: &mut egui::Ui, rect: egui::Rect, tr: &Translator) {
+        if let Some(action) = overlay::toolbar(ui, rect, tr) {
+            self.apply_view(action);
+        }
+        if let Some(at) = self.input.hover {
+            self.cursor = at;
+        }
+        let center = self.view.screen_to_world(rect.center());
+        let status = overlay::Status {
+            zoom: self.state.canvas.zoom(),
+            center: (f64::from(center.x), f64::from(center.y)),
+            cursor: self.cursor,
+            snap: self.state.snap_enabled,
+            units: self.units,
+        };
+        overlay::status_line(ui, rect, &status, tr);
+    }
+
+    /// Applies a view change from the canvas toolbar or the View commands.
+    ///
+    /// # Arguments
+    /// * `action` - The change.
+    pub fn apply_view(&mut self, action: ViewAction) {
+        match action {
+            ViewAction::ZoomIn => self.state.zoom_in(),
+            ViewAction::ZoomOut => self.state.zoom_out(),
+            ViewAction::FitContent => editing::zoom_fit(&mut self.state),
+            ViewAction::FitWorkArea => editing::fit_work_area(&mut self.state),
+            // GTK's reset: 100% with the origin at the canvas's bottom-left corner.
+            ViewAction::FitViewport => {
+                self.state.canvas.set_zoom(1.0);
+                self.state.canvas.set_pan(0.0, 0.0);
+            }
+        }
     }
 
     /// The canvas while a gallery shape is armed: the pointer moves its ghost, a primary
@@ -462,7 +505,7 @@ impl DesignerPane {
 /// not take the pointer.
 fn hint(ui: &mut egui::Ui, rect: egui::Rect, text: &str) {
     let strip = egui::Rect::from_min_size(
-        rect.min + egui::vec2(0.0, 12.0),
+        rect.min + egui::vec2(0.0, overlay::TOOLBAR_HEIGHT + 4.0),
         egui::vec2(rect.width(), 40.0),
     );
     ui.scope_builder(
@@ -489,7 +532,7 @@ impl Pane for DesignerPane {
     fn ui(&mut self, ui: &mut egui::Ui, ctx: &mut PaneContext) {
         let tr = ctx.tr;
         let out = egui::Panel::left("gcodekit5-designer-toolbox")
-            .default_size(190.0)
+            .default_size(250.0)
             .show(ui, |ui| {
                 toolbox::show(ui, &mut self.state, self.tool, self.units, tr)
             })
@@ -529,14 +572,10 @@ impl Pane for DesignerPane {
         match command {
             Command::Undo => self.undo(),
             Command::Redo => self.redo(),
-            Command::ZoomIn => self.state.zoom_in(),
-            Command::ZoomOut => self.state.zoom_out(),
-            Command::ZoomFit => editing::zoom_fit(&mut self.state),
-            // GTK's reset: 100% with the origin at the canvas's bottom-left corner.
-            Command::ResetView => {
-                self.state.canvas.set_zoom(1.0);
-                self.state.canvas.set_pan(0.0, 0.0);
-            }
+            Command::ZoomIn => self.apply_view(ViewAction::ZoomIn),
+            Command::ZoomOut => self.apply_view(ViewAction::ZoomOut),
+            Command::ZoomFit => self.apply_view(ViewAction::FitContent),
+            Command::ResetView => self.apply_view(ViewAction::FitViewport),
             Command::FileNew
             | Command::FileNew3d
             | Command::FileOpen

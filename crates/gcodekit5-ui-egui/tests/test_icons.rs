@@ -83,3 +83,76 @@ fn test_icons_tint_follows_theme_text_colour() {
         assert_eq!(tint, text);
     }
 }
+
+/// Every app SVG the designer toolbox, the shape gallery and the objects list draw.
+const APP_ICONS_USED: [&str; 18] = [
+    "select.svg",
+    "grab.svg",
+    "rectangle.svg",
+    "circle.svg",
+    "line.svg",
+    "ellipse.svg",
+    "triangle.svg",
+    "poligon.svg",
+    "polyline.svg",
+    "text.svg",
+    "gear.svg",
+    "sprocket.svg",
+    "sprocket1.svg",
+    "timingpulley.svg",
+    "slot.svg",
+    "Lsupport.svg",
+    "Usupport.svg",
+    "move_to_top.svg",
+];
+
+#[test]
+fn test_icons_every_used_app_icon_decodes() {
+    let mut names: Vec<&str> = APP_ICONS_USED.to_vec();
+    names.push("move_to_bottom.svg");
+    names.extend(
+        gcodekit5_ui_egui::panes::designer::shape_gallery::TEMPLATES
+            .iter()
+            .map(|t| t.icon),
+    );
+    names.extend(
+        gcodekit5_ui_egui::panes::designer::canvas::DesignerTool::ALL
+            .iter()
+            .map(|t| t.icon()),
+    );
+    let mut images = Vec::new();
+    let mut harness = Harness::new_ui(|ui| {
+        images = names
+            .iter()
+            .map(|name| icons::app_icon(ui, name, 24.0))
+            .collect();
+        for image in images.iter().flatten() {
+            ui.add(image.clone());
+        }
+    });
+    harness.run();
+    harness.run();
+    let ctx = harness.ctx.clone();
+    drop(harness);
+    for (name, image) in names.iter().zip(&images) {
+        let image = image
+            .as_ref()
+            .unwrap_or_else(|| panic!("{name} is not embedded"));
+        let result = image.load_for_size(&ctx, egui::vec2(24.0, 24.0));
+        assert!(
+            matches!(result, Ok(egui::load::TexturePoll::Ready { .. })),
+            "{name} did not decode: {:?}",
+            result.as_ref().err()
+        );
+    }
+}
+
+#[test]
+fn test_icons_app_icon_button_exposes_its_tooltip() {
+    let mut harness = Harness::new_ui(|ui| {
+        icons::app_icon_button(ui, "circle.svg", 40.0, true, "Circle");
+    });
+    harness.run();
+    let node = harness.get_by_label("Circle");
+    assert!((node.rect().width() - 40.0).abs() < 0.5);
+}
