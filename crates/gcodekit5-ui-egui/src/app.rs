@@ -161,6 +161,9 @@ pub struct AppState {
     /// settings folder); `None` without a settings folder. Replace it (with
     /// [`AppState::with_materials_file`]) before the app is built from the state.
     pub materials_file: Option<PathBuf>,
+    /// The Designer's stock and tool for the program it last generated, which the
+    /// visualizer's stock removal simulation takes (GTK's `sync_stock_from_designer`).
+    pub stock_seed: Option<crate::panes::visualizer::StockSeed>,
 }
 
 impl AppState {
@@ -184,6 +187,7 @@ impl AppState {
             device_file,
             tools_file,
             materials_file,
+            stock_seed: None,
         }
     }
 
@@ -702,8 +706,9 @@ impl GcodeKitApp {
                 queue.push(Command::SoftReset);
             }
         });
-        let mut panes =
-            PaneContext::new(&self.state.translator, &mut queue).with_machine(&self.state.machine);
+        let mut panes = PaneContext::new(&self.state.translator, &mut queue)
+            .with_machine(&self.state.machine)
+            .with_stock_seed(self.state.stock_seed);
         self.workspace.show(ui, &mut panes);
         if self.workspace.page().panes().is_empty() {
             egui::CentralPanel::default().show(ui, |ui| self.show_manager_page(ui));

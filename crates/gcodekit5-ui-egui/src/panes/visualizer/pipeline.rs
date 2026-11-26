@@ -533,10 +533,30 @@ pub struct VisualizerCallback {
     pub rect: egui::Rect,
 }
 
-/// The view's size in physical pixels, as egui sets the callback's viewport.
-fn size_px(rect: egui::Rect, ppp: f32) -> [u32; 2] {
-    let span = |a: f32, b: f32| ((ppp * b).round() - (ppp * a).round()).max(1.0) as u32;
-    [span(rect.min.x, rect.max.x), span(rect.min.y, rect.max.y)]
+/// The view's size in physical pixels, as egui sets the callback's viewport (rounded per
+/// edge and clamped to the screen), at least 1 and at most `max_dimension` (the device's
+/// `max_texture_dimension_2d`).
+///
+/// # Arguments
+/// * `rect` - The view's rectangle in points.
+/// * `screen` - The frame's screen size and scale.
+/// * `max_dimension` - The largest texture side the device allows.
+pub fn size_px(
+    rect: egui::Rect,
+    screen: &egui_wgpu::ScreenDescriptor,
+    max_dimension: u32,
+) -> [u32; 2] {
+    let viewport = egui::epaint::ViewportInPixels::from_points(
+        &rect,
+        screen.pixels_per_point,
+        screen.size_in_pixels,
+    );
+    let side = |px: i32| {
+        u32::try_from(px)
+            .unwrap_or(0)
+            .clamp(1, max_dimension.max(1))
+    };
+    [side(viewport.width_px), side(viewport.height_px)]
 }
 
 impl GpuResources {
@@ -621,7 +641,8 @@ impl GpuResources {
         });
     }
 
-    /// Draws the stock and then the toolpath, depth-tested, into the offscreen target.
+    /// Draws the stock and then the toolpath, depth-tested, into the offscreen target; with
+    /// no stock to draw, releases the target.
     fn draw_offscreen(
         &mut self,
         device: &wgpu::Device,
@@ -629,6 +650,7 @@ impl GpuResources {
         size: [u32; 2],
     ) {
         let Some((_, Some(_), _)) = &self.stock else {
+            self.offscreen = None;
             return;
         };
         self.ensure_offscreen(device, size);
@@ -729,7 +751,8 @@ impl egui_wgpu::CallbackTrait for VisualizerCallback {
             queue.write_buffer(&gpu.marker, 0, bytemuck::cast_slice(&marker_vertices(tip)));
         }
         gpu.upload_stock(device, self.stock.as_ref());
-        gpu.draw_offscreen(device, encoder, size_px(self.rect, screen.pixels_per_point));
+        let size = size_px(self.rect, screen, device.limits().max_texture_dimension_2d);
+        gpu.draw_offscreen(device, encoder, size);
         Vec::new()
     }
 

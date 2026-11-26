@@ -28,6 +28,7 @@ use gcodekit5_settings::config::Config;
 use crate::commands::{Command, MACHINE_CONTROL_SCOPE, VISUALIZER_SCOPE};
 use crate::dialogs::{ConfirmChoice, ConfirmRequest};
 use crate::machine::Machine;
+use crate::panes::visualizer::StockSeed;
 use gcodekit5_devicedb::ControllerType;
 
 /// Identifies one pane of the main window.
@@ -252,6 +253,8 @@ pub struct PaneContext<'a> {
     commands: &'a mut Vec<Command>,
     /// The machine connection, with this frame's events and the derived status.
     machine: Option<&'a Machine>,
+    /// The Designer's stock and tool for the program it last generated.
+    stock_seed: Option<StockSeed>,
 }
 
 impl<'a> PaneContext<'a> {
@@ -265,6 +268,7 @@ impl<'a> PaneContext<'a> {
             tr,
             commands,
             machine: None,
+            stock_seed: None,
         }
     }
 
@@ -280,6 +284,22 @@ impl<'a> PaneContext<'a> {
     /// The machine connection, when the app provided it.
     pub fn machine(&self) -> Option<&'a Machine> {
         self.machine
+    }
+
+    /// The same context with the Designer's stock and tool for the program it last
+    /// generated.
+    ///
+    /// # Arguments
+    /// * `seed` - The Designer's stock and tool, if it generated a program.
+    pub fn with_stock_seed(mut self, seed: Option<StockSeed>) -> Self {
+        self.stock_seed = seed;
+        self
+    }
+
+    /// The Designer's stock and tool for the program it last generated, when the app
+    /// provided it.
+    pub fn stock_seed(&self) -> Option<StockSeed> {
+        self.stock_seed
     }
 
     /// Asks the app to run `command` once this frame's panes are drawn.

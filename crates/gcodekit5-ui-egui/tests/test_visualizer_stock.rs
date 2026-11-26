@@ -10,6 +10,7 @@ use egui_kittest::kittest::Queryable;
 use egui_kittest::{Harness, SnapshotOptions};
 use gcodekit5_app::i18n::Translator;
 use gcodekit5_settings::config::Config;
+use gcodekit5_ui_egui::panes::visualizer::pipeline::size_px;
 use gcodekit5_ui_egui::panes::visualizer::stock::{Notice, RESOLUTION, StockSetup};
 use gcodekit5_ui_egui::panes::visualizer::{self, StdView, VisualizerPane, toolpath};
 use gcodekit5_ui_egui::theme;
@@ -55,7 +56,10 @@ fn pane_harness(pane: VisualizerPane) -> Harness<'static, VisualizerPane> {
 /// Steps `harness` until neither the toolpath nor the stock is being built.
 fn settle(harness: &mut Harness<'_, VisualizerPane>) -> TestResult {
     let deadline = Instant::now() + Duration::from_secs(60);
-    while harness.state().is_building() || harness.state().stock().is_running() {
+    while harness.state().is_building()
+        || harness.state().stock().is_running()
+        || harness.state().stock_restart_pending()
+    {
         if Instant::now() > deadline {
             return Err("simulation never finished".into());
         }
@@ -186,23 +190,15 @@ fn test_cut_floor_meets_the_toolpath_in_view_space() -> TestResult {
         .collect();
     assert!(!floor.is_empty(), "a surface over the plunge");
     assert!(floor.iter().all(|p| p.z == -2.0), "floor at Z-2: {floor:?}");
-    // The toolpath's plunge ends at the same work point.
+    // The toolpath's plunge ends at the same work point (the render-level check is
+    // `test_rendered_cut_lies_in_its_groove`).
     let path = toolpath::build(&program(PLUNGE));
-    let tip = path
-        .vertices
-        .iter()
-        .map(|v| Vec3::from_array(v.pos))
-        .find(|p| *p == Vec3::new(10.0, 10.0, -2.0));
-    let tip = tip.ok_or("no toolpath vertex at the plunge")?;
-    // Both are drawn with the same camera transform, so they land on the same pixel.
-    let rect = pane.view_rect();
-    let view_proj = pane.camera().view_proj(rect.width() / rect.height());
-    let ndc = |p: Vec3| {
-        let clip = view_proj * p.extend(1.0);
-        clip.xyz() / clip.w
-    };
-    let floor_point = Vec3::new(10.0, 10.0, floor[0].z);
-    assert_eq!(ndc(floor_point), ndc(tip));
+    assert!(
+        path.vertices
+            .iter()
+            .any(|v| Vec3::from_array(v.pos) == Vec3::new(10.0, 10.0, -2.0)),
+        "no toolpath vertex at the plunge"
+    );
     // The untouched top is at work Z0.
     let top = vertices(&mesh).map(|(p, _)| p.z).fold(f32::MIN, f32::max);
     assert_eq!(top, 0.0);
@@ -407,5 +403,279 @@ fn test_snapshot_stock_groove_top() -> TestResult {
     harness.run();
     // From above, the cut runs along the middle of its groove.
     harness.snapshot_options("visualizer_stock_groove_top", &snapshot_options());
+    Ok(())
+}
+
+/// Two grooves 2 mm deep in the 60 x 40 mm stock: along X at Y20 (X10 to X30), and along Y
+/// at X45 (Y5 to Y35).
+const SLOTS: &str = "G21\nG90\nG0 Z5\nG0 X10 Y20\nM3 S1000\nG1 Z-2 F100\nG1 X30 F300\n\
+G0 Z5\nG0 X45 Y5\nG1 Z-2 F100\nG1 Y35 F300\nG0 Z5\nM5";
+
+/// The pixel of `image` at `world`'s projection in the pane's view.
+fn pixel_at(image: &image::RgbaImage, pane: &VisualizerPane, world: Vec3) -> Option<[u8; 4]> {
+    let rect = pane.view_rect();
+    let clip = pane.camera().view_proj(rect.width() / rect.height()) * world.extend(1.0);
+    let p = clip.xyz() / clip.w;
+    let x = rect.left() + (p.x + 1.0) / 2.0 * rect.width();
+    let y = rect.top() + (1.0 - p.y) / 2.0 * rect.height();
+    image.get_pixel_checked(x as u32, y as u32).map(|p| p.0)
+}
+
+/// Whether some pixel within 1 px of `world`'s projection `matches`.
+fn near(
+    image: &image::RgbaImage,
+    pane: &VisualizerPane,
+    world: Vec3,
+    matches: impl Fn([u8; 4]) -> bool,
+) -> bool {
+    let rect = pane.view_rect();
+    let clip = pane.camera().view_proj(rect.width() / rect.height()) * world.extend(1.0);
+    let p = clip.xyz() / clip.w;
+    let x = rect.left() + (p.x + 1.0) / 2.0 * rect.width();
+    let y = rect.top() + (1.0 - p.y) / 2.0 * rect.height();
+    (-1..=1).any(|dx| {
+        (-1..=1).any(|dy| {
+            image
+                .get_pixel_checked((x as i64 + dx) as u32, (y as i64 + dy) as u32)
+                .is_some_and(|p| matches(p.0))
+        })
+    })
+}
+
+/// Whether two colours are within `tolerance` per channel.
+fn similar(a: [u8; 4], b: [u8; 4], tolerance: u8) -> bool {
+    a.iter().zip(b).all(|(x, y)| x.abs_diff(y) <= tolerance)
+}
+
+/// Checks one groove in `image`, seen from 60 degrees up across it. `world(s, across, z)`
+/// is the point `s` mm along the groove, `across` mm from its centre line toward the far
+/// wall, at height `z`; `top` and `face` are points on the uncut top and on the stock face
+/// that faces the camera (lit like the far wall).
+fn check_groove(
+    image: &image::RgbaImage,
+    pane: &VisualizerPane,
+    world: impl Fn(f32, f32, f32) -> Vec3,
+    along: [f32; 2],
+    top: Vec3,
+    face: Vec3,
+) -> TestResult {
+    let top = pixel_at(image, pane, top).ok_or("top off view")?;
+    let face = pixel_at(image, pane, face).ok_or("face off view")?;
+    assert!(
+        !similar(top, face, 12),
+        "top {top:?} and face {face:?} tell apart"
+    );
+    let cut = [255, 255, 0, 255];
+    let lit_like = |reference: [u8; 4]| move |p: [u8; 4]| similar(p, reference, 6);
+    for s in along {
+        // The line at Z-2 shows only while the floor is at Z-2 and the near edge (1.6 mm
+        // from the line, at Z0) does not cover it.
+        assert!(
+            near(image, pane, world(s, 0.0, -2.0), |p| p == cut),
+            "the cut at {} shows in its groove",
+            world(s, 0.0, -2.0)
+        );
+        // The floor 1.3 mm toward the far wall (at 1.6 mm) shows only while the floor and
+        // the wall are where the cut put them.
+        assert!(
+            near(image, pane, world(s, 1.3, -2.0), lit_like(top)),
+            "the groove floor at {} shows (lit like the top)",
+            world(s, 1.3, -2.0)
+        );
+        assert!(
+            near(image, pane, world(s, 1.75, -1.6), lit_like(face)),
+            "the far wall behind {} shows (lit like the stock face)",
+            world(s, 1.75, -1.6)
+        );
+    }
+    Ok(())
+}
+
+#[test]
+fn test_rendered_cut_lies_in_its_groove() -> TestResult {
+    let mut harness = gpu_harness(VisualizerPane::new());
+    shown(&mut harness, groove_stock());
+    load(&mut harness, SLOTS);
+    settle(&mut harness)?;
+    let stock = visualizer::Aabb::new(Vec3::new(0.0, 0.0, -5.0), Vec3::new(60.0, 40.0, 0.0));
+    harness.state_mut().camera_mut().fit(stock);
+    // From the front (-Y), across the groove along X at Y20.
+    harness.state_mut().camera_mut().look(-90.0, 60.0);
+    harness.run();
+    let image = harness.render()?;
+    check_groove(
+        &image,
+        harness.state(),
+        |s, across, z| Vec3::new(s, 20.0 + across, z),
+        [15.0, 25.0],
+        Vec3::new(20.0, 32.0, 0.0),
+        Vec3::new(20.0, 0.0, -4.0),
+    )?;
+    // From the right (+X), across the groove along Y at X45.
+    harness.state_mut().camera_mut().look(0.0, 60.0);
+    harness.run();
+    let image = harness.render()?;
+    check_groove(
+        &image,
+        harness.state(),
+        |s, across, z| Vec3::new(45.0 - across, s, z),
+        [12.0, 28.0],
+        Vec3::new(35.0, 30.0, 0.0),
+        Vec3::new(60.0, 20.0, -4.0),
+    )
+}
+
+#[test]
+fn test_offscreen_size_follows_the_viewport() {
+    let screen = egui_wgpu::ScreenDescriptor {
+        size_in_pixels: [800, 600],
+        pixels_per_point: 2.0,
+    };
+    let rect = egui::Rect::from_min_max(egui::pos2(100.25, 10.0), egui::pos2(300.0, 400.0));
+    // Rounded per edge, clamped to the screen as egui clamps the callback's viewport.
+    assert_eq!(size_px(rect, &screen, 8192), [399, 580]);
+    // Never past the device's texture limit, never zero.
+    assert_eq!(size_px(rect, &screen, 256), [256, 256]);
+    let empty = egui::Rect::from_min_size(egui::pos2(10.0, 10.0), egui::Vec2::ZERO);
+    assert_eq!(size_px(empty, &screen, 8192), [1, 1]);
+}
+
+#[test]
+fn test_dragging_a_field_runs_one_simulation() -> TestResult {
+    let mut harness = pane_harness(VisualizerPane::new());
+    shown(&mut harness, small_stock());
+    load(&mut harness, GROOVE);
+    settle(&mut harness)?;
+    let ctx = harness.ctx.clone();
+    let mut last = small_stock();
+    // 50 edits a frame apart, as a drag makes them.
+    for i in 0..50 {
+        last.width = 40.0 + i as f32 * 0.5;
+        harness.state_mut().edit_stock_setup(last, &ctx);
+        harness.step();
+    }
+    assert!(
+        harness.state().stock_restart_pending(),
+        "still waiting for a pause"
+    );
+    settle(&mut harness)?;
+    let stock = harness.state().stock();
+    assert!(
+        stock.peak_workers() <= 2,
+        "{} workers at once",
+        stock.peak_workers()
+    );
+    let mesh = stock.mesh().ok_or("no mesh")?;
+    assert_eq!(mesh.setup, last, "simulated with the last values");
+    Ok(())
+}
+
+/// A CNC design in the app: a 30 x 20 mm rectangle cut 1 mm deep with a 2 mm tool in 6 mm
+/// stock.
+fn cnc_design(h: &mut Harness<'static, gcodekit5_ui_egui::GcodeKitApp>) {
+    use gcodekit5_designer::designer_state::MachineMode;
+    use gcodekit5_designer::model::{DesignRectangle, Shape};
+    use gcodekit5_designer::stock_removal::StockMaterial;
+    {
+        let designer = h.state().designer();
+        let mut designer = designer.borrow_mut();
+        let state = designer.state_mut();
+        state.set_machine_mode(MachineMode::Cnc3D);
+        state.stock_material = Some(StockMaterial::new(80.0, 60.0, 6.0, (0.0, 0.0, 0.0)));
+        state.set_tool_diameter(2.0);
+        state.add_shape_with_undo_and_depth(
+            Shape::Rectangle(DesignRectangle::new(20.0, 20.0, 40.0, 30.0)),
+            // A start depth of 1 mm: the profile is cut 1 mm into the 6 mm stock.
+            1.0,
+            1.0,
+        );
+    }
+    crate::test_designer_files_app::frames(h, 1);
+}
+
+#[test]
+fn test_designer_generate_seeds_the_stock() -> TestResult {
+    let (mut h, _script) =
+        crate::test_designer_files_app::app(crate::test_designer_files_app::default_state());
+    cnc_design(&mut h);
+    h.state()
+        .designer()
+        .borrow_mut()
+        .request_to_editor(gcodekit5_ui_egui::panes::designer::ToEditor::Generate);
+    crate::test_designer_files_app::frames(&mut h, 3);
+    let seed = h.state().state().stock_seed.ok_or("no seed")?;
+    assert_eq!(
+        (seed.width, seed.height, seed.thickness, seed.tool_diameter),
+        (80.0, 60.0, 6.0, 2.0)
+    );
+    let gcode = h.state().editor().borrow().buffer().text().to_string();
+
+    // The visualizer takes the seed with the program; the header says Stock Z0: bottom.
+    let tr = Translator::new("en");
+    let mut pane = VisualizerPane::new();
+    pane.configure(&config(true));
+    let mut harness = Harness::builder()
+        .with_size(egui::vec2(730.0, 600.0))
+        .build_ui_state(
+            move |ui, pane: &mut VisualizerPane| {
+                let mut requested = Vec::new();
+                let mut ctx = PaneContext::new(&tr, &mut requested).with_stock_seed(Some(seed));
+                pane.ui(ui, &mut ctx);
+            },
+            pane,
+        );
+    let ctx = harness.ctx.clone();
+    harness.state_mut().set_stock_shown(true, &ctx);
+    harness.run();
+    load(&mut harness, &gcode);
+    settle(&mut harness)?;
+    let pane = harness.state();
+    let setup = pane.stock_setup();
+    assert_eq!(
+        (
+            setup.width,
+            setup.height,
+            setup.thickness,
+            setup.tool_diameter
+        ),
+        (80.0, 60.0, 6.0, 2.0)
+    );
+    assert_eq!(setup.zero, StockZeroReference::Bottom);
+    let mesh = mesh_floats(pane)?;
+    assert_eq!(pane.stock().mesh().ok_or("no mesh")?.setup, setup);
+    // Safe-Z moves do not cut: the top stays at the stock thickness everywhere but the
+    // rectangle's outline (X20..60, Y20..50), and the cut is 1 mm deep.
+    let heights: Vec<f32> = vertices(&mesh)
+        .filter(|(_, n)| n.z > 0.9)
+        .map(|(p, _)| p.z)
+        .collect();
+    let top = heights.iter().copied().fold(f32::MIN, f32::max);
+    let floor = heights.iter().copied().fold(f32::MAX, f32::min);
+    assert_eq!(top, 6.0, "uncut top at the stock thickness");
+    assert!(
+        (floor - 5.0).abs() < 1e-4,
+        "the profile is 1 mm deep: {floor}"
+    );
+    let centre = glam::vec2(5.0, 5.0);
+    let tris: Vec<_> = vertices(&mesh).collect();
+    let over_corner: Vec<f32> = tris
+        .as_chunks::<3>()
+        .0
+        .iter()
+        .filter(|t| t.iter().all(|(_, n)| n.z > 0.9))
+        .filter(|t| {
+            contains(
+                t[0].0.truncate(),
+                t[1].0.truncate(),
+                t[2].0.truncate(),
+                centre,
+            )
+        })
+        .flat_map(|t| t.iter().map(|(p, _)| p.z))
+        .collect();
+    assert!(
+        !over_corner.is_empty() && over_corner.iter().all(|z| *z == 6.0),
+        "the travel from the origin did not cut: {over_corner:?}"
+    );
     Ok(())
 }

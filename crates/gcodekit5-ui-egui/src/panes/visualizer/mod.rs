@@ -17,14 +17,16 @@
 //! With the `enable_stock_removal_3d` setting on, the sidebar's Simulation section shows
 //! GTK's "Show Stock Removal": the stock is cut by the program on a worker ([`stock`]) and
 //! drawn lit and depth-tested with the toolpath. The run restarts when the program or the
-//! stock changes, and stops when the toggle or the setting is turned off.
+//! stock changes (field edits after a short pause), and stops when the toggle or the setting
+//! is turned off. As in GTK, each program the Designer generates brings the Designer's stock
+//! size and tool diameter with it ([`StockSeed`], through [`PaneContext::stock_seed`]); edits
+//! in the sidebar hold until the next one.
 //!
 //! Ported from the GTK `ui/gtk/visualizer/mod.rs`, `renderer_3d.rs`, `shaders.rs` and
 //! `nav_cube.rs`. Not ported: the 2D mode, the sidebar's toggles (show/hide rapids, cuts,
 //! grid, machine bounds and tool marker; grid spacing), machine bounds (no device profiles
 //! in the egui front end yet), run preview, scrollbars, fit to device, the zoom/centre/cursor
-//! status line, intensity statistics, and copying the Designer's stock into the simulation
-//! (the stock is edited in the sidebar instead).
+//! status line and intensity statistics.
 //!
 //! [`Machine::program`]: crate::machine::Machine::program
 //!
@@ -54,7 +56,7 @@ use gcodekit5_visualizer::visualizer::StockZeroReference;
 pub use nav_cube::NavAction;
 pub use pipeline::install;
 use pipeline::{Upload, UploadedMesh, VisualizerCallback};
-pub use stock::{StockSetup, StockSimulation};
+pub use stock::{StockSeed, StockSetup, StockSimulation};
 pub use toolpath::ToolpathMesh;
 
 use crate::commands::Command;
@@ -62,6 +64,8 @@ use crate::workspace::{Pane, PaneContext, PaneId};
 
 /// Millimetres the Zoom In / Zoom Out buttons and commands move the eye (GTK's step).
 pub const ZOOM_STEP: f32 = 10.0;
+/// How long a stock field must stay unchanged before the simulation restarts with it.
+pub const STOCK_EDIT_DEBOUNCE: std::time::Duration = std::time::Duration::from_millis(250);
 /// Millimetres of zoom per point of wheel scroll (GTK: 5 mm per wheel notch).
 const ZOOM_PER_SCROLL_POINT: f32 = 0.1;
 
@@ -112,6 +116,10 @@ pub struct VisualizerPane {
     /// The user's last Stock Z0 choice, used when a program records none.
     stock_zero_choice: StockZeroReference,
     stock: StockSimulation,
+    /// When an edited stock restarts the simulation (debounced field edits).
+    stock_restart_at: Option<std::time::Instant>,
+    /// The serial of the last Designer stock applied.
+    stock_seed_serial: Option<u64>,
 }
 
 impl Default for VisualizerPane {
@@ -143,6 +151,8 @@ impl VisualizerPane {
             stock_setup: StockSetup::default(),
             stock_zero_choice: StockZeroReference::default(),
             stock: StockSimulation::new(),
+            stock_restart_at: None,
+            stock_seed_serial: None,
         }
     }
 
@@ -192,9 +202,63 @@ impl VisualizerPane {
         self.restart_stock(repaint);
     }
 
+    /// Changes the stock and tool from a field edit: the simulation restarts once the values
+    /// stay unchanged for [`STOCK_EDIT_DEBOUNCE`], so dragging a field runs it once.
+    ///
+    /// # Arguments
+    /// * `setup` - The new stock and tool.
+    /// * `repaint` - Context to wake when the pause is over.
+    pub fn edit_stock_setup(&mut self, setup: StockSetup, repaint: &egui::Context) {
+        if setup == self.stock_setup {
+            return;
+        }
+        if setup.zero != self.stock_setup.zero {
+            self.stock_zero_choice = setup.zero;
+        }
+        self.stock_setup = setup;
+        if self.show_stock {
+            self.stock_restart_at = Some(std::time::Instant::now() + STOCK_EDIT_DEBOUNCE);
+            repaint.request_repaint_after(STOCK_EDIT_DEBOUNCE);
+        }
+    }
+
+    /// Whether an edited stock waits to restart the simulation.
+    pub fn stock_restart_pending(&self) -> bool {
+        self.stock_restart_at.is_some()
+    }
+
+    /// Restarts the simulation once a field edit's pause is over.
+    fn restart_stock_if_due(&mut self, repaint: &egui::Context) {
+        match self.stock_restart_at {
+            Some(at) if std::time::Instant::now() >= at => self.restart_stock(repaint),
+            Some(at) => {
+                repaint
+                    .request_repaint_after(at.saturating_duration_since(std::time::Instant::now()));
+            }
+            None => {}
+        }
+    }
+
+    /// Takes the Designer's stock and tool when it generated a program not applied yet
+    /// (GTK's `sync_stock_from_designer` and tool sync).
+    ///
+    /// # Returns
+    /// Whether the stock changed.
+    fn apply_stock_seed(&mut self, seed: Option<StockSeed>) -> bool {
+        let Some(seed) = seed.filter(|s| Some(s.serial) != self.stock_seed_serial) else {
+            return false;
+        };
+        self.stock_seed_serial = Some(seed.serial);
+        let seeded = seed.apply(self.stock_setup);
+        let changed = seeded != self.stock_setup;
+        self.stock_setup = seeded;
+        changed
+    }
+
     /// Starts the simulation afresh when shown (GTK's `restart_stock_simulation`), else
     /// stops it.
     fn restart_stock(&mut self, repaint: &egui::Context) {
+        self.stock_restart_at = None;
         if self.show_stock {
             self.stock
                 .start(self.stock_setup, self.program.clone(), repaint);
@@ -403,11 +467,22 @@ impl Pane for VisualizerPane {
 
     fn ui(&mut self, ui: &mut egui::Ui, ctx: &mut PaneContext) {
         let mut tool = None;
+        let seeded = self.apply_stock_seed(ctx.stock_seed());
+        let shown_program = self.program.clone();
         if let Some(machine) = ctx.machine() {
             self.load_program(machine.program().cloned(), ui.ctx());
             let status = machine.status();
             tool = status.work_position().filter(|_| status.connected);
         }
+        let reloaded = match (&shown_program, &self.program) {
+            (Some(a), Some(b)) => !Arc::ptr_eq(a, b),
+            (None, None) => false,
+            (Some(_), None) | (None, Some(_)) => true,
+        };
+        if seeded && !reloaded {
+            self.restart_stock(ui.ctx());
+        }
+        self.restart_stock_if_due(ui.ctx());
         self.poll_build();
         self.stock.poll();
         let bounds = self.cut_bounds.or(self.bounds);
@@ -439,7 +514,7 @@ impl Pane for VisualizerPane {
                         .inner
                 })
                 .inner;
-            self.set_stock_setup(setup, ui.ctx());
+            self.edit_stock_setup(setup, ui.ctx());
             self.set_stock_shown(show_stock, ui.ctx());
             match clicked {
                 Some(sidebar::SidebarAction::Fit) => self.fit(),

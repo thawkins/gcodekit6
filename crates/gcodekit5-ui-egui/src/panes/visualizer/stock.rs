@@ -9,22 +9,28 @@
 //! the mesh, and wakes the UI with a repaint request. The stock and tool are checked on the
 //! UI thread first ([`StockSimulator3D::validate`], which allocates nothing).
 //!
+//! A program is parsed into its toolpath once, by the first run that needs it, and shared by
+//! every later run of the same program, so a restart for a new stock only redoes the height
+//! map. A cancelled run stops before each expensive step (parse, allocation, cutting,
+//! meshing), and the pane debounces restarts from the stock fields, so dragging a field does
+//! not pile up workers.
+//!
 //! The simulation itself is the toolkit-free `gcodekit5-visualizer` `stock_removal_3d`
 //! (height map, flat end mill, greedy surface mesh), used unchanged.
 //!
 //! Dependencies: `egui` (repaint), `gcodekit5-visualizer` (parser, simulation),
 //! `gcodekit5-app` (translations).
 
-use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::mpsc::{Receiver, Sender, TryRecvError};
+use std::sync::{Arc, OnceLock};
 
 use gcodekit5_app::i18n::Translator;
 use gcodekit5_visualizer::Visualizer;
 use gcodekit5_visualizer::visualizer::stock_removal_3d::MESH_FLOATS_PER_VERTEX;
 use gcodekit5_visualizer::visualizer::{
-    StockSimulator3D, StockXyReference, StockZeroReference, detect_stock_zero_reference,
-    toolpath_from_commands,
+    StockSimulator3D, StockXyReference, StockZeroReference, ToolpathSegment,
+    detect_stock_zero_reference, toolpath_from_commands,
 };
 
 /// Cell size of the simulation in mm (GTK's).
@@ -68,6 +74,39 @@ impl Default for StockSetup {
             tool_diameter: 3.175,
             zero: StockZeroReference::default(),
             xy: StockXyReference::default(),
+        }
+    }
+}
+
+/// The Designer's stock and tool, handed to the visualizer with each program the Designer
+/// generates (GTK copied them on every G-code apply and page switch).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct StockSeed {
+    /// Changes with every generated program, so each is applied once.
+    pub serial: u64,
+    /// Stock size in X (mm).
+    pub width: f32,
+    /// Stock size in Y (mm).
+    pub height: f32,
+    /// Stock size in Z (mm).
+    pub thickness: f32,
+    /// The Designer's tool diameter (mm).
+    pub tool_diameter: f32,
+}
+
+impl StockSeed {
+    /// `setup` with the seed's stock size and tool; the zero references are kept (a
+    /// Designer program records its Stock Z0 in its header).
+    ///
+    /// # Arguments
+    /// * `setup` - The current stock and tool.
+    pub fn apply(&self, setup: StockSetup) -> StockSetup {
+        StockSetup {
+            width: self.width,
+            height: self.height,
+            thickness: self.thickness,
+            tool_diameter: self.tool_diameter,
+            ..setup
         }
     }
 }
@@ -133,6 +172,8 @@ pub struct StockMesh {
     pub generation: u64,
     /// Number of vertices.
     pub vertices: usize,
+    /// The stock and tool it was simulated with.
+    pub setup: StockSetup,
     /// The mesh ([`gcodekit5_visualizer::visualizer::stock_removal_3d::MESH_FLOATS_PER_VERTEX`]
     /// floats per vertex: position, normal, colour), until uploaded.
     pub upload: Arc<MeshUpload>,
@@ -154,6 +195,41 @@ enum Message {
 struct Run {
     cancel: Arc<AtomicBool>,
     results: Receiver<Message>,
+    setup: StockSetup,
+}
+
+/// A program's toolpath, parsed once by the first run that needs it.
+type SharedToolpath = Arc<OnceLock<Arc<[ToolpathSegment]>>>;
+
+/// Counts the worker threads alive, and the most alive at once.
+#[derive(Debug, Default)]
+struct WorkerCount {
+    live: AtomicUsize,
+    peak: AtomicUsize,
+}
+
+/// Holds one count in [`WorkerCount`] while a worker runs.
+struct WorkerGuard(Arc<WorkerCount>);
+
+impl WorkerGuard {
+    fn new(count: Arc<WorkerCount>) -> Self {
+        let live = count.live.fetch_add(1, Ordering::AcqRel) + 1;
+        count.peak.fetch_max(live, Ordering::AcqRel);
+        Self(count)
+    }
+}
+
+impl Drop for WorkerGuard {
+    fn drop(&mut self) {
+        self.0.live.fetch_sub(1, Ordering::AcqRel);
+    }
+}
+
+/// The toolpath of `lines`.
+fn parse(lines: &[String]) -> Arc<[ToolpathSegment]> {
+    let mut vis = Visualizer::new();
+    vis.parse_gcode(&lines.join("\n"));
+    toolpath_from_commands(vis.commands()).into()
 }
 
 /// Header lines (comments and blanks) of `lines` and the first command, joined: all that
@@ -188,6 +264,7 @@ pub fn recorded_zero(lines: &[String]) -> Option<StockZeroReference> {
 fn simulate(
     setup: StockSetup,
     lines: &[String],
+    toolpath: &SharedToolpath,
     cancel: &AtomicBool,
     gate: &AtomicBool,
     tx: &Sender<Message>,
@@ -202,10 +279,13 @@ fn simulate(
             repaint.request_repaint();
         }
     };
-    let mut vis = Visualizer::new();
-    vis.parse_gcode(&lines.join("\n"));
-    let toolpath = toolpath_from_commands(vis.commands());
-    drop(vis);
+    if cancelled() {
+        return;
+    }
+    let toolpath = Arc::clone(toolpath.get_or_init(|| parse(lines)));
+    if cancelled() {
+        return;
+    }
     if toolpath.is_empty() {
         send(Message::NoMoves);
         return;
@@ -226,6 +306,9 @@ fn simulate(
             return;
         }
     };
+    if cancelled() {
+        return;
+    }
     let mut last = u8::MAX;
     let completed = simulator.simulate_toolpath_with_progress(&toolpath, |fraction| {
         let pct = (fraction * 100.0).round().clamp(0.0, 100.0) as u8;
@@ -250,6 +333,9 @@ pub struct StockSimulation {
     generation: u64,
     /// Test hook: while set, a new run waits before it starts simulating.
     gate: Arc<AtomicBool>,
+    /// The program last simulated and its toolpath, shared by its runs.
+    parsed: Option<(Arc<[String]>, SharedToolpath)>,
+    workers: Arc<WorkerCount>,
 }
 
 impl std::fmt::Debug for StockSimulation {
@@ -280,6 +366,8 @@ impl StockSimulation {
             notice: None,
             generation: 0,
             gate: Arc::new(AtomicBool::new(false)),
+            parsed: None,
+            workers: Arc::new(WorkerCount::default()),
         }
     }
 
@@ -315,8 +403,18 @@ impl StockSimulation {
         }
         let Some(lines) = program else {
             self.notice = Some(Notice::NoMoves);
+            self.parsed = None;
             return;
         };
+        let toolpath = match &self.parsed {
+            Some((program, toolpath)) if Arc::ptr_eq(program, &lines) => Arc::clone(toolpath),
+            Some(_) | None => {
+                let toolpath = SharedToolpath::default();
+                self.parsed = Some((Arc::clone(&lines), Arc::clone(&toolpath)));
+                toolpath
+            }
+        };
+        let workers = Arc::clone(&self.workers);
         let cancel = Arc::new(AtomicBool::new(false));
         let (tx, results) = std::sync::mpsc::channel();
         let worker_cancel = Arc::clone(&cancel);
@@ -324,9 +422,26 @@ impl StockSimulation {
         let repaint = repaint.clone();
         let spawned = std::thread::Builder::new()
             .name("gcodekit5-stock-sim".into())
-            .spawn(move || simulate(setup, &lines, &worker_cancel, &gate, &tx, &repaint));
+            .spawn(move || {
+                let _guard = WorkerGuard::new(workers);
+                simulate(
+                    setup,
+                    &lines,
+                    &toolpath,
+                    &worker_cancel,
+                    &gate,
+                    &tx,
+                    &repaint,
+                );
+            });
         match spawned {
-            Ok(_) => self.run = Some(Run { cancel, results }),
+            Ok(_) => {
+                self.run = Some(Run {
+                    cancel,
+                    results,
+                    setup,
+                });
+            }
             Err(error) => {
                 tracing::error!(%error, "stock simulation thread not started");
                 self.notice = Some(Notice::Failed);
@@ -339,6 +454,7 @@ impl StockSimulation {
         let Some(run) = &self.run else {
             return;
         };
+        let setup = run.setup;
         loop {
             match run.results.try_recv() {
                 Ok(Message::Progress(pct)) => self.progress = pct,
@@ -347,6 +463,7 @@ impl StockSimulation {
                     self.mesh = Some(StockMesh {
                         generation: self.generation,
                         vertices,
+                        setup,
                         upload: Arc::new(MeshUpload::new(mesh)),
                     });
                     self.run = None;
@@ -408,6 +525,20 @@ impl StockSimulation {
     #[cfg(feature = "test-support")]
     pub fn pause_worker(&self, paused: bool) {
         self.gate.store(paused, Ordering::Release);
+    }
+
+    /// Test hook: the most worker threads that were alive at once.
+    #[doc(hidden)]
+    #[cfg(feature = "test-support")]
+    pub fn peak_workers(&self) -> usize {
+        self.workers.peak.load(Ordering::Acquire)
+    }
+
+    /// Test hook: the worker threads alive now.
+    #[doc(hidden)]
+    #[cfg(feature = "test-support")]
+    pub fn live_workers(&self) -> usize {
+        self.workers.live.load(Ordering::Acquire)
     }
 }
 
