@@ -132,6 +132,17 @@ impl Default for DesignerPane {
     }
 }
 
+/// An Edit action on the design's own clipboard ([`DesignerPane::clipboard`]).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ClipboardOp {
+    /// Copy the selection, then delete it.
+    Cut,
+    /// Copy the selection.
+    Copy,
+    /// Paste the copies at the pointer.
+    Paste,
+}
+
 impl DesignerPane {
     /// An empty design with the Select tool.
     pub fn new() -> Self {
@@ -444,20 +455,19 @@ impl DesignerPane {
     /// on the canvas, with new ids, as one undo step. Ignored during a canvas drag.
     ///
     /// # Arguments
-    /// * `command` - `Cut`, `Copy` or `Paste`; any other command does nothing.
-    fn clipboard(&mut self, command: Command) {
+    /// * `op` - Cut, Copy or Paste.
+    fn clipboard(&mut self, op: ClipboardOp) {
         if self.dragging() {
-            tracing::debug!(?command, "clipboard ignored during a canvas drag");
+            tracing::debug!(?op, "clipboard ignored during a canvas drag");
             return;
         }
-        match command {
-            Command::Cut => editing::cut_selected(&mut self.state),
-            Command::Copy => self.state.copy_selected(),
-            Command::Paste => {
+        match op {
+            ClipboardOp::Cut => editing::cut_selected(&mut self.state),
+            ClipboardOp::Copy => self.state.copy_selected(),
+            ClipboardOp::Paste => {
                 let (x, y) = self.input.hover.unwrap_or(self.cursor);
                 self.state.paste_at_location(x, y);
             }
-            _ => return,
         }
         self.touch();
     }
@@ -687,7 +697,9 @@ impl Pane for DesignerPane {
             Command::ZoomOut => self.apply_view(ViewAction::ZoomOut),
             Command::ZoomFit => self.apply_view(ViewAction::FitContent),
             Command::ResetView => self.apply_view(ViewAction::FitViewport),
-            Command::Cut | Command::Copy | Command::Paste => self.clipboard(command),
+            Command::Cut => self.clipboard(ClipboardOp::Cut),
+            Command::Copy => self.clipboard(ClipboardOp::Copy),
+            Command::Paste => self.clipboard(ClipboardOp::Paste),
             Command::AlignLeft => self.edit(DesignerState::align_selected_horizontal_left),
             Command::AlignRight => self.edit(DesignerState::align_selected_horizontal_right),
             Command::AlignTop => self.edit(DesignerState::align_selected_vertical_top),
