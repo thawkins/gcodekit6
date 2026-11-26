@@ -336,3 +336,59 @@ fn test_stock_zero_reference_still_applies_with_xy_reference() {
     assert_eq!(sim.stock_top_z(), 10.0);
     assert_eq!(sim.height_map().height_at(5, 5), Some(7.0));
 }
+
+/// Mesh positions, three per triangle, with each triangle's normal.
+fn triangles(mesh: &[f32]) -> Vec<([glam::Vec3; 3], glam::Vec3)> {
+    let vertex = |v: &[f32; 10]| {
+        (
+            glam::Vec3::new(v[0], v[1], v[2]),
+            glam::Vec3::new(v[3], v[4], v[5]),
+        )
+    };
+    mesh.as_chunks::<10>()
+        .0
+        .as_chunks::<3>()
+        .0
+        .iter()
+        .map(|t| {
+            let (a, n) = vertex(&t[0]);
+            ([a, vertex(&t[1]).0, vertex(&t[2]).0], n)
+        })
+        .collect()
+}
+
+/// Whether `p` lies strictly inside the segment `a -> b`.
+fn strictly_inside(a: glam::Vec3, b: glam::Vec3, p: glam::Vec3) -> bool {
+    let ab = b - a;
+    let t = (p - a).dot(ab) / ab.length_squared();
+    t > 1e-4 && t < 1.0 - 1e-4 && (a + ab * t).distance(p) < 1e-4
+}
+
+#[test]
+fn test_mesh_top_surface_has_no_t_junctions() {
+    // Pockets at two depths and a slot, so merged tops of several sizes meet
+    // each other and walls part-way along their edges.
+    let mut sim = StockSimulator3D::new(12.0, 10.0, 5.0, 1.0, 1.0).expect("valid stock");
+    sim.simulate_toolpath(&[
+        plunge(3.0, 3.0, -2.0),
+        linear((3.0, 3.0, -2.0), (9.0, 3.0, -2.0)),
+        plunge(8.0, 7.0, -3.5),
+        plunge(4.0, 7.5, -1.0),
+    ]);
+    let mesh = sim.get_mesh();
+    let tris = triangles(&mesh);
+    let vertices: Vec<glam::Vec3> = tris.iter().flat_map(|(t, _)| *t).collect();
+    let mut checked = 0;
+    for (t, normal) in tris.iter().filter(|(_, n)| n.z > 0.5) {
+        for k in 0..3 {
+            let (a, b) = (t[k], t[(k + 1) % 3]);
+            // A fan edge from a face centre is interior to its face; only
+            // edges on the face outline can meet other faces.
+            if let Some(p) = vertices.iter().find(|p| strictly_inside(a, b, **p)) {
+                panic!("T-junction: {p} inside edge {a} -> {b} (normal {normal})");
+            }
+            checked += 1;
+        }
+    }
+    assert!(checked > 0);
+}
