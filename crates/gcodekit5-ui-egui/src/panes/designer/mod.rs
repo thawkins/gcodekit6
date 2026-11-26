@@ -411,6 +411,21 @@ impl DesignerPane {
         editing::rotate_selected_by(&mut self.state, degrees);
     }
 
+    /// Runs a shape operation from a key (Align, Group, Ungroup) and records the change, so
+    /// the toolpath preview follows it ([`DesignerPane::revision`]). Ignored during a canvas
+    /// drag, which still holds the shapes it started from.
+    ///
+    /// # Arguments
+    /// * `op` - The model's operation on the selection.
+    fn edit(&mut self, op: fn(&mut DesignerState)) {
+        if self.dragging() {
+            tracing::debug!("shape edit ignored during a canvas drag");
+            return;
+        }
+        op(&mut self.state);
+        self.touch();
+    }
+
     /// Cut, Copy or Paste of shapes through the design's own clipboard, as GTK's Edit
     /// actions on the Designer page: Paste centres the copies on the pointer's last point
     /// on the canvas, with new ids, as one undo step. Ignored during a canvas drag.
@@ -640,14 +655,14 @@ impl Pane for DesignerPane {
             Command::ZoomFit => self.apply_view(ViewAction::FitContent),
             Command::ResetView => self.apply_view(ViewAction::FitViewport),
             Command::Cut | Command::Copy | Command::Paste => self.clipboard(command),
-            Command::AlignLeft => self.state.align_selected_horizontal_left(),
-            Command::AlignRight => self.state.align_selected_horizontal_right(),
-            Command::AlignTop => self.state.align_selected_vertical_top(),
-            Command::AlignBottom => self.state.align_selected_vertical_bottom(),
-            Command::AlignCenterX => self.state.align_selected_horizontal_center(),
-            Command::AlignCenterY => self.state.align_selected_vertical_center(),
-            Command::Group => self.state.group_selected(),
-            Command::Ungroup => self.state.ungroup_selected(),
+            Command::AlignLeft => self.edit(DesignerState::align_selected_horizontal_left),
+            Command::AlignRight => self.edit(DesignerState::align_selected_horizontal_right),
+            Command::AlignTop => self.edit(DesignerState::align_selected_vertical_top),
+            Command::AlignBottom => self.edit(DesignerState::align_selected_vertical_bottom),
+            Command::AlignCenterX => self.edit(DesignerState::align_selected_horizontal_center),
+            Command::AlignCenterY => self.edit(DesignerState::align_selected_vertical_center),
+            Command::Group => self.edit(DesignerState::group_selected),
+            Command::Ungroup => self.edit(DesignerState::ungroup_selected),
             Command::FileNew
             | Command::FileNew3d
             | Command::FileOpen

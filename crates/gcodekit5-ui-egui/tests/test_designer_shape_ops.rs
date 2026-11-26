@@ -425,3 +425,41 @@ fn test_group_and_ungroup_from_context_menu() {
     h.run();
     assert_eq!(groups(h.state()), vec![None, None]);
 }
+
+#[test]
+fn test_key_edits_count_as_design_changes() {
+    // The toolpath preview rebuilds when the revision grows: every key edit must grow it.
+    let (mut h, designer) = app_with_two_selected();
+    for (modifiers, key) in [
+        (Modifiers::ALT, egui::Key::L),
+        (Modifiers::ALT, egui::Key::T),
+        (Modifiers::COMMAND, egui::Key::G),
+        (Modifiers::COMMAND | Modifiers::SHIFT, egui::Key::G),
+        (Modifiers::COMMAND, egui::Key::C),
+        (Modifiers::COMMAND, egui::Key::V),
+        (Modifiers::COMMAND, egui::Key::X),
+    ] {
+        let before = designer.borrow().revision();
+        h.key_press_modifiers(modifiers, key);
+        h.run();
+        assert!(
+            designer.borrow().revision() > before,
+            "{modifiers:?}+{key:?}"
+        );
+    }
+}
+
+#[test]
+fn test_context_menu_edits_count_as_design_changes() {
+    for item in ["Mirror on X", "Union", "Copy", "Group"] {
+        let mut h = harness(pane_with_rects(&[
+            (0.0, 0.0, 20.0, 20.0),
+            (10.0, 0.0, 20.0, 20.0),
+        ]));
+        open_menu_with_all_selected(&mut h, 5.0, 5.0);
+        let before = h.state().revision();
+        h.get_by_label(item).click();
+        h.run();
+        assert!(h.state().revision() > before, "{item}");
+    }
+}
