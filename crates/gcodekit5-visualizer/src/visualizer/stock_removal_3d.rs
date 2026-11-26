@@ -544,14 +544,27 @@ impl CornerIndex {
     }
 }
 
-/// The faces of `map` at its own resolution: merged tops, bottoms and walls.
+/// Fails with [`MeshAbort::OverBudget`] once `quads` holds more faces than `budget`: each
+/// face becomes at least one quad of the mesh, so the list need not grow further.
+fn check_faces(quads: &[GridQuad], budget: usize) -> Result<(), MeshAbort> {
+    if quads.len() > budget {
+        Err(MeshAbort::OverBudget)
+    } else {
+        Ok(())
+    }
+}
+
+/// The faces of `map` at its own resolution: merged tops, bottoms and walls. Stops with
+/// [`MeshAbort::OverBudget`] as soon as there are more faces than quads left in `builder`'s
+/// budget, so a map near the budget does not hold a face list larger than the mesh.
 fn grid_quads(map: &HeightMap, builder: &MeshBuilder<'_>) -> Result<Vec<GridQuad>, MeshAbort> {
     let (cols, rows) = (map.cols, map.rows);
     let solid = |c: usize, r: usize| map.solid_height(c as isize, r as isize);
+    let budget = builder.quads_left();
     let mut quads = Vec::new();
 
     // Top faces, merged by equal height.
-    let tops = greedy_rects(cols, rows, builder.quads_left(), builder, |c, r| {
+    let tops = greedy_rects(cols, rows, budget, builder, |c, r| {
         let h = solid(c, r);
         (h > 0.0).then_some(h)
     })?;
@@ -563,7 +576,7 @@ fn grid_quads(map: &HeightMap, builder: &MeshBuilder<'_>) -> Result<Vec<GridQuad
     }
 
     // Bottom faces under every column that still has material.
-    let bottoms = greedy_rects(cols, rows, builder.quads_left(), builder, |c, r| {
+    let bottoms = greedy_rects(cols, rows, budget - quads.len(), builder, |c, r| {
         (solid(c, r) > 0.0).then_some(())
     })?;
     for (c0, r0, c1, r1, ()) in bottoms {
@@ -601,6 +614,7 @@ fn grid_quads(map: &HeightMap, builder: &MeshBuilder<'_>) -> Result<Vec<GridQuad
                     ],
                     normal: if left > right { Vec3::X } else { Vec3::NEG_X },
                 });
+                check_faces(&quads, budget)?;
             }
             row = end;
         }
@@ -632,11 +646,29 @@ fn grid_quads(map: &HeightMap, builder: &MeshBuilder<'_>) -> Result<Vec<GridQuad
                     ],
                     normal: if below > above { Vec3::Y } else { Vec3::NEG_Y },
                 });
+                check_faces(&quads, budget)?;
             }
             col = end;
         }
     }
     Ok(quads)
+}
+
+/// The number of faces (merged tops, bottoms and walls) `map` is meshed from at its own
+/// resolution, or `None` when there are more than a mesh of `max_floats` floats can hold.
+/// Exposed for tests of the face list's budget.
+///
+/// # Arguments
+/// * `map` - Height map to mesh.
+/// * `max_floats` - Largest mesh to build, in floats.
+#[doc(hidden)]
+pub fn grid_face_count_within(map: &HeightMap, max_floats: usize) -> Option<usize> {
+    let builder = MeshBuilder {
+        vertices: Vec::new(),
+        max_floats,
+        cancel: &|| false,
+    };
+    grid_quads(map, &builder).ok().map(|quads| quads.len())
 }
 
 /// Build the mesh of `map` at its own resolution, within `builder`'s budget.

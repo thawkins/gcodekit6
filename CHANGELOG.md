@@ -22,6 +22,9 @@
 - **Console history kept across sessions in egui**: the console's Up/Down history is GTK's model and file, `command_history.json` in the legacy settings folder, at most 250 commands; both front ends now save it through the shared atomic writer, and a damaged file starts an empty history
 - **Replace and Replace All in the egui editor**: GTK's replace row under the find row ("Replace with ...", Replace, Replace All), enabled when the query has matches and the replacement is not empty; Replace changes the current match and moves to the next, Replace All changes every match (ASCII case ignored, as find) as one undo step, and both are disabled and refused while a job runs or a large file is shown read-only
 
+### Fixed
+- **Stock removal mesh memory**: the face list a stock mesh is built from stops as soon as it holds more faces than the mesh budget can take, so a stock near the vertex budget no longer holds a transient face list of up to about 1 GB before falling back to a coarser mesh (both front ends)
+
 ### Known gaps
 - Not yet ported from GTK: the visualizer and designer items listed in `docs/reports/egui-parity.md`
 

@@ -4,6 +4,7 @@
 
 use gcodekit5_visualizer::visualizer::{
     MAX_MESH_FLOATS, StockXyReference, StockZeroReference, generate_surface_mesh_within,
+    grid_face_count_within,
 };
 use gcodekit5_visualizer::{
     StockSimulator3D, ToolpathSegment, ToolpathSegmentType, Visualizer, toolpath_from_commands,
@@ -391,4 +392,19 @@ fn test_mesh_top_surface_has_no_t_junctions() {
         }
     }
     assert!(checked > 0);
+}
+
+#[test]
+fn test_stock_removal_face_list_stops_at_the_budget() {
+    // Near the vertex budget the face list itself (tops, bottoms and walls) used to grow
+    // without bound before the mesh was checked: it must stop once it passes the quads that
+    // still fit.
+    let sim = ramped_stock();
+    let map = sim.height_map();
+    let all = grid_face_count_within(map, MAX_MESH_FLOATS).expect("faces within the budget");
+    assert!(all > 40, "a ramp has many faces: {all}");
+    // Room for 20 quads (6 vertices of 10 floats each).
+    assert_eq!(grid_face_count_within(map, 20 * 60), None);
+    assert_eq!(grid_face_count_within(map, all * 60), Some(all));
+    assert_eq!(grid_face_count_within(map, (all - 1) * 60), None);
 }
