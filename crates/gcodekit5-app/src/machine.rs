@@ -352,10 +352,11 @@ enum Command {
     Stop,
     /// A line that does not change the machine state (a `$J=` jog, a `$G` query), answered
     /// through [`MachineController::lines_answered`]'s own count rather than a state-line
-    /// sequence number, so it never makes the latest report stale.
-    Line(String),
-    /// A command line that may change the machine state, with its sequence number.
-    StateLine(String, u64),
+    /// sequence number, so it never makes the latest report stale. With when it was sent.
+    Line(String, Instant),
+    /// A command line that may change the machine state, with its sequence number and when
+    /// it was sent.
+    StateLine(String, u64, Instant),
     Realtime(u8),
     Shutdown,
 }
@@ -591,6 +592,24 @@ impl MachineController {
     /// Refused (reported as [`MachineEvent::Error`]) for a non-finite distance, a feed
     /// that is not positive, or while a program streams.
     pub fn jog(&mut self, axis: Axis, distance_mm: f32, feed_mm_min: f32) {
+        self.jog_sent_at(axis, distance_mm, feed_mm_min, Instant::now());
+    }
+
+    /// [`jog`](Self::jog) as if it had been sent at `sent`, so tests can reproduce a jog that
+    /// was still in the worker's channel when the controller reset.
+    #[cfg(feature = "test-support")]
+    #[doc(hidden)]
+    pub fn jog_sent_earlier(
+        &mut self,
+        axis: Axis,
+        distance_mm: f32,
+        feed_mm_min: f32,
+        sent: Instant,
+    ) {
+        self.jog_sent_at(axis, distance_mm, feed_mm_min, sent);
+    }
+
+    fn jog_sent_at(&mut self, axis: Axis, distance_mm: f32, feed_mm_min: f32, sent: Instant) {
         if !distance_mm.is_finite() || !(feed_mm_min.is_finite() && feed_mm_min > 0.0) {
             self.pending.push(MachineEvent::Error(format!(
                 "{}: {distance_mm}, {feed_mm_min}",
@@ -605,7 +624,7 @@ impl MachineController {
             return;
         }
         let line = linear_jog_command(axis.letter(), distance_mm, feed_mm_min);
-        match self.send(Command::Line(line)) {
+        match self.send(Command::Line(line, sent)) {
             Ok(()) => self.jogs_requested += 1,
             Err(e) => self.pending.push(MachineEvent::Error(e.to_string())),
         }
@@ -624,7 +643,11 @@ impl MachineController {
     pub fn send_line(&mut self, line: &str) -> Result<(), MachineError> {
         let line = self.check_line(line)?;
         self.requested += 1;
-        self.send(Command::StateLine(line.to_string(), self.requested))
+        self.send(Command::StateLine(
+            line.to_string(),
+            self.requested,
+            Instant::now(),
+        ))
     }
 
     /// Queues a line that only asks the controller something (`$G`), behind any manual line
@@ -636,7 +659,7 @@ impl MachineController {
     /// As [`send_line`](Self::send_line).
     pub fn send_query(&mut self, line: &str) -> Result<(), MachineError> {
         let line = self.check_line(line)?;
-        self.send(Command::Line(line.to_string()))?;
+        self.send(Command::Line(line.to_string(), Instant::now()))?;
         self.jogs_requested += 1;
         Ok(())
     }
@@ -677,7 +700,11 @@ impl MachineController {
     #[doc(hidden)]
     pub fn queue_line_unchecked(&mut self, line: &str) {
         self.requested += 1;
-        self.send_or_report(Command::StateLine(line.to_string(), self.requested));
+        self.send_or_report(Command::StateLine(
+            line.to_string(),
+            self.requested,
+            Instant::now(),
+        ));
     }
 
     /// Whether the latest status report was read after every line sent with
@@ -912,6 +939,9 @@ struct WorkerState {
     jog_seen: bool,
     /// The stream being halted after an error, see [`StreamMode::StopOnError`].
     halt: Option<Halt>,
+    /// When the controller's last reset banner was read: manual lines sent before it are
+    /// dropped when they arrive, as the ones already queued were.
+    reset_at: Option<Instant>,
 }
 
 /// Why the worker loop ended.
@@ -954,6 +984,7 @@ impl WorkerState {
             jog_outstanding: false,
             jog_seen: false,
             halt: None,
+            reset_at: None,
         }
     }
 
@@ -1106,8 +1137,8 @@ impl WorkerState {
                 self.reset_buffers();
                 self.end_stream(false);
             }
-            Command::Line(line) => self.queue_manual(line, 0),
-            Command::StateLine(line, seq) => self.queue_manual(line, seq),
+            Command::Line(line, sent) => self.queue_manual(line, 0, sent),
+            Command::StateLine(line, seq, sent) => self.queue_manual(line, seq, sent),
             Command::Stream(program, mode) => {
                 self.paused = false;
                 self.stream = Some(Stream {
@@ -1203,7 +1234,15 @@ impl WorkerState {
     /// Queues a manual line (`seq` > 0 for a state line), or reports one too long for the
     /// controller's buffer, which then never runs. (`send_line` already refuses such lines;
     /// this is defence in depth.)
-    fn queue_manual(&mut self, line: String, seq: u64) {
+    fn queue_manual(&mut self, line: String, seq: u64, sent: Instant) {
+        // Sent before the controller reset itself, but still in the channel when its banner
+        // was read: the reset dropped everything queued then, so this line goes too. A jog
+        // written after the reset would move a machine the user saw reset.
+        if self.reset_at.is_some_and(|reset| sent < reset) {
+            tracing::info!(%line, "manual line sent before a controller reset dropped");
+            self.drop_line(seq);
+            return;
+        }
         if !self.window.fits_at_all(&line) {
             self.sink.emit(MachineEvent::Error(format!(
                 "{}: {line}",
@@ -1355,7 +1394,9 @@ impl WorkerState {
                 // Report the banner before the stream end it causes, so a consumer
                 // that stops at `StreamStopped` has already seen why.
                 self.sink.emit(MachineEvent::Received(banner));
-                // The controller restarted: nothing in flight will be acknowledged.
+                // The controller restarted: nothing in flight will be acknowledged, and no
+                // line sent before it may run after it.
+                self.reset_at = Some(Instant::now());
                 self.reset_buffers();
                 self.end_stream(false);
             }

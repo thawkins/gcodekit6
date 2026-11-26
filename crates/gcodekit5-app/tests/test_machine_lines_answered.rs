@@ -140,12 +140,44 @@ fn test_lines_answered_after_a_reset_drops_jogs() {
         controller.jog(Axis::Y, 1.0, 1000.0);
     }
     assert!(wait(&mut controller, |_| jogs_written(&shared) > 0));
-    // Let the worker take every jog from its channel first: a jog still in the channel at
-    // the reset would be a new line after it, written and (acks held) never answered.
-    std::thread::sleep(Duration::from_millis(20));
-    controller.poll();
+    // Some jogs may still be in the worker's channel when the banner is read: they were
+    // sent before the reset, so they are dropped too. One written after the reset would,
+    // with acks held, never be answered.
     shared.inject("Grbl 1.1h ['$' for help]\n");
     assert!(wait(&mut controller, MachineController::lines_answered));
+}
+
+/// A jog sent before the controller reset itself, but still in the worker's channel when
+/// the reset banner was read, is dropped rather than written after the reset.
+#[test]
+fn test_jog_sent_before_a_reset_never_runs_after_it() {
+    use gcodekit5_app::machine::Axis;
+    let (mut controller, shared) = connected();
+    shared.hold_acks.store(true, Ordering::SeqCst);
+    let before_reset = Instant::now();
+    shared.inject("Grbl 1.1h ['$' for help]\n");
+    assert!(
+        wait_event(&mut controller, |e| matches!(
+            e,
+            MachineEvent::Received(line) if line.starts_with("Grbl")
+        )),
+        "banner never read"
+    );
+    controller.jog_sent_earlier(Axis::Y, 1.0, 1000.0, before_reset);
+    assert!(wait(&mut controller, MachineController::lines_answered));
+    assert_eq!(jogs_written(&shared), 0, "{:?}", shared.log());
+}
+
+/// Polls `controller` until an event matching `cond` arrives or [`EVENTUALLY`] passes.
+fn wait_event(controller: &mut MachineController, cond: impl Fn(&MachineEvent) -> bool) -> bool {
+    let deadline = Instant::now() + EVENTUALLY;
+    while Instant::now() < deadline {
+        if controller.poll().iter().any(&cond) {
+            return true;
+        }
+        std::thread::sleep(Duration::from_millis(1));
+    }
+    false
 }
 
 #[test]
