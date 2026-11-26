@@ -161,6 +161,11 @@ pub struct AppState {
     /// settings folder); `None` without a settings folder. Replace it (with
     /// [`AppState::with_materials_file`]) before the app is built from the state.
     pub materials_file: Option<PathBuf>,
+    /// The console's command history file (the GTK build's `command_history.json` in the
+    /// legacy settings folder); `None` without a settings folder, which keeps the history
+    /// for the session. Replace it (with [`AppState::with_history_file`]) before the app is
+    /// built from the state.
+    pub history_file: Option<PathBuf>,
     /// The Designer's stock and tool for the program it last generated, which the
     /// visualizer's stock removal simulation takes (GTK's `sync_stock_from_designer`).
     pub stock_seed: Option<crate::panes::visualizer::StockSeed>,
@@ -177,6 +182,10 @@ impl AppState {
         let device_file = settings.dirs().map(|dirs| dirs.legacy.join(DEVICES_FILE));
         let tools_file = settings.dirs().map(|dirs| dirs.legacy.join(TOOLS_FILE));
         let materials_file = settings.dirs().map(|dirs| dirs.legacy.join(MATERIALS_FILE));
+        let history_file = settings.dirs().map(|dirs| {
+            dirs.legacy
+                .join(gcodekit5_app::command_history::HISTORY_FILE)
+        });
         Self {
             settings,
             translator,
@@ -187,6 +196,7 @@ impl AppState {
             device_file,
             tools_file,
             materials_file,
+            history_file,
             stock_seed: None,
         }
     }
@@ -206,6 +216,16 @@ impl AppState {
     /// * `file` - The custom materials file.
     pub fn with_materials_file(mut self, file: PathBuf) -> Self {
         self.materials_file = Some(file);
+        self
+    }
+
+    /// The same state keeping the console's command history in `file` (a test folder, for
+    /// example).
+    ///
+    /// # Arguments
+    /// * `file` - The command history file.
+    pub fn with_history_file(mut self, file: PathBuf) -> Self {
+        self.history_file = Some(file);
         self
     }
 
@@ -423,9 +443,10 @@ impl GcodeKitApp {
         }
         let mut workspace = Workspace::new();
         workspace.set_pane(Box::new(machine_control_pane(&state)));
-        workspace.set_pane(Box::new(ConsolePane::new(Arc::clone(
-            state.machine.controller(),
-        ))));
+        workspace.set_pane(Box::new(
+            ConsolePane::new(Arc::clone(state.machine.controller()))
+                .with_history_file(state.history_file.clone()),
+        ));
         let editor = Rc::new(RefCell::new(EditorPane::new()));
         workspace.set_pane(Box::new(SharedEditor(Rc::clone(&editor))));
         workspace.set_pane(Box::new(VisualizerPane::new()));

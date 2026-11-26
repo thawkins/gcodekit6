@@ -100,7 +100,7 @@ Status values:
 | Hide status reports | 15-console | Ported | `test_console_pane::console_filters_status_reports` |
 | Per-level filter buttons, timestamps | 15-console | Not applicable | Not in the GTK source |
 | Command history (Up/Down) | 15-console | Ported | `app/test_command_history::navigate_up`, `app/test_command_history::navigate_down` |
-| Command history kept across sessions | *(GTK)* | Gap | GTK writes a history file; egui keeps it for the session |
+| Command history kept across sessions | *(GTK)* | Ported | `test_console_pane::test_console_history_kept_across_sessions`, `app/test_command_history::test_history_file_round_trip`, `app/test_command_history::test_history_file_missing_damaged_or_long` (GTK's `command_history.json` in the legacy settings folder, 250 commands, written atomically) |
 | Bounded buffer | 15-console | Ported | `test_console_pane::console_buffer_is_bounded` |
 | Auto-scroll | 15-console | Manual check needed | egui scroll area sticks to the bottom; no test |
 | Clear | 15-console | Manual check needed | Button exists; no test |
@@ -265,7 +265,7 @@ Ranked by user impact. Sizes are rough estimates for one developer who knows the
 | 7 | Visualizer run preview (play/pause/speed) | Low | 1-2 days |
 | 8 | Import STL | Low: behind a Settings switch in GTK | 1 day |
 | 11 | Preferences Controller page and shortcut editor | Low | 1-2 days |
-| 12 | Persistent console history, designer device work area, gallery icons | Low | 1-2 days together |
+| 12 | Designer device work area, gallery icons | Low | 1-2 days together |
 
 Manual checks still to run before GTK is deleted (no automated evidence): TCP and
 WebSocket connections, auto-reconnect, non-GRBL firmwares and the grblHAL simulator, Windows

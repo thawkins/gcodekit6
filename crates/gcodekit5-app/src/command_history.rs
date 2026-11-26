@@ -1,16 +1,23 @@
-//! # Command History Panel
+//! # Command History
 //!
-//! Displays a scrollable list of previously sent G-code commands
-//! with timestamps and status indicators. Supports command re-send
-//! and history search.
+//! The console's command history: the commands typed in the console entry, newest last,
+//! with Up/Down navigation. It is kept across sessions in [`HISTORY_FILE`] (JSON) in the
+//! settings folder, written through the shared atomic writer, and bounded to
+//! [`MAX_HISTORY`] commands. Both front ends use this model and file.
+//!
+//! Dependencies: `serde`/`serde_json` (file format), `gcodekit5-core` (atomic write),
+//! `dirs` (the settings folder).
 
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 /// Most commands kept; older ones are dropped.
 pub const MAX_HISTORY: usize = 250;
+
+/// The history's file name in the settings folder (the GTK build's).
+pub const HISTORY_FILE: &str = "command_history.json";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CommandHistory {
@@ -128,26 +135,54 @@ impl CommandHistory {
             .join("gcodekit5");
 
         fs::create_dir_all(&config_dir).ok();
-        config_dir.join("command_history.json")
+        config_dir.join(HISTORY_FILE)
     }
 
+    /// The history saved in the settings folder, or an empty one.
     pub fn load() -> Self {
-        let path = Self::get_config_path();
-
-        if let Ok(contents) = fs::read_to_string(&path)
-            && let Ok(history) = serde_json::from_str::<Self>(&contents)
-        {
-            return history;
-        }
-
-        Self::new()
+        Self::load_from(&Self::get_config_path())
     }
 
+    /// The history saved in `path`; empty when the file is missing or cannot be parsed. A
+    /// file holding more than [`MAX_HISTORY`] commands keeps the newest.
+    ///
+    /// # Arguments
+    /// * `path` - The history file.
+    pub fn load_from(path: &Path) -> Self {
+        let Ok(contents) = fs::read_to_string(path) else {
+            return Self::new();
+        };
+        match serde_json::from_str::<Self>(&contents) {
+            Ok(mut history) => {
+                while history.commands.len() > MAX_HISTORY {
+                    history.commands.pop_front();
+                }
+                history
+            }
+            Err(error) => {
+                tracing::warn!(path = %path.display(), %error, "command history unreadable");
+                Self::new()
+            }
+        }
+    }
+
+    /// Saves the history in the settings folder; a failure is logged.
     pub fn save(&self) {
         let path = Self::get_config_path();
-
-        if let Ok(json) = serde_json::to_string_pretty(self) {
-            let _ = fs::write(&path, json);
+        if let Err(error) = self.save_to(&path) {
+            tracing::warn!(path = %path.display(), %error, "command history not saved");
         }
+    }
+
+    /// Saves the history to `path` through the shared atomic writer.
+    ///
+    /// # Arguments
+    /// * `path` - The history file.
+    ///
+    /// # Errors
+    /// The JSON encoding or the write failed.
+    pub fn save_to(&self, path: &Path) -> std::io::Result<()> {
+        let json = serde_json::to_string_pretty(self).map_err(std::io::Error::other)?;
+        gcodekit5_core::files::write_atomic(path, &json)
     }
 }

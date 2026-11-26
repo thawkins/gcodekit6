@@ -228,3 +228,67 @@ fn test_console_header_buttons_in_app() {
         .any(|c| matches!(c, egui::OutputCommand::CopyText(text) if text.ends_with("ALARM:1")));
     assert!(copied, "{:?}", harness.output().platform_output.commands);
 }
+
+/// A fresh scratch folder under `target/temp` for this test.
+fn scratch(name: &str) -> std::path::PathBuf {
+    let dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../target/temp/console_history")
+        .join(format!("{name}-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(&dir).expect("scratch dir");
+    dir
+}
+
+const ENTRY: &str = "Type a command and press Enter...";
+
+/// An app connected to a loopback machine whose console keeps its history in `file`.
+fn history_app(
+    file: &std::path::Path,
+) -> (
+    egui_kittest::Harness<'static, gcodekit5_ui_egui::GcodeKitApp>,
+    std::sync::Arc<gcodekit5_app::test_support::LoopbackShared>,
+) {
+    let (state, shared) = crate::machine_support::loopback_state(Duration::from_millis(1));
+    let mut state = state.with_history_file(file.to_path_buf());
+    crate::machine_support::connect(&mut state);
+    let mut harness =
+        crate::machine_support::app_harness(gcodekit5_ui_egui::GcodeKitApp::from_state(state));
+    harness.step();
+    harness.step();
+    harness
+        .get_by_role_and_label(egui::accesskit::Role::TextInput, ENTRY)
+        .click();
+    harness.step();
+    (harness, shared)
+}
+
+/// A command typed in one session is in the next session's history (GTK's
+/// `command_history.json`), and Up brings it back.
+#[test]
+fn test_console_history_kept_across_sessions() {
+    let file = scratch("across_sessions").join(gcodekit5_app::command_history::HISTORY_FILE);
+    {
+        let (mut harness, shared) = history_app(&file);
+        harness
+            .get_by_role_and_label(egui::accesskit::Role::TextInput, ENTRY)
+            .type_text("G0 X7");
+        harness.step();
+        harness.key_press(egui::Key::Enter);
+        harness.step();
+        assert!(
+            wait_until(|| shared
+                .log()
+                .iter()
+                .any(|w| matches!(w, Wrote::Line(l) if l.trim() == "G0 X7"))),
+            "line not written"
+        );
+    }
+    let saved = gcodekit5_app::command_history::CommandHistory::load_from(&file);
+    assert_eq!(saved.get(0), Some("G0 X7"));
+
+    let (mut harness, _shared) = history_app(&file);
+    harness.key_press(egui::Key::ArrowUp);
+    harness.step();
+    let entry = harness.get_by_role_and_label(egui::accesskit::Role::TextInput, ENTRY);
+    assert_eq!(entry.value().as_deref(), Some("G0 X7"));
+}

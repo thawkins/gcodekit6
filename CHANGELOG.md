@@ -19,6 +19,7 @@
 
 - **Job times in the egui status bar**: while a job streams, GTK's `Elapsed: HH:MM:SS` and `Remaining: HH:MM:SS` sit beside the progress bar; the remaining time is GTK's estimate, the average time per acknowledged line times the lines left
 - **Feed and spindle in the egui status bar**: GTK's `F: <feed>  S: <rpm> RPM` readout follows the position while connected, from the status report, in Preferences' feed units with two decimals
+- **Console history kept across sessions in egui**: the console's Up/Down history is GTK's model and file, `command_history.json` in the legacy settings folder, at most 250 commands; both front ends now save it through the shared atomic writer, and a damaged file starts an empty history
 ### Known gaps
 - Not yet ported from GTK: editor replace, and the visualizer and designer items listed in `docs/reports/egui-parity.md`
 

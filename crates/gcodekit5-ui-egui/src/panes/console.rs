@@ -11,18 +11,22 @@
 //! arrive many times a second and are shown in the DRO and status bar instead. A line typed
 //! in the entry goes through [`MachineController::send_line`], the path of the Machine Control
 //! command entry, and is echoed as `> line` once the controller accepts it; a refusal is shown
-//! under the log. Up and Down in the entry walk the lines sent in this session. The header
+//! under the log. Up and Down in the entry walk the command history, GTK's
+//! [`CommandHistory`]: kept across sessions in GTK's `command_history.json` when the app has
+//! a settings folder (see [`ConsolePane::with_history_file`]), at most
+//! [`gcodekit5_app::command_history::MAX_HISTORY`] commands. The header
 //! has GTK's icon buttons: Clear console, Copy last error (see [`ConsolePane::last_error`])
 //! and Help.
 //!
-//! Ported from the GTK `ui/gtk/device_console.rs` view. Not ported: the persistent command
-//! history file (the history lasts for the session), and the `ok` pairing of the GTK listener
-//! (acknowledgements are not events here).
+//! Ported from the GTK `ui/gtk/device_console.rs` view. Not ported: the `ok` pairing of the
+//! GTK listener (acknowledgements are not events here).
 //!
 //! Dependencies: `egui`, `gcodekit5-app` (console model, controller, translations).
 
+use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
+use gcodekit5_app::command_history::CommandHistory;
 use gcodekit5_app::console::{ConsolePanel, MessageLevel};
 use gcodekit5_app::i18n::Translator;
 use gcodekit5_app::machine::{MachineController, MachineEvent};
@@ -58,8 +62,10 @@ pub struct ConsolePane {
     log: ConsolePanel,
     /// The command entry's text.
     input: String,
-    /// The history line the entry shows (index into the log's history), while browsing.
-    history_cursor: Option<usize>,
+    /// The commands typed in the entry, with the Up/Down position.
+    history: CommandHistory,
+    /// Where the history is kept across sessions; `None` keeps it for the session.
+    history_file: Option<PathBuf>,
     /// The controller's refusal of the last line typed, shown until the next one.
     notice: Option<String>,
 }
@@ -102,9 +108,24 @@ impl ConsolePane {
             controller,
             log,
             input: String::new(),
-            history_cursor: None,
+            history: CommandHistory::new(),
+            history_file: None,
             notice: None,
         }
+    }
+
+    /// The same console keeping its command history in `file` (GTK's
+    /// `command_history.json`), loaded now and saved after each command; `None` keeps it for
+    /// the session.
+    ///
+    /// # Arguments
+    /// * `file` - The history file, if there is a settings folder.
+    pub fn with_history_file(mut self, file: Option<PathBuf>) -> Self {
+        self.history = file
+            .as_deref()
+            .map_or_else(CommandHistory::new, CommandHistory::load_from);
+        self.history_file = file;
+        self
     }
 
     /// Logs `events` (oldest first); see the module docs for what is kept.
@@ -192,32 +213,31 @@ impl ConsolePane {
         match result {
             Ok(()) => {
                 // The echo (`> line`) arrives as `MachineEvent::Sent` once it is written.
-                self.log.add_to_history(&line);
+                self.history.add(line);
+                self.history.reset_navigation();
+                if let Some(file) = &self.history_file
+                    && let Err(error) = self.history.save_to(file)
+                {
+                    tracing::warn!(file = %file.display(), %error, "command history not saved");
+                }
                 self.input.clear();
-                self.history_cursor = None;
                 self.notice = None;
             }
             Err(error) => self.notice = Some(error.to_string()),
         }
     }
 
-    /// Moves the entry to the previous (`older`) or next history line.
+    /// Moves the entry to the previous (`older`) or next history line, as GTK's console:
+    /// past the newest line the text typed before browsing comes back.
     fn browse_history(&mut self, older: bool) {
-        let history = self.log.get_history();
-        let next = match (self.history_cursor, older) {
-            (_, _) if history.is_empty() => return,
-            (None, true) => history.len() - 1,
-            (Some(i), true) => i.saturating_sub(1),
-            (None, false) => return,
-            (Some(i), false) if i + 1 < history.len() => i + 1,
-            (Some(_), false) => {
-                self.history_cursor = None;
-                self.input.clear();
-                return;
-            }
+        let line = if older {
+            self.history.previous(&self.input)
+        } else {
+            self.history.next()
         };
-        self.history_cursor = Some(next);
-        self.input.clone_from(&history[next]);
+        if let Some(line) = line {
+            self.input = line;
+        }
     }
 
     /// Draws the command entry, enabled while connected and no program streams.
