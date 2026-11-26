@@ -350,7 +350,8 @@ type SharedHook = Arc<Mutex<Option<RepaintHook>>>;
 /// Requests sent from the controller to its worker.
 #[derive(Debug)]
 enum Command {
-    Stream(Arc<[String]>, StreamMode),
+    /// A program to stream, with when it was started.
+    Stream(Arc<[String]>, StreamMode, Instant),
     Pause,
     Resume,
     Stop,
@@ -563,13 +564,34 @@ impl MachineController {
         program: Arc<[String]>,
         mode: StreamMode,
     ) -> Result<(), MachineError> {
+        self.start_stream_at(program, mode, Instant::now())
+    }
+
+    /// [`start_stream_with`](Self::start_stream_with) as if it had been called at `sent`, so
+    /// tests can reproduce a program start still in the worker's channel at a reset.
+    #[cfg(feature = "test-support")]
+    #[doc(hidden)]
+    pub fn start_stream_sent_earlier(
+        &mut self,
+        program: Arc<[String]>,
+        sent: Instant,
+    ) -> Result<(), MachineError> {
+        self.start_stream_at(program, StreamMode::default(), sent)
+    }
+
+    fn start_stream_at(
+        &mut self,
+        program: Arc<[String]>,
+        mode: StreamMode,
+        sent: Instant,
+    ) -> Result<(), MachineError> {
         if !self.is_worker_running() {
             return Err(MachineError::NotConnected);
         }
         if self.streaming.swap(true, Ordering::SeqCst) {
             return Err(MachineError::StreamInProgress);
         }
-        if let Err(e) = self.send(Command::Stream(program, mode)) {
+        if let Err(e) = self.send(Command::Stream(program, mode, sent)) {
             self.streaming.store(false, Ordering::SeqCst);
             return Err(e);
         }
@@ -1143,7 +1165,22 @@ impl WorkerState {
             }
             Command::Line(line, sent) => self.queue_manual(line, 0, sent),
             Command::StateLine(line, seq, sent) => self.queue_manual(line, seq, sent),
-            Command::Stream(program, mode) => {
+            Command::Stream(program, _, sent)
+                if self.reset_at.is_some_and(|reset| sent < reset) =>
+            {
+                // Started before the controller reset itself: it must not run after it.
+                let total = program.len();
+                tracing::info!(total, "program started before a controller reset dropped");
+                self.sink.emit(MachineEvent::Error(format!(
+                    "{}: {}",
+                    worker_text::NOT_SENT_AFTER_RESET,
+                    program.first().map_or("", String::as_str)
+                )));
+                self.streaming.store(false, Ordering::SeqCst);
+                self.sink
+                    .emit(MachineEvent::StreamStopped { acked: 0, total });
+            }
+            Command::Stream(program, mode, _) => {
                 self.paused = false;
                 self.stream = Some(Stream {
                     program,

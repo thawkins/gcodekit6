@@ -207,6 +207,48 @@ fn test_line_sent_in_answer_to_a_reset_banner_is_written() {
     assert!(written(&shared, "$G"), "$G dropped: {:?}", shared.log());
 }
 
+/// A program start still in the worker's channel when the controller's reset banner is
+/// read never runs: it is reported and ends as stopped, with no program line written.
+#[test]
+fn test_stream_started_before_a_reset_never_runs_after_it() {
+    let (mut controller, shared) = connected();
+    let before_reset = Instant::now();
+    shared.inject("Grbl 1.1h ['$' for help]\n");
+    assert!(
+        wait_event(&mut controller, |e| matches!(
+            e,
+            MachineEvent::Received(line) if line.starts_with("Grbl")
+        )),
+        "banner never read"
+    );
+    let program: Arc<[String]> = vec!["G1 X5 F100".to_string(), "G1 X9".to_string()].into();
+    controller
+        .start_stream_sent_earlier(program, before_reset)
+        .expect("start");
+    let mut events = Vec::new();
+    let deadline = Instant::now() + EVENTUALLY;
+    while !events
+        .iter()
+        .any(|e| matches!(e, MachineEvent::StreamStopped { .. }))
+        && Instant::now() < deadline
+    {
+        events.extend(controller.poll());
+        std::thread::sleep(Duration::from_millis(1));
+    }
+    assert!(
+        events.contains(&MachineEvent::StreamStopped { acked: 0, total: 2 }),
+        "{events:?}"
+    );
+    assert!(
+        events.contains(&MachineEvent::Error(
+            "not sent: the controller was reset: G1 X5 F100".to_string()
+        )),
+        "{events:?}"
+    );
+    assert!(!controller.is_streaming());
+    assert!(!written(&shared, "G1 X5 F100"), "{:?}", shared.log());
+}
+
 /// Polls `controller` until an event matching `cond` arrives or [`EVENTUALLY`] passes.
 fn wait_event(controller: &mut MachineController, cond: impl Fn(&MachineEvent) -> bool) -> bool {
     let deadline = Instant::now() + EVENTUALLY;
