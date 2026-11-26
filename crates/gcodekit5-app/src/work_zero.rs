@@ -202,9 +202,9 @@ pub fn parser_state_wcs(line: &str) -> Option<WcsWord> {
     Some(wcs_in_line(inner).unwrap_or(WcsWord::Other))
 }
 
-/// The last system a G-code line selects (`G55`, `G0G59X0`, `G 055`), if any: [`WcsWord::Other`] for
-/// a `G54.x`-`G59.x` word (`G59.1`, `G54.1`). Comments (`(...)`, `; ...`) and `$` lines
-/// select none.
+/// The last system a G-code line selects (`G55`, `G0G59X0`, `G 055`), if any:
+/// [`WcsWord::Other`] for a `G54.x`-`G59.x` word (`G59.1`, `G54.1`). Comments (`(...)`,
+/// `; ...`) and `$` lines select none.
 ///
 /// # Arguments
 /// * `line` - A G-code line, as sent to the controller.
