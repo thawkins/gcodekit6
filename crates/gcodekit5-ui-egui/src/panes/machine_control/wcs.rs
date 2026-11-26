@@ -7,7 +7,8 @@
 //! of a stream whose program may select a system (one not seen starting counts as such), and
 //! holds the zero buttons until the answer is in, so a `G10 L20 P<n>` never names a system
 //! other than the one shown. `$G` is sent as a query (`MachineController::send_query`): it
-//! does not hold up jogging. It goes out while the pane is drawn, where its buttons are.
+//! does not hold up jogging. It goes out from the pane's per-frame work, which runs whether
+//! or not the Machine Control page is shown.
 //! Only a controller that never reports its parser state falls back to the user's last
 //! selection (G54 at first), as the GTK front end did.
 //!
@@ -142,7 +143,7 @@ impl WcsPanel {
         self.not_grbl = !grbl;
     }
 
-    /// Notes, once per frame while a stream runs, whether its program may select a system:
+    /// Notes, once per frame (drawn or not) while a stream runs, whether its program may select a system:
     /// the loaded program (the one Start streams) holds a G54-G59 word.
     ///
     /// # Arguments

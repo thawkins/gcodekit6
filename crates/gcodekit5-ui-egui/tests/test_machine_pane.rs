@@ -385,3 +385,65 @@ fn test_coalesce_progress_keeps_latest() {
         ]
     );
 }
+
+/// A connect made, and then lost, while another page is shown leaves Machine Control showing
+/// the real state on return, not "Connecting…": the pane follows the machine's events while
+/// it is hidden.
+#[test]
+fn test_connection_state_follows_events_while_hidden() {
+    let (mut harness, _shared) = pane_app(Duration::from_millis(1), false);
+    harness
+        .state_mut()
+        .show_page(gcodekit5_ui_egui::workspace::Page::Visualizer);
+    harness.step();
+    harness.state_mut().dispatch(Command::Connect);
+    assert!(
+        step_until(&mut harness, |app| app.state().machine.status().connected),
+        "never connected"
+    );
+    gcodekit5_ui_egui::machine::lock(harness.state().state().machine.controller()).disconnect();
+    assert!(
+        step_until(&mut harness, |app| !app.state().machine.status().connected),
+        "never disconnected"
+    );
+    harness
+        .state_mut()
+        .show_page(gcodekit5_ui_egui::workspace::Page::MachineControl);
+    harness.step();
+    harness.step();
+    assert!(
+        harness.query_by_label("Connecting…").is_none(),
+        "stale connecting state"
+    );
+    assert!(
+        harness
+            .query_by_role_and_label(Role::Button, "Connect")
+            .is_some(),
+        "no Connect button"
+    );
+}
+
+/// The work zero `$G` query after a connect goes out while Machine Control is hidden, so
+/// the active system is known before the page is shown.
+#[test]
+fn test_work_zero_query_runs_while_hidden() {
+    let (mut harness, shared) = pane_app(Duration::from_millis(1), false);
+    harness
+        .state_mut()
+        .show_page(gcodekit5_ui_egui::workspace::Page::Designer);
+    harness.step();
+    harness.state_mut().dispatch(Command::Connect);
+    assert!(
+        step_until(&mut harness, |_| shared
+            .log()
+            .contains(&Wrote::Line("$G".to_string()))),
+        "no $G while hidden: {:?}",
+        shared.log()
+    );
+    assert!(
+        !harness
+            .state()
+            .workspace()
+            .is_drawn(gcodekit5_ui_egui::workspace::PaneId::MachineControl)
+    );
+}

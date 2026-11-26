@@ -111,32 +111,40 @@ impl GcodeKitApp {
         }
     }
 
-    /// Runs the firmware settings' reads and writes, and draws them into `page` when the
-    /// Device Config page is shown.
-    pub(super) fn show_firmware_settings(&mut self, page: Option<&mut egui::Ui>) {
-        let Some(ctx) = self.wake_ctx.get().cloned() else {
-            return;
-        };
-        let profile_controller = self
-            .device_manager
+    /// The active device profile's controller type, if a profile is active.
+    fn profile_controller(&self) -> Option<gcodekit5_devicedb::ControllerType> {
+        self.device_manager
             .active_profile()
-            .map(|p| p.controller_type);
-        self.firmware_settings.show(
-            &ctx,
-            page,
-            &self.state.machine,
+            .map(|p| p.controller_type)
+    }
+
+    /// Runs the firmware settings' reads and writes; called once every frame, before the
+    /// page is drawn, whatever page is shown.
+    pub(super) fn update_firmware_settings(&mut self, ctx: &egui::Context) {
+        let controller = self.profile_controller();
+        self.firmware_settings.update(
+            ctx,
             self.device_info.identity(),
-            profile_controller,
+            controller,
             &self.state.translator,
         );
     }
 
-    /// Runs the firmware settings while their page is not shown, draws the Device Info
-    /// window, takes Sync from Device and shows the file dialog Firmware Settings asked for.
+    /// Draws the firmware settings into the Device Config page's `ui`.
+    pub(super) fn show_firmware_settings(&mut self, ui: &mut egui::Ui) {
+        let controller = self.profile_controller();
+        self.firmware_settings.show(
+            ui,
+            &self.state.machine,
+            self.device_info.identity(),
+            controller,
+            &self.state.translator,
+        );
+    }
+
+    /// Draws the Device Info window, takes Sync from Device and shows the file dialog
+    /// Firmware Settings asked for.
     pub(super) fn show_machine_windows(&mut self, ctx: &egui::Context) {
-        if self.workspace.page() != Page::DeviceConfig {
-            self.show_firmware_settings(None);
-        }
         let tr = &self.state.translator;
         self.device_info.show(ctx, &self.state.machine, tr);
         if self.device_manager.take_sync_request() {

@@ -501,9 +501,6 @@ impl Pane for MachineControlPane {
         let default_status = MachineStatus::default();
         let machine = ctx.machine();
         let status = machine.map_or(&default_status, |m| m.status());
-        if let Some(machine) = machine {
-            self.follow_events(machine.events());
-        }
         let has_program = machine.and_then(|m| m.program()).is_some();
         egui::ScrollArea::vertical()
             .auto_shrink([false, false])
@@ -542,11 +539,6 @@ impl Pane for MachineControlPane {
                 ui.separator();
                 self.show_safety(ui, tr, status);
                 ui.separator();
-                // Asks `$G` when the active system may have changed; zeroing waits for it.
-                if let Some(machine) = machine {
-                    self.wcs.watch_stream(machine);
-                    self.wcs.drive(machine);
-                }
                 let blocked = self.wcs.blocked(status);
                 let reason = blocked.map(|msgid| tr.tr(msgid));
                 let zero = dro::ZeroButtons {
@@ -621,7 +613,16 @@ impl Pane for MachineControlPane {
     }
 
     fn machine_events(&mut self, events: &[MachineEvent], _tr: &Translator) {
+        // Here, not in `ui`: the pane is hidden on every page but Machine Control, and the
+        // connection state and the work zero query must follow the machine meanwhile.
+        self.follow_events(events);
         self.wcs.follow(events);
+    }
+
+    fn frame(&mut self, machine: &Machine) {
+        // Asks `$G` when the active system may have changed; zeroing waits for it.
+        self.wcs.watch_stream(machine);
+        self.wcs.drive(machine);
     }
 
     fn set_controller(&mut self, controller: Option<&gcodekit5_devicedb::ControllerType>) {

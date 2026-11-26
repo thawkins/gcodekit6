@@ -336,6 +336,15 @@ pub trait Pane {
         let _ = (events, tr);
     }
 
+    /// Runs once every frame, whether or not the pane is drawn, for work that must follow
+    /// the machine while the pane's page is hidden (a query that keeps its state current).
+    ///
+    /// # Arguments
+    /// * `machine` - The app's machine connection.
+    fn frame(&mut self, machine: &Machine) {
+        let _ = machine;
+    }
+
     /// Takes the active device profile's controller type (at start and when it changes).
     ///
     /// # Arguments
@@ -539,6 +548,16 @@ impl Workspace {
     pub fn machine_events(&mut self, events: &[MachineEvent], tr: &Translator) {
         for pane in &mut self.panes {
             pane.machine_events(events, tr);
+        }
+    }
+
+    /// Runs every pane's per-frame work ([`Pane::frame`]), drawn or not.
+    ///
+    /// # Arguments
+    /// * `machine` - The app's machine connection.
+    pub fn frame(&mut self, machine: &Machine) {
+        for pane in &mut self.panes {
+            pane.frame(machine);
         }
     }
 

@@ -18,27 +18,22 @@ use crate::machine::Machine;
 use crate::windows::help::{self, HelpTopic};
 
 impl FirmwareSettingsWindow {
-    /// Keeps the settings' reads and writes going, and draws the Device Config page (and the
-    /// open editor) into `page` when the page is shown.
+    /// Keeps the settings' reads and writes going. The app calls this once every frame,
+    /// whether or not the Device Config page is shown.
     ///
     /// # Arguments
     /// * `ctx` - The egui context.
-    /// * `page` - The page's `Ui`, when the Device Config page is shown.
-    /// * `machine` - The app's machine connection, for reading and writing settings.
     /// * `identity` - What the controller reported about itself (Repetier or GRBL).
     /// * `profile_controller` - The active device profile's controller type, if any.
-    /// * `tr` - Translates the labels.
-    pub fn show(
+    /// * `tr` - Translates the notices.
+    pub fn update(
         &mut self,
         ctx: &egui::Context,
-        page: Option<&mut egui::Ui>,
-        machine: &Machine,
         identity: &DeviceIdentity,
         profile_controller: Option<ControllerType>,
         tr: &Translator,
     ) {
         self.tick(tr);
-        let profile_repetier = profile_controller == Some(ControllerType::Repetier);
         self.family = GrblFamily::detect(identity, profile_controller);
         if let Some(write) = &self.write {
             ctx.request_repaint_after(write.pending.time_left());
@@ -46,11 +41,27 @@ impl FirmwareSettingsWindow {
         if self.retrieval.is_some() {
             ctx.request_repaint_after(Duration::from_millis(250));
         }
-        let Some(ui) = page else {
-            return;
-        };
+    }
+
+    /// Draws the Device Config page (and the open editor) into `ui`.
+    ///
+    /// # Arguments
+    /// * `ui` - The page's `Ui`.
+    /// * `machine` - The app's machine connection, for reading and writing settings.
+    /// * `identity` - What the controller reported about itself (Repetier or GRBL).
+    /// * `profile_controller` - The active device profile's controller type, if any.
+    /// * `tr` - Translates the labels.
+    pub fn show(
+        &mut self,
+        ui: &mut egui::Ui,
+        machine: &Machine,
+        identity: &DeviceIdentity,
+        profile_controller: Option<ControllerType>,
+        tr: &Translator,
+    ) {
+        let profile_repetier = profile_controller == Some(ControllerType::Repetier);
         self.contents(ui, machine, identity, profile_repetier, tr);
-        self.show_editor(ctx, machine, tr);
+        self.show_editor(ui.ctx(), machine, tr);
     }
 
     fn contents(

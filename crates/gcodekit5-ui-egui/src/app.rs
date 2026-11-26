@@ -673,6 +673,8 @@ impl GcodeKitApp {
             self.handle_answer(answer);
         }
         self.dispatch_keys(&ctx);
+        self.update_firmware_settings(&ctx);
+        self.workspace.frame(&self.state.machine);
         let gate = Gate {
             text_editing: ctx.text_edit_focused(),
             ..Gate::default()
@@ -1347,7 +1349,7 @@ impl GcodeKitApp {
                 self.device_manager
                     .show(ui, &self.state.machine, self.state.settings.config(), tr);
             }
-            Page::DeviceConfig => self.show_firmware_settings(Some(ui)),
+            Page::DeviceConfig => self.show_firmware_settings(ui),
             Page::CncTools => self.tools_manager.show(ui, tr),
             Page::Materials => self.materials_manager.show(ui, tr),
             Page::Designer | Page::Visualizer | Page::MachineControl | Page::CamTools => {}
