@@ -23,9 +23,15 @@
 //! asks first when the editor holds any G-code, as GTK did; the question is asked again at
 //! Yes, which is refused if a job started meanwhile.
 //!
-//! Ported from the GTK `ui/gtk/editor.rs` (GtkSourceView). Not ported: replace and replace
-//! all, and the line-counter tooltip; the GTK find box's match index ("2 of 5") is shown as
-//! the match count only.
+//! Under the find row, GTK's replace row: "Replace with ...", Replace (the current match,
+//! then on to the next; with no current match it moves to the first) and Replace All. Both
+//! are enabled, as in GTK, when the query has matches and the replacement is not empty, and
+//! are disabled, and refused, while a job runs or a large file is shown read-only. Each is
+//! one step of the text field's undo: the text before it is recorded as an undo point (see
+//! [`EditorPane::pending_undo`]) before the field draws the new text.
+//!
+//! Ported from the GTK `ui/gtk/editor.rs` (GtkSourceView). Not ported: the line-counter
+//! tooltip; the GTK find box's match index ("2 of 5") is shown as the match count only.
 //!
 //! Dependencies: `egui`, `anyhow`, `gcodekit5-app` (machine events, translations).
 
@@ -85,6 +91,9 @@ pub fn msgids() -> Vec<&'static str> {
         n_!("Cannot stream this program"),
         READ_ONLY_DURING_JOB,
         n_!("Clear editor"),
+        n_!("Replace with ..."),
+        n_!("Replace"),
+        n_!("Replace All"),
     ]
 }
 
@@ -111,6 +120,11 @@ pub struct EditorPane {
     select_match: bool,
     /// Match count of `(query, generation)`, so it is not recounted every frame.
     find_count: Option<(String, u64, usize)>,
+    /// What Replace and Replace All put in place of a match.
+    replace_text: String,
+    /// The text before a replace, to record as the text field's undo point before the field
+    /// next draws (so the replace is one undo step).
+    pending_undo: Option<String>,
     /// A line to scroll into view, and the frames left to try (the scroll area clamps an
     /// offset to the previous frame's content, so the first try can fall short).
     scroll_to: Option<(usize, u8)>,
@@ -150,6 +164,8 @@ impl EditorPane {
             find_match: None,
             select_match: false,
             find_count: None,
+            replace_text: String::new(),
+            pending_undo: None,
             scroll_to: None,
             longest: None,
             visible: 0..0,
@@ -176,6 +192,7 @@ impl EditorPane {
         *self = Self {
             buffer,
             find_query: std::mem::take(&mut self.find_query),
+            replace_text: std::mem::take(&mut self.replace_text),
             fed: None,
             scroll_to: Some((0, SCROLL_TRIES)),
             ..Self::new()
@@ -235,6 +252,82 @@ impl EditorPane {
             .map_or(self.buffer.text().len(), |m| m.start);
         let found = find::find_previous(self.buffer.text(), &self.find_query, before);
         self.show_match(found);
+    }
+
+    /// Sets what Replace and Replace All put in place of a match.
+    ///
+    /// # Arguments
+    /// * `text` - The replacement.
+    pub fn set_replace_text(&mut self, text: &str) {
+        text.clone_into(&mut self.replace_text);
+    }
+
+    /// Whether the text may be changed: no job runs and no large file is shown read-only.
+    fn editable(&self) -> bool {
+        !self.locked && (self.edit_large || !self.is_large())
+    }
+
+    /// Whether a replace is refused; while a job runs the notice says why.
+    fn replace_refused(&mut self, tr: &Translator) -> bool {
+        if self.locked {
+            self.notice = Some(tr.tr(READ_ONLY_DURING_JOB).into_owned());
+        }
+        !self.editable() || self.find_query.is_empty() || self.replace_text.is_empty()
+    }
+
+    /// Replace: the current match becomes the replacement and the next match is selected;
+    /// with no current match the next one is selected. Refused while a job runs.
+    ///
+    /// # Arguments
+    /// * `tr` - Translator for the refusal.
+    pub fn replace(&mut self, tr: &Translator) {
+        if self.replace_refused(tr) {
+            return;
+        }
+        let text = self.buffer.text();
+        let current = self.find_match.clone().filter(|range| {
+            text.get(range.clone())
+                .is_some_and(|m| m.eq_ignore_ascii_case(&self.find_query))
+        });
+        let Some(range) = current else {
+            self.find_next();
+            return;
+        };
+        let mut new = String::with_capacity(text.len());
+        new.push_str(&text[..range.start]);
+        new.push_str(&self.replace_text);
+        new.push_str(&text[range.end..]);
+        let after = range.start + self.replace_text.len();
+        self.set_replaced(new);
+        let found = find::find_next(self.buffer.text(), &self.find_query, after);
+        self.show_match(found);
+    }
+
+    /// Replace All: every match becomes the replacement, as one edit and one undo step.
+    /// Refused while a job runs.
+    ///
+    /// # Arguments
+    /// * `tr` - Translator for the refusal.
+    pub fn replace_all(&mut self, tr: &Translator) {
+        if self.replace_refused(tr) {
+            return;
+        }
+        let (new, replaced) =
+            find::replace_all(self.buffer.text(), &self.find_query, &self.replace_text);
+        if replaced > 0 {
+            self.set_replaced(new);
+            self.find_match = None;
+            self.select_match = false;
+        }
+    }
+
+    /// Puts `text` in place of the old as an edit, keeping the old for the undo point.
+    fn set_replaced(&mut self, text: String) {
+        let old = std::mem::replace(self.buffer.text_mut(), text);
+        self.buffer.mark_edited();
+        // An earlier replace not yet drawn keeps its own text as the undo point.
+        self.pending_undo.get_or_insert(old);
+        self.last_edit = Some(Instant::now());
     }
 
     fn show_match(&mut self, found: Option<Range<usize>>) {
@@ -380,15 +473,7 @@ impl EditorPane {
                 response.request_focus();
             }
             if !self.find_query.is_empty() {
-                let generation = self.buffer.generation();
-                let count = match &self.find_count {
-                    Some((query, g, n)) if *query == self.find_query && *g == generation => *n,
-                    _ => {
-                        let n = find::count(self.buffer.text(), &self.find_query);
-                        self.find_count = Some((self.find_query.clone(), generation, n));
-                        n
-                    }
-                };
+                let count = self.match_count();
                 ui.label(format!("{} {count}", tr.tr("Matches:")));
             }
             let clear = ui
@@ -398,6 +483,61 @@ impl EditorPane {
                 .inner;
             if clear.clicked() {
                 self.request_clear(tr);
+            }
+        });
+        self.show_replace(ui, tr);
+    }
+
+    /// The number of matches of the find query, counted once per query and edit.
+    fn match_count(&mut self) -> usize {
+        let generation = self.buffer.generation();
+        match &self.find_count {
+            Some((query, g, n)) if *query == self.find_query && *g == generation => *n,
+            _ => {
+                let n = find::count(self.buffer.text(), &self.find_query);
+                self.find_count = Some((self.find_query.clone(), generation, n));
+                n
+            }
+        }
+    }
+
+    /// GTK's replace row: "Replace with ...", Replace and Replace All (icon buttons), enabled
+    /// when the query has matches, the replacement is not empty and the text may be changed.
+    fn show_replace(&mut self, ui: &mut egui::Ui, tr: &Translator) {
+        ui.horizontal(|ui| {
+            let hint = tr.tr("Replace with ...");
+            let rest = 2.0 * 36.0;
+            let edit = egui::TextEdit::singleline(&mut self.replace_text)
+                .hint_text(hint.as_ref())
+                .desired_width((ui.available_width() - rest).clamp(80.0, 200.0));
+            let response = ui.add(edit);
+            response.widget_info(|| {
+                let mut info = egui::WidgetInfo::text_edit(
+                    true,
+                    &self.replace_text,
+                    &self.replace_text,
+                    hint.as_ref(),
+                );
+                info.label = Some(hint.clone().into_owned());
+                info
+            });
+            let enabled = self.editable()
+                && !self.find_query.is_empty()
+                && !self.replace_text.is_empty()
+                && self.match_count() > 0;
+            let (replace, replace_all) = ui
+                .add_enabled_ui(enabled, |ui| {
+                    (
+                        icon_only_button(ui, Icon::Replace, &tr.tr("Replace")).clicked(),
+                        icon_only_button(ui, Icon::Exchange, &tr.tr("Replace All")).clicked(),
+                    )
+                })
+                .inner;
+            if replace {
+                self.replace(tr);
+            }
+            if replace_all {
+                self.replace_all(tr);
             }
         });
     }

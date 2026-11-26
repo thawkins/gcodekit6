@@ -884,3 +884,147 @@ fn test_clear_editor_refused_while_job_runs() {
     assert!(took);
     assert_eq!(editor.borrow().buffer().text(), "G1 X1\n");
 }
+
+/// Replace All replaces every match, ignoring ASCII case as find does, left to right
+/// without overlaps.
+#[test]
+fn test_find_replace_all_text() {
+    assert_eq!(
+        find::replace_all("G1 x10\nG1 X10 Y1\n", "X10", "X20"),
+        ("G1 X20\nG1 X20 Y1\n".to_string(), 2)
+    );
+    assert_eq!(find::replace_all("aaaa", "aa", "b"), ("bb".to_string(), 2));
+    assert_eq!(find::replace_all("G0", "", "X"), ("G0".to_string(), 0));
+    assert_eq!(find::replace_all("G0", "Z", "X"), ("G0".to_string(), 0));
+}
+
+/// Replace replaces the current match and moves to the next one; with no current match it
+/// moves to the first.
+#[test]
+fn test_editor_replace_current_match() {
+    let tr = Translator::new("en");
+    let mut pane = EditorPane::new();
+    pane.buffer_mut()
+        .set_text("G1 X10\nG1 Y5\nG1 x10\n".to_string());
+    pane.set_find_query("X10");
+    pane.set_replace_text("X30");
+    pane.replace(&tr);
+    assert_eq!(
+        pane.buffer().text(),
+        "G1 X10\nG1 Y5\nG1 x10\n",
+        "nothing selected"
+    );
+    assert_eq!(pane.buffer().current_line(), 0);
+    pane.replace(&tr);
+    assert_eq!(pane.buffer().text(), "G1 X30\nG1 Y5\nG1 x10\n");
+    assert_eq!(pane.buffer().current_line(), 2, "moved to the next match");
+    pane.replace(&tr);
+    assert_eq!(pane.buffer().text(), "G1 X30\nG1 Y5\nG1 X30\n");
+}
+
+/// The editor pane in the app, with `text`, on the Machine Control page.
+fn editor_app(text: &str) -> Harness<'static, GcodeKitApp> {
+    let mut harness = app_harness();
+    harness
+        .state()
+        .editor()
+        .borrow_mut()
+        .buffer_mut()
+        .set_text(text.to_string());
+    harness
+        .state_mut()
+        .workspace_mut()
+        .show_pane(gcodekit5_ui_egui::workspace::PaneId::Editor);
+    harness.step();
+    harness.step();
+    harness
+}
+
+/// Types `text` into the field labelled `label`.
+fn type_into(harness: &mut Harness<'_, GcodeKitApp>, label: &str, text: &str) {
+    harness
+        .get_by_role_and_label(egui::accesskit::Role::TextInput, label)
+        .click();
+    harness.step();
+    harness
+        .get_by_role_and_label(egui::accesskit::Role::TextInput, label)
+        .type_text(text);
+    harness.step();
+}
+
+/// Replace All in the find row replaces every match, the count follows, and one undo in the
+/// text field brings the whole text back.
+#[test]
+fn test_editor_replace_all_is_one_undo_step() {
+    let original = "G1 X10\nG1 x10 Y2\nG0 X10\n";
+    let mut harness = editor_app(original);
+    type_into(&mut harness, "Search...", "X10");
+    assert!(harness.query_by_label("Matches: 3").is_some());
+    type_into(&mut harness, "Replace with ...", "X40");
+    harness.get_by_label("Replace All").click();
+    harness.step();
+    harness.step();
+    let editor = std::rc::Rc::clone(harness.state().editor());
+    assert_eq!(
+        editor.borrow().buffer().text(),
+        "G1 X40\nG1 X40 Y2\nG0 X40\n"
+    );
+    assert!(editor.borrow().buffer().is_dirty());
+    assert!(harness.query_by_label("Matches: 0").is_some());
+
+    harness
+        .get_by_role_and_label(egui::accesskit::Role::TextInput, "G-Code Editor")
+        .click();
+    harness.step();
+    harness.key_press_modifiers(egui::Modifiers::COMMAND, egui::Key::Z);
+    harness.step();
+    harness.step();
+    assert_eq!(editor.borrow().buffer().text(), original, "one undo");
+}
+
+/// Replace and Replace All are disabled while a job runs, and refused if asked anyway.
+#[test]
+fn test_editor_replace_refused_while_job_runs() {
+    use egui_kittest::kittest::NodeT;
+    let mut harness = crate::machine_support::app_harness(app_with_running_job("G1 X1\n"));
+    harness.step();
+    harness.step();
+    let tr = Translator::new("en");
+    {
+        let editor = harness.state().editor();
+        let mut editor = editor.borrow_mut();
+        editor.set_find_query("X1");
+        editor.set_replace_text("X2");
+    }
+    harness.step();
+    for label in ["Replace", "Replace All"] {
+        assert!(
+            harness.get_by_label(label).accesskit_node().is_disabled(),
+            "{label} enabled during a job"
+        );
+    }
+    let editor = harness.state().editor();
+    editor.borrow_mut().replace_all(&tr);
+    editor.borrow_mut().find_next();
+    editor.borrow_mut().replace(&tr);
+    assert_eq!(editor.borrow().buffer().text(), "G1 X1\n");
+    assert_eq!(
+        editor.borrow().notice(),
+        Some("Read-only while a job is running.")
+    );
+}
+
+/// The replace row fits the editor column of a 1280 px window.
+#[test]
+fn test_editor_replace_row_fits_at_1280() {
+    let harness = editor_app("G1 X1\n");
+    // The column starts at the find row's first widget.
+    let left = harness.get_by_label("Search...").rect().left();
+    for label in ["Replace with ...", "Replace", "Replace All", "Clear editor"] {
+        let rect = harness.get_by_label(label).rect();
+        assert!(
+            rect.right() <= 1280.0 && rect.left() >= left,
+            "{label} at {rect:?} outside the editor column (from {left})"
+        );
+    }
+}

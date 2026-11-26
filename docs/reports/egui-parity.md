@@ -127,8 +127,8 @@ Status values:
 | Refuses read-only files | 20-gcode-editor | Ported | `test_editor::save_refuses_read_only_file_and_keeps_content` |
 | Syntax highlighting | 20-gcode-editor | Ported | `test_editor::highlight_classes` |
 | Find next / previous | 20-gcode-editor | Ported | `test_editor::find_next` |
-| Match count | 20-gcode-editor | Ported | `Matches: N` shown; GTK's "2 of 5" index is not (editor module docs) |
-| Replace and Replace All | 20-gcode-editor | Gap | CHANGELOG M3 known gap |
+| Match count | 20-gcode-editor | Ported | `test_editor::test_editor_replace_all_is_one_undo_step` (`Matches: N` follows edits); GTK's "2 of 5" index is not (editor module docs) |
+| Replace and Replace All | 20-gcode-editor | Ported | `test_editor::test_editor_replace_all_is_one_undo_step`, `test_editor::test_editor_replace_current_match`, `test_editor::test_find_replace_all_text`, `test_editor::test_editor_replace_refused_while_job_runs`, `test_editor::test_editor_replace_row_fits_at_1280` (GTK's replace row under the find row; one undo step; refused during a job) |
 | Case-sensitive toggle | 20-gcode-editor | Not applicable | Not in the GTK source |
 | Large files | 20-gcode-editor | Ported | `test_editor::large_file_is_read_only_until_edit_anyway`, `test_editor::large_file_frame_time` |
 | Current line follows the stream | 20-gcode-editor | Ported | `test_editor::current_line_follows_stream` |
@@ -259,7 +259,6 @@ Ranked by user impact. Sizes are rough estimates for one developer who knows the
 
 | Rank | Gap | User impact | Rough size |
 | --- | --- | --- | --- |
-| 1 | Editor Replace / Replace All | Medium | 0.5-1 day |
 | 4 | Visualizer 2D mode, display toggles, grid spacing, machine bounds, fit to device | Medium | 2-3 days |
 | 6 | Designer mirror, align, cut/copy/paste, boolean ops, Ctrl+G | Medium | 2-3 days (designer commands exist in `gcodekit5-designer`) |
 | 7 | Visualizer run preview (play/pause/speed) | Low | 1-2 days |

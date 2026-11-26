@@ -20,8 +20,10 @@
 - **Job times in the egui status bar**: while a job streams, GTK's `Elapsed: HH:MM:SS` and `Remaining: HH:MM:SS` sit beside the progress bar; the remaining time is GTK's estimate, the average time per acknowledged line times the lines left
 - **Feed and spindle in the egui status bar**: GTK's `F: <feed>  S: <rpm> RPM` readout follows the position while connected, from the status report, in Preferences' feed units with two decimals
 - **Console history kept across sessions in egui**: the console's Up/Down history is GTK's model and file, `command_history.json` in the legacy settings folder, at most 250 commands; both front ends now save it through the shared atomic writer, and a damaged file starts an empty history
+- **Replace and Replace All in the egui editor**: GTK's replace row under the find row ("Replace with ...", Replace, Replace All), enabled when the query has matches and the replacement is not empty; Replace changes the current match and moves to the next, Replace All changes every match (ASCII case ignored, as find) as one undo step, and both are disabled and refused while a job runs or a large file is shown read-only
+
 ### Known gaps
-- Not yet ported from GTK: editor replace, and the visualizer and designer items listed in `docs/reports/egui-parity.md`
+- Not yet ported from GTK: the visualizer and designer items listed in `docs/reports/egui-parity.md`
 
 ## [Unreleased] - 2026-11-26 (egui + craft-libs migration, milestone M5: managers and help)
 

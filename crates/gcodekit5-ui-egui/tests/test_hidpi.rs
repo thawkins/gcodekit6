@@ -126,8 +126,9 @@ fn test_editor_click_selects_same_line_at_every_scale() -> TestResult {
         let tr = Translator::new("en");
         let mut pane = EditorPane::new();
         pane.buffer_mut().set_text(text.clone());
+        // Tall enough for all 40 lines under the find and replace rows.
         let mut harness = Harness::builder()
-            .with_size(egui::vec2(480.0, 600.0))
+            .with_size(egui::vec2(480.0, 700.0))
             .with_pixels_per_point(ppp)
             .build_ui_state(
                 move |ui, pane: &mut EditorPane| {
