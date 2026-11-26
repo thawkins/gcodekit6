@@ -434,6 +434,8 @@ impl GcodeKitApp {
         );
         workspace.set_pane(Box::new(SharedCamTools::new(Rc::clone(&cam_tools))));
         workspace.configure(state.config());
+        let profile = device_manager.active_profile();
+        workspace.set_controller(profile.as_ref().map(|p| &p.controller_type));
         {
             // Wake the event loop whenever the machine reports something.
             let wake_ctx = Arc::clone(&wake_ctx);
@@ -602,7 +604,7 @@ impl GcodeKitApp {
             }
             (ConfirmRequest::UnsavedDevice, choice) => self.device_quit_answer(choice.as_unsaved()),
             // The quit flow never asks this; forget the quit rather than act on it.
-            (ConfirmRequest::Restart | ConfirmRequest::ZeroAllAxes, _) => self.cancel_quit(),
+            (ConfirmRequest::Restart | ConfirmRequest::ZeroAllAxes(_), _) => self.cancel_quit(),
         }
     }
 
@@ -1039,14 +1041,13 @@ impl GcodeKitApp {
                 self.cancel_quit();
             }
             DialogAnswer::Confirm {
-                request: ConfirmRequest::ZeroAllAxes,
+                request: request @ ConfirmRequest::ZeroAllAxes(_),
                 choice,
             } => {
                 let mut queue = Vec::new();
                 let mut panes = PaneContext::new(&self.state.translator, &mut queue)
                     .with_machine(&self.state.machine);
-                self.workspace
-                    .confirmed(ConfirmRequest::ZeroAllAxes, *choice, &mut panes);
+                self.workspace.confirmed(*request, *choice, &mut panes);
                 self.queue.extend(queue);
             }
             DialogAnswer::Unavailable { reason, .. } => {

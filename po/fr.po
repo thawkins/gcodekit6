@@ -4599,3 +4599,18 @@ msgstr "Aller au zéro pièce refusé : la machine n'est pas au repos."
 
 msgid "Waiting for the controller to report the active work coordinate system."
 msgstr "En attente du système de coordonnées pièce actif signalé par le contrôleur."
+
+msgid "Active work coordinate system is not G54-G59."
+msgstr "Le système de coordonnées pièce actif n'est pas G54-G59."
+
+msgid "Work zero needs a GRBL-family controller (set in the device profile)."
+msgstr "Le zéro pièce nécessite un contrôleur de la famille GRBL (défini dans le profil de l'appareil)."
+
+msgid "Zero refused: the machine is not idle."
+msgstr "Mise à zéro refusée : la machine n'est pas au repos."
+
+msgid "Zero All refused: the work coordinate system changed."
+msgstr "Tout mettre à zéro refusé : le système de coordonnées pièce a changé."
+
+msgid "This sets work coordinate system {wcs} so the current X/Y/Z becomes 0."
+msgstr "Cela règle le système de coordonnées pièce {wcs} pour que les X/Y/Z actuels deviennent 0."

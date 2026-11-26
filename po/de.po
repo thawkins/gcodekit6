@@ -4592,3 +4592,18 @@ msgstr "Zum Werkstücknullpunkt abgelehnt: Die Maschine ist nicht im Leerlauf."
 
 msgid "Waiting for the controller to report the active work coordinate system."
 msgstr "Warte darauf, dass die Steuerung das aktive Werkstückkoordinatensystem meldet."
+
+msgid "Active work coordinate system is not G54-G59."
+msgstr "Das aktive Werkstückkoordinatensystem ist nicht G54-G59."
+
+msgid "Work zero needs a GRBL-family controller (set in the device profile)."
+msgstr "Werkstücknullpunkt erfordert eine Steuerung der GRBL-Familie (im Geräteprofil festgelegt)."
+
+msgid "Zero refused: the machine is not idle."
+msgstr "Nullen abgelehnt: Die Maschine ist nicht im Leerlauf."
+
+msgid "Zero All refused: the work coordinate system changed."
+msgstr "Alle nullen abgelehnt: Das Werkstückkoordinatensystem hat sich geändert."
+
+msgid "This sets work coordinate system {wcs} so the current X/Y/Z becomes 0."
+msgstr "Dies setzt das Werkstückkoordinatensystem {wcs} so, dass das aktuelle X/Y/Z zu 0 wird."

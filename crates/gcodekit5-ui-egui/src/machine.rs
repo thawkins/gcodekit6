@@ -21,7 +21,7 @@ use gcodekit5_app::machine::grbl_stream::{
     GrblResponseLine, MAX_LINE_LENGTH, classify_response, prepare_program,
 };
 use gcodekit5_app::machine::{MachineController, MachineEvent, worker_text};
-use gcodekit5_app::work_zero::{Wcs, parser_state_wcs, wcs_in_line};
+use gcodekit5_app::work_zero::{Wcs, WcsWord, parser_state_wcs, wcs_in_line};
 use gcodekit5_communication::firmware::grbl::status_parser::{
     FullStatus, WorkCoordinateOffset, parse_probe_report_in,
 };
@@ -77,6 +77,9 @@ pub struct MachineStatus {
     /// Whether the controller reported its parser state on this connection; until it does,
     /// a front end may fall back to the system the user last selected.
     pub wcs_reported: bool,
+    /// Whether the active system is outside G54-G59 (`G59.1`, `G54.1`), as reported or sent;
+    /// [`MachineStatus::active_wcs`] is then `None`. Cleared by a G54-G59 report or line.
+    pub wcs_outside: bool,
 }
 
 /// X, Y and Z in millimetres.
@@ -149,6 +152,21 @@ impl MachineStatus {
         })
     }
 
+    /// Takes `word` as the active system: a G54-G59 one, or one outside them (then unknown
+    /// to the zero commands).
+    fn set_wcs(&mut self, word: WcsWord) {
+        match word {
+            WcsWord::Known(wcs) => {
+                self.active_wcs = Some(wcs);
+                self.wcs_outside = false;
+            }
+            WcsWord::Other => {
+                self.active_wcs = None;
+                self.wcs_outside = true;
+            }
+        }
+    }
+
     /// Folds `events` (oldest first) into the status.
     ///
     /// # Arguments
@@ -172,6 +190,7 @@ impl MachineStatus {
                     self.report_inches = false;
                     self.active_wcs = None;
                     self.wcs_reported = false;
+                    self.wcs_outside = false;
                 }
                 MachineEvent::StatusReport(report) => {
                     // Positions, offsets and feed are kept in mm whatever `$13` says.
@@ -182,8 +201,8 @@ impl MachineStatus {
                     self.report = Some(report);
                 }
                 MachineEvent::Received(line) => {
-                    if let Some(wcs) = parser_state_wcs(line) {
-                        self.active_wcs = Some(wcs);
+                    if let Some(word) = parser_state_wcs(line) {
+                        self.set_wcs(word);
                         self.wcs_reported = true;
                     } else if matches!(classify_response(line), GrblResponseLine::Reset(_)) {
                         // A reset restores the default system: unknown until reported
@@ -237,8 +256,8 @@ impl MachineStatus {
                 }
                 MachineEvent::Sent(line) => {
                     // Lines run in order, so a later `G10 L20` acts on this system.
-                    if let Some(wcs) = wcs_in_line(line) {
-                        self.active_wcs = Some(wcs);
+                    if let Some(word) = wcs_in_line(line) {
+                        self.set_wcs(word);
                     }
                 }
                 MachineEvent::Error(message) => self.last_error = Some(message.clone()),

@@ -4587,3 +4587,18 @@ msgstr "Ir para o zero de trabalho recusado: a máquina não está inativa."
 
 msgid "Waiting for the controller to report the active work coordinate system."
 msgstr "A aguardar que o controlador indique o sistema de coordenadas de trabalho ativo."
+
+msgid "Active work coordinate system is not G54-G59."
+msgstr "O sistema de coordenadas de trabalho ativo não é G54-G59."
+
+msgid "Work zero needs a GRBL-family controller (set in the device profile)."
+msgstr "O zero de trabalho requer um controlador da família GRBL (definido no perfil do dispositivo)."
+
+msgid "Zero refused: the machine is not idle."
+msgstr "Zerar recusado: a máquina não está inativa."
+
+msgid "Zero All refused: the work coordinate system changed."
+msgstr "Zerar tudo recusado: o sistema de coordenadas de trabalho mudou."
+
+msgid "This sets work coordinate system {wcs} so the current X/Y/Z becomes 0."
+msgstr "Isto define o sistema de coordenadas de trabalho {wcs} para que o X/Y/Z atual passe a 0."

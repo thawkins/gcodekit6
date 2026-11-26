@@ -4516,3 +4516,18 @@ msgstr ""
 
 msgid "Waiting for the controller to report the active work coordinate system."
 msgstr ""
+
+msgid "Active work coordinate system is not G54-G59."
+msgstr ""
+
+msgid "Work zero needs a GRBL-family controller (set in the device profile)."
+msgstr ""
+
+msgid "Zero refused: the machine is not idle."
+msgstr ""
+
+msgid "Zero All refused: the work coordinate system changed."
+msgstr ""
+
+msgid "This sets work coordinate system {wcs} so the current X/Y/Z becomes 0."
+msgstr ""

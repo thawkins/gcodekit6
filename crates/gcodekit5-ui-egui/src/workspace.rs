@@ -28,6 +28,7 @@ use serde::{Deserialize, Serialize};
 use crate::commands::{Command, MACHINE_CONTROL_SCOPE, VISUALIZER_SCOPE};
 use crate::dialogs::{ConfirmChoice, ConfirmRequest};
 use crate::machine::Machine;
+use gcodekit5_devicedb::ControllerType;
 
 /// Identifies one pane of the main window.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -192,6 +193,14 @@ pub trait Pane {
     /// * `tr` - Translator for the current UI language.
     fn machine_events(&mut self, events: &[MachineEvent], tr: &Translator) {
         let _ = (events, tr);
+    }
+
+    /// Takes the active device profile's controller type (at start and when it changes).
+    ///
+    /// # Arguments
+    /// * `controller` - The controller type, if a profile is active.
+    fn set_controller(&mut self, controller: Option<&ControllerType>) {
+        let _ = controller;
     }
 
     /// Takes the confirmation the pane wants the app to ask for, if any.
@@ -418,6 +427,17 @@ impl Workspace {
     pub fn machine_events(&mut self, events: &[MachineEvent], tr: &Translator) {
         for pane in &mut self.panes {
             pane.machine_events(events, tr);
+        }
+    }
+
+    /// Hands the active device profile's controller type to every pane
+    /// ([`Pane::set_controller`]).
+    ///
+    /// # Arguments
+    /// * `controller` - The controller type, if a profile is active.
+    pub fn set_controller(&mut self, controller: Option<&ControllerType>) {
+        for pane in &mut self.panes {
+            pane.set_controller(controller);
         }
     }
 

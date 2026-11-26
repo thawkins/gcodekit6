@@ -21,6 +21,7 @@ use craft_dialogs::{
 };
 use gcodekit5_app::UnsavedChangesChoice;
 use gcodekit5_app::i18n::Translator;
+use gcodekit5_app::work_zero::Wcs;
 use raw_window_handle::{HasDisplayHandle, HasWindowHandle};
 
 /// What a file dialog is for; its answer comes back with it.
@@ -235,9 +236,9 @@ pub enum ConfirmRequest {
     Restart,
     /// A job is running while the user quits: stop it and quit (Yes) or keep running (No).
     StopJob,
-    /// Zero All Axes: set the current X/Y/Z as 0 of the active work coordinate system (Yes)
-    /// or not (No).
-    ZeroAllAxes,
+    /// Zero All Axes: set the current X/Y/Z as 0 of the work coordinate system it names,
+    /// the active one when asked (Yes), or not (No).
+    ZeroAllAxes(Wcs),
 }
 
 impl ConfirmRequest {
@@ -273,9 +274,9 @@ impl ConfirmRequest {
                 n_!("Stop job and quit?"),
                 n_!("A job is running. Quitting stops it and closes the machine connection."),
             ),
-            Self::ZeroAllAxes => (
+            Self::ZeroAllAxes(_) => (
                 n_!("Zero all work axes?"),
-                n_!("This sets the active work coordinate system so the current X/Y/Z becomes 0."),
+                n_!("This sets work coordinate system {wcs} so the current X/Y/Z becomes 0."),
             ),
         }
     }
@@ -487,14 +488,23 @@ impl Dialogs {
                 ),
             ),
             ConfirmRequest::Restart => (MessageLevel::Info, MessageButtons::YesNo),
-            ConfirmRequest::StopJob | ConfirmRequest::ZeroAllAxes => {
+            ConfirmRequest::StopJob | ConfirmRequest::ZeroAllAxes(_) => {
                 (MessageLevel::Warning, MessageButtons::YesNo)
             }
         };
         let message = Message {
             level,
             title: tr.tr(title).into_owned(),
-            description: tr.tr(description).into_owned(),
+            description: match request {
+                ConfirmRequest::ZeroAllAxes(wcs) => tr.tr(description).replace("{wcs}", wcs.code()),
+                ConfirmRequest::UnsavedGcode
+                | ConfirmRequest::UnsavedDesign
+                | ConfirmRequest::UnsavedTool
+                | ConfirmRequest::UnsavedMaterial
+                | ConfirmRequest::UnsavedDevice
+                | ConfirmRequest::Restart
+                | ConfirmRequest::StopJob => tr.tr(description).into_owned(),
+            },
             buttons,
         };
         self.inner.ask_message(
@@ -633,7 +643,7 @@ pub fn msgids() -> Vec<&'static str> {
         ConfirmRequest::UnsavedDevice,
         ConfirmRequest::Restart,
         ConfirmRequest::StopJob,
-        ConfirmRequest::ZeroAllAxes,
+        ConfirmRequest::ZeroAllAxes(Wcs::G54),
     ]
     .into_iter()
     .flat_map(|request| {

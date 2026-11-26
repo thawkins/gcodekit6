@@ -37,7 +37,9 @@ use gcodekit5_app::i18n::Translator;
 use gcodekit5_app::machine::{
     Axis, MachineController, MachineError, MachineEvent, RealtimeCommand,
 };
-use gcodekit5_app::work_zero::{Wcs, go_to_work_zero_command, zero_axes_command};
+use gcodekit5_app::work_zero::{
+    Wcs, go_to_work_zero_command, reports_grbl_parser_state, zero_axes_command,
+};
 use gcodekit5_core::units::{FeedRateUnits, MeasurementSystem};
 use gcodekit5_settings::ConnectionSettings;
 use gcodekit5_settings::config::Config;
@@ -82,6 +84,8 @@ const MSGIDS: &[&str] = &[
     COMMAND_DURING_JOB,
     WCS_CHANGE_DURING_JOB,
     GO_TO_ZERO_NOT_IDLE,
+    ZERO_NOT_IDLE,
+    WCS_CHANGED,
 ];
 
 /// A work zero command refused while a job runs.
@@ -90,6 +94,10 @@ const COMMAND_DURING_JOB: &str = n_!("Command ignored: a job is running.");
 const WCS_CHANGE_DURING_JOB: &str = n_!("Work coordinate change ignored: a job is running.");
 /// Go to Work Zero refused without a fresh `Idle` report.
 const GO_TO_ZERO_NOT_IDLE: &str = n_!("Go to Work Zero refused: the machine is not idle.");
+/// Zero or Zero All Axes refused without a fresh `Idle` report.
+const ZERO_NOT_IDLE: &str = n_!("Zero refused: the machine is not idle.");
+/// Zero All Axes refused at Yes: the active system is no longer the one the question named.
+const WCS_CHANGED: &str = n_!("Zero All refused: the work coordinate system changed.");
 
 /// The Machine Control pane.
 pub struct MachineControlPane {
@@ -203,56 +211,85 @@ impl MachineControlPane {
     ) -> bool {
         let running = machine.is_some_and(Machine::job_running);
         if running {
-            tracing::info!(reason = msgid, "work zero command refused");
-            self.notice = Some(tr.tr(msgid).into_owned());
+            self.refuse(tr, msgid);
         }
         running
     }
 
-    /// Makes the current position 0 on `axes` in the active work coordinate system
-    /// (`G10 L20 P<n> X0 ...`), unless a job runs or the active system is not known.
-    fn zero_axes(&mut self, machine: Option<&Machine>, tr: &Translator, axes: &[Axis]) {
-        if self.refuse_during_job(machine, tr, COMMAND_DURING_JOB) {
-            return;
-        }
-        let Some(wcs) = machine.and_then(|m| self.wcs.active(m.status())) else {
-            self.notice = Some(tr.tr(wcs::WAITING_FOR_WCS).into_owned());
-            return;
+    /// The active work coordinate system a work zero command acts on, or the msgid of why
+    /// it is refused: a job runs, the system is not known (or outside G54-G59, or the
+    /// controller is not GRBL-family), or the machine is not `Idle` with a fresh report.
+    /// GRBL refuses G-code in Alarm (`error:9`), parks `G10` behind a Hold and takes the
+    /// offset from a moving machine's target, so only `Idle` is accepted.
+    fn work_zero_target(
+        &self,
+        machine: Option<&Machine>,
+        not_idle: &'static str,
+    ) -> Result<Wcs, &'static str> {
+        let Some(machine) = machine else {
+            return Err(wcs::WAITING_FOR_WCS);
         };
-        self.send_line(&zero_axes_command(wcs, axes));
-    }
-
-    /// Asks the app to confirm Zero All Axes, unless it would be refused now.
-    fn ask_zero_all(&mut self, machine: Option<&Machine>, tr: &Translator) {
-        if self.refuse_during_job(machine, tr, COMMAND_DURING_JOB) {
-            return;
+        if machine.job_running() {
+            return Err(COMMAND_DURING_JOB);
         }
-        if machine.and_then(|m| self.wcs.active(m.status())).is_none() {
-            self.notice = Some(tr.tr(wcs::WAITING_FOR_WCS).into_owned());
-            return;
+        let status = machine.status();
+        if let Some(reason) = self.wcs.blocked(status) {
+            return Err(reason);
         }
-        self.notice = None;
-        self.confirm = Some(ConfirmRequest::ZeroAllAxes);
-    }
-
-    /// Rapids to work zero, only with a fresh `Idle` report (the jog rule) and no job.
-    fn go_to_work_zero(&mut self, machine: Option<&Machine>, tr: &Translator, include_z: bool) {
-        if self.refuse_during_job(machine, tr, COMMAND_DURING_JOB) {
-            return;
-        }
-        let idle = machine.is_some_and(|m| {
-            m.jog_allowed()
-                && m.status()
-                    .report
-                    .as_ref()
-                    .and_then(|r| r.machine_state.as_deref())
-                    .is_some_and(|state| state.starts_with("Idle"))
-        });
+        let idle = machine.jog_allowed()
+            && status
+                .report
+                .as_ref()
+                .and_then(|r| r.machine_state.as_deref())
+                .is_some_and(|state| state.starts_with("Idle"));
         if !idle {
-            self.notice = Some(tr.tr(GO_TO_ZERO_NOT_IDLE).into_owned());
-            return;
+            return Err(not_idle);
         }
-        self.send_line(go_to_work_zero_command(include_z));
+        self.wcs.active(status).ok_or(wcs::WAITING_FOR_WCS)
+    }
+
+    /// Shows the refusal `msgid` in the pane.
+    fn refuse(&mut self, tr: &Translator, msgid: &str) {
+        tracing::info!(reason = msgid, "work zero command refused");
+        self.notice = Some(tr.tr(msgid).into_owned());
+    }
+
+    /// Makes the current position 0 on `axes` in the active work coordinate system
+    /// (`G10 L20 P<n> X0 ...`), unless [`Self::work_zero_target`] refuses, or the system is
+    /// no longer `expected` (the one a confirmation named).
+    fn zero_axes(
+        &mut self,
+        machine: Option<&Machine>,
+        tr: &Translator,
+        axes: &[Axis],
+        expected: Option<Wcs>,
+    ) {
+        match self.work_zero_target(machine, ZERO_NOT_IDLE) {
+            Ok(wcs) if expected.is_some_and(|e| e != wcs) => self.refuse(tr, WCS_CHANGED),
+            Ok(wcs) => self.send_line(&zero_axes_command(wcs, axes)),
+            Err(msgid) => self.refuse(tr, msgid),
+        }
+    }
+
+    /// Asks the app to confirm Zero All Axes in the active system, unless it would be
+    /// refused now.
+    fn ask_zero_all(&mut self, machine: Option<&Machine>, tr: &Translator) {
+        match self.work_zero_target(machine, ZERO_NOT_IDLE) {
+            Ok(wcs) => {
+                self.notice = None;
+                self.confirm = Some(ConfirmRequest::ZeroAllAxes(wcs));
+            }
+            Err(msgid) => self.refuse(tr, msgid),
+        }
+    }
+
+    /// Rapids to work zero, only to a known active system, with a fresh `Idle` report (the
+    /// jog rule) and no job.
+    fn go_to_work_zero(&mut self, machine: Option<&Machine>, tr: &Translator, include_z: bool) {
+        match self.work_zero_target(machine, GO_TO_ZERO_NOT_IDLE) {
+            Ok(_) => self.send_line(go_to_work_zero_command(include_z)),
+            Err(msgid) => self.refuse(tr, msgid),
+        }
     }
 
     /// Selects a work coordinate system (`G55`), unless a job runs; the status follows the
@@ -510,17 +547,15 @@ impl Pane for MachineControlPane {
                     self.wcs.watch_stream(machine);
                     self.wcs.drive(machine);
                 }
-                let active_wcs = self.wcs.active(status);
-                let zero_enabled = status.connected && active_wcs.is_some();
-                let waiting = tr.tr(wcs::WAITING_FOR_WCS);
+                let blocked = self.wcs.blocked(status);
+                let reason = blocked.map(|msgid| tr.tr(msgid));
                 let zero = dro::ZeroButtons {
                     tr,
-                    enabled: zero_enabled,
-                    disabled_reason: (status.connected && active_wcs.is_none())
-                        .then_some(waiting.as_ref()),
+                    enabled: status.connected && blocked.is_none(),
+                    disabled_reason: reason.as_deref().filter(|_| status.connected),
                 };
                 if let Some(axis) = dro::show(ui, tr, status, self.units, self.feed_units, &zero) {
-                    self.zero_axes(machine, tr, &[axis]);
+                    self.zero_axes(machine, tr, &[axis], None);
                 }
                 ui.separator();
                 match stream::show(ui, tr, status, has_program) {
@@ -558,7 +593,7 @@ impl Pane for MachineControlPane {
                 }
                 ui.separator();
                 // Below the long-standing sections, so their places in the pane stay put.
-                match self.wcs.show(ui, tr, status, zero_enabled) {
+                match self.wcs.show(ui, tr, status) {
                     Some(wcs::Action::Select(wcs)) => self.select_wcs(machine, tr, wcs),
                     Some(wcs::Action::ZeroAll) => self.ask_zero_all(machine, tr),
                     Some(wcs::Action::GoToZero { include_z }) => {
@@ -589,6 +624,10 @@ impl Pane for MachineControlPane {
         self.wcs.follow(events);
     }
 
+    fn set_controller(&mut self, controller: Option<&gcodekit5_devicedb::ControllerType>) {
+        self.wcs.set_grbl(reports_grbl_parser_state(controller));
+    }
+
     fn take_confirm(&mut self) -> Option<ConfirmRequest> {
         self.confirm.take()
     }
@@ -599,12 +638,13 @@ impl Pane for MachineControlPane {
         choice: ConfirmChoice,
         ctx: &mut PaneContext,
     ) -> bool {
-        if request != ConfirmRequest::ZeroAllAxes {
+        let ConfirmRequest::ZeroAllAxes(asked) = request else {
             return false;
-        }
+        };
         if choice == ConfirmChoice::Yes {
-            // Checked again: the job or the active system may have changed meanwhile.
-            self.zero_axes(ctx.machine(), ctx.tr, &[Axis::X, Axis::Y, Axis::Z]);
+            // Checked again: the job, the state or the active system may have changed.
+            let axes = [Axis::X, Axis::Y, Axis::Z];
+            self.zero_axes(ctx.machine(), ctx.tr, &axes, Some(asked));
         }
         true
     }

@@ -101,8 +101,10 @@ impl GcodeKitApp {
     /// Gives the CAM tools the active device again once it changed.
     fn sync_active_device(&mut self) {
         if self.device_manager.take_changed() {
-            self.cam_tools.borrow_mut().speeds_feeds_mut().device =
-                self.device_manager.active_profile();
+            let profile = self.device_manager.active_profile();
+            self.workspace
+                .set_controller(profile.as_ref().map(|p| &p.controller_type));
+            self.cam_tools.borrow_mut().speeds_feeds_mut().device = profile;
         }
     }
 

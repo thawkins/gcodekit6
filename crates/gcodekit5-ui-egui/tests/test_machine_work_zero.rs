@@ -2,6 +2,7 @@
 //! buttons, the G54-G59 selector, Zero All Axes (confirmed) and Go to Work Zero, with the
 //! active work coordinate system taken from the controller's `[GC:...]` parser state.
 
+use std::sync::atomic::Ordering;
 use std::time::{Duration, Instant};
 
 use egui_kittest::Harness;
@@ -12,9 +13,7 @@ use gcodekit5_app::work_zero::Wcs;
 use gcodekit5_ui_egui::GcodeKitApp;
 use gcodekit5_ui_egui::machine::MachineStatus;
 
-use crate::machine_support::{
-    EVENTUALLY, app_harness, loopback_state, start_held_stream, step_until,
-};
+use crate::machine_support::{EVENTUALLY, step_until};
 use crate::test_machine_pane::{pane_app, report_idle, report_state};
 
 /// Every work zero control's accessible name.
@@ -35,6 +34,15 @@ const CONTROLS: [&str; 11] = [
 /// Whether the loopback saw the line `line`.
 fn wrote(shared: &LoopbackShared, line: &str) -> bool {
     shared.log().contains(&Wrote::Line(line.to_string()))
+}
+
+/// How many `$G` lines were written.
+fn count_dollar_g(shared: &LoopbackShared) -> usize {
+    shared
+        .log()
+        .iter()
+        .filter(|w| **w == Wrote::Line("$G".to_string()))
+        .count()
 }
 
 /// Whether any line starting with `prefix` was written.
@@ -126,6 +134,7 @@ fn test_zero_x_uses_reported_g55() {
         "no $G after connect"
     );
     report_wcs(&mut harness, &shared, Wcs::G55);
+    report_idle(&mut harness, &shared);
     assert!(step_enabled(&mut harness, "Zero X"), "Zero X disabled");
     click(&mut harness, "Zero X");
     assert!(
@@ -140,6 +149,7 @@ fn test_zero_x_uses_reported_g55() {
 fn test_zero_all_needs_confirmation() {
     let (mut harness, shared) = pane_app(Duration::from_millis(1), true);
     wait_zero_ready(&mut harness, &shared);
+    report_idle(&mut harness, &shared);
     click(&mut harness, "Zero All Axes");
     assert_eq!(
         harness.state().dialogs().waiting(),
@@ -185,6 +195,7 @@ fn test_zero_all_needs_confirmation() {
 #[test]
 fn test_go_to_work_zero_refused_when_not_idle() {
     let (mut harness, shared) = pane_app(Duration::from_millis(1), true);
+    wait_zero_ready(&mut harness, &shared);
     report_state(
         &mut harness,
         &shared,
@@ -215,19 +226,179 @@ fn test_go_to_work_zero_refused_when_not_idle() {
 
 #[test]
 fn test_wcs_change_refused_during_stream() {
-    let (mut state, shared) = loopback_state(Duration::from_millis(1));
-    start_held_stream(&mut state, &shared, 50);
-    let mut harness = app_harness(GcodeKitApp::from_state(state));
+    let (mut harness, shared) = pane_app(Duration::from_millis(1), true);
+    // The active system is settled before the job starts, so Zero X is enabled and only the
+    // job guard can refuse it.
+    wait_zero_ready(&mut harness, &shared);
+    report_idle(&mut harness, &shared);
+    shared.hold_acks.store(true, Ordering::SeqCst);
+    let machine = &mut harness.state_mut().state_mut().machine;
+    machine
+        .set_program("G1 X1 F100\nG1 X2 F100\n")
+        .expect("program");
+    let program = machine.program().cloned().expect("program loaded");
+    gcodekit5_ui_egui::machine::lock(machine.controller())
+        .start_stream(program)
+        .expect("start_stream");
+    assert!(
+        step_until(&mut harness, |app| app.state().machine.status().streaming),
+        "stream never started"
+    );
     harness.step();
-    harness.step();
+    assert!(
+        enabled(&harness, "Zero X"),
+        "Zero X disabled during the job"
+    );
+    click(&mut harness, "Zero X");
+    assert!(shows_notice(
+        &mut harness,
+        "Command ignored: a job is running."
+    ));
     click(&mut harness, "G55");
     assert!(shows_notice(
         &mut harness,
         "Work coordinate change ignored: a job is running."
     ));
-    click(&mut harness, "Zero X");
     assert!(!wrote(&shared, "G55"), "WCS changed during a stream");
     assert!(!wrote_prefix(&shared, "G10"), "zeroed during a stream");
+}
+
+#[test]
+fn test_zero_refused_when_not_idle() {
+    let (mut harness, shared) = pane_app(Duration::from_millis(1), true);
+    wait_zero_ready(&mut harness, &shared);
+    report_state(
+        &mut harness,
+        &shared,
+        "<Hold:0|MPos:0.000,0.000,0.000|FS:0,0>",
+        "Hold:0",
+    );
+    click(&mut harness, "Zero X");
+    assert!(shows_notice(
+        &mut harness,
+        "Zero refused: the machine is not idle."
+    ));
+    click(&mut harness, "Zero All Axes");
+    assert_eq!(
+        harness.state().dialogs().waiting(),
+        0,
+        "asked while not idle"
+    );
+    assert!(!wrote_prefix(&shared, "G10"), "zeroed while not idle");
+}
+
+#[test]
+fn test_zero_all_refused_when_the_wcs_changed_before_yes() {
+    let (mut harness, shared) = pane_app(Duration::from_millis(1), true);
+    wait_zero_ready(&mut harness, &shared);
+    report_idle(&mut harness, &shared);
+    click(&mut harness, "Zero All Axes");
+    assert_eq!(
+        harness.state().dialogs().waiting(),
+        1,
+        "no confirmation asked"
+    );
+    // While the question (naming G54) is open, the console selects G55.
+    gcodekit5_ui_egui::machine::lock(harness.state().state().machine.controller())
+        .send_line("G55")
+        .expect("send G55");
+    assert!(
+        step_until(&mut harness, |_| count_dollar_g(&shared) == 2),
+        "no $G after G55"
+    );
+    assert!(step_enabled(&mut harness, "Zero X"), "G55 never settled");
+    report_idle(&mut harness, &shared);
+    assert!(
+        step_until(&mut harness, |app| app.state().machine.jog_allowed()),
+        "report never fresh after G55"
+    );
+    harness
+        .state_mut()
+        .dialogs_mut()
+        .set_override(Some(Box::new(|_| {
+            craft_dialogs::Answer::Message(craft_dialogs::MessageResult::Yes)
+        })));
+    harness
+        .state_mut()
+        .dialogs_mut()
+        .end_frame(None::<&eframe::Frame>);
+    harness.step();
+    harness.step();
+    assert!(shows_notice(
+        &mut harness,
+        "Zero All refused: the work coordinate system changed."
+    ));
+    assert!(!wrote_prefix(&shared, "G10"), "zeroed another system");
+}
+
+#[test]
+fn test_wcs_outside_g54_g59_disables_zero() {
+    let (mut harness, shared) = pane_app(Duration::from_millis(1), true);
+    wait_zero_ready(&mut harness, &shared);
+    report_idle(&mut harness, &shared);
+    // grblHAL reports G59.1: no G10 L20 P1..P6 names it.
+    shared.inject("[GC:G0 G59.1 G17 G21 G90 G94 M5 M9 T0 F0 S0]\n");
+    assert!(
+        step_until(&mut harness, |app| app.state().machine.status().wcs_outside),
+        "G59.1 not taken"
+    );
+    harness.step();
+    for label in ["Zero X", "Zero All Axes", "Go to Work Zero"] {
+        assert!(!enabled(&harness, label), "{label} enabled in G59.1");
+    }
+    // The reply does not ask again: no endless $G.
+    for _ in 0..20 {
+        harness.step();
+    }
+    assert_eq!(count_dollar_g(&shared), 1, "{:?}", shared.log());
+    assert!(!wrote_prefix(&shared, "G10"));
+
+    // Typed in the console: G59.2 is unknown too, and `$G` is asked once for it.
+    let (mut harness, shared) = pane_app(Duration::from_millis(1), true);
+    wait_zero_ready(&mut harness, &shared);
+    gcodekit5_ui_egui::machine::lock(harness.state().state().machine.controller())
+        .send_line("G59.2")
+        .expect("send G59.2");
+    assert!(
+        step_until(&mut harness, |app| app.state().machine.status().wcs_outside),
+        "G59.2 not followed"
+    );
+    assert!(
+        step_until(&mut harness, |_| count_dollar_g(&shared) == 2),
+        "no $G after G59.2"
+    );
+    for _ in 0..20 {
+        harness.step();
+    }
+    assert!(!enabled(&harness, "Zero X"), "Zero X enabled in G59.2");
+    assert_eq!(count_dollar_g(&shared), 2);
+}
+
+#[test]
+fn test_work_zero_disabled_for_non_grbl_controller() {
+    let (mut harness, shared) = pane_app(Duration::from_millis(1), false);
+    harness
+        .state_mut()
+        .workspace_mut()
+        .set_controller(Some(&gcodekit5_devicedb::ControllerType::Repetier));
+    gcodekit5_ui_egui::machine::lock(harness.state().state().machine.controller())
+        .connect(&gcodekit5_app::test_support::tcp_settings())
+        .expect("connect");
+    assert!(
+        step_until(&mut harness, |app| app.state().machine.status().connected),
+        "never connected"
+    );
+    for _ in 0..20 {
+        harness.step();
+    }
+    for label in CONTROLS {
+        assert!(!enabled(&harness, label), "{label} enabled for Repetier");
+    }
+    assert!(
+        !wrote(&shared, "$G"),
+        "$G sent to Repetier: {:?}",
+        shared.log()
+    );
 }
 
 #[test]
@@ -252,9 +423,20 @@ fn test_status_tracks_active_wcs() {
     assert_eq!(status.active_wcs, None);
     status.apply(&[MachineEvent::Sent("G0 G59 X0".to_string())]);
     assert_eq!(status.active_wcs, Some(Wcs::G59));
+    // Outside G54-G59, reported or sent: unknown to the zero commands.
+    status.apply(&[MachineEvent::Received("[GC:G0 G59.1 G17]".to_string())]);
+    assert_eq!(status.active_wcs, None);
+    assert!(status.wcs_outside);
+    status.apply(&[MachineEvent::Sent("G55".to_string())]);
+    assert_eq!(status.active_wcs, Some(Wcs::G55));
+    assert!(!status.wcs_outside);
+    status.apply(&[MachineEvent::Sent("G59.2".to_string())]);
+    assert_eq!(status.active_wcs, None);
+    assert!(status.wcs_outside);
     status.apply(&[MachineEvent::Disconnected]);
     assert_eq!(status.active_wcs, None);
     assert!(!status.wcs_reported);
+    assert!(!status.wcs_outside);
 }
 
 #[test]
@@ -279,6 +461,11 @@ fn test_console_wcs_change_is_followed_by_zero() {
             == 2),
         "no $G after G56: {:?}",
         shared.log()
+    );
+    report_idle(&mut harness, &shared);
+    assert!(
+        step_until(&mut harness, |app| app.state().machine.jog_allowed()),
+        "report never fresh after G56"
     );
     assert!(step_enabled(&mut harness, "Zero Y"), "Zero Y disabled");
     click(&mut harness, "Zero Y");
