@@ -25,6 +25,7 @@ Fixes #
 - [ ] `cargo fmt` passed
 - [ ] `cargo clippy` has no new warnings
 - [ ] Tests added for new functionality
+- [ ] kittest snapshots updated if UI changed
 - [ ] Public APIs documented with `///`
 - [ ] Error cases handled (no silent failures)
 - [ ] No debug `eprintln!()` or `println!()` statements
