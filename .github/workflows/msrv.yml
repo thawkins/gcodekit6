@@ -58,9 +58,19 @@ jobs:
         uses: taiki-e/install-action@nextest
 
       - name: Run tests on MSRV
-        run: cargo nextest run --workspace
+        run: cargo nextest run --workspace --profile ci
         env:
           WGPU_BACKEND: vulkan
+
+      - name: Upload kittest snapshot diffs
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: kittest-snapshot-diffs
+          path: |
+            crates/gcodekit5-ui-egui/tests/snapshots/**/*.diff.png
+            crates/gcodekit5-ui-egui/tests/snapshots/**/*.new.png
+          if-no-files-found: ignore
 
       - name: Run doc tests on MSRV
         run: cargo test --workspace --doc

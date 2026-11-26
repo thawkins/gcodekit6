@@ -22,7 +22,7 @@ Brief description of changes made.
 ### Testing
 - [ ] I have added tests that prove my fix is effective or my feature works
 - [ ] New and existing unit tests pass locally with my changes
-- [ ] `cargo test --workspace` passes
+- [ ] `cargo nextest run --workspace` and `cargo test --workspace --doc` pass
 - [ ] kittest snapshots updated if UI changed
 
 ### Documentation

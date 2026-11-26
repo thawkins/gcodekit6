@@ -98,7 +98,7 @@ anyhow = "1.0"
 [package.metadata.deb]
 maintainer = "GCodeKit Contributors"
 copyright = "2025, GCodeKit Contributors"
-depends = "$auto"
+depends = "$auto, libxkbcommon-x11-0, libvulkan1 | libegl1"
 section = "utility"
 priority = "optional"
 assets = [
@@ -113,6 +113,12 @@ assets = [
     { source = "assets/pictures/com.github.thawkins.gcodekit5.png", dest = "/usr/share/icons/hicolor/256x256/apps/com.github.thawkins.gcodekit5.png", mode = "644" },
     { source = "flatpak/com.github.thawkins.gcodekit5.desktop", dest = "/usr/share/applications/com.github.thawkins.gcodekit5.desktop", mode = "644" },
 ]
+
+# Libraries winit and wgpu dlopen at run time (not in the ELF NEEDED list, so
+# auto-req cannot see them); auto-req still adds libc, libudev, etc.
+[package.metadata.generate-rpm.requires]
+libxkbcommon-x11 = "*"
+vulkan-loader = "*"
 
 [dev-dependencies]
 mutants = "0.0.4"
