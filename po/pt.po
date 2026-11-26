@@ -4644,3 +4644,51 @@ msgstr "Converter em caminho"
 
 msgid "Convert to Rectangle"
 msgstr "Converter em retângulo"
+
+msgid "Reset All"
+msgstr "Repor tudo"
+
+msgid "Command"
+msgstr "Comando"
+
+msgid "Where"
+msgstr "Onde"
+
+msgid "Shortcut"
+msgstr "Atalho"
+
+msgid "Everywhere"
+msgstr "Em todo o lado"
+
+msgid "Press a key (Escape cancels)"
+msgstr "Prima uma tecla (Escape cancela)"
+
+msgid "Change"
+msgstr "Alterar"
+
+msgid "The E-STOP and feed hold keys cannot be changed"
+msgstr "As teclas de PARAGEM DE EMERGÊNCIA e pausa de avanço não podem ser alteradas"
+
+msgid "{key} is kept for {command}"
+msgstr "{key} está reservada para {command}"
+
+msgid "A command that moves the machine cannot use the letter of the E-STOP or feed hold key"
+msgstr "Um comando que move a máquina não pode usar a letra da tecla de PARAGEM DE EMERGÊNCIA ou de pausa de avanço"
+
+msgid "A jog key must be a letter, digit or symbol key without Ctrl or Alt, so it never jogs while you type"
+msgstr "Uma tecla de jog tem de ser uma letra, um dígito ou um símbolo sem Ctrl nem Alt, para nunca mover a máquina enquanto escreve"
+
+msgid "{key} opens a menu"
+msgstr "{key} abre um menu"
+
+msgid "{key} is already used by {command}"
+msgstr "{key} já é usada por {command}"
+
+msgid "{key} is reserved by the system"
+msgstr "{key} está reservada pelo sistema"
+
+msgid "Double presses are not supported"
+msgstr "Pressões duplas não são suportadas"
+
+msgid "{key} works in the wrong place"
+msgstr "{key} funciona no lugar errado"

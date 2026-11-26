@@ -146,8 +146,12 @@ mod test_materials_manager;
 mod test_panel_visibility;
 #[path = "test_quit.rs"]
 mod test_quit;
+#[path = "test_settings_shortcuts.rs"]
+mod test_settings_shortcuts;
 #[path = "test_settings_window.rs"]
 mod test_settings_window;
+#[path = "test_shortcut_rules.rs"]
+mod test_shortcut_rules;
 #[path = "test_smoke.rs"]
 mod test_smoke;
 #[path = "test_status_bar.rs"]

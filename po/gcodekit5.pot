@@ -4561,3 +4561,51 @@ msgstr ""
 
 msgid "Convert to Rectangle"
 msgstr ""
+
+msgid "Reset All"
+msgstr ""
+
+msgid "Command"
+msgstr ""
+
+msgid "Where"
+msgstr ""
+
+msgid "Shortcut"
+msgstr ""
+
+msgid "Everywhere"
+msgstr ""
+
+msgid "Press a key (Escape cancels)"
+msgstr ""
+
+msgid "Change"
+msgstr ""
+
+msgid "The E-STOP and feed hold keys cannot be changed"
+msgstr ""
+
+msgid "{key} is kept for {command}"
+msgstr ""
+
+msgid "A command that moves the machine cannot use the letter of the E-STOP or feed hold key"
+msgstr ""
+
+msgid "A jog key must be a letter, digit or symbol key without Ctrl or Alt, so it never jogs while you type"
+msgstr ""
+
+msgid "{key} opens a menu"
+msgstr ""
+
+msgid "{key} is already used by {command}"
+msgstr ""
+
+msgid "{key} is reserved by the system"
+msgstr ""
+
+msgid "Double presses are not supported"
+msgstr ""
+
+msgid "{key} works in the wrong place"
+msgstr ""

@@ -402,6 +402,16 @@ impl Command {
         )
     }
 
+    /// Whether the command can start machine motion: a jog, a run, a stream start, a cycle
+    /// start or homing. Its keys stay off the feed hold and soft reset keys.
+    pub fn starts_motion(self) -> bool {
+        self.is_jog()
+            || matches!(
+                self,
+                Command::FileRun | Command::StreamStart | Command::CycleStart | Command::Home
+            )
+    }
+
     /// The command's catalog entry for craft-keymap.
     fn bindable(self) -> Bindable {
         let spec = self.spec();

@@ -4652,3 +4652,51 @@ msgstr "Converti in tracciato"
 
 msgid "Convert to Rectangle"
 msgstr "Converti in rettangolo"
+
+msgid "Reset All"
+msgstr "Ripristina tutto"
+
+msgid "Command"
+msgstr "Comando"
+
+msgid "Where"
+msgstr "Dove"
+
+msgid "Shortcut"
+msgstr "Scorciatoia"
+
+msgid "Everywhere"
+msgstr "Ovunque"
+
+msgid "Press a key (Escape cancels)"
+msgstr "Premi un tasto (Esc annulla)"
+
+msgid "Change"
+msgstr "Cambia"
+
+msgid "The E-STOP and feed hold keys cannot be changed"
+msgstr "I tasti di ARRESTO DI EMERGENZA e sospensione avanzamento non possono essere modificati"
+
+msgid "{key} is kept for {command}"
+msgstr "{key} è riservato a {command}"
+
+msgid "A command that moves the machine cannot use the letter of the E-STOP or feed hold key"
+msgstr "Un comando che muove la macchina non può usare la lettera del tasto di ARRESTO DI EMERGENZA o di sospensione avanzamento"
+
+msgid "A jog key must be a letter, digit or symbol key without Ctrl or Alt, so it never jogs while you type"
+msgstr "Un tasto di jog deve essere una lettera, una cifra o un simbolo senza Ctrl o Alt, così non muove mai la macchina mentre scrivi"
+
+msgid "{key} opens a menu"
+msgstr "{key} apre un menu"
+
+msgid "{key} is already used by {command}"
+msgstr "{key} è già usato da {command}"
+
+msgid "{key} is reserved by the system"
+msgstr "{key} è riservato dal sistema"
+
+msgid "Double presses are not supported"
+msgstr "Le doppie pressioni non sono supportate"
+
+msgid "{key} works in the wrong place"
+msgstr "{key} agisce nel posto sbagliato"

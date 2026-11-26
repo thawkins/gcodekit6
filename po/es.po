@@ -4652,3 +4652,51 @@ msgstr "Convertir en trazado"
 
 msgid "Convert to Rectangle"
 msgstr "Convertir en rectángulo"
+
+msgid "Reset All"
+msgstr "Restablecer todo"
+
+msgid "Command"
+msgstr "Comando"
+
+msgid "Where"
+msgstr "Dónde"
+
+msgid "Shortcut"
+msgstr "Atajo"
+
+msgid "Everywhere"
+msgstr "En todas partes"
+
+msgid "Press a key (Escape cancels)"
+msgstr "Pulse una tecla (Escape cancela)"
+
+msgid "Change"
+msgstr "Cambiar"
+
+msgid "The E-STOP and feed hold keys cannot be changed"
+msgstr "Las teclas de PARADA DE EMERGENCIA y retención de avance no se pueden cambiar"
+
+msgid "{key} is kept for {command}"
+msgstr "{key} está reservada para {command}"
+
+msgid "A command that moves the machine cannot use the letter of the E-STOP or feed hold key"
+msgstr "Un comando que mueve la máquina no puede usar la letra de la tecla de PARADA DE EMERGENCIA o de retención de avance"
+
+msgid "A jog key must be a letter, digit or symbol key without Ctrl or Alt, so it never jogs while you type"
+msgstr "Una tecla de desplazamiento debe ser una letra, un dígito o un símbolo sin Ctrl ni Alt, para que nunca mueva la máquina mientras escribe"
+
+msgid "{key} opens a menu"
+msgstr "{key} abre un menú"
+
+msgid "{key} is already used by {command}"
+msgstr "{key} ya la usa {command}"
+
+msgid "{key} is reserved by the system"
+msgstr "{key} está reservada por el sistema"
+
+msgid "Double presses are not supported"
+msgstr "No se admiten pulsaciones dobles"
+
+msgid "{key} works in the wrong place"
+msgstr "{key} funciona en el lugar equivocado"

@@ -6,17 +6,28 @@
 //! [`Config`] field backs and that mean something to this front end: General (units, feed rate
 //! units, default folder), Machine (jog step, jog feed rate, X/Y/Z travel), User Interface
 //! (theme, language, About on startup, grid line widths, and "Use system title bar" where
-//! craft-window says it changes something), File Processing and Advanced. A language or
-//! title-bar change takes effect after a restart; [`SettingsOutcome::Applied`] says when one
-//! is needed.
+//! craft-window says it changes something), File Processing, Shortcuts and Advanced. A
+//! language or title-bar change takes effect after a restart; [`SettingsOutcome::Applied`] says
+//! when one is needed. GTK's Controller page had no rows, so there is none here.
 //!
-//! Dependencies: `egui`, `craft-ui` (combo boxes), `gcodekit5-settings` (the settings and
-//! saving them), `gcodekit5-app` (translations).
+//! The Shortcuts page (documented in `docs/user/70-settings.md`; GTK's page was empty) lists
+//! every command with its keys: Change records the next key press as the command's key, Clear
+//! removes its keys, Reset gives it its defaults and Reset All every command. A key is given
+//! only when [`crate::shortcuts`] allows it, which keeps the E-STOP and feed hold keys fixed;
+//! otherwise the page says why. Apply hands the edited keymap to the app
+//! ([`SettingsWindow::take_applied_keymap`]), which uses it at once.
+//!
+//! Dependencies: `egui`, `craft-ui` (combo boxes), `craft-keymap` (the keymap and recording a
+//! key), `gcodekit5-settings` (the settings and saving them), `gcodekit5-app` (translations).
 
+use craft_keymap::{Key, KeyInput, Keymap, Layout, Mods, Platform, Trigger};
 use craft_ui::combo::ComboBox;
 use gcodekit5_app::i18n::{Translator, needs_restart, normalized_language};
 use gcodekit5_settings::SettingsManager;
 use gcodekit5_settings::config::{Config, FeedRateUnits, MeasurementSystem, Theme, UiSettings};
+
+use crate::commands::{self, Command};
+use crate::shortcuts::{self, LOCKED};
 
 /// The UI languages offered, as `(code, name)`; names are each language's own, so they are not
 /// translated. `"system"` is listed first under a translated name.
@@ -55,15 +66,17 @@ enum Page {
     Machine,
     UserInterface,
     FileProcessing,
+    Shortcuts,
     Advanced,
 }
 
 impl Page {
-    const ALL: [Self; 5] = [
+    const ALL: [Self; 6] = [
         Self::General,
         Self::Machine,
         Self::UserInterface,
         Self::FileProcessing,
+        Self::Shortcuts,
         Self::Advanced,
     ];
 
@@ -73,6 +86,7 @@ impl Page {
             Self::Machine => n_!("Machine"),
             Self::UserInterface => n_!("User Interface"),
             Self::FileProcessing => n_!("File Processing"),
+            Self::Shortcuts => n_!("Shortcuts"),
             Self::Advanced => n_!("Advanced"),
         }
     }
@@ -88,6 +102,14 @@ pub struct Draft {
     pub directory: String,
     /// Why the last Apply failed.
     error: Option<String>,
+    /// The shortcuts as edited.
+    keymap: Keymap,
+    /// The command whose key the next key press sets.
+    recording: Option<Command>,
+    /// Why the last key was not given, or that it was.
+    shortcut_notice: Option<String>,
+    /// The Shortcuts page's filter text.
+    filter: String,
 }
 
 /// The Preferences window.
@@ -101,6 +123,8 @@ pub struct SettingsWindow {
     launch_system_title_bar: bool,
     page: Page,
     draft: Option<Draft>,
+    /// The shortcuts the last Apply saved, until the app takes them.
+    applied_keymap: Option<Keymap>,
 }
 
 impl SettingsWindow {
@@ -117,14 +141,17 @@ impl SettingsWindow {
             launch_system_title_bar: launch.use_system_title_bar,
             page: Page::General,
             draft: None,
+            applied_keymap: None,
         }
     }
 
-    /// Opens the window on a copy of the current settings; does nothing when it is open.
+    /// Opens the window on a copy of the current settings and shortcuts; does nothing when it
+    /// is open.
     ///
     /// # Arguments
     /// * `settings` - The settings to edit.
-    pub fn open(&mut self, settings: &SettingsManager) {
+    /// * `keymap` - The shortcuts in use.
+    pub fn open(&mut self, settings: &SettingsManager, keymap: &Keymap) {
         if self.draft.is_none() {
             let config = settings.config().clone();
             let directory = config
@@ -136,6 +163,10 @@ impl SettingsWindow {
                 config,
                 directory,
                 error: None,
+                keymap: keymap.clone(),
+                recording: None,
+                shortcut_notice: None,
+                filter: String::new(),
             });
         }
     }
@@ -143,6 +174,17 @@ impl SettingsWindow {
     /// Whether the window is open.
     pub fn is_open(&self) -> bool {
         self.draft.is_some()
+    }
+
+    /// Whether the Shortcuts page waits for a key press to record. The app then runs no key
+    /// but the E-STOP and feed hold keys, so the press reaches the window.
+    pub fn is_recording(&self) -> bool {
+        self.draft.as_ref().is_some_and(|d| d.recording.is_some())
+    }
+
+    /// The shortcuts the last Apply saved, once: the app uses them from then on.
+    pub fn take_applied_keymap(&mut self) -> Option<Keymap> {
+        self.applied_keymap.take()
     }
 
     /// The copy being edited while the window is open (tests: set every edited field at
@@ -170,6 +212,10 @@ impl SettingsWindow {
         let Some(draft) = self.draft.as_mut() else {
             return SettingsOutcome::Closed;
         };
+        if self.page != Page::Shortcuts {
+            draft.recording = None;
+        }
+        record_key(ctx, tr, draft);
         let mut open = true;
         let mut action = None;
         let page = &mut self.page;
@@ -186,24 +232,29 @@ impl SettingsWindow {
                     }
                 });
                 ui.separator();
-                egui::ScrollArea::vertical()
-                    .max_height((ui.available_height() - 48.0).max(80.0))
-                    .show(ui, |ui| {
-                        egui::Grid::new("gcodekit5-preferences-rows")
-                            .num_columns(2)
-                            .spacing([16.0, 8.0])
-                            .show(ui, |ui| match *page {
-                                Page::General => general_rows(ui, tr, draft),
-                                Page::Machine => machine_rows(ui, tr, &mut draft.config),
-                                Page::UserInterface => {
-                                    ui_rows(ui, tr, &mut draft.config.ui, title_bar_row);
-                                }
-                                Page::FileProcessing => {
-                                    file_rows(ui, tr, &mut draft.config);
-                                }
-                                Page::Advanced => advanced_rows(ui, tr, &mut draft.config.ui),
-                            });
-                    });
+                if *page == Page::Shortcuts {
+                    shortcut_page(ui, tr, draft);
+                } else {
+                    egui::ScrollArea::vertical()
+                        .max_height((ui.available_height() - 48.0).max(80.0))
+                        .show(ui, |ui| {
+                            egui::Grid::new("gcodekit5-preferences-rows")
+                                .num_columns(2)
+                                .spacing([16.0, 8.0])
+                                .show(ui, |ui| match *page {
+                                    Page::General => general_rows(ui, tr, draft),
+                                    Page::Machine => machine_rows(ui, tr, &mut draft.config),
+                                    Page::UserInterface => {
+                                        ui_rows(ui, tr, &mut draft.config.ui, title_bar_row);
+                                    }
+                                    Page::FileProcessing => {
+                                        file_rows(ui, tr, &mut draft.config);
+                                    }
+                                    Page::Advanced => advanced_rows(ui, tr, &mut draft.config.ui),
+                                    Page::Shortcuts => {}
+                                });
+                        });
+                }
                 if let Some(error) = &draft.error {
                     ui.colored_label(ui.visuals().error_fg_color, error);
                 }
@@ -243,7 +294,9 @@ impl SettingsWindow {
                 && config.ui.use_system_title_bar != self.launch_system_title_bar);
         match settings.apply(config) {
             Ok(()) => {
-                self.draft = None;
+                if let Some(draft) = self.draft.take() {
+                    self.applied_keymap = Some(draft.keymap);
+                }
                 SettingsOutcome::Applied { restart }
             }
             Err(error) => {
@@ -529,6 +582,179 @@ fn advanced_rows(ui: &mut egui::Ui, tr: &Translator, settings: &mut UiSettings) 
     );
 }
 
+/// Takes the frame's first key press as the key of the command being recorded, before any
+/// widget sees it. Escape alone stops recording; a key the rules refuse leaves the command as
+/// it was and says why.
+fn record_key(ctx: &egui::Context, tr: &Translator, draft: &mut Draft) {
+    let Some(command) = draft.recording else {
+        return;
+    };
+    let platform: Platform = draft.keymap.platform();
+    let event = ctx.input_mut(|input| {
+        let press = |e: &egui::Event| {
+            matches!(
+                e,
+                egui::Event::Key {
+                    pressed: true,
+                    repeat: false,
+                    ..
+                }
+            )
+        };
+        let clipboard = |e: &egui::Event| {
+            matches!(
+                e,
+                egui::Event::Copy | egui::Event::Cut | egui::Event::Paste(_)
+            )
+        };
+        let found = input
+            .events
+            .iter()
+            .position(press)
+            .or_else(|| input.events.iter().position(clipboard))
+            .map(|i| input.events[i].clone());
+        // Nothing typed reaches a widget while a key is recorded.
+        input
+            .events
+            .retain(|e| !(press(e) || clipboard(e) || matches!(e, egui::Event::Text(_))));
+        found
+    });
+    let chord = match event {
+        Some(egui::Event::Copy) => Some(craft_keymap::Chord::new(Mods::CMD, Key::C)),
+        Some(egui::Event::Cut) => Some(craft_keymap::Chord::new(Mods::CMD, Key::X)),
+        Some(egui::Event::Paste(_)) => Some(craft_keymap::Chord::new(Mods::CMD, Key::V)),
+        Some(event) => {
+            KeyInput::from_egui(&event, platform).and_then(|input| Layout::new().resolve(&input))
+        }
+        None => None,
+    };
+    let Some(chord) = chord else {
+        return;
+    };
+    draft.recording = None;
+    if chord.key == Key::Escape && chord.mods.is_none() {
+        draft.shortcut_notice = None;
+        return;
+    }
+    draft.shortcut_notice =
+        match shortcuts::set_key(&mut draft.keymap, command, Trigger::single(chord)) {
+            Ok(()) => None,
+            Err(refusal) => Some(refusal.message(tr, &chord.display(platform))),
+        };
+}
+
+/// Where a command's keys work, as the Shortcuts page names it.
+fn where_msgid(keymap: &Keymap, command: Command) -> &'static str {
+    match keymap
+        .bindable(&command.command_ref())
+        .map(|b| b.scope.as_str())
+    {
+        Some(commands::MACHINE_CONTROL_SCOPE) => n_!("Machine Control"),
+        Some(commands::VISUALIZER_SCOPE) => n_!("Visualizer"),
+        Some(commands::DESIGNER_SCOPE) => n_!("Designer"),
+        _ => n_!("Everywhere"),
+    }
+}
+
+/// The Shortcuts page: a filter, Reset All, the last refusal, and a row per command.
+fn shortcut_page(ui: &mut egui::Ui, tr: &Translator, draft: &mut Draft) {
+    ui.horizontal(|ui| {
+        let label = row_label(ui, tr, n_!("Filter:"));
+        ui.text_edit_singleline(&mut draft.filter)
+            .labelled_by(label);
+        if ui.button(tr.tr(n_!("Reset All"))).clicked() {
+            shortcuts::reset_all(&mut draft.keymap);
+            draft.recording = None;
+            draft.shortcut_notice = None;
+        }
+    });
+    if let Some(notice) = &draft.shortcut_notice {
+        ui.colored_label(ui.visuals().error_fg_color, notice);
+    }
+    let query = draft.filter.trim().to_lowercase();
+    let platform = draft.keymap.platform();
+    egui::ScrollArea::vertical()
+        .max_height((ui.available_height() - 48.0).max(80.0))
+        .show(ui, |ui| {
+            egui::Grid::new("gcodekit5-shortcut-rows")
+                .num_columns(6)
+                .striped(true)
+                .spacing([12.0, 6.0])
+                .show(ui, |ui| {
+                    for msgid in [n_!("Command"), n_!("Where"), n_!("Shortcut")] {
+                        ui.strong(tr.tr(msgid));
+                    }
+                    ui.end_row();
+                    for command in Command::ALL {
+                        let label = tr.tr(command.label_msgid());
+                        if !query.is_empty() && !label.to_lowercase().contains(&query) {
+                            continue;
+                        }
+                        shortcut_row(ui, tr, draft, command, &label, platform);
+                    }
+                });
+        });
+}
+
+/// One command's row: its label, where its keys work, the keys, Change, Clear and Reset.
+fn shortcut_row(
+    ui: &mut egui::Ui,
+    tr: &Translator,
+    draft: &mut Draft,
+    command: Command,
+    label: &str,
+    platform: Platform,
+) {
+    let command_ref = command.command_ref();
+    let bindings = draft.keymap.bindings(&command_ref);
+    let recording = draft.recording == Some(command);
+    let locked = LOCKED.contains(&command);
+    ui.label(label);
+    ui.label(tr.tr(where_msgid(&draft.keymap, command)));
+    let keys = if recording {
+        tr.tr(n_!("Press a key (Escape cancels)")).into_owned()
+    } else if bindings.is_empty() {
+        tr.tr(n_!("None")).into_owned()
+    } else {
+        bindings
+            .iter()
+            .map(|b| b.trigger.display(platform))
+            .collect::<Vec<_>>()
+            .join(", ")
+    };
+    ui.label(keys);
+    let fixed = || shortcuts::Refusal::Locked.message(tr, "");
+    let change = ui.add_enabled(
+        !locked,
+        egui::Button::new(tr.tr(n_!("Change"))).selected(recording),
+    );
+    if change.clicked() {
+        draft.recording = (!recording).then_some(command);
+        draft.shortcut_notice = None;
+    }
+    change.on_disabled_hover_text(fixed());
+    let clear = ui.add_enabled(
+        !locked && !bindings.is_empty(),
+        egui::Button::new(tr.tr(n_!("Clear"))),
+    );
+    if clear.clicked() {
+        if let Err(refusal) = shortcuts::clear(&mut draft.keymap, command) {
+            draft.shortcut_notice = Some(refusal.message(tr, ""));
+        }
+        draft.recording = None;
+    }
+    let changed = bindings != draft.keymap.default_bindings(&command_ref);
+    if ui
+        .add_enabled(!locked && changed, egui::Button::new(tr.tr(n_!("Reset"))))
+        .clicked()
+    {
+        shortcuts::reset(&mut draft.keymap, command);
+        draft.recording = None;
+        draft.shortcut_notice = None;
+    }
+    ui.end_row();
+}
+
 /// The English msgids this window shows, for the translation test.
 pub fn msgids() -> Vec<&'static str> {
     let mut ids: Vec<&'static str> = Page::ALL.into_iter().map(Page::title_msgid).collect();
@@ -560,6 +786,21 @@ pub fn msgids() -> Vec<&'static str> {
         n_!("Max Line Length"),
         n_!("3D Stock Removal Visualization"),
         n_!("STL File Import"),
+        n_!("Filter:"),
+        n_!("Reset All"),
+        n_!("Command"),
+        n_!("Where"),
+        n_!("Shortcut"),
+        n_!("Everywhere"),
+        n_!("Machine Control"),
+        n_!("Visualizer"),
+        n_!("Designer"),
+        n_!("Press a key (Escape cancels)"),
+        n_!("None"),
+        n_!("Change"),
+        n_!("Clear"),
+        n_!("Reset"),
     ]);
+    ids.extend(shortcuts::msgids());
     ids
 }

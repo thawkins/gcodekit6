@@ -810,8 +810,17 @@ impl GcodeKitApp {
             panel: self.keyboard_panel(ctx),
             ..Active::NONE
         };
+        // While Preferences records a key, only the E-STOP and feed hold keys run; every
+        // other press is left for the window to record.
+        let recording = self.settings_window.is_recording();
         let (hits, modifiers) = ctx.input_mut(|input| {
-            let hits = self.dispatcher.dispatch(input, &self.keymap, &active);
+            let hits = self
+                .dispatcher
+                .dispatch_filtered(input, &self.keymap, &active, |hit| {
+                    !recording
+                        || Command::from_ref(&hit.command)
+                            .is_some_and(|c| crate::shortcuts::LOCKED.contains(&c))
+                });
             (hits, input.modifiers)
         });
         // The key of each jog a key ran, so a continuous jog can last while it is held.
@@ -1052,7 +1061,9 @@ impl GcodeKitApp {
                 self.after_save = None;
                 self.ask_save_gcode();
             }
-            Command::OpenSettings => self.settings_window.open(&self.state.settings),
+            Command::OpenSettings => self
+                .settings_window
+                .open(&self.state.settings, &self.keymap),
             Command::About => self.about_window.open(),
             Command::OpenFirmwareSettings => self.show_page(Page::DeviceConfig),
             Command::OpenDeviceInfo => self.show_page(Page::DeviceConfig),
@@ -1151,6 +1162,10 @@ impl GcodeKitApp {
         let outcome =
             self.settings_window
                 .show(ctx, &mut self.state.settings, &self.state.translator);
+        if let Some(keymap) = self.settings_window.take_applied_keymap() {
+            self.keymap = keymap;
+            self.menus.set_keymap(&self.state.translator, &self.keymap);
+        }
         match outcome {
             SettingsOutcome::Applied { restart } => {
                 self.workspace.configure(self.state.config());
@@ -1581,6 +1596,12 @@ impl GcodeKitApp {
         {
             tracing::error!(%error, "could not restart GCodeKit5");
         }
+    }
+
+    /// The Preferences window (tests: whether it is open or recording a key).
+    #[doc(hidden)]
+    pub fn settings_window(&self) -> &SettingsWindow {
+        &self.settings_window
     }
 
     /// The last command [`GcodeKitApp::dispatch`] ran.

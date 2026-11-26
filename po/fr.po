@@ -4656,3 +4656,51 @@ msgstr "Convertir en chemin"
 
 msgid "Convert to Rectangle"
 msgstr "Convertir en rectangle"
+
+msgid "Reset All"
+msgstr "Tout réinitialiser"
+
+msgid "Command"
+msgstr "Commande"
+
+msgid "Where"
+msgstr "Où"
+
+msgid "Shortcut"
+msgstr "Raccourci"
+
+msgid "Everywhere"
+msgstr "Partout"
+
+msgid "Press a key (Escape cancels)"
+msgstr "Appuyez sur une touche (Échap annule)"
+
+msgid "Change"
+msgstr "Modifier"
+
+msgid "The E-STOP and feed hold keys cannot be changed"
+msgstr "Les touches d'ARRÊT D'URGENCE et de suspension d'avance ne peuvent pas être modifiées"
+
+msgid "{key} is kept for {command}"
+msgstr "{key} est réservée à {command}"
+
+msgid "A command that moves the machine cannot use the letter of the E-STOP or feed hold key"
+msgstr "Une commande qui déplace la machine ne peut pas utiliser la lettre de la touche d'ARRÊT D'URGENCE ou de suspension d'avance"
+
+msgid "A jog key must be a letter, digit or symbol key without Ctrl or Alt, so it never jogs while you type"
+msgstr "Une touche de déplacement doit être une lettre, un chiffre ou un symbole sans Ctrl ni Alt, pour ne jamais déplacer la machine pendant la saisie"
+
+msgid "{key} opens a menu"
+msgstr "{key} ouvre un menu"
+
+msgid "{key} is already used by {command}"
+msgstr "{key} est déjà utilisée par {command}"
+
+msgid "{key} is reserved by the system"
+msgstr "{key} est réservée par le système"
+
+msgid "Double presses are not supported"
+msgstr "Les doubles pressions ne sont pas prises en charge"
+
+msgid "{key} works in the wrong place"
+msgstr "{key} agit au mauvais endroit"

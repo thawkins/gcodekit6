@@ -30,14 +30,26 @@ Access settings from the **Settings** panel. Changes take effect immediately unl
 
 ## Keyboard Shortcuts
 
-All keyboard shortcuts are customizable:
+The **Shortcuts** page of Preferences lists every command, where its keys work (everywhere, or
+only while Machine Control, the Visualizer or the Designer has the keyboard) and its keys:
 
-1. Navigate to the **Shortcuts** section in Settings
-2. Click on a shortcut entry
-3. Press the new key combination
-4. The shortcut is remapped immediately
+1. Type part of a command's name in **Filter:** to find it
+2. Click **Change**, then press the new key combination (Escape cancels)
+3. Click **Apply**: the new key works at once and shows in the menus
 
-Click **Reset to Defaults** to restore all shortcuts to their default bindings. Conflicts are detected and flagged if two actions share the same key combination.
+**Clear** removes a command's keys, **Reset** gives one command its default keys back, and
+**Reset All** every command. **Cancel** drops the changes.
+
+A key is refused, with the reason shown above the list, when:
+
+- it is the E-STOP (soft reset, Ctrl+Shift+K) or feed hold (`!`, Ctrl+Shift+H) key; those two
+  commands cannot be changed;
+- a command that moves the machine (jog, run, start, cycle start, home) would use the letter of
+  one of those keys;
+- a jog key is not a plain letter, digit or symbol key (with Ctrl, Alt or a function key it would
+  jog while you type in a text field);
+- Alt and the letter open a menu in any of the languages;
+- another command already uses it where both could run.
 
 See [Keyboard Shortcuts Reference](90-shortcuts.md) for the full default list.
 

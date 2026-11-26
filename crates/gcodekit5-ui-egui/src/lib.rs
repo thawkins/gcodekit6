@@ -26,6 +26,7 @@ pub mod machine;
 pub mod menu;
 pub mod panes;
 pub mod resources;
+pub mod shortcuts;
 pub mod status_bar;
 pub mod theme;
 pub mod windows;

@@ -55,6 +55,19 @@ pub const LAYOUT_LABELS: [&str; 25] = [
 /// The English msgids of the top-level menu titles, in bar order: GTK's four.
 pub const MENU_TITLES: [&str; 4] = [n_!("File"), n_!("Edit"), n_!("Machine"), n_!("Help")];
 
+/// The access keys (mnemonics) the in-window menu bar gives [`MENU_TITLES`], in bar order, for
+/// every shipped language. Alt and one of these letters opens a menu, so the shortcut editor
+/// gives no command such a key. `test_commands::test_designer_alt_keys_leave_the_menu_mnemonics`
+/// checks the table against the bar.
+pub const MENU_MNEMONICS: [(&str, [char; 4]); 6] = [
+    ("en", ['f', 'e', 'm', 'h']),
+    ("de", ['d', 'b', 'm', 'h']),
+    ("es", ['a', 'e', 'm', 'y']),
+    ("fr", ['f', 'd', 'm', 'a']),
+    ("it", ['f', 'm', 'a', 'i']),
+    ("pt", ['f', 'e', 'm', 'a']),
+];
+
 /// A menu item running `command`, labelled in the current language.
 fn item(tr: &Translator, command: Command) -> Node {
     craft_menu::Item::new(command.command_ref(), tr.tr(command.label_msgid())).into()
@@ -201,6 +214,8 @@ pub struct Menus {
     /// The bar laid out for [`Target::current`], drawn in the window when there is no native
     /// menu.
     laid_out: MenuBar,
+    /// Counts the changes of `laid_out`, so the native menu is laid out again after one.
+    version: u64,
     /// The macOS menu bar, when AppKit accepted it.
     #[cfg(target_os = "macos")]
     native: Option<craft_menu::NativeMenu>,
@@ -224,9 +239,20 @@ impl Menus {
     pub fn new(tr: &Translator, keymap: &Keymap) -> Self {
         Self {
             laid_out: Self::layout(tr, keymap, Target::current()),
+            version: 0,
             #[cfg(target_os = "macos")]
             native: None,
         }
+    }
+
+    /// Shows `keymap`'s shortcuts from now on, after the user changed them.
+    ///
+    /// # Arguments
+    /// * `tr` - Translator for the labels.
+    /// * `keymap` - The keymap whose bindings the items show.
+    pub fn set_keymap(&mut self, tr: &Translator, keymap: &Keymap) {
+        self.laid_out = Self::layout(tr, keymap, Target::current());
+        self.version += 1;
     }
 
     /// The app's menus with `keymap`'s shortcuts, laid out for `target`.
@@ -298,9 +324,9 @@ impl Menus {
         if let Some(native) = &mut self.native {
             native.set_gate(gate);
             let chosen = native.take_clicks(ctx);
-            // The menus do not change after start-up yet, so one state value is enough.
+            // The menus change only with the shortcuts, which bump `version`.
             let layout = self.laid_out.clone();
-            native.sync_with(0, move || craft_menu::Layout {
+            native.sync_with(self.version, move || craft_menu::Layout {
                 bar: layout,
                 clashes: Vec::new(),
             });

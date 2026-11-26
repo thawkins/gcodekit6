@@ -36,7 +36,7 @@ fn harness(dirs: ConfigDirs, title_bar_row: bool) -> Harness<'static, State> {
     let (settings, problem) = SettingsManager::open(dirs);
     assert!(problem.is_none(), "{problem:?}");
     let mut window = SettingsWindow::new(title_bar_row, &settings.config().ui);
-    window.open(&settings);
+    window.open(&settings, &gcodekit5_ui_egui::commands::keymap());
     let state = State {
         window,
         settings,

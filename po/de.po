@@ -4649,3 +4649,51 @@ msgstr "In Pfad umwandeln"
 
 msgid "Convert to Rectangle"
 msgstr "In Rechteck umwandeln"
+
+msgid "Reset All"
+msgstr "Alle zurücksetzen"
+
+msgid "Command"
+msgstr "Befehl"
+
+msgid "Where"
+msgstr "Wo"
+
+msgid "Shortcut"
+msgstr "Tastenkürzel"
+
+msgid "Everywhere"
+msgstr "Überall"
+
+msgid "Press a key (Escape cancels)"
+msgstr "Taste drücken (Escape bricht ab)"
+
+msgid "Change"
+msgstr "Ändern"
+
+msgid "The E-STOP and feed hold keys cannot be changed"
+msgstr "Die Tasten für NOT-AUS und Vorschub halten können nicht geändert werden"
+
+msgid "{key} is kept for {command}"
+msgstr "{key} ist für {command} reserviert"
+
+msgid "A command that moves the machine cannot use the letter of the E-STOP or feed hold key"
+msgstr "Ein Befehl, der die Maschine bewegt, kann nicht den Buchstaben der NOT-AUS- oder Vorschub-halten-Taste verwenden"
+
+msgid "A jog key must be a letter, digit or symbol key without Ctrl or Alt, so it never jogs while you type"
+msgstr "Eine Tipptaste muss eine Buchstaben-, Ziffern- oder Symboltaste ohne Strg oder Alt sein, damit sie beim Tippen nie verfährt"
+
+msgid "{key} opens a menu"
+msgstr "{key} öffnet ein Menü"
+
+msgid "{key} is already used by {command}"
+msgstr "{key} wird bereits von {command} verwendet"
+
+msgid "{key} is reserved by the system"
+msgstr "{key} ist vom System reserviert"
+
+msgid "Double presses are not supported"
+msgstr "Doppeltes Drücken wird nicht unterstützt"
+
+msgid "{key} works in the wrong place"
+msgstr "{key} wirkt am falschen Ort"

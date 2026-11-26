@@ -703,9 +703,15 @@ fn test_designer_alt_keys_leave_the_menu_mnemonics() {
         .filter_map(|text| text.strip_prefix("Alt+").map(str::to_lowercase))
         .collect();
     assert_eq!(alt_letters.len(), 6, "{alt_letters:?}");
-    for language in ["en", "de", "es", "fr", "it", "pt"] {
+    for (language, table) in menu::MENU_MNEMONICS {
         let mnemonics = title_mnemonics(language);
         assert_eq!(mnemonics.len(), 4, "{language}: {mnemonics:?}");
+        // The shortcut editor refuses Alt keys by this table.
+        let table: Vec<String> = table.iter().map(char::to_string).collect();
+        assert_eq!(
+            mnemonics, table,
+            "{language}: menu::MENU_MNEMONICS is stale"
+        );
         for letter in &alt_letters {
             assert!(
                 !mnemonics.contains(letter),

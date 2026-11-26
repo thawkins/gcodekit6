@@ -233,7 +233,7 @@ Status values:
 | DRO decimals | 70-settings | Ported | Fixed: 2 for mm, 3 for inches, as GTK (`test_machine_pane::dro_shows_two_decimals`) |
 | Auto-connect on startup | 70-settings | Not applicable | Not in the GTK source |
 | Preferences "Controller" page | *(GTK)* | Not applicable | `settings/test_settings_dialog_pages::test_gtk_controller_page_has_no_rows` (GTK's Controller tab is empty: no setting is in that category since the connection rows moved to the Device Manager, so egui adds no empty page) |
-| Keyboard shortcut editor | 70-settings | Gap | GTK Preferences has a Shortcuts page; egui has no shortcut editor |
+| Keyboard shortcut editor | 70-settings | Ported | `test_settings_shortcuts::test_change_records_a_key_and_apply_hands_it_to_the_app`, `test_settings_shortcuts::test_applied_shortcut_runs_at_once_and_shows_in_the_menu`, `test_settings_shortcuts::test_refused_key_says_why_and_keeps_the_old_key`, `test_settings_shortcuts::test_safety_rows_cannot_be_changed`, `test_settings_shortcuts::test_only_the_safety_keys_run_while_a_key_is_recorded`, `test_settings_shortcuts::test_reset_and_reset_all_restore_defaults_and_cancel_drops_edits`, `test_shortcut_rules::test_no_command_takes_a_safety_key_in_any_scope`, `test_shortcut_rules::test_jog_keys_are_plain_character_keys`, `test_shortcut_rules::test_alt_keys_never_open_a_menu_in_any_language`, `test_shortcut_rules::test_a_key_in_use_where_both_could_run_is_refused` and 6 more (GTK's Shortcuts tab was empty: its list was never shown or saved; egui's page, built on craft-keymap, is what `70-settings` documents. The E-STOP and feed hold keys are fixed, motion commands stay off their letters, jog keys are plain keys that never jog while typing, no Alt key takes a menu mnemonic in any language, and two commands never share a key where both run) |
 | Firmware settings: retrieve, filter, write | 70-settings | Ported | `test_firmware_settings::firmware_settings_retrieve_sends_dump_and_identity_queries`, `test_firmware_settings::firmware_settings_write_sends_exactly_the_line` |
 | Firmware settings: export / import to file | 70-settings | Manual check needed | Save/Load buttons exist; no test |
 
@@ -262,7 +262,6 @@ Ranked by user impact. Sizes are rough estimates for one developer who knows the
 
 | Rank | Gap | User impact | Rough size |
 | --- | --- | --- | --- |
-| 11 | Preferences shortcut editor | Low | 1-2 days |
 | 12 | Designer gallery icons | Low | 1 day |
 
 Manual checks still to run before GTK is deleted (no automated evidence): TCP and
