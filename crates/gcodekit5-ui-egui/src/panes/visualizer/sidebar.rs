@@ -134,7 +134,7 @@ fn display(ui: &mut egui::Ui, display: &mut Display, units: MeasurementSystem, t
             let spacing =
                 |mm: f32| format!("{} {}", format_length(mm, units), get_unit_label(units));
             ui.horizontal(|ui| {
-                let label = ui.label(tr.tr("Grid spacing"));
+                let label = ui.small(tr.tr("Grid spacing"));
                 egui::ComboBox::from_id_salt("visualizer-grid-spacing")
                     .selected_text(spacing(display.grid_spacing))
                     .show_ui(ui, |ui| {
