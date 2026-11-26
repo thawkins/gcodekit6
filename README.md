@@ -428,9 +428,11 @@ RUST_LOG=debug cargo run
 
 Settings files are stored in platform-specific locations:
 
-- **Linux**: `~/.config/gcodekit5/config.json`
-- **macOS**: `~/Library/Application Support/gcodekit5/config.json`
-- **Windows**: `%APPDATA%\gcodekit5\config.json`
+- **Linux**: `~/.config/gcodekit5/config.toml`
+- **macOS**: `~/Library/Application Support/gcodekit5/config.toml`
+- **Windows**: `%APPDATA%\gcodekit5\config.toml`
+
+On first start the app imports the settings and data files of the older GTK builds (`config.json` and the JSON data files beside it). The old files are left unchanged.
 
 ## Libraries needed to compile on Linux (Debian/Ubuntu)
 - **Build**:  
@@ -486,20 +488,20 @@ cargo check
 
 ### Testing
 ```bash
-# Run all tests
-cargo test
+# Run all tests (cargo-nextest)
+cargo nextest run --workspace
 
 # Run specific test
-cargo test test_grbl_status_parser
+cargo nextest run -E 'test(test_grbl_status_parser)'
 
 # Run tests with output visible
-cargo test -- --nocapture
+cargo nextest run --success-output immediate
 
-# Run only library tests (skip integration tests)
-cargo test --lib
+# Run doc tests (nextest does not run them)
+cargo test --doc
 
-# Run tests with 10-minute timeout
-timeout 600 cargo test
+# Run tests with a timeout
+timeout 1500 cargo nextest run --workspace
 ```
 
 ### Code Quality
@@ -554,7 +556,7 @@ git config core.hooksPath .githooks
 git checkout -b feature/amazing-feature
 
 # 4. Make changes, then run checks
-cargo fmt && cargo clippy && cargo test
+cargo fmt && cargo clippy && cargo nextest run --workspace
 
 # 5. Commit and push
 git commit -m "feat: add amazing feature"
@@ -584,7 +586,6 @@ See [CHANGELOG.md](CHANGELOG.md) for detailed version history and [GitHub Issues
 - **[docs/adr/](docs/adr/)** - Architecture Decision Records (ADRs)
 - **[docs/COORDINATE_SYSTEM.md](docs/COORDINATE_SYSTEM.md)** - Coordinate system and Y-flip explanation
 - **[SPEC.md](SPEC.md)** - Complete technical specification
-- **[PLAN.md](PLAN.md)** - Implementation roadmap
 - **[AGENTS.md](AGENTS.md)** - Development guidelines
 - **[AGENTS-LANGUAGE.md](AGENTS-LANGUAGE.md)** - Rust-specific development guidelines
 - **[CHANGELOG.md](CHANGELOG.md)** - Version history
@@ -595,7 +596,7 @@ See [CHANGELOG.md](CHANGELOG.md) for detailed version history and [GitHub Issues
 
 This project is dual-licensed under:
 
-- **MIT License** - See [LICENSE-MIT](LICENSE) for details
+- **MIT License** - See [LICENSE-MIT](LICENSE-MIT) for details
 - **Apache License 2.0** - See [LICENSE-APACHE](LICENSE-APACHE) for details
 
 You may choose either license for your use of this software.

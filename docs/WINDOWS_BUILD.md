@@ -2,181 +2,73 @@
 
 ## Prerequisites
 
-1. **MSYS2 with UCRT64 environment** installed at `C:\msys64`
-2. **WiX Toolset** installed (for creating MSI installer)
-3. **Rust toolchain** for Windows (MSVC target)
+1. **Rust toolchain** (1.95 or later) with the MSVC target `x86_64-pc-windows-msvc`
+2. **Visual Studio Build Tools** (Desktop development with C++ workload)
+3. **WiX Toolset v3.14.1** (for the MSI installer)
+4. **cargo-wix** (`cargo install cargo-wix`)
 
-## Required MSYS2 Packages
-
-Install the following packages in MSYS2 UCRT64 terminal:
-
-```bash
-pacman -S mingw-w64-ucrt-x86_64-gtk4 \
-          mingw-w64-ucrt-x86_64-libadwaita \
-          mingw-w64-ucrt-x86_64-gtksourceview5 \
-          mingw-w64-ucrt-x86_64-gettext \
-          mingw-w64-ucrt-x86_64-toolchain
-```
+No GTK runtime and no MSYS2 are needed. The egui front end links only against system DLLs, and `.cargo/config.toml` links the C runtime statically (`+crt-static`), so the exe needs no VC++ redistributable.
 
 ## Build Process
+
+### One command
+
+```powershell
+.\scripts\build-windows-release.ps1
+```
+
+This builds the release binary, the MSI and the portable zip. Use `-SkipBuild` to reuse an existing binary.
 
 ### Step 1: Build the Release Binary
 
 ```powershell
-# From project root
-cargo build --release
+cargo build --release --target x86_64-pc-windows-msvc
 ```
 
-This creates `target\release\gcodekit5.exe`
+This creates `target\x86_64-pc-windows-msvc\release\gcodekit5.exe`.
 
-### Step 2: Bundle GTK4 Runtime
-
-Run the bundling script to copy all required DLLs and data files:
+### Step 2: Test the Binary Locally
 
 ```powershell
-.\scripts\windows-bundle-gtk.ps1 -TargetDir "target\release" -MsysPath "C:\msys64\ucrt64"
+.\target\x86_64-pc-windows-msvc\release\gcodekit5.exe
 ```
 
-This script will:
-- Create `target\release\bin\` directory with all DLLs and the executable
-- Copy GTK4, Libadwaita, and GtkSourceView5 DLLs
-- Copy GLib schemas to `target\release\share\glib-2.0\schemas\`
-- Copy icons to `target\release\share\icons\`
-- Copy GtkSourceView language specs and styles
-- Copy GDK-Pixbuf loaders
+### Step 3: Create the MSI Installer
 
-After bundling, verify the structure:
-```
-target\release\
-├── bin\
-│   ├── gcodekit5.exe
-│   ├── libgtk-4-1.dll
-│   ├── libadwaita-1-0.dll
-│   ├── libgtksourceview-5-0.dll
-│   └── ... (all other DLLs)
-├── share\
-│   ├── glib-2.0\schemas\
-│   ├── icons\
-│   └── gtksourceview-5\
-└── lib\
-    └── gdk-pixbuf-2.0\
-```
-
-### Step 3: Test the Bundle Locally
-
-Before creating the installer, test the bundled application:
+WiX needs a numeric `x.y.z` version, so a prerelease such as `1.2.0-beta.2` is installed as `1.2.0`:
 
 ```powershell
-cd target\release\bin
-.\gcodekit5.exe
+cargo wix --package gcodekit5-design --target x86_64-pc-windows-msvc --no-build --nocapture `
+    --install-version 1.2.0 -o target\wix\gcodekit5-1.2.0-beta.2-x64.msi
 ```
 
-If you see errors about missing DLLs, check:
-1. The DLL is in the `bin\` directory
-2. The DLL exists in `C:\msys64\ucrt64\bin\`
-3. Add missing DLLs to the bundling script if needed
+The MSI installs `gcodekit5.exe` and `License.rtf`. `wix\main.wxs` is the installer definition.
 
-### Step 4: Create MSI Installer
+### Step 4: Create the Portable Zip
 
-Using cargo-wix:
-
-```powershell
-cargo wix --nocapture
-```
-
-Or manually with WiX toolset:
-
-```powershell
-candle.exe -arch x64 -ext WixUIExtension wix\main.wxs
-light.exe -ext WixUIExtension -out target\wix\gcodekit5.msi target\wix\main.wixobj
-```
-
-The MSI installer will include:
-- The executable and all DLLs from `target\release\bin\`
-- GTK4 data files from `target\release\share\`
-- GDK-Pixbuf loaders from `target\release\lib\`
+The portable zip holds `gcodekit5.exe` and `License.rtf` only. `build-windows-release.ps1` writes it to `target\gcodekit5-<version>-windows-x86_64-portable.zip`.
 
 ## Troubleshooting
 
-### Missing DLL Errors
+### WiX Not Found
 
-If the installed application shows "The code execution cannot proceed because [dll-name] was not found":
+`cargo wix` finds `candle.exe` and `light.exe` through the `WIX` environment variable or `PATH`. After installing WiX 3.14.1, set:
 
-1. **Find the missing DLL** in MSYS2:
-   ```powershell
-   # In MSYS2 UCRT64 terminal
-   find /ucrt64/bin -name "*missing-name*"
-   ```
+```powershell
+$env:WIX = "${env:ProgramFiles(x86)}\WiX Toolset v3.14\"
+```
 
-2. **Add to bundling script** in `scripts/windows-bundle-gtk.ps1`:
-   ```powershell
-   $DllsToCopy = @(
-       # ... existing DLLs ...
-       "libmissing-dll.dll",
-   )
-   ```
+### The App Shows a Blank Window or Does Not Start
 
-3. **Rebuild the bundle and installer**
-
-### Common Missing DLLs
-
-Based on typical GTK4/Adwaita applications, these are often missed:
-- `libdatrie-1.dll` - For Thai text support
-- `libthai-0.dll` - For Thai text support  
-- `libgraphite2.dll` - For advanced font rendering
-- `libunistring-5.dll` - Unicode string operations
-- `libidn2-0.dll` - Internationalized domain names
-- `libffi-7.dll` or `libffi-8.dll` - Foreign function interface
-- `libcroco-0.6-3.dll` - CSS parsing (for SVG)
-
-### DLL Dependency Analysis
-
-To find all dependencies of a DLL or executable on Windows:
-
-1. Use **Dependencies.exe** (modern dependency walker):
-   ```
-   https://github.com/lucasg/Dependencies
-   ```
-
-2. Open `target\release\bin\gcodekit5.exe` in Dependencies
-3. Look for red entries (missing DLLs)
-4. Add them to the bundling script
-
-### Icon/Theme Issues
-
-If icons don't appear:
-1. Verify `target\release\share\icons\` contains Adwaita icons
-2. Verify `target\release\share\glib-2.0\schemas\` has schema files
-3. Run schema compilation if needed:
-   ```powershell
-   glib-compile-schemas.exe target\release\share\glib-2.0\schemas\
-   ```
-
-### GtkSourceView Language Support Missing
-
-If syntax highlighting doesn't work:
-1. Verify `target\release\share\gtksourceview-5\language-specs\` exists
-2. Verify `target\release\share\gtksourceview-5\styles\` exists
-3. Check that `.lang` and `.style` files are present
-
-## Environment Variables
-
-The application may need these environment variables set (usually automatic):
-- `GDK_PIXBUF_MODULEDIR` - Points to pixbuf loaders
-- `XDG_DATA_DIRS` - Points to share directory
-- `GTK_THEME` - GTK theme name (optional)
+The egui front end draws with wgpu. It needs a working GPU driver with Direct3D 12 or Vulkan. Update the graphics driver and try again.
 
 ## Distribution Checklist
 
 Before distributing the MSI:
 
 - [ ] Built with `--release` profile
-- [ ] All DLLs bundled (no missing DLL errors)
-- [ ] Icons and themes work correctly
-- [ ] Syntax highlighting works in GCode editor
-- [ ] Application starts without console window
-- [ ] Tested on clean Windows 11 system
-- [ ] Tested on clean Windows 10 system
+- [ ] Application starts on a clean Windows 11 system
+- [ ] Application starts on a clean Windows 10 system
 - [ ] MSI installs to correct location
 - [ ] Start menu shortcut works
 - [ ] Uninstaller removes all files
@@ -184,54 +76,10 @@ Before distributing the MSI:
 
 ## File Size Expectations
 
-A typical bundled GTK4 application with Libadwaita:
-- Executable: 5-15 MB
-- DLLs: 50-100 MB
-- Data files (icons, schemas, etc.): 20-50 MB
-- Total bundle: ~80-165 MB
-- MSI installer: ~80-165 MB (compressed)
-
-## Automation
-
-Consider creating a PowerShell build script that combines all steps:
-
-```powershell
-# build-windows-release.ps1
-param(
-    [switch]$SkipBuild = $false
-)
-
-$ErrorActionPreference = "Stop"
-
-if (-not $SkipBuild) {
-    Write-Host "Building release binary..."
-    cargo build --release
-}
-
-Write-Host "Bundling GTK4 runtime..."
-.\scripts\windows-bundle-gtk.ps1
-
-Write-Host "Testing bundle..."
-$TestProcess = Start-Process -FilePath "target\release\bin\gcodekit5.exe" -PassThru
-Start-Sleep -Seconds 5
-if (-not $TestProcess.HasExited) {
-    Write-Host "Application started successfully" -ForegroundColor Green
-    $TestProcess.Kill()
-} else {
-    Write-Host "Application failed to start" -ForegroundColor Red
-    exit 1
-}
-
-Write-Host "Creating MSI installer..."
-cargo wix --nocapture
-
-Write-Host "`nBuild complete!" -ForegroundColor Green
-Write-Host "MSI location: target\wix\gcodekit5-*.msi"
-```
+- Executable: a single file, no bundled DLLs
+- MSI installer and portable zip: about the size of the executable (compressed)
 
 ## References
 
-- GTK4 Windows guide: https://gtk-rs.org/gtk4-rs/stable/latest/book/installation_windows.html
-- Libadwaita: https://gnome.pages.gitlab.gnome.org/libadwaita/
 - WiX Toolset: https://wixtoolset.org/
-- MSYS2: https://www.msys2.org/
+- cargo-wix: https://github.com/volks73/cargo-wix

@@ -1,7 +1,9 @@
 # ADR-001: GTK4 UI Framework
 
 ## Status
-Accepted
+Superseded by [ADR-012](ADR-012-egui-craft-libs.md)
+
+The GTK4 front end was removed in the egui + craft-libs migration. This record is kept for history.
 
 ## Context
 

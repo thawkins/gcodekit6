@@ -9,7 +9,7 @@ GCodeKit5 works with three different coordinate system conventions:
 | System | Origin | Y Direction | Used By |
 |--------|--------|-------------|---------|
 | **CNC/G-code** | Front-left of machine | Up/Away from operator | G-code files, machine commands |
-| **Screen/GTK** | Top-left of window | Down | GTK4 drawing, mouse events |
+| **Screen/egui** | Top-left of window | Down | egui painting (points), pointer events |
 | **Mathematical** | Center or bottom-left | Up | Calculations, user display |
 
 ## Coordinate System Diagrams
@@ -33,7 +33,7 @@ GCodeKit5 works with three different coordinate system conventions:
     Z+ points UP (towards ceiling)
 ```
 
-### Screen/GTK Coordinate System
+### Screen/egui Coordinate System
 
 ```
     (0,0)─────────────────→ +X (right)
@@ -72,7 +72,7 @@ GCodeKit5 works with three different coordinate system conventions:
 
 When drawing G-code toolpaths on screen:
 - G-code uses Y+ = away from operator (up on screen for intuitive viewing)
-- GTK uses Y+ = down on screen
+- egui uses Y+ = down on screen (units are points)
 - Without transformation, toolpaths appear upside-down
 
 ### The Solution
@@ -291,5 +291,5 @@ fn draw_label(&self, cr: &cairo::Context, world_x: f64, world_y: f64, text: &str
 ## Related Documentation
 
 - [ADR-002: Coordinate System](adr/ADR-002-coordinate-system.md) - Architecture decision record
-- [GTK4.md](../GTK4.md) - GTK4-specific implementation notes
+- [GTK4.md](archive/GTK4.md) - GTK4-specific implementation notes (archived)
 - `crates/gcodekit5-visualizer/src/viewport.rs` - ViewportTransform implementation

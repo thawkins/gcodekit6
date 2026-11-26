@@ -1,8 +1,8 @@
 # Project Statistics
-Last Updated: 2026-11-26 (1.2.0-beta.2, egui migration M6)
+Last Updated: 2026-11-27 (1.2.0-beta.2, egui migration M8)
 
-Current snapshot (`git ls-files '*.rs' | xargs cat | wc -l`, 2026-11-26, egui migration M6, GTK front end removed):
-450 Rust files, 152,222 lines; 1391 tests (`cargo nextest run --workspace`, 2 skipped).
+Current snapshot (`git ls-files '*.rs' | xargs cat | wc -l`, 2026-11-27, egui migration M8, GTK front end removed):
+450 Rust files, 152,222 lines; 1391 tests (`cargo nextest run --workspace`, 2 skipped; test count from the M6 run, not re-run in M8).
 
 Earlier snapshot (2026-11-16, after merging PR #104): 305 Rust files, 115,022 lines; 436 tests.
 

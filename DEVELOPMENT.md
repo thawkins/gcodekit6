@@ -8,10 +8,8 @@ This guide will help you set up a development environment for GCodeKit5.
 
 | Software | Minimum Version | Purpose |
 |----------|-----------------|---------|
-| **Rust** | 1.70+ | Compiler and cargo |
-| **GTK4** | 4.6+ | UI framework |
-| **libadwaita** | 1.2+ | Modern GTK widgets |
-| **pkg-config** | - | Library discovery |
+| **Rust** | 1.95+ | Compiler and cargo |
+| **pkg-config** | - | Library discovery (Linux) |
 | **Git** | 2.0+ | Version control |
 
 ### Platform-Specific Setup
@@ -22,11 +20,13 @@ This guide will help you set up a development environment for GCodeKit5.
 # Install development tools
 sudo dnf groupinstall "Development Tools"
 
-# Install GTK4 and dependencies
-sudo dnf install gtk4-devel libadwaita-devel \
-    glib2-devel cairo-devel pango-devel \
-    gdk-pixbuf2-devel graphene-devel \
-    openssl-devel sqlite-devel pkg-config
+# Install the build dependencies (serial ports, Wayland and X11 for egui)
+sudo dnf install systemd-devel pkgconf-pkg-config \
+    libxkbcommon-devel wayland-devel libX11-devel \
+    libXcursor-devel libXrandr-devel libXi-devel
+
+# Runtime graphics driver for wgpu
+sudo dnf install vulkan-loader mesa-vulkan-drivers
 
 # Install Rust (if not already installed)
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
@@ -40,11 +40,12 @@ source ~/.cargo/env
 sudo apt update
 sudo apt install build-essential
 
-# Install GTK4 and dependencies
-sudo apt install libgtk-4-dev libadwaita-1-dev \
-    libglib2.0-dev libcairo2-dev libpango1.0-dev \
-    libgdk-pixbuf-2.0-dev libgraphene-1.0-dev \
-    libssl-dev libsqlite3-dev pkg-config
+# Install the build dependencies (serial ports, Wayland and X11 for egui)
+sudo apt install libudev-dev pkg-config libxkbcommon-dev \
+    libwayland-dev libx11-dev libxcursor-dev libxrandr-dev libxi-dev
+
+# Runtime graphics driver for wgpu
+sudo apt install libvulkan1 mesa-vulkan-drivers
 
 # Install Rust (if not already installed)
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
@@ -53,12 +54,11 @@ source ~/.cargo/env
 
 #### macOS
 
-```bash
-# Install Homebrew (if not installed)
-/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+Nothing needs installing besides Rust and the Xcode Command Line Tools.
 
-# Install GTK4 and dependencies
-brew install gtk4 libadwaita pkg-config
+```bash
+# Install the Xcode Command Line Tools (linker)
+xcode-select --install
 
 # Install Rust (if not already installed)
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
@@ -69,7 +69,7 @@ See [docs/MACOS_BUILD.md](docs/MACOS_BUILD.md) for detailed macOS instructions.
 
 #### Windows
 
-See [docs/WINDOWS_BUILD.md](docs/WINDOWS_BUILD.md) for Windows setup using MSYS2.
+See [docs/WINDOWS_BUILD.md](docs/WINDOWS_BUILD.md) for Windows setup (Rust MSVC toolchain, no extra libraries).
 
 ## Clone and Build
 
@@ -151,40 +151,37 @@ Or open in VS Code with the Dev Containers extension (set `"dev.containers.docke
 
 ### All Tests
 
+The workspace runs tests with [cargo-nextest](https://nexte.st) (`cargo install cargo-nextest`).
+
 ```bash
 # Run all tests
-cargo test
+cargo nextest run --workspace
 
-# Run with output visible
-cargo test -- --nocapture
+# Show output of passing tests too
+cargo nextest run --workspace --success-output immediate
 
-# Run with longer timeout (some tests are slow)
-timeout 600 cargo test
+# Run with a timeout (a full run is slow)
+timeout 1500 cargo nextest run --workspace
 ```
 
 ### Specific Tests
 
 ```bash
 # Run tests for a specific crate
-cargo test -p gcodekit5-core
+cargo nextest run -p gcodekit5-core
 
-# Run a specific test by name
-cargo test test_grbl_status_parser
+# Run tests matching a name
+cargo nextest run -E 'test(test_grbl_status_parser)'
 
-# Run tests matching a pattern
-cargo test gcode
+# Run one test file (each crate has one `all` test binary)
+cargo nextest run -p gcodekit5-core -E 'test(test_foo::)'
 ```
 
-### Test Categories
+### Doc Tests
+
+nextest does not run doc tests:
 
 ```bash
-# Library tests only (skip integration tests)
-cargo test --lib
-
-# Integration tests only
-cargo test --test '*'
-
-# Doc tests only
 cargo test --doc
 ```
 
@@ -219,7 +216,7 @@ The git hooks run automatically, but you can run them manually:
 
 ```bash
 # Run the same checks as pre-commit
-cargo fmt --check && cargo clippy && cargo test --lib
+cargo fmt --check && cargo clippy && cargo nextest run --workspace
 ```
 
 ## Project Structure
@@ -232,13 +229,13 @@ gcodekit5/
 ├── crates/                 # Library crates
 │   ├── gcodekit5-core/     # Core types, traits, events
 │   ├── gcodekit5-communication/  # Serial, firmware protocols
-│   ├── gcodekit5-gcodeeditor/    # G-code text editing
 │   ├── gcodekit5-visualizer/     # 2D/3D rendering
 │   ├── gcodekit5-designer/       # CAD/CAM tools
 │   ├── gcodekit5-camtools/       # Box maker, puzzle, etc.
 │   ├── gcodekit5-devicedb/       # Device profiles
 │   ├── gcodekit5-settings/       # App configuration
-│   └── gcodekit5-ui/             # GTK4 UI components
+│   ├── gcodekit5-app/            # Toolkit-free application state
+│   └── gcodekit5-ui-egui/        # egui + craft-libs front end
 ├── docs/                   # Documentation
 ├── assets/                 # Icons, images
 ├── flatpak/                # Flatpak packaging
@@ -313,30 +310,26 @@ gdb target/debug/gcodekit5
 lldb target/debug/gcodekit5
 ```
 
-### GTK Inspector
+### egui Inspection
 
-Enable the GTK Inspector to debug UI:
-
-```bash
-GTK_DEBUG=interactive cargo run
-```
-
-Press Ctrl+Shift+I in the running application to open the inspector.
+The egui front end has no inspector. To check a page's layout without a display, the front
+end's tests use `egui_kittest` and write snapshot images (see `crates/gcodekit5-ui-egui/tests`).
 
 ## Common Issues
 
-### Build Fails: Missing GTK4
+### Build Fails: Missing System Libraries (Linux)
 
-**Error**: `Package gtk4 was not found`
+**Error**: `The system library `libudev` required by crate `libudev-sys` was not found` or a
+missing `xkbcommon` or `wayland` library
 
-**Solution**: Install GTK4 development packages (see Prerequisites above)
+**Solution**: Install the Linux build dependencies (see Prerequisites above)
 
 ```bash
 # Fedora
-sudo dnf install gtk4-devel
+sudo dnf install systemd-devel libxkbcommon-devel wayland-devel
 
 # Ubuntu
-sudo apt install libgtk-4-dev
+sudo apt install libudev-dev libxkbcommon-dev libwayland-dev
 ```
 
 ### Build Fails: pkg-config Not Found
@@ -355,28 +348,13 @@ sudo apt install pkg-config
 brew install pkg-config
 ```
 
-### Linker Errors on macOS
-
-**Error**: Various linker errors about missing symbols
-
-**Solution**: Ensure PKG_CONFIG_PATH is set:
-```bash
-export PKG_CONFIG_PATH="/opt/homebrew/lib/pkgconfig:$PKG_CONFIG_PATH"
-```
-
-Add to your `~/.zshrc` or `~/.bashrc` for persistence.
-
 ### Tests Timeout
 
 **Error**: Tests hang or timeout
 
-**Solution**: Some tests may need more time:
+**Solution**: nextest kills a single test after 150 s (see `.config/nextest.toml`). Run one crate at a time:
 ```bash
-# Increase timeout
-timeout 600 cargo test
-
-# Or skip slow tests during development
-cargo test --lib  # Only unit tests, skip integration
+timeout 1500 cargo nextest run -p gcodekit5-core
 ```
 
 ### Serial Port Permission Denied (Linux)
@@ -389,17 +367,14 @@ sudo usermod -aG dialout $USER
 # Log out and back in for changes to take effect
 ```
 
-### UI Looks Wrong / Missing Styles
+### Window Does Not Open / Blank Window (Linux)
 
-**Error**: Application appears unstyled or broken
+**Error**: The app starts but shows no window, or logs a wgpu adapter error
 
-**Solution**: Ensure libadwaita is installed and you're running in a GTK-compatible desktop:
+**Solution**: Install a Vulkan or OpenGL driver for wgpu:
 ```bash
-# Check libadwaita
-pkg-config --modversion libadwaita-1
-
-# Force a theme (if needed)
-GTK_THEME=Adwaita:dark cargo run
+# Ubuntu
+sudo apt install libvulkan1 mesa-vulkan-drivers
 ```
 
 ### Flatpak Build Fails

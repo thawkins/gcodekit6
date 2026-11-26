@@ -109,7 +109,7 @@ python scripts/generate_test_stl.py
 
 ### First Time Setup
 
-Install the Rust MSVC toolchain, WiX Toolset v3.11+, and `cargo install cargo-wix`.
+Install the Rust MSVC toolchain, WiX Toolset v3.14.1, and `cargo install cargo-wix`.
 
 ### Create Release
 

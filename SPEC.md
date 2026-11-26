@@ -1,8 +1,19 @@
 # GCodeKit5 - Specification Document
 
 **Version**: 1.2.0-beta.2
-**Last Updated**: 2026-11-11
+**Last Updated**: 2026-11-27
 **Status**: Beta Release
+
+### Unreleased (2026-11-27) - egui + craft-libs Front End
+- ✅ **UI toolkit**
+  - The UI is egui on wgpu with the craft-libs widget crates (`gcodekit5-ui-egui`); the GTK4, libadwaita and GtkSourceView front end is removed ([ADR-012](docs/adr/ADR-012-egui-craft-libs.md)).
+  - Toolkit-free application state is in `gcodekit5-app`; the `gcodekit5-ui` and `gcodekit5-gcodeeditor` crates no longer exist.
+- ✅ **Build and packaging**
+  - Linux needs `libudev-dev pkg-config` and the Wayland and X11 headers, plus a Vulkan or OpenGL driver at run time; macOS and Windows need nothing extra. Windows builds `x86_64-pc-windows-msvc` with a static C runtime.
+- ✅ **Internationalization**
+  - `po/*.po` is still the source; `build.rs` embeds the catalogs, so there is no gettext at run time and no `msgfmt` step.
+- ✅ **Settings**
+  - Settings are saved in `config.toml` (craft-settings); the older `config.json` and data files are imported once on first start.
 
 ### Unreleased (2026-11-11) - Visualiser 2D/3D Toggle
 - ✅ **Visualizer**
@@ -704,8 +715,8 @@ GCodeKit5 enables makers, engineers, and manufacturers to:
 - **Alarm**: Machine alarm codes and descriptions
 - **Error**: Error codes and messages
 
-#### 3.1.6 UI Module (`ui/`)
-**Purpose**: Slint-based graphical user interface
+#### 3.1.6 UI Module (`gcodekit5-ui-egui/`, state in `gcodekit5-app/`)
+**Purpose**: egui + craft-libs graphical user interface (eframe on wgpu), see ADR-012. Toolkit-free application state lives in `gcodekit5-app`.
 
 **Main Components**:
 - **Main Window**: Application frame, menu bar, toolbar, status bar
@@ -1890,7 +1901,7 @@ See [FIRMWARE_CAPABILITIES_DATABASE.md](docs/FIRMWARE_CAPABILITIES_DATABASE.md) 
 
 ### 9.2 Software Constraints
 - Rust version: 1.95.0 or newer
-- Platform: Linux, Windows (7+), macOS (10.13+)
+- Platform: Linux (Wayland or X11, Vulkan or OpenGL driver), Windows 10 or later (x86_64, MSVC), macOS 11 or later
 - No root/admin privileges required
 - Single application instance (planned: multi-instance support)
 
