@@ -163,7 +163,7 @@ pub(super) fn remaining_travel(mpos_mm: f32, travel_mm: f32, direction: f32) -> 
 }
 
 /// mm/min to `units`.
-pub(super) fn feed_to_display(mm_min: f32, units: FeedRateUnits) -> f32 {
+pub(crate) fn feed_to_display(mm_min: f32, units: FeedRateUnits) -> f32 {
     match units {
         FeedRateUnits::MmPerMin => mm_min,
         FeedRateUnits::MmPerSec => mm_min / 60.0,

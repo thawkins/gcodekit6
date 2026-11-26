@@ -115,6 +115,7 @@ Status values:
 | Progress in status bar and editor | 80-streaming | Ported | `test_machine_pane::stream_progress_updates_while_dialog_open`, `test_editor::current_line_follows_stream` |
 | Alarm ends the stream | 80-streaming | Ported | `app/test_machine_controller::alarm_ends_stream` |
 | Elapsed / remaining time | 80-streaming | Ported | `test_status_bar::test_status_bar_time_format`, `test_status_bar::test_status_bar_job_times_estimate`, `test_status_bar::test_status_bar_summary_times_while_streaming`, `test_status_bar::test_status_bar_stream_start_time_follows_stream` (GTK's `HH:MM:SS` and its per-line estimate) |
+| Feed / spindle readout in the status bar | *(GTK)* | Ported | `test_status_bar::test_status_bar_feed_spindle_text`, `test_status_bar::test_status_bar_shows_feed_spindle_in_app` (reported feed with two decimals and its unit, as the DRO; GTK showed the commanded feed) |
 | File statistics and estimated run time | 20-gcode-editor, 80-streaming | Not applicable | Not in the GTK source |
 | Comments stripped, line length checked | *(GTK)* | Ported | `app/test_job_preferences::comments_are_removed_unless_preserved`, `app/test_job_preferences::line_longer_than_maximum_is_refused` |
 
@@ -263,7 +264,6 @@ Ranked by user impact. Sizes are rough estimates for one developer who knows the
 | 6 | Designer mirror, align, cut/copy/paste, boolean ops, Ctrl+G | Medium | 2-3 days (designer commands exist in `gcodekit5-designer`) |
 | 7 | Visualizer run preview (play/pause/speed) | Low | 1-2 days |
 | 8 | Import STL | Low: behind a Settings switch in GTK | 1 day |
-| 9 | Status bar feed/spindle readout | Low | 0.5 day |
 | 11 | Preferences Controller page and shortcut editor | Low | 1-2 days |
 | 12 | Persistent console history, designer device work area, gallery icons | Low | 1-2 days together |
 

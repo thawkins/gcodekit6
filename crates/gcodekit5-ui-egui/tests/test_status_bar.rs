@@ -8,7 +8,9 @@ use gcodekit5_app::i18n::Translator;
 use gcodekit5_communication::firmware::grbl::status_parser::FullStatus;
 use gcodekit5_core::units::MeasurementSystem;
 use gcodekit5_ui_egui::machine::{MachineStatus, Progress};
-use gcodekit5_ui_egui::status_bar::{device_text, format_time, job_times, position_text, summary};
+use gcodekit5_ui_egui::status_bar::{
+    device_text, feed_spindle_text, format_time, job_times, position_text, summary,
+};
 
 use gcodekit5_app::test_support::Wrote;
 use gcodekit5_ui_egui::GcodeKitApp;
@@ -235,4 +237,47 @@ fn test_status_bar_stream_start_time_follows_stream() {
     assert_eq!(status.stream_started, Some(started));
     status.apply(&[MachineEvent::StreamFinished { lines: 3 }]);
     assert_eq!(status.stream_started, None);
+}
+
+/// GTK's `F: <feed>  S: <spindle> RPM`, shown once a report gives both, in the user's feed
+/// units with two decimals; nothing while disconnected.
+#[test]
+fn test_status_bar_feed_spindle_text() {
+    use gcodekit5_core::units::FeedRateUnits;
+    let mut status = MachineStatus {
+        connected: true,
+        report: Some(report("<Run|MPos:0.000,0.000,0.000|FS:1500,12000>")),
+        ..MachineStatus::default()
+    };
+    assert_eq!(
+        feed_spindle_text(&status, FeedRateUnits::MmPerMin).as_deref(),
+        Some("F: 1500.00 mm/min  S: 12000 RPM")
+    );
+    assert_eq!(
+        feed_spindle_text(&status, FeedRateUnits::InPerMin).as_deref(),
+        Some("F: 59.06 in/min  S: 12000 RPM")
+    );
+    status.report = Some(report("<Idle|MPos:0.000,0.000,0.000>"));
+    assert_eq!(feed_spindle_text(&status, FeedRateUnits::MmPerMin), None);
+    status.report = Some(report("<Idle|MPos:0.000,0.000,0.000|FS:0,0>"));
+    status.connected = false;
+    assert_eq!(feed_spindle_text(&status, FeedRateUnits::MmPerMin), None);
+}
+
+#[test]
+fn test_status_bar_shows_feed_spindle_in_app() {
+    let (mut harness, shared) = pane_app(Duration::from_millis(1), true);
+    shared.inject("<Idle|MPos:0.00000,0.00000,0.00000|FS:250,1000>\n");
+    assert!(step_until(&mut harness, |app| app
+        .state()
+        .machine
+        .status()
+        .report
+        .is_some()));
+    harness.step();
+    assert!(
+        harness
+            .query_by_label("F: 250.00 mm/min  S: 1000 RPM")
+            .is_some()
+    );
 }

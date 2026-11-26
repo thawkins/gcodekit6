@@ -18,6 +18,7 @@
 - **Keyboard jog in egui**: GTK's numeric keypad keys (8/2 Y+/Y-, 4/6 X-/X+, 9/3 Z+/Z-) jog in the Machine Control scope, so only after a press in the pane and never while a text field or dropdown has the keyboard. In Continuous mode a held key jogs like a held button and sends one jog cancel on release, on a pointer press, when a widget takes the keyboard, on a page switch and when the window loses focus. egui reports the keypad digits as the top-row digits, so those jog too, as in GTK
 
 - **Job times in the egui status bar**: while a job streams, GTK's `Elapsed: HH:MM:SS` and `Remaining: HH:MM:SS` sit beside the progress bar; the remaining time is GTK's estimate, the average time per acknowledged line times the lines left
+- **Feed and spindle in the egui status bar**: GTK's `F: <feed>  S: <rpm> RPM` readout follows the position while connected, from the status report, in Preferences' feed units with two decimals
 ### Known gaps
 - Not yet ported from GTK: editor replace, and the visualizer and designer items listed in `docs/reports/egui-parity.md`
 

@@ -56,6 +56,7 @@ use gcodekit5_settings::ConnectionSettings;
 use gcodekit5_settings::config::Config;
 
 pub(crate) use dro::format_length;
+pub(crate) use jog::feed_to_display;
 
 use crate::commands::Command;
 use crate::dialogs::{ConfirmChoice, ConfirmRequest};

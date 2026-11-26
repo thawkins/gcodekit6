@@ -8,9 +8,10 @@
 //! `format_length` as the DRO does).
 //!
 //! Ported from the GTK `ui/gtk/status_bar.rs`; the remaining time is estimated as GTK's
-//! `update_progress` does, from the average time per acknowledged line. Not ported: the
-//! feed/spindle readout and the timed notices; the connected port is not known to the
-//! status.
+//! `update_progress` does, from the average time per acknowledged line. The feed comes from
+//! the status report (as the Machine Control DRO's) with two decimals and its unit, where
+//! GTK showed the commanded feed with three decimals and no unit. Not ported: the timed
+//! notices; the connected port is not known to the status.
 //!
 //! Dependencies: `egui`, `gcodekit5-app` (translations), `gcodekit5-core` (units),
 //! `gcodekit5-devicedb` (the active profile).
@@ -18,7 +19,7 @@
 use std::time::Duration;
 
 use gcodekit5_app::i18n::Translator;
-use gcodekit5_core::units::{MeasurementSystem, get_unit_label};
+use gcodekit5_core::units::{FeedRateUnits, MeasurementSystem, get_unit_label};
 use gcodekit5_devicedb::DeviceProfile;
 
 use crate::machine::{MachineStatus, Progress, Xyz};
@@ -103,6 +104,21 @@ pub fn job_times(progress: Progress, elapsed: Duration) -> (String, String) {
     (format_time(elapsed), format_time(remaining))
 }
 
+/// The feed and spindle readout, `F: 1500.00 mm/min  S: 12000 RPM`, from the latest status
+/// report; `None` while disconnected or until a report gives both, as GTK.
+///
+/// # Arguments
+/// * `status` - The app's machine status.
+/// * `feed_units` - The feed rate units to show.
+pub fn feed_spindle_text(status: &MachineStatus, feed_units: FeedRateUnits) -> Option<String> {
+    let report = status.report.as_ref().filter(|_| status.connected)?;
+    let feed = crate::panes::machine_control::feed_to_display(report.feed_rate? as f32, feed_units);
+    Some(format!(
+        "F: {feed:.2} {feed_units}  S: {} RPM",
+        report.spindle_speed?
+    ))
+}
+
 /// What the bar shows for `status`.
 ///
 /// # Arguments
@@ -170,6 +186,7 @@ pub fn device_text(profile: Option<&DeviceProfile>, tr: &Translator) -> String {
 /// * `tr` - Translator for the current UI language.
 /// * `status` - The app's machine status.
 /// * `units` - The measurement system lengths are shown in.
+/// * `feed_units` - The feed rate units to show.
 /// * `profile` - The active device profile, if one is set.
 ///
 /// # Returns
@@ -180,6 +197,7 @@ pub fn show(
     tr: &Translator,
     status: &MachineStatus,
     units: MeasurementSystem,
+    feed_units: FeedRateUnits,
     profile: Option<&DeviceProfile>,
 ) -> bool {
     let summary = summary(status, units, tr);
@@ -215,6 +233,10 @@ pub fn show(
         if let Some(position) = &summary.position {
             ui.separator();
             ui.monospace(position);
+        }
+        if let Some(feed_spindle) = feed_spindle_text(status, feed_units) {
+            ui.separator();
+            ui.monospace(feed_spindle);
         }
         ui.add_space(8.0);
         ui.weak(device_text(profile, tr));

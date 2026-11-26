@@ -711,6 +711,7 @@ impl GcodeKitApp {
                 &self.state.translator,
                 self.state.machine.status(),
                 self.state.config().ui.measurement_system,
+                self.state.config().ui.feed_rate_units,
                 profile.as_ref(),
             ) {
                 queue.push(Command::SoftReset);
