@@ -276,3 +276,74 @@ fn test_cam_tool_rows_hold_their_wrapped_descriptions_at_1280x800() {
         "no description wrapped at 1280; the test checks nothing"
     );
 }
+
+/// Asserts that every node labelled with one of `labels` lies inside `window`.
+fn assert_inside(harness: &Harness<'static, GcodeKitApp>, window: egui::Rect, labels: &[&str]) {
+    for label in labels {
+        let nodes: Vec<_> = harness.query_all_by_label(label).collect();
+        assert!(!nodes.is_empty(), "no {label}");
+        for node in nodes {
+            let rect = node.rect();
+            assert!(
+                window.contains_rect(rect),
+                "{label} at {rect:?} outside {window:?}"
+            );
+        }
+    }
+}
+
+#[test]
+fn test_cam_action_row_in_place_on_the_first_frame_of_a_revisited_page() {
+    let size = egui::vec2(1280.0, 800.0);
+    let window = egui::Rect::from_min_size(egui::Pos2::ZERO, size);
+    let mut harness = page_harness("cam_revisit", Page::CamTools, size, 1.0, false);
+    let open = |h: &mut Harness<'static, GcodeKitApp>, tool: &str| {
+        h.get_by_label(tool).click();
+        h.run_steps(2);
+        h.get_by_label("Open").click();
+        h.run_steps(3);
+        h.get_by_label("Back").click();
+        h.run_steps(3);
+    };
+    // Each page once, so every page's state (grids, row sizes) exists.
+    open(&mut harness, "Gerber to G-Code");
+    open(&mut harness, "Speeds and Feeds Calculator");
+    // Back to Gerber: its first frame, drawn with no input, must place its row right.
+    harness.get_by_label("Gerber to G-Code").click();
+    harness.run_steps(2);
+    harness.get_by_label("Open").click();
+    harness.step();
+    harness.step();
+    assert_inside(
+        &harness,
+        window,
+        &["Load", "Save", "Send to Editor", "Preview", "Generate"],
+    );
+}
+
+#[test]
+fn test_cam_action_row_in_place_on_the_frame_probe_stop_appears() {
+    use gcodekit5_ui_egui::panes::cam_tools::probe_routines::RoutineKind;
+    let (mut h, shared) =
+        crate::test_cam_probe_run::probe_app(true, crate::test_cam_probe_run::IDLE);
+    let window = egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(1280.0, 2400.0));
+    h.state().cam_tools().borrow_mut().probe_mut().routine = RoutineKind::BossCenter;
+    h.run_steps(2);
+    let before = crate::test_cam_probe_run::lines(&shared).len();
+    h.get_by_label("Probe").click();
+    // Step one frame at a time; the first frame that shows Stop Probe must place it.
+    for _ in 0..200 {
+        h.step();
+        if h.query_by_label("Stop Probe").is_some() {
+            assert_inside(
+                &h,
+                window,
+                &["Generate", "Probe", "Apply to WCS", "Stop Probe"],
+            );
+            assert!(crate::test_cam_probe_run::lines(&shared).len() > before);
+            return;
+        }
+        std::thread::sleep(std::time::Duration::from_millis(2));
+    }
+    panic!("Stop Probe never appeared");
+}

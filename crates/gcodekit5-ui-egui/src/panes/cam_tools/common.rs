@@ -575,7 +575,11 @@ pub fn cam_page<S>(
     let side_rect = egui::Rect::from_min_max(rect.min, egui::pos2(divider - GAP, rect.bottom()));
     let right = egui::Rect::from_min_max(egui::pos2(divider + GAP, rect.top()), rect.max);
     // The action row's size from the last frame (one row until it has been drawn).
-    let size_id = ui.scope_id().with("gcodekit5-cam-actions-size");
+    // Kept per page (each page has its own input type), so a page shown after another
+    // does not start from that page's row width.
+    let size_id = ui
+        .scope_id()
+        .with(("gcodekit5-cam-actions-size", std::any::type_name::<S>()));
     let last: egui::Vec2 = ui
         .data(|d| d.get_temp(size_id))
         .unwrap_or(egui::vec2(0.0, ui.spacing().interact_size.y + 12.0));
@@ -615,6 +619,11 @@ pub fn cam_page<S>(
     let pressed = actions(&mut actions_ui, state);
     let size = actions_ui.min_rect().size();
     ui.data_mut(|d| d.insert_temp(size_id, size));
+    // A row that changed size (first visit, Stop appearing, another language) is placed
+    // right in a second pass of this frame instead of waiting for the next input.
+    if (size - last).abs().max_elem() > 0.5 {
+        ui.ctx().request_discard("cam action row size");
+    }
     ui.allocate_rect(rect, egui::Sense::hover());
     if pressed == CamAction::None {
         from_form

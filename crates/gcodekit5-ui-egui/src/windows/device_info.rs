@@ -1,6 +1,7 @@
 //! The Device Info panel, the left column of the Device Config page as in GTK: what the
-//! controller reports about itself (name, firmware, version, build date, compile options), its capabilities (homing
-//! `$22`, laser mode `$32`), and the device type selector that writes `$32`.
+//! controller reports about itself (name, firmware, version, build date, compile options),
+//! its capabilities (homing `$22`, laser mode `$32`), and the device type selector that
+//! writes `$32`.
 //!
 //! - The identity follows the controller's lines whether the page is shown or not: the
 //!   startup banner, the `$I` reply (`[VER:...]`, `[OPT:...]`), Repetier's `M115` reply and
@@ -261,15 +262,19 @@ impl DeviceInfoPanel {
         ui.separator();
         // GTK's header: the connection icon, "Device", and the refresh and copy buttons.
         ui.horizontal(|ui| {
-            // The icon alone shows the state, as in GTK; the page's status line names it in
-            // words, so the icon carries no second "Not connected" label.
-            let icon = if connected {
-                Icon::Transfer
+            // The icon shows the state, as in GTK. Its tooltip and accessible name say it as
+            // "Device: Not connected", not the bare state the page's status line names.
+            let (icon, state) = if connected {
+                (Icon::Transfer, n_!("Connected"))
             } else {
-                Icon::Disconnected
+                (Icon::Disconnected, n_!("Not connected"))
             };
-            let (rect, _) = ui.allocate_exact_size(egui::Vec2::splat(18.0), egui::Sense::hover());
+            let name = format!("{} {}", tr.tr(n_!("Device:")), tr.tr(state));
+            let (rect, response) =
+                ui.allocate_exact_size(egui::Vec2::splat(18.0), egui::Sense::hover());
             icon.themed(ui).paint_at(ui, rect);
+            response.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Image, true, &name));
+            response.on_hover_text(&name);
             crate::theme::section_heading(ui, &tr.tr(n_!("Device")));
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 ui.add_enabled_ui(connected, |ui| {

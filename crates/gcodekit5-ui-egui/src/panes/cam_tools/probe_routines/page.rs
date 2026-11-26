@@ -155,9 +155,9 @@ pub fn show(
         params,
         |ui, _| {
             ui.label(tr.tr(DESCRIPTION));
-        },
-        |ui, params| {
-            ui.horizontal(|ui| {
+            // GTK's sidebar also holds the machine and probe state.
+            ui.add_space(8.0);
+            ui.horizontal_wrapped(|ui| {
                 ui.label(format!(
                     "{} {}",
                     tr.tr(STATUS),
@@ -173,6 +173,8 @@ pub fn show(
             if !view.connected {
                 ui.colored_label(ui.visuals().error_fg_color, tr.tr(OFFLINE));
             }
+        },
+        |ui, params| {
             let unit = units::get_unit_label(params.units);
             heading(ui, tr, n_!("Routine Selection"));
             grid(ui, "cam-probe-routine", |ui| {

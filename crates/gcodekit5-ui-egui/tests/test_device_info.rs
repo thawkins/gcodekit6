@@ -1,6 +1,6 @@
-//! The Device Info panel of the Device Config page: what the controller reports about itself (firmware, version,
-//! build date, compile options, homing and laser mode), the device type selector writing
-//! `$32`, and Refresh asking the controller again.
+//! The Device Info panel of the Device Config page: what the controller reports about
+//! itself (firmware, version, build date, compile options, homing and laser mode), the
+//! device type selector writing `$32`, and Refresh asking the controller again.
 
 use std::time::Duration;
 
