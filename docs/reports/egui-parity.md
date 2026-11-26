@@ -149,7 +149,7 @@ Status values:
 | 2D mode | SPEC (2D/3D toggle) | Gap | CHANGELOG M3 known gap |
 | Show/hide rapids, cuts, grid, tool marker; grid spacing | 30-visualizer | Gap | GTK sidebar; not ported |
 | Machine bounds, fit to device | *(GTK)* | Gap | CHANGELOG M3 known gap |
-| Stock removal simulation | 30-visualizer, SPEC | Ported | `test_visualizer_stock::toggle_follows_the_setting`, `test_visualizer_stock::simulation_restarts_on_program_change`, `test_visualizer_stock::frame_returns_while_simulating`, `test_visualizer_stock::cut_floor_meets_the_toolpath_in_view_space`, `test_visualizer_stock::snapshot_stock_groove` |
+| Stock removal simulation | 30-visualizer, SPEC | Ported | `test_visualizer_stock::toggle_follows_the_setting`, `test_visualizer_stock::simulation_restarts_on_program_change`, `test_visualizer_stock::frame_returns_while_simulating`, `test_visualizer_stock::rendered_cut_lies_in_its_groove`, `test_visualizer_stock::designer_generate_seeds_the_stock`, `test_visualizer_stock::dragging_a_field_runs_one_simulation`, `test_visualizer_stock::snapshot_stock_groove` |
 | Run preview (play/pause/speed) | *(GTK)* | Gap | CHANGELOG M3 known gap |
 | Copy cursor coordinates, intensity statistics | *(GTK)* | Gap | Visualizer module docs |
 
