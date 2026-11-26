@@ -202,7 +202,7 @@ pub fn parser_state_wcs(line: &str) -> Option<WcsWord> {
     Some(wcs_in_line(inner).unwrap_or(WcsWord::Other))
 }
 
-/// The last system a G-code line selects (`G55`, `G0G59X0`), if any: [`WcsWord::Other`] for
+/// The last system a G-code line selects (`G55`, `G0G59X0`, `G 055`), if any: [`WcsWord::Other`] for
 /// a `G54.x`-`G59.x` word (`G59.1`, `G54.1`). Comments (`(...)`, `; ...`) and `$` lines
 /// select none.
 ///
@@ -225,10 +225,13 @@ pub fn wcs_in_line(line: &str) -> Option<WcsWord> {
             }
             ';' => break,
             'G' | 'g' => {
+                // Spaces inside a word are ignored, as controllers read G-code (`G 55`).
                 let mut number = String::new();
                 while let Some(&d) = chars.peek() {
                     if d.is_ascii_digit() || d == '.' {
                         number.push(d);
+                        chars.next();
+                    } else if d == ' ' || d == '\t' {
                         chars.next();
                     } else {
                         break;

@@ -161,3 +161,16 @@ fn test_work_zero_support_per_controller() {
         );
     }
 }
+
+#[test]
+fn test_wcs_in_line_reads_spaced_and_padded_words() {
+    assert_eq!(wcs_in_line("G 55"), Some(WcsWord::Known(Wcs::G55)));
+    assert_eq!(wcs_in_line("G055"), Some(WcsWord::Known(Wcs::G55)));
+    assert_eq!(wcs_in_line("g 0 5 6"), Some(WcsWord::Known(Wcs::G56)));
+    assert_eq!(wcs_in_line("G0 X1 G 59 Y2"), Some(WcsWord::Known(Wcs::G59)));
+    assert_eq!(wcs_in_line("G 59.1"), Some(WcsWord::Other));
+    assert_eq!(wcs_in_line("G 5 9 . 1"), Some(WcsWord::Other));
+    // A G word that is not one, and a number after another word.
+    assert_eq!(wcs_in_line("G1 X55"), None);
+    assert_eq!(wcs_in_line("G 1 F 55"), None);
+}
