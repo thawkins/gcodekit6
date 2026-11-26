@@ -408,3 +408,16 @@ fn test_stock_removal_face_list_stops_at_the_budget() {
     assert_eq!(grid_face_count_within(map, all * 60), Some(all));
     assert_eq!(grid_face_count_within(map, (all - 1) * 60), None);
 }
+
+#[test]
+fn test_stock_removal_face_budget_allows_exactly_quads_left() {
+    // Uncut stock: one top, one bottom and four walls. Room for exactly six quads is
+    // enough at every stage (tops, bottoms, walls); room for five is not, nor for one,
+    // where the bottoms find no room left after the top.
+    let sim = StockSimulator3D::new(10.0, 10.0, 5.0, 0.5, 1.0).expect("valid stock");
+    let map = sim.height_map();
+    assert_eq!(grid_face_count_within(map, 6 * 60), Some(6));
+    assert_eq!(grid_face_count_within(map, 5 * 60), None);
+    assert_eq!(grid_face_count_within(map, 2 * 60), None);
+    assert_eq!(grid_face_count_within(map, 60), None);
+}

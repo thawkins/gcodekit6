@@ -562,7 +562,9 @@ fn strictly_between<T>(
 }
 
 /// Fails with [`MeshAbort::OverBudget`] once `quads` holds more faces than `budget`: each
-/// face becomes at least one quad of the mesh, so the list need not grow further.
+/// face becomes at least one quad of the mesh, so the list need not grow further. This is
+/// the bound `greedy_rects` keeps too: at most `budget` (`quads_left`) faces, exactly
+/// `budget` being allowed.
 fn check_faces(quads: &[GridQuad], budget: usize) -> Result<(), MeshAbort> {
     if quads.len() > budget {
         Err(MeshAbort::OverBudget)
