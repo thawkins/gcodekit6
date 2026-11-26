@@ -814,3 +814,41 @@ fn test_stock_fields_follow_the_measurement_system() -> TestResult {
     assert_eq!((setup.width, setup.tool_diameter), (254.0, 6.35));
     settle(&mut harness)
 }
+
+/// Whether `p` is the machine bounds' blue.
+fn bounds_blue(p: [u8; 4]) -> bool {
+    p[0] < 60 && p[1] > 90 && p[1] < 170 && p[2] > 200
+}
+
+#[test]
+fn test_machine_bounds_in_front_of_the_stock_stay_visible() -> TestResult {
+    let mut harness = gpu_harness(VisualizerPane::new());
+    shown(&mut harness, groove_stock());
+    load(&mut harness, SLOTS);
+    let mut profile = gcodekit5_devicedb::DeviceProfile::default();
+    profile.x_axis.min = 20.0;
+    profile.x_axis.max = 40.0;
+    profile.y_axis.min = -10.0;
+    profile.y_axis.max = 50.0;
+    profile.z_axis.min = -10.0;
+    profile.z_axis.max = 40.0;
+    harness.state_mut().set_device(Some(&profile));
+    settle(&mut harness)?;
+    let stock = visualizer::Aabb::new(Vec3::new(0.0, 0.0, -5.0), Vec3::new(60.0, 40.0, 0.0));
+    harness.state_mut().camera_mut().fit(stock);
+    // From the front (-Y), 60 degrees up: the bounds' front vertical edges (Y-10) are
+    // nearer than the stock top they are seen against.
+    harness.state_mut().camera_mut().look(-90.0, 60.0);
+    harness.run();
+    let image = harness.render()?;
+    let pane = harness.state();
+    for x in [20.0, 40.0] {
+        let on_stock = Vec3::new(x, -10.0, 30.0);
+        assert!(
+            near(&image, pane, on_stock, bounds_blue),
+            "bounds edge at {on_stock} hidden: {:?}",
+            pixel_at(&image, pane, on_stock)
+        );
+    }
+    Ok(())
+}

@@ -138,6 +138,9 @@ struct GpuResources {
     stock_pipeline: wgpu::RenderPipeline,
     /// The toolpath, depth-tested against the stock (offscreen).
     toolpath_depth_pipeline: wgpu::RenderPipeline,
+    /// The axes and machine bounds, depth-tested against the stock in the offscreen pass,
+    /// so the stock hides only the edges behind it.
+    line_depth_pipeline: wgpu::RenderPipeline,
     /// Copies the offscreen image into egui's pass.
     composite_pipeline: wgpu::RenderPipeline,
     composite_layout: wgpu::BindGroupLayout,
@@ -421,15 +424,21 @@ pub fn install(render_state: &egui_wgpu::RenderState) {
             },
         }),
     };
+    // Lines are tested against the stock but do not write depth, so their order is free.
+    let line_depth = wgpu::DepthStencilState {
+        format: DEPTH_FORMAT,
+        depth_write_enabled: Some(false),
+        depth_compare: Some(wgpu::CompareFunction::Less),
+        stencil: wgpu::StencilState::default(),
+        bias: wgpu::DepthBiasState::default(),
+    };
     let toolpath_depth_draw = Draw {
-        depth: Some(wgpu::DepthStencilState {
-            format: DEPTH_FORMAT,
-            depth_write_enabled: Some(false),
-            depth_compare: Some(wgpu::CompareFunction::Less),
-            stencil: wgpu::StencilState::default(),
-            bias: wgpu::DepthBiasState::default(),
-        }),
+        depth: Some(line_depth.clone()),
         ..Draw::plain(toolpath_layout.clone(), lines)
+    };
+    let line_depth_draw = Draw {
+        depth: Some(line_depth),
+        ..Draw::plain(scene_layout.clone(), lines)
     };
     let composite_draw = Draw {
         vertex: None,
@@ -466,6 +475,7 @@ pub fn install(render_state: &egui_wgpu::RenderState) {
             toolpath_depth_draw,
             format,
         ),
+        line_depth_pipeline: pipeline(device, &layout, &grid_shader, line_depth_draw, format),
         composite_pipeline: pipeline(
             device,
             &composite_pipeline_layout,
@@ -741,13 +751,15 @@ impl GpuResources {
         });
     }
 
-    /// Draws the stock and then the toolpath, depth-tested, into the offscreen target; with
-    /// no stock to draw, releases the target.
+    /// Draws the stock and then the axes, the machine bounds (when `bounds`) and the
+    /// toolpath, depth-tested, into the offscreen target; with no stock to draw, releases
+    /// the target.
     fn draw_offscreen(
         &mut self,
         device: &wgpu::Device,
         encoder: &mut wgpu::CommandEncoder,
         size: [u32; 2],
+        bounds: bool,
     ) {
         let Some((_, Some(_), _)) = &self.stock else {
             self.offscreen = None;
@@ -785,6 +797,13 @@ impl GpuResources {
         pass.set_pipeline(&self.stock_pipeline);
         pass.set_vertex_buffer(0, stock.slice(..));
         pass.draw(0..*stock_count, 0..1);
+        pass.set_pipeline(&self.line_depth_pipeline);
+        pass.set_vertex_buffer(0, self.axes.slice(..));
+        pass.draw(0..self.axes_count, 0..1);
+        if bounds {
+            pass.set_vertex_buffer(0, self.bounds.slice(..));
+            pass.draw(0..BOUNDS_VERTICES as u32, 0..1);
+        }
         if let Some((_, Some(buffer), count)) = &self.toolpath {
             pass.set_pipeline(&self.toolpath_depth_pipeline);
             pass.set_vertex_buffer(0, buffer.slice(..));
@@ -868,7 +887,7 @@ impl egui_wgpu::CallbackTrait for VisualizerCallback {
         }
         gpu.upload_stock(device, self.stock.as_ref());
         let size = size_px(self.rect, screen, device.limits().max_texture_dimension_2d);
-        gpu.draw_offscreen(device, encoder, size);
+        gpu.draw_offscreen(device, encoder, size, self.machine_bounds.is_some());
         Vec::new()
     }
 
@@ -887,15 +906,18 @@ impl egui_wgpu::CallbackTrait for VisualizerCallback {
             pass.set_vertex_buffer(0, gpu.grid.0.slice(..));
             pass.draw(0..gpu.grid.1, 0..1);
         }
-        pass.set_vertex_buffer(0, gpu.axes.slice(..));
-        pass.draw(0..gpu.axes_count, 0..1);
-        if self.machine_bounds.is_some() {
-            pass.set_vertex_buffer(0, gpu.bounds.slice(..));
-            pass.draw(0..BOUNDS_VERTICES as u32, 0..1);
+        // With the stock, the axes and bounds are in the offscreen pass, depth-tested
+        // against it; the grid stays under the stock.
+        let offscreen = gpu.offscreen.as_ref().filter(|_| gpu.stock_drawn());
+        if offscreen.is_none() {
+            pass.set_vertex_buffer(0, gpu.axes.slice(..));
+            pass.draw(0..gpu.axes_count, 0..1);
+            if self.machine_bounds.is_some() {
+                pass.set_vertex_buffer(0, gpu.bounds.slice(..));
+                pass.draw(0..BOUNDS_VERTICES as u32, 0..1);
+            }
         }
-        if gpu.stock_drawn()
-            && let Some(offscreen) = &gpu.offscreen
-        {
+        if let Some(offscreen) = offscreen {
             pass.set_pipeline(&gpu.composite_pipeline);
             pass.set_bind_group(0, &offscreen.bind_group, &[]);
             pass.draw(0..3, 0..1);
