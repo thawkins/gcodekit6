@@ -324,14 +324,17 @@ there is no screenshot of them. The lists below are what still differs.
 
 **CAM Tools** (no help image; compared with `ui/gtk/cam_tools/`):
 
-- The tool list matches GTK: a boxed list with GTK's icons, a title and a caption, and
-  the details and Open beside it.
-- A tool page has GTK's header (back, title, help). Its fields sit in framed groups with
-  bold titles. Generate is the primary button, and Load and Save have icons.
-- Tool pages are one column. GTK splits each page into a description sidebar (40%) and the
-  form. egui shows the description above the form.
-- The action buttons sit under the form, inside the scroll area. GTK pins them, right
-  aligned, at the bottom of the form panel.
+- The tool list matches GTK: a boxed list with GTK's icons, a title and a caption that
+  wraps (the row grows with it), and the details and Open beside it.
+- A tool page matches GTK's layout:
+  - GTK's header (back, title, help).
+  - The description sidebar (40%; Speeds and Feeds: the results, 35%).
+  - The form in its own scroll area, in framed groups with bold titles.
+  - The action buttons pinned at the bottom right: Load, Save, then the page's actions,
+    with Generate (primary) at the right end.
+- The sidebar has no second title-3 heading: it would repeat the header's title, and two
+  labels with the tool's name would make it ambiguous for screen readers.
+- The generated program (an egui-only view) is shown in the sidebar under the description.
 - Fields are text fields with the unit beside them, not Adwaita action rows with suffix
   widgets.
 
@@ -348,8 +351,10 @@ there is no screenshot of them. The lists below are what still differs.
 
 - The toolbar, filter bar, list header (GTK's column widths), boxed list and status line
   match GTK.
-- GTK's left Device Info panel (320 px) is not embedded. Device Info stays a window,
-  opened from the Machine menu.
+- The Device Info panel is the page's left column (320 pt), as in GTK. Machine > Device
+  Info switches to this page.
+- The panel lists Build and Options as well as GTK's Name, Firmware and Version. The
+  connection icon has no text label: the page's status line states the connection.
 - Long units are truncated in the 80 pt Unit column; GTK's labels widen the column.
 
 **CNC Tools** (no help image; compared with `ui/gtk/tools_manager/`):
@@ -357,7 +362,6 @@ there is no screenshot of them. The lists below are what still differs.
 - The layout matches GTK's three columns: the list sidebar (header, search, type and
   material filters, framed Filters, boxed list), the form (action bar, tab switcher,
   framed form), and the Library sidebar.
-- The Library sidebar is 240 pt wide (GTK: 280 px).
 - The diameter filters' hints read "Min diameter (mm)" (GTK: "Min Ø (mm)").
 
 **Materials** (no help image; compared with `ui/gtk/materials_manager.rs`):
