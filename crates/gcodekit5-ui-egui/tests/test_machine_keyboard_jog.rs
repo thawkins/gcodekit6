@@ -690,3 +690,33 @@ fn test_press_in_machine_control_released_elsewhere() {
         }
     }
 }
+
+/// A press in Machine Control whose release is lost (the window loses focus with the
+/// button held) must not stay held: after focus returns, a digit typed once the user has
+/// left a text field never jogs.
+#[test]
+fn test_lost_release_does_not_leave_the_press_held() {
+    let (mut harness, shared) = keyboard_app(false);
+    focus_text(&mut harness, "G-Code Editor");
+    let at = harness.get_by_label("Machine State").rect().center();
+    crate::test_machine_pane::pointer_button(&harness, at, true);
+    harness.step();
+    harness.input_mut().focused = false;
+    harness.event(egui::Event::WindowFocused(false));
+    harness.step();
+    harness.input_mut().focused = true;
+    harness.event(egui::Event::WindowFocused(true));
+    harness.step();
+    harness.step();
+    assert!(widget_focused(&harness), "field lost the focus");
+    harness.key_press(egui::Key::Escape);
+    harness.step();
+    harness.step();
+    assert!(!widget_focused(&harness), "field kept the focus");
+    tap(&mut harness, egui::Key::Num6);
+    assert!(
+        settled_jogs(&harness, &shared).is_empty(),
+        "{:?}",
+        shared.log()
+    );
+}

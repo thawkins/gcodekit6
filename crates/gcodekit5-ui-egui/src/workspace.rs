@@ -751,6 +751,20 @@ impl Workspace {
     /// # Arguments
     /// * `ctx` - The egui context.
     pub fn begin_frame(&mut self, ctx: &egui::Context) {
+        // A lost pointer release (the window lost focus with a button held) must not leave
+        // the press held: that would stop focus loss from disarming the keys. A window
+        // without focus disarms them too; a held press with no button down and no release
+        // this frame is stale.
+        let (window_focused, button_down, button_released) =
+            ctx.input(|i| (i.focused, i.pointer.any_down(), i.pointer.any_released()));
+        if !window_focused {
+            self.focused = None;
+            self.press_held = false;
+            self.press_released = false;
+        } else if self.press_held && !self.press_released && !button_down && !button_released {
+            self.press_held = false;
+            self.press_released = false;
+        }
         let widget_focus = ctx.memory(|m| m.focused().is_some());
         let overlays = overlay_layers(ctx);
         let focus_lost = self.widget_focus_before && !widget_focus;
