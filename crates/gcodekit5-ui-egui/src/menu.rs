@@ -86,7 +86,7 @@ fn menu(tr: &Translator, title: &str, role: MenuRole, rows: &[Option<Command>]) 
 }
 
 /// The app's menus, labelled through `tr`, before any platform layout and without shortcuts
-/// (`craft_menu::apply_keymap` adds them): GTK's File, Edit, Machine and Help. The commands
+/// ([`apply_shortcuts`] adds them): GTK's File, Edit, Machine and Help. The commands
 /// left out have a home elsewhere: jogging and the visualizer's view commands are buttons on
 /// their pages (Reset View also keeps its `Cmd+0` key), and the manager windows of earlier
 /// builds are page tabs ([`crate::workspace::Page::for_command`]). About, Preferences and
@@ -171,6 +171,39 @@ pub fn menu_bar(tr: &Translator) -> MenuBar {
     bar.tag_item(&C::OpenSettings.command_ref(), ItemRole::Settings);
     bar.tag_item(&C::Quit.command_ref(), ItemRole::Quit);
     bar
+}
+
+/// Puts `keymap`'s shortcuts on `bar`'s items (`craft_menu::apply_keymap`), then shows on each
+/// item only a key that works on every page. A key bound in one pane's scope only (Cycle
+/// Start's `~`, which works only while Machine Control has the keyboard) would promise a key
+/// that does nothing elsewhere, so such an item shows no key; Preferences' Shortcuts page
+/// lists it with where it works. GTK's menus had no such item.
+///
+/// # Arguments
+/// * `bar` - The menus to label.
+/// * `keymap` - The keymap whose bindings the items show.
+pub fn apply_shortcuts(bar: &mut MenuBar, keymap: &Keymap) {
+    craft_menu::apply_keymap(bar, keymap);
+    for menu in &mut bar.menus {
+        for node in &mut menu.children {
+            let Node::Item(item) = node else {
+                continue;
+            };
+            let Some(bindable) = keymap.bindable(&item.command) else {
+                continue;
+            };
+            let app_wide = keymap.bindings(&item.command).into_iter().any(|b| {
+                Some(b.trigger.chord) == item.shortcut && b.scope_or(&bindable.scope).is_app()
+            });
+            if !app_wide {
+                item.shortcut = keymap
+                    .bindings(&item.command)
+                    .into_iter()
+                    .find(|b| !b.trigger.double && b.scope_or(&bindable.scope).is_app())
+                    .map(|b| b.trigger.chord);
+            }
+        }
+    }
 }
 
 /// The overflow menu's title, which egui's default fonts cannot draw.
@@ -258,7 +291,7 @@ impl Menus {
     /// The app's menus with `keymap`'s shortcuts, laid out for `target`.
     fn layout(tr: &Translator, keymap: &Keymap, target: Target) -> MenuBar {
         let mut bar = menu_bar(tr);
-        craft_menu::apply_keymap(&mut bar, keymap);
+        apply_shortcuts(&mut bar, keymap);
         let label = |english: &'static str| layout_label(tr, english);
         let options = LayoutOptions {
             label: &label,

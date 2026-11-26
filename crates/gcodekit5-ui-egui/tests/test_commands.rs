@@ -510,11 +510,44 @@ fn test_manager_commands_switch_page() {
 fn test_menu_shows_keymap_shortcuts() {
     let tr = Translator::new("en");
     let mut bar = menu::menu_bar(&tr);
-    craft_menu::apply_keymap(&mut bar, &commands::keymap());
+    menu::apply_shortcuts(&mut bar, &commands::keymap());
     let open = bar
         .find(&Command::FileOpen.command_ref())
         .expect("File > Open");
     assert_eq!(open.shortcut, Some(Chord::parse("Cmd+O").expect("chord")));
+}
+
+/// A menu item shows only a key that works on every page: Cycle Start's `~` works only while
+/// Machine Control has the keyboard, so its item shows no key, while Feed Hold and Reset keep
+/// theirs.
+#[test]
+fn test_menu_shows_only_keys_that_work_on_every_page() {
+    let tr = Translator::new("en");
+    let keymap = commands::keymap();
+    let mut bar = menu::menu_bar(&tr);
+    menu::apply_shortcuts(&mut bar, &keymap);
+    let shortcut = |command: Command| {
+        bar.find(&command.command_ref())
+            .expect("menu item")
+            .shortcut
+    };
+    assert_eq!(shortcut(Command::CycleStart), None);
+    assert!(shortcut(Command::FeedHold).is_some());
+    assert_eq!(
+        shortcut(Command::SoftReset),
+        Some(Chord::parse("Cmd+Shift+K").expect("chord"))
+    );
+    for item in bar.items() {
+        let Some(chord) = item.shortcut else {
+            continue;
+        };
+        let command = Command::from_ref(&item.command).expect("our command");
+        assert_eq!(
+            keymap.lookup(&chord, false, &Active::NONE),
+            Lookup::Run(command.command_ref()),
+            "{command:?} shows {chord} but it does not run from every page"
+        );
+    }
 }
 
 #[test]
