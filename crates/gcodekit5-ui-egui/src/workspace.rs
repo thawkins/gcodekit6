@@ -364,6 +364,13 @@ pub trait Pane {
         let _ = (events, tr);
     }
 
+    /// How long until the pane must be handed an empty batch of machine events (see
+    /// [`Pane::machine_events`]) even if the machine stays quiet: a probe run's backstop. The
+    /// app requests a repaint for then, and hands every pane the empty batch once one is due.
+    fn wake_in(&self) -> Option<std::time::Duration> {
+        None
+    }
+
     /// Runs once every frame, whether or not the pane is drawn, for work that must follow
     /// the machine while the pane's page is hidden (a query that keeps its state current).
     ///
@@ -583,6 +590,11 @@ impl Workspace {
         for pane in &mut self.panes {
             pane.machine_events(events, tr);
         }
+    }
+
+    /// The soonest [`Pane::wake_in`] of the panes.
+    pub fn wake_in(&self) -> Option<std::time::Duration> {
+        self.panes.iter().filter_map(|pane| pane.wake_in()).min()
     }
 
     /// Runs every pane's per-frame work ([`Pane::frame`]), drawn or not.

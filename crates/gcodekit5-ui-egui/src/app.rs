@@ -793,6 +793,15 @@ impl GcodeKitApp {
     /// due, the run gets an empty batch of events (which fires it); until then a repaint is
     /// requested for the moment it falls due.
     fn drive_probe_backstop(&mut self, ctx: &egui::Context) {
+        // A pane's run (Machine Control's quick probe) takes the empty batch through the
+        // workspace.
+        match self.workspace.wake_in() {
+            Some(wait) if wait.is_zero() => {
+                self.workspace.machine_events(&[], &self.state.translator);
+            }
+            Some(wait) => ctx.request_repaint_after(wait),
+            None => {}
+        }
         let Ok(mut cam) = self.cam_tools.try_borrow_mut() else {
             return;
         };

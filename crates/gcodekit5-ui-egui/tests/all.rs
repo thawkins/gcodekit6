@@ -122,6 +122,8 @@ mod test_machine_override_target;
 mod test_machine_pane;
 #[path = "test_machine_probe_report.rs"]
 mod test_machine_probe_report;
+#[path = "test_machine_quick_probe.rs"]
+mod test_machine_quick_probe;
 #[path = "test_machine_work_zero.rs"]
 mod test_machine_work_zero;
 #[path = "test_machine_worker_messages.rs"]

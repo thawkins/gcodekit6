@@ -33,6 +33,7 @@ mod direct_sender;
 mod dro;
 mod jog;
 mod overrides;
+mod quick_probe;
 mod stream;
 mod wcs;
 
@@ -58,6 +59,7 @@ use crate::commands::Command;
 use crate::dialogs::{ConfirmChoice, ConfirmRequest};
 use crate::icons::Icon;
 use crate::machine::{Machine, MachineStatus, lock};
+use crate::panes::cam_tools::probe_routines::run::{self as probe_run, Outcome, ProbeRun};
 use crate::workspace::{Pane, PaneContext, PaneId};
 
 /// The msgids the pane shows, for the translation check.
@@ -67,6 +69,7 @@ pub fn msgids() -> Vec<&'static str> {
         dro::MSGIDS,
         jog::MSGIDS,
         overrides::MSGIDS,
+        quick_probe::MSGIDS,
         stream::MSGIDS,
         direct_sender::MSGIDS,
         wcs::MSGIDS,
@@ -138,6 +141,10 @@ pub struct MachineControlPane {
     targets: overrides::Targets,
     /// The override being moved to a Set % target, one confirmed step at a time.
     override_target: Option<OverrideTarget>,
+    /// The quick probe on the machine, until it succeeds, is restored or aborts.
+    probe: Option<ProbeRun>,
+    /// The last quick probe's progress or result.
+    probe_text: Option<String>,
     /// The emergency stop picture (`images/eStop2.png`): `None` until first drawn, then the
     /// texture, or `None` inside when it could not be decoded (the button shows its text).
     estop_image: Option<Option<egui::TextureHandle>>,
@@ -205,6 +212,8 @@ impl MachineControlPane {
             pending_refusal: None,
             targets: overrides::Targets::default(),
             override_target: None,
+            probe: None,
+            probe_text: None,
             estop_image: None,
         }
     }
@@ -527,6 +536,50 @@ impl MachineControlPane {
         true
     }
 
+    /// Starts a quick probe through the Probe Routines run; a refusal is shown in the pane.
+    fn start_quick_probe(
+        &mut self,
+        machine: Option<&Machine>,
+        tr: &Translator,
+        quick: quick_probe::QuickProbe,
+    ) {
+        if self.probe.is_some() {
+            return;
+        }
+        match ProbeRun::start(machine, &quick.params(), tr) {
+            Ok((run, text)) => {
+                self.probe = Some(run);
+                self.probe_text = Some(text);
+                self.notice = None;
+            }
+            Err(reason) => {
+                tracing::info!(%reason, ?quick, "quick probe refused");
+                self.notice = Some(reason);
+            }
+        }
+    }
+
+    /// Takes machine events into the quick probe run, if one is on.
+    fn follow_probe(&mut self, events: &[MachineEvent], tr: &Translator) {
+        let Some(run) = self.probe.as_mut() else {
+            return;
+        };
+        for outcome in run.handle(events, tr) {
+            match outcome {
+                Outcome::Succeeded(success) => {
+                    self.probe_text = Some(probe_run::describe(&success, tr));
+                    self.probe = None;
+                }
+                Outcome::Failed(text) => self.probe_text = Some(text),
+                Outcome::Restored => self.probe = None,
+                Outcome::Aborted => {
+                    self.probe_text = Some(probe_run::aborted_text(tr));
+                    self.probe = None;
+                }
+            }
+        }
+    }
+
     /// Takes the Set % target one step further: sends the next override byte once the
     /// controller reported the last one; ends it at the target, on a disconnect, or (with a
     /// notice) when a step is not confirmed.
@@ -715,27 +768,40 @@ impl MachineControlPane {
         };
         let units = self.units;
         let wcs = &mut self.wcs;
-        let (zeroed, wcs_action) = if stacked {
+        // Quick probes: GTK's guards (connected, no job, one probe at a time); the run
+        // checks the rest (Idle, fresh report, probe input) when it starts.
+        let probe_enabled =
+            status.connected && self.probe.is_none() && !machine.is_some_and(Machine::job_running);
+        let probe_text = self.probe_text.as_deref();
+        let (zeroed, wcs_action, quick) = if stacked {
             let zeroed = dro::show_work(ui, status, units, &zero);
             ui.add_space(6.0);
-            (zeroed, wcs.show_zero_actions(ui, tr, status))
+            let action = wcs.show_zero_actions(ui, tr, status);
+            let quick = quick_probe::show(ui, tr, probe_enabled, probe_text);
+            (zeroed, action, quick)
         } else {
             ui.horizontal(|ui| {
                 let zeroed = ui
                     .vertical(|ui| dro::show_work(ui, status, units, &zero))
                     .inner;
                 ui.add_space(16.0);
-                let action = ui
-                    .vertical(|ui| {
-                        ui.set_width(ui.available_width().min(260.0));
-                        ui.add_space(24.0);
-                        wcs.show_zero_actions(ui, tr, status)
-                    })
-                    .inner;
-                (zeroed, action)
+                ui.vertical(|ui| {
+                    ui.set_width(ui.available_width().min(260.0));
+                    // Compact, so the column (wrapped in a narrow window) is no taller
+                    // than the readout beside it.
+                    ui.spacing_mut().item_spacing.y = 4.0;
+                    ui.add_space(4.0);
+                    let action = wcs.show_zero_actions(ui, tr, status);
+                    let quick = quick_probe::show(ui, tr, probe_enabled, probe_text);
+                    (zeroed, action, quick)
+                })
+                .inner
             })
             .inner
         };
+        if let Some(quick) = quick {
+            self.start_quick_probe(machine, tr, quick);
+        }
         if let Some(axis) = zeroed {
             self.zero_rotary(machine, tr, axis);
         }
@@ -935,11 +1001,17 @@ impl Pane for MachineControlPane {
         MachineControlPane::configure(self, config);
     }
 
-    fn machine_events(&mut self, events: &[MachineEvent], _tr: &Translator) {
+    fn machine_events(&mut self, events: &[MachineEvent], tr: &Translator) {
         // Here, not in `ui`: the pane is hidden on every page but Machine Control, and the
-        // connection state and the work zero query must follow the machine meanwhile.
+        // connection state, the work zero query and a quick probe must follow the machine
+        // meanwhile.
         self.follow_events(events);
         self.wcs.follow(events);
+        self.follow_probe(events, tr);
+    }
+
+    fn wake_in(&self) -> Option<std::time::Duration> {
+        self.probe.as_ref().and_then(ProbeRun::backstop_in)
     }
 
     fn frame(&mut self, machine: &Machine) {

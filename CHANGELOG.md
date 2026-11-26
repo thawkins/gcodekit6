@@ -13,6 +13,7 @@
 - **Rotary axes in the egui DRO**: A, B and C are shown in degrees (work and machine position) when the machine reports them, each with a Zero button that sends `G10 L20 P<n> A<calibration>` with the active system's P number and Preferences' rotary calibration, under the same guards as X/Y/Z Zero
 - **Set % overrides in the egui Machine Control pane**: GTK's target fields for the feed and spindle overrides (10-200 %) move the override to the exact percentage, one realtime step at a time, each sent only after the controller's `Ov:` report confirmed the last (`gcodekit5_app::override_target`); a step not confirmed within 2 s ends it with a notice. The override readout now keeps the last `Ov:` values between reports
 - **Clear editor in egui**: a Clear editor button at the end of the editor's find row asks "Clear the editor?" when the editor holds G-code, as GTK did, and is disabled and refused while a job runs (also at Yes, if a job started meanwhile)
+- **Quick probes in the egui Machine Control pane**: GTK's Probe Z (20 mm down) and Edge X-/X+/Y-/Y+ (10 mm) buttons, at 100 mm/min, run through the Probe Routines generator and run of the CAM page, with its guards, stop-on-error stream, backstop (now driven for any pane through `Pane::wake_in`) and G90 restore after a failed probe; the result is shown under the buttons and no work offset is written
 
 ### Known gaps
 - Not yet ported from GTK: editor replace, quick probe buttons, keyboard jog, rotary axes in the DRO, and the visualizer and designer items listed in `docs/reports/egui-parity.md`
