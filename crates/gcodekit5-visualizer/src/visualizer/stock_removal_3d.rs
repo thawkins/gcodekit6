@@ -507,31 +507,35 @@ impl CornerIndex {
     }
 
     /// Corners of any face lying strictly inside the edge `a -> b`, in order
-    /// from `a`. Edges are axis-aligned on the grid.
+    /// from `a`. Edges are axis-aligned on the grid. Each line's corners are
+    /// sorted, so the ones inside are found by binary search, not a scan of
+    /// the whole line.
     fn inside(&self, a: GridPoint, b: GridPoint) -> Vec<GridPoint> {
-        let between = |lo: f32, hi: f32, v: f32| v > lo.min(hi) && v < lo.max(hi);
         let mut points: Vec<GridPoint> = if a.0 == b.0 && a.1 == b.1 {
+            let (lo, hi) = (a.2.min(b.2), a.2.max(b.2));
             self.along_z.get(&(a.0, a.1)).map_or_else(Vec::new, |zs| {
-                zs.iter()
-                    .filter(|&&z| between(a.2, b.2, z))
+                strictly_between(zs, |&z| z <= lo, |&z| z < hi)
+                    .iter()
                     .map(|&z| (a.0, a.1, z))
                     .collect()
             })
         } else if a.1 == b.1 {
+            let (lo, hi) = (a.0.min(b.0), a.0.max(b.0));
             self.along_x
                 .get(&(a.1, a.2.to_bits()))
                 .map_or_else(Vec::new, |cs| {
-                    cs.iter()
-                        .filter(|&&c| between(a.0 as f32, b.0 as f32, c as f32))
+                    strictly_between(cs, |&c| c <= lo, |&c| c < hi)
+                        .iter()
                         .map(|&c| (c, a.1, a.2))
                         .collect()
                 })
         } else {
+            let (lo, hi) = (a.1.min(b.1), a.1.max(b.1));
             self.along_y
                 .get(&(a.0, a.2.to_bits()))
                 .map_or_else(Vec::new, |rs| {
-                    rs.iter()
-                        .filter(|&&r| between(a.1 as f32, b.1 as f32, r as f32))
+                    strictly_between(rs, |&r| r <= lo, |&r| r < hi)
+                        .iter()
                         .map(|&r| (a.0, r, a.2))
                         .collect()
                 })
@@ -542,6 +546,19 @@ impl CornerIndex {
         }
         points
     }
+}
+
+/// The run of the sorted `values` above the low end and below the high end of an edge:
+/// `at_or_below_lo` holds for the values up to and including the low end, `below_hi` for the
+/// values short of the high end.
+fn strictly_between<T>(
+    values: &[T],
+    at_or_below_lo: impl Fn(&T) -> bool,
+    below_hi: impl Fn(&T) -> bool,
+) -> &[T] {
+    let first = values.partition_point(at_or_below_lo);
+    let end = values.partition_point(below_hi).max(first);
+    &values[first..end]
 }
 
 /// Fails with [`MeshAbort::OverBudget`] once `quads` holds more faces than `budget`: each
