@@ -65,7 +65,11 @@ fn test_rotary_jog_disabled_outside_idle() {
     assert!(!enabled(&harness, "Jog A+"), "enabled in Alarm");
     harness.get_by_label("Jog A+").click();
     harness.step();
-    assert!(settled_jogs(&shared).is_empty(), "{:?}", shared.log());
+    assert!(
+        settled_jogs(&harness, &shared).is_empty(),
+        "{:?}",
+        shared.log()
+    );
 }
 
 /// Continuous: a held rotary button moves at most the axis limit (360 degrees) and ends with

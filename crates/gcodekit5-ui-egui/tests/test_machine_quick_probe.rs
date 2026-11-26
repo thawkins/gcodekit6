@@ -123,9 +123,14 @@ fn test_quick_probe_refused_unless_idle() {
     );
     let before = lines(&shared).len();
     click(&mut harness, "Probe Z");
-    std::thread::sleep(Duration::from_millis(50));
     harness.step();
-    assert_eq!(lines(&shared).len(), before, "lines were sent in Alarm");
+    crate::test_machine_keyboard_jog::settle(&harness, &shared);
+    let sent: Vec<String> = lines(&shared)[before..]
+        .iter()
+        .filter(|l| l.as_str() != "$I")
+        .cloned()
+        .collect();
+    assert!(sent.is_empty(), "lines were sent in Alarm: {sent:?}");
     harness.get_by_label("Unlock").scroll_to_me();
     harness.step();
     harness.step();

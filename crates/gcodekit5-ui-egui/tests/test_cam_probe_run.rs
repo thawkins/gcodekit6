@@ -331,7 +331,8 @@ fn test_cam_probe_stop_button_resets_the_controller() {
     let (before, program) = start_boss(&mut h, &shared);
     reply(&shared, ALARM);
     click(&mut h, "Stop Probe");
-    assert!(reset_written(&shared), "no soft reset");
+    // The worker writes the reset on its own thread: wait for it.
+    until(&mut h, "the soft reset", |_| reset_written(&shared));
     check_stopped_then_restored(&mut h, &shared, before, &program);
 }
 

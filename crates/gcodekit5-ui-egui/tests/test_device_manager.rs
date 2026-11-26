@@ -698,6 +698,6 @@ fn test_device_manager_quit_cancel_ends_keyboard_jog() {
     h.step();
     tap(&mut h, egui::Key::Num6);
     tap(&mut h, egui::Key::Num8);
-    assert_eq!(settled_jogs(&shared).len(), 1, "{:?}", shared.log());
+    assert_eq!(settled_jogs(&h, &shared).len(), 1, "{:?}", shared.log());
     assert_eq!(cancels(&shared), 1);
 }

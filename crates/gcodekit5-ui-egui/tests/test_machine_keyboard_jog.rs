@@ -38,15 +38,44 @@ pub(crate) fn cancels(shared: &LoopbackShared) -> usize {
         .count()
 }
 
-/// Lets the worker write what it was given, then returns the jog lines.
-pub(crate) fn settled_jogs(shared: &LoopbackShared) -> Vec<String> {
-    std::thread::sleep(Duration::from_millis(30));
+/// Waits until every command the app handed the controller so far was written: a sentinel
+/// query (`$I`), queued behind them, has been written. A queued jog line is written before
+/// it, and a real-time byte (jog cancel) as soon as the worker takes it, so after this the
+/// log holds everything the app sent; a negative assertion then needs no sleep.
+pub(crate) fn settle(harness: &Harness<'_, GcodeKitApp>, shared: &LoopbackShared) {
+    let sentinels = |shared: &LoopbackShared| {
+        shared
+            .log()
+            .iter()
+            .filter(|w| **w == Wrote::Line("$I".to_string()))
+            .count()
+    };
+    let before = sentinels(shared);
+    gcodekit5_ui_egui::machine::lock(harness.state().state().machine.controller())
+        .send_query("$I")
+        .expect("sentinel query");
+    assert!(
+        wait_until(|| sentinels(shared) > before),
+        "sentinel never written: {:?}",
+        shared.log()
+    );
+}
+
+/// The jog lines once everything sent so far was written ([`settle`]).
+pub(crate) fn settled_jogs(
+    harness: &Harness<'_, GcodeKitApp>,
+    shared: &LoopbackShared,
+) -> Vec<String> {
+    settle(harness, shared);
     jogs(shared)
 }
 
-/// Lets the worker write what it was given, then returns the jog cancel count.
-fn settled_cancels(shared: &LoopbackShared) -> usize {
-    std::thread::sleep(Duration::from_millis(30));
+/// The jog cancel count once everything sent so far was written ([`settle`]).
+pub(crate) fn settled_cancels(
+    harness: &Harness<'_, GcodeKitApp>,
+    shared: &LoopbackShared,
+) -> usize {
+    settle(harness, shared);
     cancels(shared)
 }
 
@@ -127,7 +156,7 @@ fn test_keypad_keys_jog_one_step_each() {
         );
     }
     // A step jog never sends a cancel.
-    assert_eq!(settled_cancels(&shared), 0);
+    assert_eq!(settled_cancels(&harness, &shared), 0);
 }
 
 #[test]
@@ -137,7 +166,11 @@ fn test_keys_never_jog_while_a_text_field_has_focus() {
     tap(&mut harness, egui::Key::Num8);
     harness.event(egui::Event::Text("8".to_string()));
     harness.step();
-    assert!(settled_jogs(&shared).is_empty(), "{:?}", shared.log());
+    assert!(
+        settled_jogs(&harness, &shared).is_empty(),
+        "{:?}",
+        shared.log()
+    );
     assert!(entry(&harness).is_focused());
 }
 
@@ -151,7 +184,11 @@ fn test_keys_never_jog_before_the_pane_has_the_keyboard() {
         "Idle",
     );
     tap(&mut harness, egui::Key::Num6);
-    assert!(settled_jogs(&shared).is_empty(), "{:?}", shared.log());
+    assert!(
+        settled_jogs(&harness, &shared).is_empty(),
+        "{:?}",
+        shared.log()
+    );
 }
 
 /// A held key jogs until released, then sends exactly one jog cancel.
@@ -164,7 +201,7 @@ fn test_continuous_key_hold_cancels_once_on_release() {
         harness.step();
     }
     assert_eq!(
-        settled_cancels(&shared),
+        settled_cancels(&harness, &shared),
         0,
         "hold ended while the key was down"
     );
@@ -174,7 +211,7 @@ fn test_continuous_key_hold_cancels_once_on_release() {
     for _ in 0..4 {
         harness.step();
     }
-    assert_eq!(settled_cancels(&shared), 1);
+    assert_eq!(settled_cancels(&harness, &shared), 1);
     assert_eq!(jogs(&shared).len(), 1);
 }
 
@@ -191,7 +228,7 @@ fn test_continuous_key_hold_cancelled_when_a_text_field_takes_focus() {
     assert!(wait_until(|| cancels(&shared) == 1), "{:?}", shared.log());
     key(&harness, egui::Key::Num6, false);
     harness.step();
-    assert_eq!(settled_cancels(&shared), 1);
+    assert_eq!(settled_cancels(&harness, &shared), 1);
 }
 
 /// Review Focus 1: another page shown ends the hold.
@@ -244,8 +281,13 @@ fn test_continuous_key_repeat_sends_no_second_jog() {
         });
         harness.step();
     }
-    assert_eq!(settled_jogs(&shared).len(), 1, "{:?}", shared.log());
-    assert_eq!(settled_cancels(&shared), 0);
+    assert_eq!(
+        settled_jogs(&harness, &shared).len(),
+        1,
+        "{:?}",
+        shared.log()
+    );
+    assert_eq!(settled_cancels(&harness, &shared), 0);
 }
 
 /// Review Focus 1, a lost key-up: with NumLock on, Shift turns a held keypad 8 into
@@ -271,7 +313,7 @@ fn test_continuous_key_hold_cancelled_when_shift_changes_the_key() {
     for _ in 0..3 {
         harness.step();
     }
-    assert_eq!(settled_cancels(&shared), 1);
+    assert_eq!(settled_cancels(&harness, &shared), 1);
     assert_eq!(jogs(&shared).len(), 1);
 }
 
