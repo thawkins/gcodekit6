@@ -1,3 +1,15 @@
+## [Unreleased] - 2026-11-26 (egui + craft-libs migration, milestone M6: cut-over)
+
+### Changed
+- **egui is the default front end**: `cargo run` starts the egui + craft-libs build; the GTK build stays available with `cargo run --no-default-features --features gtk` until it is removed
+- CI lints the GTK build of the binary in its own clippy step
+
+### Added
+- **Parity checklist**: `docs/reports/egui-parity.md` lists every user-visible feature, its egui status and the test that covers it, with a ranked list of gaps
+
+### Known gaps
+- Not yet ported from GTK: work-coordinate zeroing and the G54-G59 selector, editor replace, quick probe buttons, keyboard jog, rotary axes in the DRO, and the visualizer and designer items listed in `docs/reports/egui-parity.md`
+
 ## [Unreleased] - 2026-11-26 (egui + craft-libs migration, milestone M5: managers and help)
 
 ### Added

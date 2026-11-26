@@ -8,7 +8,7 @@
 #[cfg(all(feature = "gtk", feature = "egui"))]
 compile_error!("features `gtk` and `egui` are exclusive: build with one front end");
 #[cfg(not(any(feature = "gtk", feature = "egui")))]
-compile_error!("no front end: enable feature `gtk` (default) or `egui`");
+compile_error!("no front end: enable feature `egui` (default) or `gtk`");
 
 use gcodekit5_design::init_logging;
 

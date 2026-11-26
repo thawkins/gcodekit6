@@ -86,8 +86,9 @@ codegen-units = 1
 opt-level = 1
 
 [features]
-default = ["gtk"]
-# Exactly one front end: the GTK4 build (default) or the egui + craft-libs build.
+default = ["egui"]
+# Exactly one front end: the egui + craft-libs build (default) or the GTK4 build
+# (`--no-default-features --features gtk`, until GTK is removed).
 gtk = ["dep:gcodekit5-ui"]
 egui = ["dep:gcodekit5-ui-egui"]
 

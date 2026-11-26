@@ -342,11 +342,20 @@ cd gcodekit5
 # Build release version (optimized)
 cargo build --release
 
-# Run the application
+# Run the application (egui front end, the default)
 cargo run --release
 ```
 
 The compiled binary will be located at `target/release/gcodekit5`.
+
+The egui + craft-libs front end is the default. Until the GTK4 front end is removed, it can
+still be built and run on its own (the two front ends are exclusive features):
+
+```bash
+cargo run --release --no-default-features --features gtk
+```
+
+Gaps between the two front ends are listed in `docs/reports/egui-parity.md`.
 
 ### Development Build
 ```bash

@@ -87,6 +87,10 @@ jobs:
       - name: Run clippy
         run: cargo clippy --workspace --all-targets -- -D warnings
 
+      # egui is the default front end; the GTK build of the binary stays linted until GTK is removed.
+      - name: Run clippy (GTK front end)
+        run: cargo clippy -p gcodekit5-design --no-default-features --features gtk --all-targets -- -D warnings
+
   nextest:
     name: Tests (nextest)
     runs-on: ubuntu-26.04
