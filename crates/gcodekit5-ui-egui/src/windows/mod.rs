@@ -1,5 +1,5 @@
-//! Windows the app opens over its pages (Preferences, About, Device Info and Help), and the
-//! manager pages that were windows in earlier builds (Device Manager, Device Config's
+//! Windows the app opens over its pages (Preferences, About and Help), and the manager pages
+//! that were windows in earlier builds (Device Manager, Device Config's Device Info panel and
 //! firmware settings, CNC Tools and Materials).
 //!
 //! Dependencies: `egui`, `craft-ui`, `gcodekit5-settings`, `gcodekit5-app`,
@@ -17,7 +17,7 @@ pub mod settings;
 pub mod tools_manager;
 
 pub use about::AboutWindow;
-pub use device_info::DeviceInfoWindow;
+pub use device_info::DeviceInfoPanel;
 pub use device_manager::DeviceManagerWindow;
 pub use firmware_settings::FirmwareSettingsWindow;
 pub use help::HelpWindow;

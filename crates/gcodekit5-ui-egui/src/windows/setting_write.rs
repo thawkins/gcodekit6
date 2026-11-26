@@ -1,4 +1,4 @@
-//! Sending settings commands from the Firmware Settings and Device Info windows: when they
+//! Sending settings commands from the Firmware Settings page and the Device Info panel: when they
 //! may be sent ([`blocked`]), and a `$n=v` write followed until the controller answers it
 //! ([`PendingWrite`]).
 //!

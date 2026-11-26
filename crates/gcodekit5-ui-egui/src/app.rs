@@ -77,7 +77,7 @@ use crate::panes::machine_control::MachineControlPane;
 use crate::panes::visualizer::VisualizerPane;
 use crate::theme;
 use crate::windows::{
-    AboutWindow, DeviceInfoWindow, DeviceManagerWindow, FirmwareSettingsWindow, HelpWindow,
+    AboutWindow, DeviceInfoPanel, DeviceManagerWindow, FirmwareSettingsWindow, HelpWindow,
     MaterialsManagerWindow, SettingsOutcome, SettingsWindow, ToolsManagerWindow, help,
 };
 use crate::workspace::{Page, PaneContext, PaneId, Workspace};
@@ -316,8 +316,8 @@ pub struct GcodeKitApp {
     help_window: HelpWindow,
     /// The Device Config page's firmware settings.
     firmware_settings: FirmwareSettingsWindow,
-    /// The Device Info window.
-    device_info: DeviceInfoWindow,
+    /// The Device Info panel (the left column of the Device Config page).
+    device_info: DeviceInfoPanel,
     /// The Device Manager page, which also holds the device profiles.
     device_manager: DeviceManagerWindow,
     /// The CNC Tools page, which also holds the tool library.
@@ -468,7 +468,7 @@ impl GcodeKitApp {
             about_window,
             help_window: HelpWindow::default(),
             firmware_settings: FirmwareSettingsWindow::default(),
-            device_info: DeviceInfoWindow::default(),
+            device_info: DeviceInfoPanel::default(),
             device_manager,
             tools_manager,
             materials_manager,
@@ -904,7 +904,7 @@ impl GcodeKitApp {
             Command::OpenSettings => self.settings_window.open(&self.state.settings),
             Command::About => self.about_window.open(),
             Command::OpenFirmwareSettings => self.show_page(Page::DeviceConfig),
-            Command::OpenDeviceInfo => self.device_info.open(),
+            Command::OpenDeviceInfo => self.show_page(Page::DeviceConfig),
             Command::OpenDeviceManager => self.show_page(Page::DeviceManager),
             Command::Quit => self.request_quit(QuitSource::MenuQuit),
             Command::Cut => self

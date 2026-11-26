@@ -157,7 +157,7 @@ const CASES: [PageCase; 7] = [
         page: Page::DeviceConfig,
         name: "device_config_page_dark",
         select: &[],
-        primary: &["Retrieve", "Save", "Load"],
+        primary: &["Retrieve", "Save", "Load", "Refresh device info", "Laser"],
     },
     PageCase {
         page: Page::CncTools,

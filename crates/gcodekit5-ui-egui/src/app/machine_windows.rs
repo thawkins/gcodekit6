@@ -1,5 +1,5 @@
 //! The app's side of the Device Config (firmware settings) and Device Manager pages and the
-//! Device Info window: the machine events handed to them, drawing them, the Save / Load file
+//! Device Info panel: the machine events handed to them, drawing them, the Save / Load file
 //! dialogs Firmware Settings asks for ([`crate::windows::FirmwareSettingsWindow::save_to`],
 //! [`crate::windows::FirmwareSettingsWindow::load_from`]), and what passes between Firmware
 //! Settings and the device profiles (the active profile's controller, a retrieved dump kept
@@ -12,11 +12,14 @@ use super::GcodeKitApp;
 use crate::dialogs::{Asked, DialogAnswer, FilePurpose};
 use crate::machine::lock;
 use crate::windows::firmware_settings::{EXPORT_FILE_NAME, FileRequest};
-use crate::windows::{DeviceInfoWindow, DeviceManagerWindow, FirmwareSettingsWindow};
+use crate::windows::{DeviceInfoPanel, DeviceManagerWindow, FirmwareSettingsWindow};
 use crate::workspace::Page;
 use gcodekit5_app::UnsavedChangesChoice;
 use gcodekit5_app::machine::MachineEvent;
 use gcodekit5_devicedb::DeviceProfile;
+
+/// Width of the Device Config page's Device Info panel (GTK: 320 px).
+const DEVICE_INFO_WIDTH: f32 = 320.0;
 
 impl GcodeKitApp {
     /// The Device Config page's firmware settings.
@@ -29,8 +32,8 @@ impl GcodeKitApp {
         &mut self.firmware_settings
     }
 
-    /// The Device Info window.
-    pub fn device_info(&self) -> &DeviceInfoWindow {
+    /// The Device Info panel (the left column of the Device Config page).
+    pub fn device_info(&self) -> &DeviceInfoPanel {
         &self.device_info
     }
 
@@ -130,23 +133,35 @@ impl GcodeKitApp {
         );
     }
 
-    /// Draws the firmware settings into the Device Config page's `ui`.
+    /// Draws the Device Config page into `ui` as GTK lays it out: the Device Info panel
+    /// on the left, the firmware settings on the right.
     pub(super) fn show_firmware_settings(&mut self, ui: &mut egui::Ui) {
         let controller = self.profile_controller();
-        self.firmware_settings.show(
-            ui,
-            &self.state.machine,
-            self.device_info.identity(),
-            controller,
-            &self.state.translator,
-        );
+        let tr = &self.state.translator;
+        ui.horizontal_top(|ui| {
+            let size = egui::vec2(DEVICE_INFO_WIDTH, ui.available_height());
+            ui.allocate_ui_with_layout(size, egui::Layout::top_down(egui::Align::Min), |ui| {
+                self.device_info.show(ui, &self.state.machine, tr);
+            });
+            ui.separator();
+            ui.add_space(6.0);
+            ui.vertical(|ui| {
+                self.firmware_settings.show(
+                    ui,
+                    &self.state.machine,
+                    self.device_info.identity(),
+                    controller,
+                    tr,
+                );
+            });
+        });
     }
 
-    /// Draws the Device Info window, takes Sync from Device and shows the file dialog
+    /// Runs the Device Info panel's writes, takes Sync from Device and shows the file dialog
     /// Firmware Settings asked for.
     pub(super) fn show_machine_windows(&mut self, ctx: &egui::Context) {
         let tr = &self.state.translator;
-        self.device_info.show(ctx, &self.state.machine, tr);
+        self.device_info.update(ctx, tr);
         if self.device_manager.take_sync_request() {
             let reported = self.firmware_settings.reported_values();
             let connected = self.state.machine.status().connected;
