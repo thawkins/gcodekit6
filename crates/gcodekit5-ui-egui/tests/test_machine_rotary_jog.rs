@@ -18,8 +18,17 @@ const A_AND_B: &str = "<Idle|MPos:0.000,0.000,0.000,10.000,20.000|FS:0,0>";
 
 /// Connected with a rotary step of 5 degrees, Idle with `report`.
 fn rotary_app(report: &str, state: &str) -> (Harness<'static, GcodeKitApp>, Arc<LoopbackShared>) {
+    rotary_app_with_step(5.0, report, state)
+}
+
+/// [`rotary_app`] with a rotary step of `step` degrees.
+fn rotary_app_with_step(
+    step: f64,
+    report: &str,
+    state: &str,
+) -> (Harness<'static, GcodeKitApp>, Arc<LoopbackShared>) {
     let mut config = loopback_config();
-    config.machine.jog_increment_rotary = 5.0;
+    config.machine.jog_increment_rotary = step;
     let (mut harness, shared) = pane_app_with(config, Duration::from_millis(1), true);
     report_state(&mut harness, &shared, report, state);
     (harness, shared)
@@ -49,7 +58,7 @@ fn test_rotary_jog_steps_by_the_rotary_increment() {
     );
     assert_eq!(
         jogs(&shared),
-        ["$J=G91 G21 A5.00 F1000", "$J=G91 G21 B-5.00 F1000"]
+        ["$J=G91 G21 A5.000 F1000", "$J=G91 G21 B-5.000 F1000"]
     );
 }
 
@@ -87,7 +96,7 @@ fn test_rotary_hold_cancels_on_release() {
         "{:?}",
         shared.log()
     );
-    assert_eq!(jogs(&shared), ["$J=G91 G21 B360.00 F1000"]);
+    assert_eq!(jogs(&shared), ["$J=G91 G21 B360.000 F1000"]);
     for _ in 0..5 {
         harness.step();
     }
@@ -121,4 +130,19 @@ fn test_rotary_hold_cancelled_when_the_axis_row_goes() {
     );
     harness.step();
     assert!(wait_until(|| cancels(&shared) == 1), "{:?}", shared.log());
+}
+
+/// A rotary step too small for the jog line's 3 decimals is raised to 0.001 degree, so the
+/// button never sends a zero-length jog.
+#[test]
+fn test_tiny_rotary_step_is_raised_not_sent_as_zero() {
+    let (mut harness, shared) = rotary_app_with_step(0.0001, A_AND_B, "Idle");
+    harness.get_by_label("Jog A+").click();
+    harness.step();
+    assert!(
+        wait_until(|| jogs(&shared).len() == 1),
+        "{:?}",
+        shared.log()
+    );
+    assert_eq!(jogs(&shared), ["$J=G91 G21 A0.001 F1000"]);
 }

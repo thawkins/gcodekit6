@@ -63,6 +63,8 @@ pub(super) const KEY_HOLD_DEAD_MAN: Duration = Duration::from_millis(250);
 /// How often a frame is asked for while a keyboard hold lasts, well inside
 /// [`KEY_HOLD_DEAD_MAN`].
 pub(super) const KEY_HOLD_FRAME: Duration = Duration::from_millis(50);
+/// The smallest rotary step a jog line can write (3 decimals).
+const MIN_ROTARY_STEP_DEG: f32 = 0.001;
 /// Millimetres per inch.
 const MM_PER_INCH: f32 = 25.4;
 
@@ -293,10 +295,11 @@ impl JogPanel {
     }
 
     /// Sets the rotary jog step and the A, B and C limits, in degrees; values that are not
-    /// positive keep the current ones.
+    /// positive keep the current ones. A step below the 0.001 degree a jog line can write
+    /// is raised to it, so a click never asks for a zero-length move.
     pub(super) fn configure_rotary(&mut self, step_deg: f32, limits_deg: [f32; 3]) {
         if step_deg.is_finite() && step_deg > 0.0 {
-            self.rotary_step_deg = step_deg;
+            self.rotary_step_deg = step_deg.max(MIN_ROTARY_STEP_DEG);
         }
         for (limit, new) in self.rotary_limit_deg.iter_mut().zip(limits_deg) {
             if new.is_finite() && new > 0.0 {

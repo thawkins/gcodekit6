@@ -35,7 +35,7 @@ use gcodekit5_settings::{ConnectionSettings, ConnectionType};
 
 use grbl_stream::{
     CharCountWindow, GRBL_RX_BUFFER_BYTES, GrblResponseLine, MAX_LINE_LENGTH, ResponseLineSplitter,
-    classify_response, linear_jog_command,
+    classify_response, linear_jog_command, rotary_jog_line,
 };
 
 /// How often the worker asks for a status report while it waits for a feed hold to complete.
@@ -615,8 +615,10 @@ impl MachineController {
 
     /// Jogs `axis` by `distance_mm` (relative) at `feed_mm_min` with a `$J=` command.
     ///
-    /// Refused (reported as [`MachineEvent::Error`]) for a non-finite distance, a feed
-    /// that is not positive, or while a program streams.
+    /// A linear axis is written with 2 decimals (mm), a rotary one with 3 (degrees).
+    /// Refused (reported as [`MachineEvent::Error`]) for a non-finite distance, one that
+    /// would be written as zero (no zero-length jog is sent), a feed that is not positive,
+    /// or while a program streams.
     pub fn jog(&mut self, axis: Axis, distance_mm: f32, feed_mm_min: f32) {
         self.jog_sent_at(axis, distance_mm, feed_mm_min, Instant::now());
     }
@@ -636,7 +638,14 @@ impl MachineController {
     }
 
     fn jog_sent_at(&mut self, axis: Axis, distance_mm: f32, feed_mm_min: f32, sent: Instant) {
-        if !distance_mm.is_finite() || !(feed_mm_min.is_finite() && feed_mm_min > 0.0) {
+        let rotary = matches!(axis, Axis::A | Axis::B | Axis::C);
+        // The written value: 2 decimals for mm, 3 for degrees; zero means no motion.
+        let scale = if rotary { 1000.0 } else { 100.0 };
+        let written_zero = (distance_mm * scale).round() == 0.0;
+        if !distance_mm.is_finite()
+            || written_zero
+            || !(feed_mm_min.is_finite() && feed_mm_min > 0.0)
+        {
             self.pending.push(MachineEvent::Error(format!(
                 "{}: {distance_mm}, {feed_mm_min}",
                 worker_text::JOG_INVALID
@@ -649,7 +658,11 @@ impl MachineController {
             ));
             return;
         }
-        let line = linear_jog_command(axis.letter(), distance_mm, feed_mm_min);
+        let line = if rotary {
+            rotary_jog_line(axis.letter(), distance_mm, feed_mm_min)
+        } else {
+            linear_jog_command(axis.letter(), distance_mm, feed_mm_min)
+        };
         match self.send(Command::Line(line, sent)) {
             Ok(()) => self.jogs_requested += 1,
             Err(e) => self.pending.push(MachineEvent::Error(e.to_string())),

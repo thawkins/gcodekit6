@@ -187,6 +187,38 @@ fn test_jog_writes_jog_command() {
     );
 }
 
+/// A rotary jog keeps 3 decimals (degrees); a jog that would be written as zero, on any
+/// axis, is refused rather than sent as a zero-length move.
+#[test]
+fn test_rotary_jog_has_three_decimals_and_zero_jogs_are_refused() {
+    use gcodekit5_app::machine::{Axis, MachineEvent};
+    let shared = Arc::new(LoopbackShared::default());
+    let mut controller = loopback_controller(&shared, Duration::from_millis(1));
+    connect(&mut controller);
+    controller.jog(Axis::A, 0.0004, 1000.0);
+    controller.jog(Axis::X, 0.004, 1000.0);
+    let refused = controller
+        .poll()
+        .into_iter()
+        .filter(|e| matches!(e, MachineEvent::Error(t) if t.starts_with("jog ignored")))
+        .count();
+    assert_eq!(refused, 2);
+    controller.jog(Axis::A, 0.012, 1000.0);
+    assert!(
+        wait_until(|| shared
+            .log()
+            .contains(&Wrote::Line("$J=G91 G21 A0.012 F1000".to_string()))),
+        "rotary jog not written: {:?}",
+        shared.log()
+    );
+    let jogs = shared
+        .log()
+        .into_iter()
+        .filter(|w| matches!(w, Wrote::Line(l) if l.starts_with("$J=")))
+        .count();
+    assert_eq!(jogs, 1, "{:?}", shared.log());
+}
+
 #[test]
 fn test_repaint_hook_called_on_event() {
     let shared = Arc::new(LoopbackShared::default());
