@@ -4,7 +4,7 @@
 
 use egui::{Modifiers, PointerButton};
 use egui_kittest::Harness;
-use egui_kittest::kittest::Queryable;
+use egui_kittest::kittest::{NodeT, Queryable};
 use gcodekit5_designer::model::{DesignRectangle, Shape};
 use gcodekit5_ui_egui::panes::designer::DesignerPane;
 use glam::Vec2;
@@ -235,7 +235,28 @@ fn test_cut_removes_the_selection_and_paste_brings_it_back() {
     crate::test_designer_canvas::click(&mut h, p);
     right_click_item(&mut h, 5.0, 5.0, "Cut");
     assert_eq!(ids(h.state()), vec![b]);
-    // With nothing selected the menu still offers Paste while the clipboard holds shapes.
+    // With nothing selected the menu is GTK's whole menu while the clipboard holds shapes:
+    // Paste works, the entries that need a selection are shown disabled.
+    let p = screen(&h, 20.0, 20.0);
+    click_with(&mut h, p, PointerButton::Secondary, Modifiers::NONE);
+    for item in [
+        "Cut",
+        "Copy",
+        "Delete",
+        "Mirror on X",
+        "Mirror on Y",
+        "Array...",
+        "Rotate",
+        "Convert to Path",
+        "Convert to Rectangle",
+    ] {
+        let node = h.get_by_label(item);
+        assert!(node.accesskit_node().is_disabled(), "{item} is disabled");
+    }
+    assert!(!h.get_by_label("Paste").accesskit_node().is_disabled());
+    h.get_by_label("Delete").click();
+    h.run();
+    assert_eq!(ids(h.state()), vec![b], "a disabled entry does nothing");
     right_click_item(&mut h, 20.0, 20.0, "Paste");
     let now = ids(h.state());
     assert_eq!(now.len(), 2);

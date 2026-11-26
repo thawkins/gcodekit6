@@ -16,11 +16,11 @@
 //! - Right-click with a selection: GTK's context menu with Cut, Copy, Paste, Delete, Mirror
 //!   on X / Y, Array... (the pane opens the Array dialog), Rotate, Align, Group / Ungroup
 //!   (also Ctrl+G / Ctrl+Shift+G), the boolean operations (Union, Diff, Inter) and Convert
-//!   to Path / Rectangle; with only a
-//!   clipboard, Paste. Cut, Copy and Paste use the design's own clipboard
+//!   to Path / Rectangle. With only a clipboard the same menu opens for Paste, the entries
+//!   that need a selection disabled. Cut, Copy and Paste use the design's own clipboard
 //!   (`DesignerState::clipboard`), as GTK did, not the system clipboard; Paste centres the
-//!   copies on the point right-clicked. Align also has GTK's Alt keys,
-//!   through the app's keymap (`crate::commands`) while the canvas has the keyboard.
+//!   copies on the point right-clicked. Align also has GTK's Alt keys, through the app's
+//!   keymap (`crate::commands`) while the canvas has the keyboard.
 //!
 //! Drawing tools and moves snap to the snap step; selection hit tests use the raw pointer.
 //!
@@ -589,7 +589,8 @@ pub fn msgids() -> Vec<&'static str> {
 /// shapes), Delete, Group and Ungroup (when the selection can be), for two shapes or more
 /// Union, Diff and Inter, Mirror on X and Y, Array..., Rotate by a fixed angle, for two
 /// shapes or more Align, then Convert to Path and Convert to Rectangle. Without a selection
-/// only Paste is offered. Each edit is one undo step.
+/// (a menu for Paste) the entries that need one are shown disabled. Each edit is one undo
+/// step.
 ///
 /// # Arguments
 /// * `at` - The world point right-clicked, where Paste centres the clipboard.
@@ -603,35 +604,36 @@ fn context_menu(
     at: (f64, f64),
 ) -> bool {
     let selection = state.selected_count() > 0;
-    if selection && ui.button(tr.tr("Cut")).clicked() {
+    // An entry that needs a selection is shown disabled without one, as GTK's whole menu.
+    let item = |ui: &mut egui::Ui, enabled: bool, label: &str| {
+        let clicked = ui
+            .add_enabled(enabled, egui::Button::new(tr.tr(label)))
+            .clicked();
+        if clicked {
+            ui.close();
+        }
+        clicked
+    };
+    if item(ui, selection, "Cut") {
         editing::cut_selected(state);
-        ui.close();
     }
-    if selection && ui.button(tr.tr("Copy")).clicked() {
+    if item(ui, selection, "Copy") {
         state.copy_selected();
-        ui.close();
     }
-    if !state.clipboard.is_empty() && ui.button(tr.tr("Paste")).clicked() {
+    if !state.clipboard.is_empty() && item(ui, true, "Paste") {
         state.paste_at_location(at.0, at.1);
-        ui.close();
     }
-    if !selection {
-        return false;
-    }
-    if ui.button(tr.tr("Delete")).clicked() {
+    if item(ui, selection, "Delete") {
         state.delete_selected();
-        ui.close();
     }
     ui.separator();
     let can_group = state.can_group();
     let can_ungroup = state.can_ungroup();
-    if can_group && ui.button(tr.tr("Group")).clicked() {
+    if can_group && item(ui, true, "Group") {
         state.group_selected();
-        ui.close();
     }
-    if can_ungroup && ui.button(tr.tr("Ungroup")).clicked() {
+    if can_ungroup && item(ui, true, "Ungroup") {
         state.ungroup_selected();
-        ui.close();
     }
     if can_group || can_ungroup {
         ui.separator();
@@ -639,49 +641,42 @@ fn context_menu(
     // GTK offers the boolean operations for two shapes or more.
     if state.can_perform_boolean_op() {
         for (label, op) in BOOLEANS {
-            if ui.button(tr.tr(label)).clicked() {
+            if item(ui, true, label) {
                 op(state);
-                ui.close();
             }
         }
         ui.separator();
     }
-    if ui.button(tr.tr("Mirror on X")).clicked() {
+    if item(ui, selection, "Mirror on X") {
         state.mirror_selected_x();
-        ui.close();
     }
-    if ui.button(tr.tr("Mirror on Y")).clicked() {
+    if item(ui, selection, "Mirror on Y") {
         state.mirror_selected_y();
-        ui.close();
     }
-    let array = ui.button(tr.tr("Array...")).clicked();
-    if array {
-        ui.close();
-    }
-    ui.menu_button(tr.tr("Rotate"), |ui| {
-        for (label, degrees) in ROTATIONS {
-            if ui.button(tr.tr(label)).clicked() {
-                editing::rotate_selected_by(state, degrees);
-                ui.close();
+    let array = item(ui, selection, "Array...");
+    ui.add_enabled_ui(selection, |ui| {
+        ui.menu_button(tr.tr("Rotate"), |ui| {
+            for (label, degrees) in ROTATIONS {
+                if item(ui, true, label) {
+                    editing::rotate_selected_by(state, degrees);
+                }
             }
-        }
+        });
     });
     // GTK offers Align for two shapes or more.
     if state.selected_count() >= 2 {
         ui.menu_button(tr.tr("Align"), |ui| {
             for (label, align) in ALIGNMENTS {
-                if ui.button(tr.tr(label)).clicked() {
+                if item(ui, true, label) {
                     align(state);
-                    ui.close();
                 }
             }
         });
     }
     ui.separator();
     for (label, convert) in CONVERSIONS {
-        if ui.button(tr.tr(label)).clicked() {
+        if item(ui, selection, label) {
             convert(state);
-            ui.close();
         }
     }
     array
