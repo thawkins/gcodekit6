@@ -586,7 +586,6 @@ See [CHANGELOG.md](CHANGELOG.md) for detailed version history and [GitHub Issues
 - **[docs/adr/](docs/adr/)** - Architecture Decision Records (ADRs)
 - **[docs/COORDINATE_SYSTEM.md](docs/COORDINATE_SYSTEM.md)** - Coordinate system and Y-flip explanation
 - **[SPEC.md](SPEC.md)** - Complete technical specification
-- **PLAN** - Implementation roadmap
 - **[AGENTS.md](AGENTS.md)** - Development guidelines
 - **[AGENTS-LANGUAGE.md](AGENTS-LANGUAGE.md)** - Rust-specific development guidelines
 - **[CHANGELOG.md](CHANGELOG.md)** - Version history
