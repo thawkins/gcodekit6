@@ -7,12 +7,16 @@
 //! positions are stored as numbers from [`REPETIER_OFFSET`] up, so both firmwares share one
 //! table type.
 //!
-//! Dependencies: `gcodekit5-communication` (`Setting`, `SettingsManager`).
+//! Dependencies: `gcodekit5-communication` (`Setting`, `SettingsManager`),
+//! `gcodekit5-devicedb` (the device profile's `ControllerType`).
 
 mod grbl_definitions;
 mod repetier_definitions;
 
 use gcodekit5_communication::firmware::grbl::settings::{Setting, SettingsManager};
+use gcodekit5_devicedb::ControllerType;
+
+use crate::device_identity::DeviceIdentity;
 
 pub use grbl_definitions::grbl_definitions;
 pub use repetier_definitions::repetier_definitions;
@@ -310,22 +314,89 @@ impl ValueError {
     }
 }
 
+/// Which GRBL-family firmware the controller runs, as far as is known; it decides whether
+/// the masks and switches below `$100` are bytes ([`check_value`]).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum GrblFamily {
+    /// Classic GRBL (0.9, 1.1), which stores those settings in a byte.
+    Classic,
+    /// grblHAL: wider masks (`$10=511`) and other meanings (`$56` is a distance in mm).
+    GrblHal,
+    /// FluidNC: settings beyond GRBL 1.1's byte range.
+    FluidNc,
+    /// Nothing says which firmware it is.
+    #[default]
+    Unknown,
+}
+
+impl GrblFamily {
+    /// The firmware from what the controller said and the active device profile.
+    ///
+    /// grblHAL or FluidNC named by either source wins: GRBL 1.1's `$I` reply sets the
+    /// firmware to `Grbl` before grblHAL's `[FIRMWARE:grblHAL]` line, and FluidNC's banner
+    /// says `Grbl`, so a plain `Grbl` is weaker evidence than a named variant. A wrong
+    /// "grblHAL" profile on a classic GRBL only lifts the pre-send guard; the read-back
+    /// after a write still reports a truncated value.
+    ///
+    /// # Arguments
+    /// * `identity` - What the controller reported about itself.
+    /// * `profile` - The active device profile's controller type, if a profile is active.
+    pub fn detect(identity: &DeviceIdentity, profile: Option<ControllerType>) -> Self {
+        let said = [&identity.firmware, &identity.name, &identity.version]
+            .into_iter()
+            .flatten()
+            .map(|text| text.to_lowercase())
+            .collect::<Vec<_>>();
+        let says = |marker: &str| said.iter().any(|text| text.contains(marker));
+        if says("grblhal") || profile == Some(ControllerType::GrblHal) {
+            GrblFamily::GrblHal
+        } else if says("fluidnc") || profile == Some(ControllerType::FluidNC) {
+            GrblFamily::FluidNc
+        } else if identity
+            .firmware
+            .as_deref()
+            .is_some_and(|f| f.eq_ignore_ascii_case("grbl"))
+            || profile == Some(ControllerType::Grbl)
+        {
+            GrblFamily::Classic
+        } else {
+            GrblFamily::Unknown
+        }
+    }
+
+    /// Whether the masks and switches below `$100` may be bytes: classic GRBL, and an
+    /// unknown firmware (fail safe).
+    fn has_byte_settings(self) -> bool {
+        match self {
+            GrblFamily::Classic | GrblFamily::Unknown => true,
+            GrblFamily::GrblHal | GrblFamily::FluidNc => false,
+        }
+    }
+}
+
 /// Checks a typed value before it is written, and trims it.
 ///
 /// A Repetier position takes what its reported type holds (a byte, a 16- or 32-bit
 /// integer, or a float). A GRBL setting whose reported value is a number takes a number of
 /// 0 or more (with a decimal point, never a comma; GRBL answers a negative with `error:4`);
-/// a mask or switch below `$100` ([`grbl_definitions`] unit `mask` or `bool`), which
-/// GRBL 1.1 stores in a byte, takes a whole number from 0 to 255. A setting reported as
-/// text (a grblHAL host name) takes any text.
+/// on classic GRBL (or an unknown firmware), a mask or switch below `$100`
+/// ([`grbl_definitions`] unit `mask` or `bool`), which GRBL 1.1 stores in a byte, takes a
+/// whole number from 0 to 255, unless its reported value is above 255 or has a fraction,
+/// which proves it is not a byte on this controller. A setting reported as text (a grblHAL
+/// host name) takes any text.
 ///
 /// # Arguments
 /// * `setting` - The setting as the controller reported it.
 /// * `value` - The value as typed.
+/// * `family` - The GRBL-family firmware the controller runs ([`GrblFamily::detect`]).
 ///
 /// # Errors
 /// The [`ValueError`] saying why the value cannot be written.
-pub fn check_value(setting: &Setting, value: &str) -> Result<String, ValueError> {
+pub fn check_value(
+    setting: &Setting,
+    value: &str,
+    family: GrblFamily,
+) -> Result<String, ValueError> {
     let value = value.trim();
     if value.is_empty() {
         return Err(ValueError::Empty);
@@ -344,7 +415,14 @@ pub fn check_value(setting: &Setting, value: &str) -> Result<String, ValueError>
         Some(2) => Some((i64::from(i32::MIN), i64::from(i32::MAX))),
         Some(_) => None,
         None if setting.numeric_value.is_none() => return Ok(value.to_string()),
-        None if is_grbl_byte_setting(setting.number) => byte,
+        None if family.has_byte_settings()
+            && is_grbl_byte_setting(setting.number)
+            && setting
+                .numeric_value
+                .is_none_or(|v| (0.0..=255.0).contains(&v) && v.fract() == 0.0) =>
+        {
+            byte
+        }
         None => None,
     };
     let parsed = number()?;

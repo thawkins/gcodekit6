@@ -1,15 +1,17 @@
 //! Drawing the Firmware Settings window: its toolbar, filter, notice, list and the
 //! editor of the clicked row. The state and what the buttons do live in the parent module.
 //!
-//! Dependencies: `egui`, `gcodekit5-app` (settings model, translations).
+//! Dependencies: `egui`, `gcodekit5-app` (settings model, translations),
+//! `gcodekit5-devicedb` (the active profile's controller type).
 
 use std::time::Duration;
 
 use gcodekit5_app::device_identity::DeviceIdentity;
 use gcodekit5_app::firmware_settings::{
-    ConfigSettingRow, REPETIER_OFFSET, SETTING_CATEGORIES, setting_id,
+    ConfigSettingRow, GrblFamily, REPETIER_OFFSET, SETTING_CATEGORIES, setting_id,
 };
 use gcodekit5_app::i18n::Translator;
+use gcodekit5_devicedb::ControllerType;
 
 use super::{Edit, FileRequest, FirmwareSettingsWindow};
 use crate::machine::Machine;
@@ -22,17 +24,19 @@ impl FirmwareSettingsWindow {
     /// * `ctx` - The egui context.
     /// * `machine` - The app's machine connection, for reading and writing settings.
     /// * `identity` - What the controller reported about itself (Repetier or GRBL).
-    /// * `profile_repetier` - The active device profile's controller is Repetier.
+    /// * `profile_controller` - The active device profile's controller type, if any.
     /// * `tr` - Translates the labels.
     pub fn show(
         &mut self,
         ctx: &egui::Context,
         machine: &Machine,
         identity: &DeviceIdentity,
-        profile_repetier: bool,
+        profile_controller: Option<ControllerType>,
         tr: &Translator,
     ) {
         self.tick(tr);
+        let profile_repetier = profile_controller == Some(ControllerType::Repetier);
+        self.family = GrblFamily::detect(identity, profile_controller);
         if let Some(write) = &self.write {
             ctx.request_repaint_after(write.pending.time_left());
         }

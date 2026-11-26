@@ -15,7 +15,7 @@ use crate::windows::firmware_settings::{EXPORT_FILE_NAME, FileRequest};
 use crate::windows::{DeviceInfoWindow, DeviceManagerWindow, FirmwareSettingsWindow};
 use gcodekit5_app::UnsavedChangesChoice;
 use gcodekit5_app::machine::MachineEvent;
-use gcodekit5_devicedb::{ControllerType, DeviceProfile};
+use gcodekit5_devicedb::DeviceProfile;
 
 impl GcodeKitApp {
     /// The Firmware Settings window.
@@ -109,15 +109,15 @@ impl GcodeKitApp {
     /// Draws both windows and shows the file dialog Firmware Settings asked for.
     pub(super) fn show_machine_windows(&mut self, ctx: &egui::Context) {
         let tr = &self.state.translator;
-        let profile_repetier = self
+        let profile_controller = self
             .device_manager
             .active_profile()
-            .is_some_and(|p| p.controller_type == ControllerType::Repetier);
+            .map(|p| p.controller_type);
         self.firmware_settings.show(
             ctx,
             &self.state.machine,
             self.device_info.identity(),
-            profile_repetier,
+            profile_controller,
             tr,
         );
         self.device_info.show(ctx, &self.state.machine, tr);

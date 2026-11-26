@@ -33,7 +33,7 @@ use std::time::{Duration, Instant};
 
 use gcodekit5_app::device_identity::DeviceIdentity;
 use gcodekit5_app::firmware_settings::{
-    ConfigSettingRow, REPETIER_OFFSET, SETTING_CATEGORIES, SettingsBlocked, ValueError,
+    ConfigSettingRow, GrblFamily, REPETIER_OFFSET, SETTING_CATEGORIES, SettingsBlocked, ValueError,
     apply_value, check_value, filtered_rows, grbl_definitions, load_definitions,
     parse_repetier_epr_line, repetier_definitions, setting_id, write_command,
 };
@@ -110,6 +110,9 @@ pub struct FirmwareSettingsWindow {
     dump_for_profile: Option<HashMap<u16, String>>,
     /// A dump was handed over on this connection.
     dump_stored: bool,
+    /// The GRBL-family firmware, from the identity and the active profile, for the value
+    /// check.
+    family: GrblFamily,
 }
 
 impl Default for FirmwareSettingsWindow {
@@ -127,6 +130,7 @@ impl Default for FirmwareSettingsWindow {
             file_request: None,
             dump_for_profile: None,
             dump_stored: false,
+            family: GrblFamily::Unknown,
         }
     }
 }
@@ -392,7 +396,7 @@ impl FirmwareSettingsWindow {
         };
         // A Repetier position is written as the type the controller reported for it.
         let eeprom_type = setting.eeprom_type;
-        let value = match check_value(setting, &edit.value) {
+        let value = match check_value(setting, &edit.value, self.family) {
             Ok(value) => value,
             Err(error) => {
                 let reason = tr.tr(error.msgid());

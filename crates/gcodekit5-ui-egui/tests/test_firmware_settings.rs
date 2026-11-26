@@ -622,6 +622,32 @@ fn test_firmware_settings_value_grbl_would_truncate_is_not_sent() {
     );
 }
 
+/// On a controller that said it runs grblHAL, a mask below `$100` is not held to GRBL
+/// 1.1's byte: the window sends the wider value.
+#[test]
+fn test_firmware_settings_grblhal_mask_above_255_is_sent() {
+    let (mut h, shared) = open_window(|_| {});
+    shared.inject("[FIRMWARE:grblHAL]\n$3=0\n");
+    assert!(step_until(&mut h, |app| app
+        .firmware_settings()
+        .visible_rows()
+        .iter()
+        .any(|r| r.number == 3)));
+    h.run_steps(3);
+    set_field(&mut h, "Filter:", "$3");
+    h.run_steps(2);
+    h.get_by_label("$3").click();
+    h.run_steps(2);
+    set_field(&mut h, "Value:", "300");
+    h.get_by_label("Apply").click();
+    h.run_steps(2);
+    assert!(
+        wait_until(|| wrote(&shared, "$3=300")),
+        "notice: {:?}",
+        h.state().firmware_settings().notice()
+    );
+}
+
 /// A write waits for an earlier jog's reply, so the jog's `error:15` is never taken for the
 /// write's answer.
 #[test]
