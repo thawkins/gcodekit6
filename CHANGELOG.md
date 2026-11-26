@@ -1,3 +1,8 @@
+## [Unreleased] - 2026-11-27 (release workflow dry-run fixes)
+
+### Fixed
+- **Release workflow (dry-run fixes)**: macOS builds on `macos-latest`, since GitHub no longer offers `macos-14`; the Windows leg uses the WiX v3 already on the runner instead of failing on a pinned reinstall
+
 ## [2.0.0-alpha.1] - 2026-11-27
 
 First alpha of GCodeKit5 2.0: the user interface is rewritten on egui + craft-libs. GTK4, libadwaita and GtkSourceView are no longer required to build, run or package the app. The migration landed in milestones M0-M8, listed below. Settings, machine profiles and libraries from 1.x are kept.
