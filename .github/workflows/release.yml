@@ -25,7 +25,7 @@ jobs:
             bin: gcodekit5
             name_suffix: linux-x86_64
           - os_name: macOS-ARM64
-            os: macos-14
+            os: macos-latest
             target: aarch64-apple-darwin
             bin: gcodekit5
             name_suffix: macos-arm64
