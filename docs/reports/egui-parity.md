@@ -191,7 +191,7 @@ Status values:
 | Adaptive pocket strategy | 40-designer | Manual check needed | "Adaptive" strategy listed; no test selects it |
 | Multi-pass depth stepping | 40-designer | Ported | `test_designer_properties_cam::cam_rejects_unsafe_step_and_ramp_values` |
 | V-carve, drilling operations | 40-designer | Not applicable | Not in the GTK designer |
-| Toolpath preview | 40-designer | Ported | `test_designer_toolpath::show_toolpaths_previews_the_design` |
+| Toolpath preview | 40-designer | Ported | `test_designer_toolpath::show_toolpaths_previews_the_design`, `test_designer_toolpath::test_preview_build_shows_progress_and_cancel` (GTK's spinner, progress and Cancel beside Show Toolpaths; GTK also put the progress in the status bar, egui does not; Cancel clears the preview where GTK kept a stale one) |
 | Undo / redo | 40-designer | Ported | `test_designer_editing::undo_redo_commands`, `test_designer_app::app_routes_undo_to_active_designer_and_tracks_dirty` |
 | Save / open design files | 40-designer | Ported | `test_designer_files::save_then_open_round_trips_the_design` |
 | Export G-code and SVG | 40-designer | Ported | `test_designer_files::export_gcode_writes_only_visible_shapes`, `test_designer_files::export_svg_writes_visible_shapes` |

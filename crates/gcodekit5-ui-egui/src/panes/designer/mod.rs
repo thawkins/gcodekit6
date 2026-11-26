@@ -259,6 +259,16 @@ impl DesignerPane {
         self.toolpaths.set_build_panics(on);
     }
 
+    /// Test hook: each toolpath preview build waits `delay` before its first shape.
+    ///
+    /// # Arguments
+    /// * `delay` - The wait, or `None` for none.
+    #[doc(hidden)]
+    #[cfg(any(test, feature = "test-support"))]
+    pub fn set_toolpath_build_delay(&mut self, delay: Option<std::time::Duration>) {
+        self.toolpaths.set_build_delay(delay);
+    }
+
     /// Toolpath preview builds started so far.
     #[doc(hidden)]
     pub fn toolpath_builds_started(&self) -> u64 {
@@ -628,7 +638,8 @@ impl Pane for DesignerPane {
         let out = egui::Panel::left("gcodekit5-designer-toolbox")
             .default_size(250.0)
             .show(ui, |ui| {
-                toolbox::show(ui, &mut self.state, self.tool, self.units, tr)
+                let preview = self.toolpaths.progress();
+                toolbox::show(ui, &mut self.state, self.tool, self.units, preview, tr)
             })
             .inner;
         if let Some(tool) = out.tool {
@@ -657,6 +668,10 @@ impl Pane for DesignerPane {
         });
         if acted {
             self.touch();
+        }
+        // After the click's touch, so the design as it is now counts as previewed.
+        if out.cancel_preview {
+            self.toolpaths.cancel(self.revision);
         }
         self.show_notice(ui, tr);
         if let Some(command) = self.show_canvas(ui, tr) {

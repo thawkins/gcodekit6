@@ -47,6 +47,7 @@ pub fn msgids() -> Vec<&'static str> {
         n_!("Show Grid"),
         n_!("Snap to grid"),
         n_!("Show Toolpaths"),
+        n_!("Cancel"),
         n_!("Machine Mode"),
         n_!("Laser 2D"),
         n_!("CNC 3D"),
@@ -70,6 +71,8 @@ pub struct ToolboxOutput {
     pub generate: bool,
     /// "Frame" was clicked.
     pub frame: bool,
+    /// The toolpath preview build's Cancel was clicked.
+    pub cancel_preview: bool,
 }
 
 /// The tools in GTK's grid order (three per row).
@@ -105,6 +108,7 @@ const WIDE_BUTTON: f32 = 28.0;
 /// * `state` - The design, whose grid, snap, machine mode and settings are edited.
 /// * `tool` - The current tool.
 /// * `units` - The display units of the settings.
+/// * `preview` - The running toolpath preview build's share of shapes done, if one runs.
 /// * `tr` - Translator for the current UI language.
 ///
 /// # Returns
@@ -114,6 +118,7 @@ pub fn show(
     state: &mut DesignerState,
     tool: DesignerTool,
     units: MeasurementSystem,
+    preview: Option<f32>,
     tr: &Translator,
 ) -> ToolboxOutput {
     let mut out = ToolboxOutput::default();
@@ -153,7 +158,9 @@ pub fn show(
             });
             egui::CollapsingHeader::new(tr.tr("View Controls"))
                 .default_open(true)
-                .show(ui, |ui| view_controls(ui, state, units, tr));
+                .show(ui, |ui| {
+                    out.cancel_preview = view_controls(ui, state, units, preview, tr);
+                });
         });
     out
 }
@@ -204,13 +211,19 @@ fn tool_buttons(ui: &mut egui::Ui, current: DesignerTool, tr: &Translator) -> Op
     picked
 }
 
-/// Show Grid, the grid spacing, Show Toolpaths, then the snap switch and its step.
+/// Show Grid, the grid spacing, Show Toolpaths (with GTK's spinner, progress and Cancel while
+/// the preview builds), then the snap switch and its step.
+///
+/// # Returns
+/// Whether the preview build's Cancel was clicked.
 fn view_controls(
     ui: &mut egui::Ui,
     state: &mut DesignerState,
     system: MeasurementSystem,
+    preview: Option<f32>,
     tr: &Translator,
-) {
+) -> bool {
+    let mut cancel = false;
     crate::theme::checkbox(ui, &mut state.show_grid, tr.tr("Show Grid"));
     let length = |mm: f64| {
         let shown = match system {
@@ -235,6 +248,13 @@ fn view_controls(
         response.widget_info(|| egui::WidgetInfo::labeled(egui::Role::ComboBox, enabled, &name));
     });
     crate::theme::checkbox(ui, &mut state.show_toolpaths, tr.tr("Show Toolpaths"));
+    if let Some(done) = preview {
+        ui.horizontal(|ui| {
+            ui.spinner();
+            ui.label(format!("{:.0}%", done * 100.0));
+            cancel = ui.button(tr.tr("Cancel")).clicked();
+        });
+    }
     ui.separator();
     crate::theme::checkbox(ui, &mut state.snap_enabled, tr.tr("Snap to grid"));
     ui.horizontal(|ui| {
@@ -257,6 +277,7 @@ fn view_controls(
             state.snap_threshold_mm = (shown * scale).max(0.0);
         }
     });
+    cancel
 }
 
 /// The Laser 2D / CNC 3D radio buttons.

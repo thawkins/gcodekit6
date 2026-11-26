@@ -235,3 +235,44 @@ fn test_panicking_preview_build_is_tried_once_per_revision() {
     assert_eq!(h.state().toolpath_builds_started(), 3);
     assert!(!cut_points(h.state()).is_empty());
 }
+
+/// GTK's spinner and Cancel while the preview builds: the share of shapes done is shown
+/// beside Show Toolpaths, Cancel stops the build and clears the preview, and the next design
+/// change builds again.
+#[test]
+fn test_preview_build_shows_progress_and_cancel() {
+    let mut pane = pane_with_rects(&[(20.0, 20.0, 40.0, 30.0)]);
+    pane.set_toolpath_build_delay(Some(Duration::from_secs(5)));
+    let mut h = harness(pane);
+    h.state_mut().state_mut().show_toolpaths = true;
+    h.step();
+    h.step();
+    assert_eq!(h.state().toolpath_builds_running(), 1);
+    let _ = h.get_by_label("0%");
+    h.get_by_label("Cancel").click();
+    h.step();
+    h.step();
+    assert_eq!(h.state().toolpath_builds_running(), 0);
+    assert!(
+        h.query_by_label("Cancel").is_none(),
+        "Cancel goes with the build"
+    );
+    assert!(h.state().preview_toolpaths().is_empty());
+    for _ in 0..10 {
+        h.step();
+    }
+    assert_eq!(
+        h.state().toolpath_builds_started(),
+        1,
+        "no rebuild by itself"
+    );
+    h.state_mut().set_toolpath_build_delay(None);
+    h.state_mut()
+        .state_mut()
+        .add_shape_with_undo(gcodekit5_designer::model::Shape::Rectangle(
+            gcodekit5_designer::model::DesignRectangle::new(80.0, 20.0, 10.0, 10.0),
+        ));
+    wait_for_preview(&mut h);
+    assert_eq!(h.state().toolpath_builds_started(), 2);
+    assert!(!cut_points(h.state()).is_empty());
+}
