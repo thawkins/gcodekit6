@@ -106,8 +106,8 @@ pub(super) struct WcsPanel {
     /// The last G54-G59 sent on this connection (G54 until one is): the fallback for a
     /// controller that does not report its parser state.
     selected: Wcs,
-    /// How work zero works on the active profile's controller; see
-    /// [`WcsPanel::set_support`].
+    /// How work zero works: the active profile's offline, the connection's while connected;
+    /// see [`WcsPanel::set_support`].
     support: WorkZeroSupport,
     /// Whether Go to Work Zero moves Z too; off by default, a Z0 rapid can crash a tool.
     include_z: bool,
@@ -174,13 +174,27 @@ impl WcsPanel {
         }
     }
 
-    /// Takes how work zero works on the active device profile's controller; `$G` is asked
-    /// only of the GRBL family ([`WorkZeroSupport::Reported`]).
+    /// Takes how work zero works: the active device profile's while offline, the
+    /// connection's while connected ([`gcodekit5_app::work_zero::work_zero_mode`]). `$G` is
+    /// asked only of the GRBL family ([`WorkZeroSupport::Reported`]). A change while
+    /// connected leaves the active system unknown: `$G` is asked again, or, without `$G`
+    /// ([`WorkZeroSupport::Selected`]), the user must select one.
     ///
     /// # Arguments
     /// * `support` - How it works.
-    pub(super) fn set_support(&mut self, support: WorkZeroSupport) {
+    /// * `connected` - Whether a controller is connected.
+    pub(super) fn set_support(&mut self, support: WorkZeroSupport, connected: bool) {
+        if support == self.support {
+            return;
+        }
         self.support = support;
+        if connected {
+            match support {
+                WorkZeroSupport::Reported => self.query = Query::Wanted,
+                WorkZeroSupport::Selected => self.selection_unknown = true,
+                WorkZeroSupport::PositionOnly | WorkZeroSupport::Unavailable => {}
+            }
+        }
     }
 
     /// Whether a zero command names a work coordinate system (not on Repetier, whose `G92`

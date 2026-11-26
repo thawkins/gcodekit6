@@ -7,6 +7,7 @@
 //!
 //! Dependencies: `gcodekit5-devicedb` (controller type), [`crate::machine::Axis`].
 
+use gcodekit5_communication::firmware::ControllerProtocol;
 use gcodekit5_devicedb::ControllerType;
 
 use crate::machine::Axis;
@@ -69,6 +70,29 @@ pub fn work_zero_support(controller: Option<&ControllerType>) -> WorkZeroSupport
         Some(ControllerType::TinyG | ControllerType::G2Core | ControllerType::Marlin) => {
             WorkZeroSupport::Unavailable
         }
+    }
+}
+
+/// How work zero works on a live connection: from the protocol the connection speaks, so
+/// that a profile activated or edited while connected cannot change the commands Zero sends
+/// to the controller already on the link (a Repetier profile over a GRBL link would send
+/// `G10 L20 P1`, which GRBL writes into G54 whatever system is active).
+///
+/// # Arguments
+/// * `protocol` - The connection's protocol ([`MachineController::protocol`]).
+/// * `connected_with` - The support of the profile the connection was started with, for a
+///   protocol that does not say ([`ControllerProtocol::Unknown`]: Smoothieware, TinyG,
+///   g2core, Marlin, or no profile).
+///
+/// [`MachineController::protocol`]: crate::machine::MachineController::protocol
+pub fn work_zero_mode(
+    protocol: ControllerProtocol,
+    connected_with: WorkZeroSupport,
+) -> WorkZeroSupport {
+    match protocol {
+        ControllerProtocol::Grbl => WorkZeroSupport::Reported,
+        ControllerProtocol::Repetier => WorkZeroSupport::PositionOnly,
+        ControllerProtocol::Unknown => connected_with,
     }
 }
 

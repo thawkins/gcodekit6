@@ -49,7 +49,8 @@ use gcodekit5_app::machine::{
 };
 use gcodekit5_app::override_target::{OverrideTarget, TargetStep};
 use gcodekit5_app::work_zero::{
-    Wcs, go_to_work_zero_command, work_zero_support, zero_axes_command, zero_rotary_command,
+    Wcs, WorkZeroSupport, go_to_work_zero_command, work_zero_mode, work_zero_support,
+    zero_axes_command, zero_rotary_command,
 };
 use gcodekit5_communication::firmware::ControllerProtocol;
 use gcodekit5_core::units::{FeedRateUnits, MeasurementSystem};
@@ -185,6 +186,15 @@ pub struct MachineControlPane {
     /// The active device profile's protocol, which a connect speaks
     /// ([`MachineController::connect_with`]).
     protocol: ControllerProtocol,
+    /// How work zero works on the active device profile's controller: the section's mode
+    /// while offline.
+    profile_support: WorkZeroSupport,
+    /// How work zero works on the profile the last connect was started with: the mode of a
+    /// connection whose protocol does not say ([`ControllerProtocol::Unknown`]).
+    connect_support: WorkZeroSupport,
+    /// Whether the last frame saw the machine connected; a profile change applies to the
+    /// work zero section only while offline (see [`work_zero_mode`]).
+    online: bool,
 }
 
 /// Share of the pane's width the sidebar (connection, state, work coordinates, job) takes.
@@ -253,6 +263,9 @@ impl MachineControlPane {
             probe_text: None,
             estop_image: None,
             protocol: ControllerProtocol::Unknown,
+            profile_support: WorkZeroSupport::default(),
+            connect_support: WorkZeroSupport::default(),
+            online: false,
         }
     }
 
@@ -482,6 +495,7 @@ impl MachineControlPane {
         match self.with_controller(|c| c.connect_with(&settings, protocol)) {
             Ok(()) => {
                 self.notice = None;
+                self.connect_support = self.profile_support;
                 self.connection.set_connecting(true);
             }
             Err(error) => {
@@ -1231,7 +1245,16 @@ impl Pane for MachineControlPane {
 
     fn frame(&mut self, machine: &Machine) {
         // Every frame, drawn or not: a keyboard jog may run while the pane is hidden.
-        let repetier = machine.status().connected && self.with_controller(|c| c.is_repetier());
+        let connected = machine.status().connected;
+        let protocol = self.with_controller(|c| c.protocol());
+        self.online = connected;
+        let support = if connected {
+            work_zero_mode(protocol, self.connect_support)
+        } else {
+            self.profile_support
+        };
+        self.wcs.set_support(support, connected);
+        let repetier = connected && protocol == ControllerProtocol::Repetier;
         if self.jog.set_continuous_allowed(!repetier) {
             self.with_controller(|c| c.realtime(RealtimeCommand::JogCancel));
         }
@@ -1246,7 +1269,10 @@ impl Pane for MachineControlPane {
     }
 
     fn set_controller(&mut self, controller: Option<&gcodekit5_devicedb::ControllerType>) {
-        self.wcs.set_support(work_zero_support(controller));
+        self.profile_support = work_zero_support(controller);
+        if !self.online {
+            self.wcs.set_support(self.profile_support, false);
+        }
         self.protocol = controller.map_or(ControllerProtocol::Unknown, |c| {
             ControllerProtocol::from_name(c.as_str())
         });

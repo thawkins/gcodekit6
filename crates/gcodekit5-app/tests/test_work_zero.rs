@@ -174,3 +174,28 @@ fn test_wcs_in_line_reads_spaced_and_padded_words() {
     assert_eq!(wcs_in_line("G1 X55"), None);
     assert_eq!(wcs_in_line("G 1 F 55"), None);
 }
+
+#[test]
+fn test_work_zero_mode_follows_the_connection_protocol() {
+    use gcodekit5_app::work_zero::{WorkZeroSupport, work_zero_mode};
+    use gcodekit5_communication::firmware::ControllerProtocol;
+    for profile in [
+        WorkZeroSupport::Reported,
+        WorkZeroSupport::Selected,
+        WorkZeroSupport::PositionOnly,
+        WorkZeroSupport::Unavailable,
+    ] {
+        assert_eq!(
+            work_zero_mode(ControllerProtocol::Grbl, profile),
+            WorkZeroSupport::Reported
+        );
+        assert_eq!(
+            work_zero_mode(ControllerProtocol::Repetier, profile),
+            WorkZeroSupport::PositionOnly
+        );
+        assert_eq!(
+            work_zero_mode(ControllerProtocol::Unknown, profile),
+            profile
+        );
+    }
+}

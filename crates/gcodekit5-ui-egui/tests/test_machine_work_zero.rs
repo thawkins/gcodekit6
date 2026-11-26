@@ -839,3 +839,96 @@ fn test_smoothieware_judges_the_program_streamed_not_the_editors() {
         "reason not shown on Zero All Axes"
     );
 }
+
+/// Makes `controller` the active profile's without reconnecting, as the Device Manager does
+/// when another profile is activated (or the active one saved) while connected.
+fn switch_profile(
+    harness: &mut Harness<'_, GcodeKitApp>,
+    controller: gcodekit5_devicedb::ControllerType,
+) {
+    harness
+        .state_mut()
+        .workspace_mut()
+        .set_controller(Some(&controller));
+    for _ in 0..4 {
+        harness.step();
+    }
+}
+
+#[test]
+fn test_grbl_connection_keeps_its_wcs_after_a_switch_to_a_repetier_profile() {
+    let (mut harness, shared) = connect_profile(gcodekit5_devicedb::ControllerType::Grbl);
+    assert!(
+        step_until(&mut harness, |_| wrote(&shared, "$G")),
+        "no $G after connect"
+    );
+    report_wcs(&mut harness, &shared, Wcs::G55);
+    report_idle(&mut harness, &shared);
+    switch_profile(&mut harness, gcodekit5_devicedb::ControllerType::Repetier);
+    // The connection is still GRBL: the selector stays usable and Zero names G55.
+    assert!(step_enabled(&mut harness, "Zero All Axes"));
+    assert!(enabled(&harness, "G55"), "selector disabled on a GRBL link");
+    click(&mut harness, "Zero All Axes");
+    answer_yes(&mut harness);
+    assert!(
+        step_until(&mut harness, |_| wrote(&shared, "G10 L20 P2 X0 Y0 Z0")),
+        "Zero All not written to G55: {:?}",
+        shared.log()
+    );
+    assert!(
+        !wrote_prefix(&shared, "G10 L20 P1"),
+        "zero written to G54: {:?}",
+        shared.log()
+    );
+}
+
+#[test]
+fn test_repetier_connection_keeps_g92_after_a_switch_to_a_grbl_profile() {
+    let (mut harness, shared) = connect_profile(gcodekit5_devicedb::ControllerType::Repetier);
+    assert!(step_enabled(&mut harness, "Zero X"), "Zero X never enabled");
+    switch_profile(&mut harness, gcodekit5_devicedb::ControllerType::Grbl);
+    for _ in 0..20 {
+        harness.step();
+    }
+    assert!(
+        !enabled(&harness, "G55"),
+        "selector enabled on a Repetier link"
+    );
+    assert!(step_enabled(&mut harness, "Zero X"), "Zero X disabled");
+    click(&mut harness, "Zero X");
+    assert!(
+        step_until(&mut harness, |_| wrote_numbered(&shared, "G92 X0")),
+        "Zero X not sent as G92: {:?}",
+        shared.log()
+    );
+    assert!(
+        shared
+            .log()
+            .iter()
+            .all(|w| matches!(w, Wrote::Line(l) if !l.contains('$'))),
+        "GRBL command or byte written: {:?}",
+        shared.log()
+    );
+}
+
+#[test]
+fn test_smoothieware_connection_keeps_its_selection_after_a_switch_to_a_grbl_profile() {
+    let (mut harness, shared) = connect_profile(gcodekit5_devicedb::ControllerType::Smoothieware);
+    report_idle(&mut harness, &shared);
+    click(&mut harness, "G55");
+    assert!(step_until(&mut harness, |_| wrote(&shared, "G55")));
+    assert!(step_until(&mut harness, |app| app
+        .state()
+        .machine
+        .jog_allowed()));
+    switch_profile(&mut harness, gcodekit5_devicedb::ControllerType::Grbl);
+    assert!(step_enabled(&mut harness, "Zero Y"), "Zero Y disabled");
+    click(&mut harness, "Zero Y");
+    assert!(
+        step_until(&mut harness, |_| wrote(&shared, "G10 L20 P2 Y0")),
+        "{:?}",
+        shared.log()
+    );
+    assert!(!wrote(&shared, "$G"), "$G sent to Smoothieware");
+    assert!(!wrote(&shared, "G10 L20 P1 Y0"), "zero written to G54");
+}
