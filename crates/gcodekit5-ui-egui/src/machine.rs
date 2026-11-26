@@ -17,8 +17,11 @@
 use std::sync::{Arc, Mutex, PoisonError};
 
 use gcodekit5_app::i18n::Translator;
-use gcodekit5_app::machine::grbl_stream::{MAX_LINE_LENGTH, prepare_program};
+use gcodekit5_app::machine::grbl_stream::{
+    GrblResponseLine, MAX_LINE_LENGTH, classify_response, prepare_program,
+};
 use gcodekit5_app::machine::{MachineController, MachineEvent, worker_text};
+use gcodekit5_app::work_zero::{Wcs, parser_state_wcs, wcs_in_line};
 use gcodekit5_communication::firmware::grbl::status_parser::{
     FullStatus, WorkCoordinateOffset, parse_probe_report_in,
 };
@@ -66,6 +69,14 @@ pub struct MachineStatus {
     /// Whether the controller reports positions in inches (`$13=1`). Until a `$$` line says
     /// so, reports are taken as mm, GRBL's default (as the GTK front end does).
     pub report_inches: bool,
+    /// The active work coordinate system: from the controller's parser state (`[GC:...]`)
+    /// or a G54-G59 line sent since. `None` until known, and again after a controller reset
+    /// (which restores the default) until the controller reports it. A stream's program may
+    /// change it too; the Machine Control pane asks the controller again after one.
+    pub active_wcs: Option<Wcs>,
+    /// Whether the controller reported its parser state on this connection; until it does,
+    /// a front end may fall back to the system the user last selected.
+    pub wcs_reported: bool,
 }
 
 /// X, Y and Z in millimetres.
@@ -159,6 +170,8 @@ impl MachineStatus {
                     self.wco = None;
                     self.grbl_travel = [None; 3];
                     self.report_inches = false;
+                    self.active_wcs = None;
+                    self.wcs_reported = false;
                 }
                 MachineEvent::StatusReport(report) => {
                     // Positions, offsets and feed are kept in mm whatever `$13` says.
@@ -169,6 +182,16 @@ impl MachineStatus {
                     self.report = Some(report);
                 }
                 MachineEvent::Received(line) => {
+                    if let Some(wcs) = parser_state_wcs(line) {
+                        self.active_wcs = Some(wcs);
+                        self.wcs_reported = true;
+                    } else if matches!(classify_response(line), GrblResponseLine::Reset(_)) {
+                        // A reset restores the default system: unknown until reported
+                        // again (without reports the last one stays as the fallback).
+                        if self.wcs_reported {
+                            self.active_wcs = None;
+                        }
+                    }
                     if let Some((index, travel)) = parse_travel(line) {
                         self.grbl_travel[index] = Some(travel);
                     }
@@ -212,7 +235,12 @@ impl MachineStatus {
                         total: *total,
                     });
                 }
-                MachineEvent::Sent(_) => {}
+                MachineEvent::Sent(line) => {
+                    // Lines run in order, so a later `G10 L20` acts on this system.
+                    if let Some(wcs) = wcs_in_line(line) {
+                        self.active_wcs = Some(wcs);
+                    }
+                }
                 MachineEvent::Error(message) => self.last_error = Some(message.clone()),
                 MachineEvent::StreamHalted { reason } => self.last_error = Some(reason.clone()),
             }
@@ -298,6 +326,10 @@ pub struct Machine {
     program: Option<Arc<[String]>>,
     /// Whether the controller's latest report was fresh when this frame polled it.
     report_fresh: bool,
+    /// Whether every line sent had been answered just before the last poll.
+    answered_at_poll: bool,
+    /// How many times [`Machine::poll`] ran.
+    polls: u64,
 }
 
 impl Machine {
@@ -313,6 +345,8 @@ impl Machine {
             pending: Vec::new(),
             program: None,
             report_fresh: true,
+            answered_at_poll: true,
+            polls: 0,
         }
     }
 
@@ -342,16 +376,35 @@ impl Machine {
     /// Takes the controller's events, replacing the previous frame's, and updates the status.
     /// Call once per frame. Never blocks on I/O.
     pub fn poll(&mut self) {
-        let (fresh, events) = {
+        let (fresh, answered, events) = {
             let mut controller = lock(&self.controller);
             // Freshness first: the worker marks a report fresh after sending it, so a fresh
-            // report is already among the events polled next.
-            (controller.report_fresh(), controller.poll())
+            // report is already among the events polled next. Likewise a line's reply text
+            // (`[GC:...]`) is read before its `ok`.
+            (
+                controller.report_fresh(),
+                controller.lines_answered(),
+                controller.poll(),
+            )
         };
         self.report_fresh = fresh;
+        self.answered_at_poll = answered;
+        self.polls += 1;
         self.events = coalesce_progress(events);
         self.status.apply(&self.events);
         self.pending.extend(self.events.iter().cloned());
+    }
+
+    /// How many times [`Machine::poll`] ran; with [`Machine::lines_answered_at_poll`] a
+    /// consumer tells whether a line it sent had its reply before a later poll.
+    pub fn polls(&self) -> u64 {
+        self.polls
+    }
+
+    /// Whether every line sent had been answered (see `MachineController::lines_answered`)
+    /// just before the last poll, so the replies' text lines are among the events it took.
+    pub fn lines_answered_at_poll(&self) -> bool {
+        self.answered_at_poll
     }
 
     /// Takes the events that no observer has taken yet: those of [`Machine::poll`] and
