@@ -162,14 +162,20 @@ const CASES: [PageCase; 7] = [
     PageCase {
         page: Page::CncTools,
         name: "cnc_tools_page_dark",
-        select: &[],
-        primary: &["New Tool"],
+        select: &["1/4\" Flat End Mill"],
+        primary: &[
+            "New Tool",
+            "Save",
+            "Cancel",
+            "Delete",
+            "Reset Custom Tools...",
+        ],
     },
     PageCase {
         page: Page::Materials,
         name: "materials_page_dark",
-        select: &[],
-        primary: &["New Material"],
+        select: &["Acrylic"],
+        primary: &["New Material", "Save", "Cancel", "Delete"],
     },
 ];
 

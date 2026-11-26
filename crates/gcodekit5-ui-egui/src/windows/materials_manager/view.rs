@@ -11,7 +11,10 @@ use gcodekit5_app::material_form::{
     chip_type_label, hazard_level_label, heat_sensitivity_label, surface_finish_label,
 };
 
-use crate::windows::help::{HelpTopic, help_row};
+use crate::icons::Icon;
+use crate::theme;
+use crate::windows::help::HelpTopic;
+use crate::windows::manager_ui::{self, SIDEBAR_WIDTH, icon_text_button};
 
 use super::{MaterialsManagerWindow, Next, Question, Tab};
 
@@ -30,19 +33,26 @@ impl MaterialsManagerWindow {
     /// * `ui` - The page's `Ui`.
     /// * `tr` - Translates the labels.
     pub fn show(&mut self, ui: &mut egui::Ui, tr: &Translator) {
-        help_row(ui, HelpTopic::MaterialsManager, tr);
+        // GTK: the material list sidebar | the edit form.
         ui.horizontal_top(|ui| {
-            let size = egui::vec2(260.0, ui.available_height());
+            let size = egui::vec2(SIDEBAR_WIDTH, ui.available_height());
             ui.allocate_ui_with_layout(size, egui::Layout::top_down(egui::Align::Min), |ui| {
                 self.sidebar(ui, tr);
             });
             ui.separator();
+            ui.add_space(12.0);
             ui.vertical(|ui| self.details(ui, tr));
         });
     }
 
     /// Search, category filter, New Material and the list.
     fn sidebar(&mut self, ui: &mut egui::Ui, tr: &Translator) {
+        manager_ui::sidebar_header(
+            ui,
+            &tr.tr(n_!("Materials")),
+            HelpTopic::MaterialsManager,
+            tr,
+        );
         ui.add(
             egui::TextEdit::singleline(&mut self.filter.search)
                 .hint_text(tr.tr(n_!("Search materials...")))
@@ -66,18 +76,20 @@ impl MaterialsManagerWindow {
                     );
                 }
             });
-        let new = ui.add_enabled(
-            self.backend.is_some(),
-            egui::Button::new(tr.tr(n_!("New Material"))),
-        );
-        if new.clicked() {
-            self.request(Next::New);
-        }
-        ui.separator();
+        ui.add_space(4.0);
+        // New Material sits under the list, as in GTK.
+        let new_height = ui.spacing().interact_size.y + 12.0;
         egui::ScrollArea::vertical()
             .id_salt("gcodekit5-materials-manager-list")
             .auto_shrink([false, false])
+            .max_height((ui.available_height() - new_height).max(80.0))
             .show(ui, |ui| self.list(ui, tr));
+        ui.add_space(6.0);
+        let new = theme::primary_icon_button(Icon::Add.image(), tr.tr(n_!("New Material")))
+            .min_size(egui::vec2(ui.available_width(), 0.0));
+        if ui.add_enabled(self.backend.is_some(), new).clicked() {
+            self.request(Next::New);
+        }
     }
 
     fn list(&mut self, ui: &mut egui::Ui, tr: &Translator) {
@@ -93,22 +105,25 @@ impl MaterialsManagerWindow {
         }
         let machinability = tr.tr(n_!("Machinability:"));
         let mut clicked = None;
-        for material in listed {
-            let is_selected = selected.as_deref() == Some(material.id.0.as_str());
-            if ui.selectable_label(is_selected, &material.name).clicked() {
-                clicked = Some(material.id.0.clone());
+        manager_ui::boxed_list(ui, |ui| {
+            for (index, material) in listed.into_iter().enumerate() {
+                let is_selected = selected.as_deref() == Some(material.id.0.as_str());
+                let row = manager_ui::list_row(ui, index == 0, is_selected, &material.name, |ui| {
+                    ui.weak(format!(
+                        "{} - {}",
+                        tr.tr(category_label(material.category)),
+                        material.subcategory
+                    ));
+                    ui.label(format!(
+                        "{machinability} {}/10",
+                        material.machinability_rating
+                    ));
+                });
+                if row.clicked() {
+                    clicked = Some(material.id.0.clone());
+                }
             }
-            ui.weak(format!(
-                "{} - {}",
-                tr.tr(category_label(material.category)),
-                material.subcategory
-            ));
-            ui.label(format!(
-                "{machinability} {}/10",
-                material.machinability_rating
-            ));
-            ui.add_space(4.0);
-        }
+        });
         if let Some(id) = clicked
             && selected.as_deref() != Some(id.as_str())
         {
@@ -118,42 +133,37 @@ impl MaterialsManagerWindow {
 
     /// The notice, the open question, the action bar and the form.
     fn details(&mut self, ui: &mut egui::Ui, tr: &Translator) {
-        match &self.notice {
-            Some((text, true)) => {
-                ui.colored_label(ui.visuals().error_fg_color, text);
-            }
-            Some((text, false)) => {
-                ui.label(text);
-            }
-            None => {}
-        }
+        manager_ui::notice(ui, self.notice.as_ref());
         self.ask(ui, tr);
         if self.edit.is_none() {
-            ui.centered_and_justified(|ui| {
-                ui.weak(tr.tr(n_!("Please select or create a material to edit")));
-            });
+            manager_ui::placeholder(
+                ui,
+                &tr.tr(n_!("Please select or create a material to edit")),
+            );
             return;
         }
         let action = self.action_bar(ui, tr);
-        ui.separator();
+        ui.add_space(8.0);
         if let Some(edit) = self.edit.as_mut() {
-            ui.horizontal(|ui| {
-                for tab in Tab::ALL {
-                    ui.selectable_value(&mut edit.tab, tab, tr.tr(tab.msgid()));
-                }
-            });
-            ui.separator();
+            let tabs: Vec<_> = Tab::ALL
+                .iter()
+                .map(|tab| (*tab, tr.tr(tab.msgid()).into_owned()))
+                .collect();
+            manager_ui::tab_switcher(ui, &mut edit.tab, &tabs);
+            ui.add_space(8.0);
             let creating = edit.original.is_none();
             let form = &mut edit.form;
             egui::ScrollArea::vertical()
                 .id_salt("gcodekit5-materials-manager-form")
                 .auto_shrink([false, false])
-                .show(ui, |ui| match edit.tab {
-                    Tab::Basic => basic(ui, form, creating, tr),
-                    Tab::Properties => properties(ui, form, tr),
-                    Tab::Machining => machining(ui, form, tr),
-                    Tab::Safety => safety(ui, form, tr),
-                    Tab::Notes => notes(ui, form, tr),
+                .show(ui, |ui| {
+                    manager_ui::form_group(ui, None, |ui| match edit.tab {
+                        Tab::Basic => basic(ui, form, creating, tr),
+                        Tab::Properties => properties(ui, form, tr),
+                        Tab::Machining => machining(ui, form, tr),
+                        Tab::Safety => safety(ui, form, tr),
+                        Tab::Notes => notes(ui, form, tr),
+                    });
                 });
         }
         match action {
@@ -177,17 +187,20 @@ impl MaterialsManagerWindow {
         let mut action = None;
         ui.horizontal(|ui| {
             ui.add_enabled_ui(!asking, |ui| {
-                if ui
-                    .add_enabled(dirty, egui::Button::new(tr.tr(n_!("Save"))))
-                    .clicked()
-                {
+                let save = theme::primary_icon_button(Icon::Save.image(), tr.tr(n_!("Save")));
+                if ui.add_enabled(dirty, save).clicked() {
                     action = Some(Action::Save);
                 }
-                if ui.button(tr.tr(n_!("Cancel"))).clicked() {
+                if ui
+                    .add(icon_text_button(ui, Icon::Close, tr.tr(n_!("Cancel"))))
+                    .clicked()
+                {
                     action = Some(Action::Cancel);
                 }
+                let delete =
+                    theme::destructive_icon_button(ui, Icon::Trash.image(), tr.tr(n_!("Delete")));
                 let delete = ui
-                    .add_enabled(custom, egui::Button::new(tr.tr(n_!("Delete"))))
+                    .add_enabled(custom, delete)
                     .on_disabled_hover_text(tr.tr(n_!("Only custom materials can be deleted.")));
                 if delete.clicked() {
                     action = Some(Action::Delete);
@@ -218,18 +231,8 @@ impl MaterialsManagerWindow {
                 &[n_!("Save"), n_!("Discard"), n_!("Cancel")],
             ),
         };
-        let mut answer = None;
-        ui.group(|ui| {
-            ui.strong(tr.tr(title));
-            ui.label(text);
-            ui.horizontal(|ui| {
-                for (index, choice) in choices.iter().enumerate() {
-                    if ui.button(tr.tr(choice)).clicked() {
-                        answer = Some(index);
-                    }
-                }
-            });
-        });
+        let choices: Vec<String> = choices.iter().map(|c| tr.tr(c).into_owned()).collect();
+        let answer = manager_ui::question(ui, &tr.tr(title), &text, &choices);
         let Some(answer) = answer else {
             return;
         };
@@ -291,6 +294,7 @@ fn choice<T: Copy + PartialEq>(
 fn basic(ui: &mut egui::Ui, f: &mut MaterialForm, creating: bool, tr: &Translator) {
     egui::Grid::new("gcodekit5-materials-basic")
         .num_columns(2)
+        .spacing([12.0, 8.0])
         .show(ui, |ui| {
             field(ui, &tr.tr(n_!("ID:")), &mut f.id, creating, "unique_id");
             field(ui, &tr.tr(n_!("Name:")), &mut f.name, true, "");
@@ -316,6 +320,7 @@ fn basic(ui: &mut egui::Ui, f: &mut MaterialForm, creating: bool, tr: &Translato
 fn properties(ui: &mut egui::Ui, f: &mut MaterialForm, tr: &Translator) {
     egui::Grid::new("gcodekit5-materials-properties")
         .num_columns(2)
+        .spacing([12.0, 8.0])
         .show(ui, |ui| {
             let label = ui.label(tr.tr(n_!("Density (kg/m3):")));
             ui.add(
@@ -355,6 +360,7 @@ fn properties(ui: &mut egui::Ui, f: &mut MaterialForm, tr: &Translator) {
 fn machining(ui: &mut egui::Ui, f: &mut MaterialForm, tr: &Translator) {
     egui::Grid::new("gcodekit5-materials-machining")
         .num_columns(2)
+        .spacing([12.0, 8.0])
         .show(ui, |ui| {
             choice(
                 ui,
@@ -394,6 +400,7 @@ fn machining(ui: &mut egui::Ui, f: &mut MaterialForm, tr: &Translator) {
 fn safety(ui: &mut egui::Ui, f: &mut MaterialForm, tr: &Translator) {
     egui::Grid::new("gcodekit5-materials-safety")
         .num_columns(2)
+        .spacing([12.0, 8.0])
         .show(ui, |ui| {
             choice(
                 ui,

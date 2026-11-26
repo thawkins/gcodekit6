@@ -10,7 +10,10 @@ use gcodekit5_app::tool_form::{
     has_corner_radius, has_tip_angle, tool_material_label, tool_summary, tool_type_label,
 };
 
-use crate::windows::help::{HelpTopic, help_row};
+use crate::icons::Icon;
+use crate::theme;
+use crate::windows::help::HelpTopic;
+use crate::windows::manager_ui::{self, SIDEBAR_WIDTH, icon_text_button};
 
 use super::{GtcFile, Next, Question, Tab, ToolsFileRequest, ToolsManagerWindow};
 
@@ -29,25 +32,30 @@ impl ToolsManagerWindow {
     /// * `ui` - The page's `Ui`.
     /// * `tr` - Translates the labels.
     pub fn show(&mut self, ui: &mut egui::Ui, tr: &Translator) {
-        help_row(ui, HelpTopic::ToolsManager, tr);
+        // GTK: the tool list sidebar | the edit form | the library sidebar.
         ui.horizontal_top(|ui| {
-            let size = egui::vec2(300.0, ui.available_height());
+            let size = egui::vec2(SIDEBAR_WIDTH, ui.available_height());
             ui.allocate_ui_with_layout(size, egui::Layout::top_down(egui::Align::Min), |ui| {
                 self.sidebar(ui, tr);
             });
             ui.separator();
-            let width = (ui.available_width() - 220.0).max(300.0);
+            ui.add_space(12.0);
+            let width = (ui.available_width() - LIBRARY_WIDTH - 24.0).max(300.0);
             let size = egui::vec2(width, ui.available_height());
             ui.allocate_ui_with_layout(size, egui::Layout::top_down(egui::Align::Min), |ui| {
                 self.details(ui, tr);
             });
             ui.separator();
-            ui.vertical(|ui| self.library_actions(ui, tr));
+            ui.vertical(|ui| {
+                ui.set_width(LIBRARY_WIDTH);
+                self.library_actions(ui, tr);
+            });
         });
     }
 
     /// Search, filters and the tool list.
     fn sidebar(&mut self, ui: &mut egui::Ui, tr: &Translator) {
+        manager_ui::sidebar_header(ui, &tr.tr(n_!("CNC Tools")), HelpTopic::ToolsManager, tr);
         ui.add(
             egui::TextEdit::singleline(&mut self.filter.search)
                 .hint_text(tr.tr(n_!("Search (name, id, type, diameter)...")))
@@ -86,21 +94,22 @@ impl ToolsManagerWindow {
                     ui.selectable_value(&mut self.filter.material, Some(m), text);
                 }
             });
-        ui.label(tr.tr(n_!("Filters")));
-        ui.horizontal(|ui| {
-            let error = ui.visuals().error_fg_color;
-            let min_bad = self.filter.dia_min_invalid();
-            let max_bad = self.filter.dia_max_invalid();
-            let min = egui::TextEdit::singleline(&mut self.filter.dia_min)
-                .hint_text(tr.tr(n_!("Min diameter (mm)")))
-                .desired_width(120.0);
-            ui.add(if min_bad { min.text_color(error) } else { min });
-            let max = egui::TextEdit::singleline(&mut self.filter.dia_max)
-                .hint_text(tr.tr(n_!("Max diameter (mm)")))
-                .desired_width(120.0);
-            ui.add(if max_bad { max.text_color(error) } else { max });
+        manager_ui::form_group(ui, Some(&tr.tr(n_!("Filters"))), |ui| {
+            ui.horizontal(|ui| {
+                let error = ui.visuals().error_fg_color;
+                let min_bad = self.filter.dia_min_invalid();
+                let max_bad = self.filter.dia_max_invalid();
+                let half = (ui.available_width() - ui.spacing().item_spacing.x) / 2.0;
+                let min = egui::TextEdit::singleline(&mut self.filter.dia_min)
+                    .hint_text(tr.tr(n_!("Min diameter (mm)")))
+                    .desired_width(half);
+                ui.add(if min_bad { min.text_color(error) } else { min });
+                let max = egui::TextEdit::singleline(&mut self.filter.dia_max)
+                    .hint_text(tr.tr(n_!("Max diameter (mm)")))
+                    .desired_width(half);
+                ui.add(if max_bad { max.text_color(error) } else { max });
+            });
         });
-        ui.separator();
         egui::ScrollArea::vertical()
             .id_salt("gcodekit5-tools-manager-list")
             .auto_shrink([false, false])
@@ -116,18 +125,19 @@ impl ToolsManagerWindow {
             .map(|t| t.id.0.clone());
         let none = tr.tr(n_!("None"));
         let mut clicked = None;
-        for tool in self.filter.apply(&tools) {
-            let is_selected = selected.as_deref() == Some(tool.id.0.as_str());
-            if ui.selectable_label(is_selected, &tool.name).clicked() {
-                clicked = Some(tool.id.0.clone());
+        manager_ui::boxed_list(ui, |ui| {
+            for (index, tool) in self.filter.apply(&tools).into_iter().enumerate() {
+                let is_selected = selected.as_deref() == Some(tool.id.0.as_str());
+                let type_name = tr.tr(tool_type_label(tool.tool_type));
+                let summary = tool_summary(tool, &type_name, &none);
+                let row = manager_ui::list_row(ui, index == 0, is_selected, &tool.name, |ui| {
+                    ui.add(egui::Label::new(egui::RichText::new(summary).weak()).wrap());
+                });
+                if row.clicked() {
+                    clicked = Some(tool.id.0.clone());
+                }
             }
-            let type_name = tr.tr(tool_type_label(tool.tool_type));
-            ui.add(
-                egui::Label::new(egui::RichText::new(tool_summary(tool, &type_name, &none)).weak())
-                    .wrap(),
-            );
-            ui.add_space(4.0);
-        }
+        });
         if let Some(id) = clicked
             && selected.as_deref() != Some(id.as_str())
         {
@@ -138,14 +148,23 @@ impl ToolsManagerWindow {
     /// New Tool and the Library actions (GTK's right-hand sidebar).
     fn library_actions(&mut self, ui: &mut egui::Ui, tr: &Translator) {
         let has_store = self.backend.is_some();
+        let new = theme::primary_icon_button(Icon::Add.image(), tr.tr(n_!("New Tool")))
+            .min_size(egui::vec2(ui.available_width(), 0.0));
         let new = ui
-            .add_enabled(has_store, egui::Button::new(tr.tr(n_!("New Tool"))))
+            .add_enabled(has_store, new)
             .on_hover_text(tr.tr(n_!("Create a new custom tool")));
         if new.clicked() {
             self.request(Next::New);
         }
-        ui.separator();
-        ui.strong(tr.tr(n_!("Library")));
+        ui.add_space(8.0);
+        manager_ui::form_group(ui, Some(&tr.tr(n_!("Library"))), |ui| {
+            self.library_buttons(ui, tr, has_store);
+        });
+    }
+
+    /// The Library group's import, export and reset buttons.
+    fn library_buttons(&mut self, ui: &mut egui::Ui, tr: &Translator, has_store: bool) {
+        let wide = egui::vec2(ui.available_width(), 0.0);
         let buttons = [
             (
                 n_!("Import GTC (.zip)..."),
@@ -165,20 +184,17 @@ impl ToolsManagerWindow {
         ];
         for (label, hint, request) in buttons {
             let button = ui
-                .add_enabled(has_store, egui::Button::new(tr.tr(label)))
+                .add_enabled(has_store, egui::Button::new(tr.tr(label)).min_size(wide))
                 .on_hover_text(tr.tr(hint));
             if button.clicked() {
                 self.file_request = Some(request);
             }
         }
-        let reset = ui
-            .add_enabled(
-                has_store,
-                egui::Button::new(tr.tr(n_!("Reset Custom Tools..."))),
-            )
-            .on_hover_text(tr.tr(n_!(
-                "Remove all custom/imported tools and delete local storage"
-            )));
+        let reset =
+            theme::destructive_button(ui, tr.tr(n_!("Reset Custom Tools..."))).min_size(wide);
+        let reset = ui.add_enabled(has_store, reset).on_hover_text(tr.tr(n_!(
+            "Remove all custom/imported tools and delete local storage"
+        )));
         if reset.clicked() {
             self.question = Some(Question::Reset);
         }
@@ -186,41 +202,33 @@ impl ToolsManagerWindow {
 
     /// The notice, the open question, the action bar and the form.
     fn details(&mut self, ui: &mut egui::Ui, tr: &Translator) {
-        match &self.notice {
-            Some((text, true)) => {
-                ui.colored_label(ui.visuals().error_fg_color, text);
-            }
-            Some((text, false)) => {
-                ui.label(text);
-            }
-            None => {}
-        }
+        manager_ui::notice(ui, self.notice.as_ref());
         self.ask(ui, tr);
         if self.edit.is_none() {
-            ui.centered_and_justified(|ui| {
-                ui.weak(tr.tr(n_!("Please select or create a tool to edit")));
-            });
+            manager_ui::placeholder(ui, &tr.tr(n_!("Please select or create a tool to edit")));
             return;
         }
         let action = self.action_bar(ui, tr);
-        ui.separator();
+        ui.add_space(8.0);
         if let Some(edit) = self.edit.as_mut() {
-            ui.horizontal(|ui| {
-                for tab in Tab::ALL {
-                    ui.selectable_value(&mut edit.tab, tab, tr.tr(tab.msgid()));
-                }
-            });
-            ui.separator();
+            let tabs: Vec<_> = Tab::ALL
+                .iter()
+                .map(|tab| (*tab, tr.tr(tab.msgid()).into_owned()))
+                .collect();
+            manager_ui::tab_switcher(ui, &mut edit.tab, &tabs);
+            ui.add_space(8.0);
             let creating = edit.original.is_none();
             let form = &mut edit.form;
             egui::ScrollArea::vertical()
                 .id_salt("gcodekit5-tools-manager-form")
                 .auto_shrink([false, false])
-                .show(ui, |ui| match edit.tab {
-                    Tab::Basic => basic(ui, form, creating, tr),
-                    Tab::Geometry => geometry(ui, form, tr),
-                    Tab::Manufacturer => manufacturer(ui, form, tr),
-                    Tab::Notes => notes(ui, form, tr),
+                .show(ui, |ui| {
+                    manager_ui::form_group(ui, None, |ui| match edit.tab {
+                        Tab::Basic => basic(ui, form, creating, tr),
+                        Tab::Geometry => geometry(ui, form, tr),
+                        Tab::Manufacturer => manufacturer(ui, form, tr),
+                        Tab::Notes => notes(ui, form, tr),
+                    });
                 });
         }
         match action {
@@ -244,14 +252,15 @@ impl ToolsManagerWindow {
         let mut action = None;
         ui.horizontal(|ui| {
             ui.add_enabled_ui(!asking, |ui| {
+                let save = theme::primary_icon_button(Icon::Save.image(), tr.tr(n_!("Save")));
                 let save = ui
-                    .add_enabled(dirty, egui::Button::new(tr.tr(n_!("Save"))))
+                    .add_enabled(dirty, save)
                     .on_hover_text(tr.tr(n_!("Save changes")));
                 if save.clicked() {
                     action = Some(Action::Save);
                 }
                 let cancel = ui
-                    .button(tr.tr(n_!("Cancel")))
+                    .add(icon_text_button(ui, Icon::Close, tr.tr(n_!("Cancel"))))
                     .on_hover_text(tr.tr(n_!("Discard changes")));
                 if cancel.clicked() {
                     action = Some(Action::Cancel);
@@ -261,8 +270,10 @@ impl ToolsManagerWindow {
                 } else {
                     n_!("Only custom tools can be deleted.")
                 };
+                let delete =
+                    theme::destructive_icon_button(ui, Icon::Trash.image(), tr.tr(n_!("Delete")));
                 let delete = ui
-                    .add_enabled(custom, egui::Button::new(tr.tr(n_!("Delete"))))
+                    .add_enabled(custom, delete)
                     .on_hover_text(tr.tr(hint))
                     .on_disabled_hover_text(tr.tr(hint));
                 if delete.clicked() {
@@ -302,18 +313,8 @@ impl ToolsManagerWindow {
                 &[n_!("Save"), n_!("Discard"), n_!("Cancel")],
             ),
         };
-        let mut answer = None;
-        ui.group(|ui| {
-            ui.strong(tr.tr(title));
-            ui.label(text);
-            ui.horizontal(|ui| {
-                for (index, choice) in choices.iter().enumerate() {
-                    if ui.button(tr.tr(choice)).clicked() {
-                        answer = Some(index);
-                    }
-                }
-            });
-        });
+        let choices: Vec<String> = choices.iter().map(|c| tr.tr(c).into_owned()).collect();
+        let answer = manager_ui::question(ui, &tr.tr(title), &text, &choices);
         let Some(answer) = answer else {
             return;
         };
@@ -331,6 +332,9 @@ impl ToolsManagerWindow {
         }
     }
 }
+
+/// Width of the library sidebar on the right (GTK: 280 px).
+const LIBRARY_WIDTH: f32 = 240.0;
 
 /// A labelled single-line field in a grid row.
 fn field(ui: &mut egui::Ui, label: &str, text: &mut String, enabled: bool, hint: &str) {
@@ -376,6 +380,7 @@ fn choice<T: Copy + PartialEq>(
 fn basic(ui: &mut egui::Ui, f: &mut ToolForm, creating: bool, tr: &Translator) {
     egui::Grid::new("gcodekit5-tools-basic")
         .num_columns(2)
+        .spacing([12.0, 8.0])
         .show(ui, |ui| {
             field(ui, &tr.tr(n_!("ID:")), &mut f.id, creating, "tool_id");
             let label = ui.label(tr.tr(n_!("Tool Number:")));
@@ -431,6 +436,7 @@ fn basic(ui: &mut egui::Ui, f: &mut ToolForm, creating: bool, tr: &Translator) {
 fn geometry(ui: &mut egui::Ui, f: &mut ToolForm, tr: &Translator) {
     egui::Grid::new("gcodekit5-tools-geometry")
         .num_columns(2)
+        .spacing([12.0, 8.0])
         .show(ui, |ui| {
             field(ui, &tr.tr(n_!("Diameter (mm):")), &mut f.diameter, true, "");
             field(ui, &tr.tr(n_!("Length (mm):")), &mut f.length, true, "");
@@ -477,6 +483,7 @@ fn geometry(ui: &mut egui::Ui, f: &mut ToolForm, tr: &Translator) {
 fn manufacturer(ui: &mut egui::Ui, f: &mut ToolForm, tr: &Translator) {
     egui::Grid::new("gcodekit5-tools-manufacturer")
         .num_columns(2)
+        .spacing([12.0, 8.0])
         .show(ui, |ui| {
             field(
                 ui,
