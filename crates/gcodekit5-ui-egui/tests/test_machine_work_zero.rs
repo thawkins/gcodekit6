@@ -792,3 +792,50 @@ fn test_smoothieware_program_selecting_a_wcs_needs_a_new_selection() {
     );
     assert!(!wrote(&shared, "$G"), "$G sent to Smoothieware");
 }
+
+#[test]
+fn test_smoothieware_judges_the_program_streamed_not_the_editors() {
+    let (mut harness, shared) = connect_profile(gcodekit5_devicedb::ControllerType::Smoothieware);
+    report_idle(&mut harness, &shared);
+    assert!(step_enabled(&mut harness, "Zero X"), "Zero X never enabled");
+    // The editor's program selects no system; the one streamed (a probe routine or CAM
+    // handoff would stream its own) selects G55.
+    harness
+        .state_mut()
+        .state_mut()
+        .machine
+        .set_program("G1 X1 F100\n")
+        .expect("program");
+    let streamed: std::sync::Arc<[String]> =
+        vec!["G55".to_string(), "G1 X1 F100".to_string()].into();
+    gcodekit5_ui_egui::machine::lock(harness.state().state().machine.controller())
+        .start_stream(streamed)
+        .expect("stream");
+    assert!(
+        step_until(&mut harness, |app| app
+            .state()
+            .machine
+            .status()
+            .stream_end
+            .is_some()),
+        "the program did not end"
+    );
+    for _ in 0..4 {
+        harness.step();
+    }
+    assert!(
+        !enabled(&harness, "Zero All Axes"),
+        "zero allowed after a program that selected G55"
+    );
+    // The reason shown is that the system must be selected again.
+    let reason = "Select the active work coordinate system: the program may have changed it.";
+    scroll_to(&mut harness, "Zero All Axes");
+    harness.get_by_label("Zero All Axes").hover();
+    for _ in 0..30 {
+        harness.step();
+    }
+    assert!(
+        harness.query_by_label(reason).is_some(),
+        "reason not shown on Zero All Axes"
+    );
+}

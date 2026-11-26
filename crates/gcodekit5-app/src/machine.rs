@@ -440,6 +440,9 @@ pub struct MachineController {
     last_connection: Option<ConnectionSettings>,
     /// The protocol of the last connection started (kept after it closes).
     protocol: ControllerProtocol,
+    /// The program of the last stream started, see
+    /// [`MachineController::streamed_program`].
+    streamed: Option<Arc<[String]>>,
     /// Shared with the worker, per connection: set by a Repetier `M112`, cleared by the
     /// firmware's `start`; see [`MachineController::is_halted`].
     halted: Arc<AtomicBool>,
@@ -497,6 +500,7 @@ impl MachineController {
             last_connection: None,
             protocol: ControllerProtocol::Unknown,
             halted: Arc::new(AtomicBool::new(false)),
+            streamed: None,
             repaint: Arc::new(Mutex::new(None)),
             streaming: Arc::new(AtomicBool::new(false)),
             requested: 0,
@@ -602,6 +606,12 @@ impl MachineController {
         self.protocol
     }
 
+    /// The program of the last stream started (a job, a probe routine, any caller's), kept
+    /// after it ends: what the controller actually ran, whatever the editor holds.
+    pub fn streamed_program(&self) -> Option<&Arc<[String]>> {
+        self.streamed.as_ref()
+    }
+
     /// Whether the last connection started speaks Repetier's protocol: no GRBL real-time
     /// byte or `$` command is written on it, and the emergency stop is `M112`.
     pub fn is_repetier(&self) -> bool {
@@ -701,10 +711,11 @@ impl MachineController {
         if self.streaming.swap(true, Ordering::SeqCst) {
             return Err(MachineError::StreamInProgress);
         }
-        if let Err(e) = self.send(Command::Stream(program, mode, sent)) {
+        if let Err(e) = self.send(Command::Stream(program.clone(), mode, sent)) {
             self.streaming.store(false, Ordering::SeqCst);
             return Err(e);
         }
+        self.streamed = Some(program);
         Ok(())
     }
 

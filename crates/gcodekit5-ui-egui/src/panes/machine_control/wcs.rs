@@ -190,14 +190,15 @@ impl WcsPanel {
     }
 
     /// Notes, once per frame (drawn or not) while a stream runs, whether its program may
-    /// select a system: the loaded program (the one Start streams) holds a G54-G59 word.
+    /// select a system: the program the controller streams (a job, a probe routine, any
+    /// caller's, not the editor's) holds a G54-G59 word.
     ///
     /// # Arguments
     /// * `machine` - The app's machine connection.
     pub(super) fn watch_stream(&mut self, machine: &Machine) {
         if machine.job_running() && self.stream_selects_wcs.is_none() {
-            let selects = machine
-                .program()
+            let selects = lock(machine.controller())
+                .streamed_program()
                 .is_some_and(|lines| lines.iter().any(|l| wcs_in_line(l).is_some()));
             self.stream_selects_wcs = Some(selects);
         }
