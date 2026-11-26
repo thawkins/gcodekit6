@@ -445,3 +445,57 @@ fn test_change_replaces_one_key_and_add_adds_one() {
         .collect();
     assert_eq!(keys, ["Cmd+Shift+Y", "F4", "Cmd+Alt+Y"]);
 }
+
+/// The Shortcuts page in German (the longest labels) in a window at its smallest: every
+/// column, the key chips and the row buttons fit without clipping.
+#[test]
+fn test_shortcuts_page_snapshot_german_at_minimum_size() {
+    use egui_kittest::SnapshotOptions;
+    let (settings, _) = SettingsManager::open(scratch("test_shortcuts_page_snapshot"));
+    let mut window = SettingsWindow::new(false, &settings.config().ui);
+    window.open(&settings, &commands::keymap());
+    let state = State {
+        window,
+        settings,
+        tr: Translator::new("de"),
+        outcomes: Vec::new(),
+    };
+    let mut h = Harness::builder()
+        .with_size(egui::vec2(
+            SettingsWindow::MIN_SIZE[0] + 40.0,
+            SettingsWindow::MIN_SIZE[1] + 60.0,
+        ))
+        .with_theme(egui::Theme::Dark)
+        .wgpu()
+        .build_ui_state(
+            |ui, state: &mut State| {
+                gcodekit5_ui_egui::theme::install(ui.ctx());
+                let _ = state.window.show(ui.ctx(), &mut state.settings, &state.tr);
+            },
+            state,
+        );
+    h.run();
+    click(&mut h, "Tastenkürzel");
+    // No row (all of them shown, the widest included) and no button reaches past the
+    // window's right edge.
+    let window = h.get_by_role(egui::accesskit::Role::Window).rect();
+    for role in [egui::accesskit::Role::Label, egui::accesskit::Role::Button] {
+        for node in h.get_all_by_role(role) {
+            let rect = node.rect();
+            assert!(
+                rect.max.x <= window.max.x,
+                "{:?} {rect:?} past {window:?}",
+                node.accesskit_node()
+                    .value()
+                    .or(node.accesskit_node().label())
+            );
+        }
+    }
+    let options = SnapshotOptions::new()
+        .threshold(1.0)
+        .max_failed_pixels(40)
+        .output_path(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/snapshots"));
+    if let Err(error) = h.try_snapshot_options("preferences_shortcuts_de", &options) {
+        panic!("preferences_shortcuts_de: {error}");
+    }
+}

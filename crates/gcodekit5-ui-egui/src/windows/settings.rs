@@ -108,6 +108,8 @@ pub struct Draft {
     /// The command whose key the next key press sets, and which of its keys it replaces
     /// (`None`: one more key).
     recording: Option<(Command, Option<Binding>)>,
+    /// The row the buttons act on (the first shown by default).
+    row: Option<Command>,
     /// The key Change replaces, per row: the one clicked last (the first by default).
     selected: Option<(Command, Binding)>,
     /// Why the last key was not given, or that it was.
@@ -132,6 +134,9 @@ pub struct SettingsWindow {
 }
 
 impl SettingsWindow {
+    /// The smallest size of the window, in points: the Shortcuts page's rows fit in it.
+    pub const MIN_SIZE: [f32; 2] = [560.0, 420.0];
+
     /// A closed window.
     ///
     /// # Arguments
@@ -169,6 +174,7 @@ impl SettingsWindow {
                 error: None,
                 keymap: keymap.clone(),
                 recording: None,
+                row: None,
                 selected: None,
                 shortcut_notice: None,
                 filter: String::new(),
@@ -229,9 +235,11 @@ impl SettingsWindow {
             .id(egui::Id::unique("gcodekit5-preferences"))
             .open(&mut open)
             .collapsible(false)
-            .default_size([560.0, 420.0])
+            .default_size(Self::MIN_SIZE)
+            .min_size(Self::MIN_SIZE)
             .show(ctx, |ui| {
-                ui.horizontal(|ui| {
+                // Wrapped: the German titles do not fit one row of the smallest window.
+                ui.horizontal_wrapped(|ui| {
                     for candidate in Page::ALL {
                         ui.selectable_value(page, candidate, tr.tr(candidate.title_msgid()));
                     }
@@ -666,9 +674,11 @@ fn where_msgid(keymap: &Keymap, command: Command) -> &'static str {
     }
 }
 
-/// The Shortcuts page: a filter, Reset All, the last refusal, and a row per command.
+/// The Shortcuts page: a filter, Reset All, the last refusal, a row per command (its name,
+/// where its keys work and its keys), and the buttons for the chosen row under the list, so
+/// the rows fit the smallest window in every language.
 fn shortcut_page(ui: &mut egui::Ui, tr: &Translator, draft: &mut Draft) {
-    ui.horizontal(|ui| {
+    ui.horizontal_wrapped(|ui| {
         let label = row_label(ui, tr, n_!("Filter:"));
         ui.text_edit_singleline(&mut draft.filter)
             .labelled_by(label);
@@ -683,11 +693,19 @@ fn shortcut_page(ui: &mut egui::Ui, tr: &Translator, draft: &mut Draft) {
     }
     let query = draft.filter.trim().to_lowercase();
     let platform = draft.keymap.platform();
+    let visible: Vec<Command> = Command::ALL
+        .into_iter()
+        .filter(|c| query.is_empty() || tr.tr(c.label_msgid()).to_lowercase().contains(&query))
+        .collect();
+    let current = draft
+        .row
+        .filter(|c| visible.contains(c))
+        .or_else(|| visible.first().copied());
     egui::ScrollArea::vertical()
-        .max_height((ui.available_height() - 48.0).max(80.0))
+        .max_height((ui.available_height() - 88.0).max(80.0))
         .show(ui, |ui| {
             egui::Grid::new("gcodekit5-shortcut-rows")
-                .num_columns(4)
+                .num_columns(3)
                 .striped(true)
                 .spacing([12.0, 6.0])
                 .show(ui, |ui| {
@@ -695,39 +713,47 @@ fn shortcut_page(ui: &mut egui::Ui, tr: &Translator, draft: &mut Draft) {
                         ui.strong(tr.tr(msgid));
                     }
                     ui.end_row();
-                    for command in Command::ALL {
-                        let label = tr.tr(command.label_msgid());
-                        if !query.is_empty() && !label.to_lowercase().contains(&query) {
-                            continue;
-                        }
-                        shortcut_row(ui, tr, draft, command, &label, platform);
+                    for command in &visible {
+                        shortcut_row(ui, tr, draft, *command, current == Some(*command), platform);
                     }
                 });
         });
+    ui.separator();
+    if let Some(command) = current {
+        shortcut_buttons(ui, tr, draft, command, platform);
+    }
 }
 
-/// One command's row: its label, where its keys work, its keys (click one to choose the key
-/// Change replaces), Change, Add, Clear and Reset.
+/// The key of `command` that Change replaces: the one clicked last, else its first.
+fn chosen_key(draft: &Draft, command: Command, bindings: &[Binding]) -> Option<Binding> {
+    draft
+        .selected
+        .as_ref()
+        .filter(|(c, b)| *c == command && bindings.contains(b))
+        .map(|(_, b)| b.clone())
+        .or_else(|| bindings.first().cloned())
+}
+
+/// One command's row: its name (click to choose the row), where its keys work, and its keys
+/// (click one to choose the key Change replaces).
 fn shortcut_row(
     ui: &mut egui::Ui,
     tr: &Translator,
     draft: &mut Draft,
     command: Command,
-    label: &str,
+    current: bool,
     platform: Platform,
 ) {
-    let command_ref = command.command_ref();
-    let bindings = draft.keymap.bindings(&command_ref);
+    let bindings = draft.keymap.bindings(&command.command_ref());
     let recording = draft.recording.as_ref().map(|(c, _)| *c) == Some(command);
-    let locked = LOCKED.contains(&command);
-    let selected = draft
-        .selected
-        .as_ref()
-        .filter(|(c, b)| *c == command && bindings.contains(b))
-        .map(|(_, b)| b.clone())
-        .or_else(|| bindings.first().cloned());
-    ui.label(label);
+    if ui
+        .selectable_label(current, tr.tr(command.label_msgid()))
+        .clicked()
+    {
+        draft.row = Some(command);
+    }
     ui.label(tr.tr(where_msgid(&draft.keymap, command)));
+    let chosen = chosen_key(draft, command, &bindings);
     ui.horizontal(|ui| {
         if recording {
             ui.label(tr.tr(n_!("Press a key (Escape cancels)")));
@@ -736,17 +762,34 @@ fn shortcut_row(
         } else {
             for binding in &bindings {
                 let text = binding.trigger.display(platform);
-                let chosen = selected.as_ref() == Some(binding) && bindings.len() > 1;
-                if ui.selectable_label(chosen, text).clicked() {
+                let marked = current && bindings.len() > 1 && chosen.as_ref() == Some(binding);
+                if ui.selectable_label(marked, text).clicked() {
+                    draft.row = Some(command);
                     draft.selected = Some((command, binding.clone()));
                 }
             }
         }
     });
+    ui.end_row();
+}
+
+/// The chosen row's buttons: Change, Add, Clear and Reset.
+fn shortcut_buttons(
+    ui: &mut egui::Ui,
+    tr: &Translator,
+    draft: &mut Draft,
+    command: Command,
+    platform: Platform,
+) {
+    let command_ref = command.command_ref();
+    let bindings = draft.keymap.bindings(&command_ref);
+    let locked = LOCKED.contains(&command);
+    let chosen = chosen_key(draft, command, &bindings);
     let fixed = || shortcuts::Refusal::Locked.message(tr, "");
-    ui.horizontal(|ui| {
+    ui.horizontal_wrapped(|ui| {
+        ui.strong(tr.tr(command.label_msgid()));
         for (msgid, replace) in [(n_!("Change"), true), (n_!("Add"), false)] {
-            let target = if replace { selected.clone() } else { None };
+            let target = if replace { chosen.clone() } else { None };
             let active = draft.recording == Some((command, target.clone()));
             let enabled = !locked && (replace || !bindings.is_empty());
             let button = ui.add_enabled(enabled, egui::Button::new(tr.tr(msgid)).selected(active));
@@ -779,7 +822,6 @@ fn shortcut_row(
                 .map(|(trigger, refusal)| refusal.message(tr, &trigger.display(platform)));
         }
     });
-    ui.end_row();
 }
 
 /// The English msgids this window shows, for the translation test.

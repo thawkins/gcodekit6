@@ -33,7 +33,8 @@ Access settings from the **Settings** panel. Changes take effect immediately unl
 The **Shortcuts** page of Preferences lists every command, where its keys work (everywhere, or
 only while Machine Control, the Visualizer or the Designer has the keyboard) and its keys:
 
-1. Type part of a command's name in **Filter:** to find it
+1. Type part of a command's name in **Filter:** to find it, and click it to choose it (the
+   buttons under the list act on the chosen command)
 2. Click **Change**, then press the new key combination (Escape cancels); it replaces the
    command's first key, or the key you clicked in its row. **Add** gives it one more key
 3. Click **Apply**: the new key works at once and shows in the menus
