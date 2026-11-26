@@ -112,3 +112,54 @@ fn test_canvas_keys_do_not_fire_while_typing() {
     assert_eq!(designer.borrow().state().canvas.shape_count(), 1);
     assert_eq!(selected(&designer.borrow()).len(), 1);
 }
+
+/// GTK's empty state: with no shapes the canvas shows "No shapes yet" and the open and
+/// import buttons; Load Design opens a design, each Import opens the import dialog, Import
+/// STL shows only with STL import on, Import Image is disabled in CNC mode, and the empty
+/// state goes once a shape is drawn.
+#[test]
+fn test_empty_design_shows_gtks_open_and_import_buttons() {
+    let mut h = app_with_designer();
+    let _ = h.get_by_label("No shapes yet");
+    assert!(
+        h.query_by_label("Import STL").is_none(),
+        "STL import is off"
+    );
+    for (label, command) in [
+        ("Load Design", Command::FileOpen),
+        ("Import SVG", Command::FileImport),
+        ("Import DXF", Command::FileImport),
+        ("Import Image", Command::FileImportImage),
+    ] {
+        h.get_by_label(label).click();
+        h.run();
+        assert_eq!(h.state().last_dispatched(), Some(command), "{label}");
+    }
+    let mut config = h.state().state().config().clone();
+    config.ui.enable_stl_import = true;
+    h.state_mut().workspace_mut().configure(&config);
+    h.run();
+    h.get_by_label("Import STL").click();
+    h.run();
+    assert_eq!(h.state().last_dispatched(), Some(Command::FileImport));
+    let designer = std::rc::Rc::clone(h.state().designer());
+    designer
+        .borrow_mut()
+        .state_mut()
+        .set_machine_mode(gcodekit5_designer::designer_state::MachineMode::Cnc3D);
+    h.run();
+    {
+        use egui_kittest::kittest::NodeT;
+        assert!(
+            h.get_by_label("Import Image")
+                .accesskit_node()
+                .is_disabled()
+        );
+    }
+    designer
+        .borrow_mut()
+        .state_mut()
+        .add_shape_with_undo(Shape::Rectangle(DesignRectangle::new(0.0, 0.0, 10.0, 10.0)));
+    h.run();
+    assert!(h.query_by_label("No shapes yet").is_none());
+}

@@ -3,6 +3,10 @@
 //! keyboard-shortcut popover, zoom in) and the status line at the bottom left (zoom, view
 //! centre, cursor, snap and constraint, units).
 //!
+//! While the design has no shapes, GTK's empty state sits in the middle of the canvas: "No
+//! shapes yet", a hint, and Load Design, Import SVG, Import DXF, Import STL (when STL import
+//! is on) and Import Image (disabled in CNC mode, as GTK).
+//!
 //! Not ported: GTK's scrollbar toggle (the canvas has no scrollbars).
 //!
 //! Dependencies: `egui`, `gcodekit5-core` (units), `gcodekit5-app` (translations).
@@ -10,6 +14,7 @@
 use gcodekit5_app::i18n::Translator;
 use gcodekit5_core::units::{self, MeasurementSystem};
 
+use crate::commands::Command;
 use crate::icons::{self, Icon};
 
 /// The msgids the overlay shows, for the translation check.
@@ -34,6 +39,14 @@ pub fn msgids() -> Vec<&'static str> {
         n_!("Paste"),
         n_!("Duplicate"),
         n_!("Delete"),
+        n_!("No shapes yet"),
+        n_!("Use the toolbox on the left to start drawing."),
+        n_!("Load Design"),
+        n_!("Import SVG"),
+        n_!("Import DXF"),
+        n_!("Import STL"),
+        n_!("Import Image"),
+        n_!("Raster image import is only available in 2D mode"),
     ]
 }
 
@@ -258,4 +271,68 @@ pub fn status_line(ui: &mut egui::Ui, rect: egui::Rect, status: &Status, tr: &Tr
             });
         },
     );
+}
+
+/// GTK's empty state in the middle of the canvas `rect`: a title, a hint and the open and
+/// import buttons. Import SVG, DXF and STL open the import dialog, which offers each of
+/// those file types (GTK opened one dialog per type).
+///
+/// # Arguments
+/// * `ui` - The canvas's `Ui`.
+/// * `rect` - The canvas.
+/// * `tr` - Translator for the current UI language.
+/// * `stl_import` - Whether STL import is on (Preferences), which shows Import STL.
+/// * `image_import` - Whether a raster image can be imported (laser mode), else Import Image
+///   is disabled and says why.
+///
+/// # Returns
+/// The command of the button clicked this frame, if any.
+pub fn empty_state(
+    ui: &mut egui::Ui,
+    rect: egui::Rect,
+    tr: &Translator,
+    stl_import: bool,
+    image_import: bool,
+) -> Option<Command> {
+    let mut clicked = None;
+    let size = egui::vec2(rect.width().min(560.0), 120.0);
+    let area = egui::Rect::from_center_size(rect.center(), size);
+    ui.scope_builder(
+        egui::UiBuilder::new()
+            .max_rect(area)
+            .layout(egui::Layout::top_down(egui::Align::Center)),
+        |ui| {
+            osd_frame(ui).show(ui, |ui| {
+                ui.vertical_centered(|ui| {
+                    ui.add(egui::Label::new(tr.tr("No shapes yet")).selectable(false));
+                    ui.add(
+                        egui::Label::new(tr.tr("Use the toolbox on the left to start drawing."))
+                            .selectable(false),
+                    );
+                    ui.horizontal_wrapped(|ui| {
+                        let buttons = [
+                            ("Load Design", Command::FileOpen, true),
+                            ("Import SVG", Command::FileImport, true),
+                            ("Import DXF", Command::FileImport, true),
+                            ("Import STL", Command::FileImport, stl_import),
+                        ];
+                        for (msgid, command, shown) in buttons {
+                            if shown && ui.button(tr.tr(msgid)).clicked() {
+                                clicked = Some(command);
+                            }
+                        }
+                        let image = ui
+                            .add_enabled(image_import, egui::Button::new(tr.tr("Import Image")))
+                            .on_disabled_hover_text(
+                                tr.tr("Raster image import is only available in 2D mode"),
+                            );
+                        if image.clicked() {
+                            clicked = Some(Command::FileImportImage);
+                        }
+                    });
+                });
+            });
+        },
+    );
+    clicked
 }

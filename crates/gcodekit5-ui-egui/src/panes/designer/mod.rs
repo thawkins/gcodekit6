@@ -453,7 +453,10 @@ impl DesignerPane {
     }
 
     /// The canvas: input, then painting with the view the input left.
-    fn show_canvas(&mut self, ui: &mut egui::Ui, tr: &Translator) {
+    ///
+    /// # Returns
+    /// The command of the empty state's button clicked this frame, if any.
+    fn show_canvas(&mut self, ui: &mut egui::Ui, tr: &Translator) -> Option<Command> {
         let rect = ui.available_rect_before_wrap();
         ui.advance_cursor_after_rect(rect);
         let response = ui.interact(rect, canvas::canvas_id(), egui::Sense::click_and_drag());
@@ -512,7 +515,16 @@ impl DesignerPane {
             hint(ui, rect, &tr.tr("Click to position shape"));
         }
         self.overlays(ui, rect, tr);
+        let empty = if self.state.canvas.shape_store.is_empty() && self.gallery.pending().is_none()
+        {
+            let laser =
+                self.state.machine_mode() != gcodekit5_designer::designer_state::MachineMode::Cnc3D;
+            overlay::empty_state(ui, rect, tr, self.stl_import, laser)
+        } else {
+            None
+        };
         self.gallery.show(ui.ctx(), tr);
+        empty
     }
 
     /// The floating toolbar (applied at once) and the status line over the canvas `rect`.
@@ -647,7 +659,9 @@ impl Pane for DesignerPane {
             self.touch();
         }
         self.show_notice(ui, tr);
-        self.show_canvas(ui, tr);
+        if let Some(command) = self.show_canvas(ui, tr) {
+            ctx.request(command);
+        }
     }
 
     fn command(&mut self, command: Command, _ctx: &mut PaneContext) -> bool {
