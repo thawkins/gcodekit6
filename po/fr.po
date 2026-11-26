@@ -4650,3 +4650,9 @@ msgstr "Afficher/masquer les mouvements de coupe"
 
 msgid "Align"
 msgstr "Aligner"
+
+msgid "Convert to Path"
+msgstr "Convertir en chemin"
+
+msgid "Convert to Rectangle"
+msgstr "Convertir en rectangle"

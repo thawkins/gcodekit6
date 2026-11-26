@@ -463,3 +463,42 @@ fn test_context_menu_edits_count_as_design_changes() {
         assert!(h.state().revision() > before, "{item}");
     }
 }
+
+#[test]
+fn test_convert_to_path_and_rectangle_replace_the_selection_in_one_undo_step() {
+    use gcodekit5_designer::model::{DesignCircle, Point, ShapeType};
+    for (item, kind) in [
+        ("Convert to Path", ShapeType::Path),
+        ("Convert to Rectangle", ShapeType::Rectangle),
+    ] {
+        let mut pane = DesignerPane::new();
+        pane.state_mut()
+            .add_shape_with_undo(Shape::Circle(DesignCircle::new(
+                Point::new(10.0, 10.0),
+                10.0,
+            )));
+        pane.state_mut()
+            .add_shape_with_undo(Shape::Rectangle(DesignRectangle::new(
+                30.0, 0.0, 10.0, 10.0,
+            )));
+        pane.state_mut().deselect_all();
+        let mut h = harness(pane);
+        let originals = ids(h.state());
+        menu_item(&mut h, 10.0, 10.0, item);
+        let now = ids(h.state());
+        assert_eq!(now.len(), 1, "{item}");
+        assert!(!originals.contains(&now[0]), "{item}: a new id");
+        let obj = h.state().state().canvas.get_shape(now[0]).cloned();
+        let obj = obj.expect("shape");
+        assert_eq!(obj.shape.shape_type(), kind, "{item}");
+        let b = bounds(h.state(), now[0]);
+        let near = |a: f64, b: f64| (a - b).abs() < 0.05;
+        assert!(
+            near(b.0, 0.0) && near(b.1, 0.0) && near(b.2, 40.0) && near(b.3, 20.0),
+            "{item}: {b:?}"
+        );
+        h.state_mut().undo();
+        h.run();
+        assert_eq!(ids(h.state()), originals, "{item}");
+    }
+}

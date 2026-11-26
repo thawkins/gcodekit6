@@ -4643,3 +4643,9 @@ msgstr "Schnittbewegungen ein/aus"
 
 msgid "Align"
 msgstr "Ausrichten"
+
+msgid "Convert to Path"
+msgstr "In Pfad umwandeln"
+
+msgid "Convert to Rectangle"
+msgstr "In Rechteck umwandeln"

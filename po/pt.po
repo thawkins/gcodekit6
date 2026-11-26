@@ -4638,3 +4638,9 @@ msgstr "Alternar movimentos de corte"
 
 msgid "Align"
 msgstr "Alinhar"
+
+msgid "Convert to Path"
+msgstr "Converter em caminho"
+
+msgid "Convert to Rectangle"
+msgstr "Converter em retângulo"

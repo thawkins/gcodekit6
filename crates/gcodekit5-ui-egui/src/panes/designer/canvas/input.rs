@@ -15,7 +15,8 @@
 //!   instead, so these never fire while typing.
 //! - Right-click with a selection: GTK's context menu with Cut, Copy, Paste, Delete, Mirror
 //!   on X / Y, Array... (the pane opens the Array dialog), Rotate, Align, Group / Ungroup
-//!   (also Ctrl+G / Ctrl+Shift+G) and the boolean operations (Union, Diff, Inter); with only a
+//!   (also Ctrl+G / Ctrl+Shift+G), the boolean operations (Union, Diff, Inter) and Convert
+//!   to Path / Rectangle; with only a
 //!   clipboard, Paste. Cut, Copy and Paste use the design's own clipboard
 //!   (`DesignerState::clipboard`), as GTK did, not the system clipboard; Paste centres the
 //!   copies on the point right-clicked. Align also has GTK's Alt keys,
@@ -549,6 +550,19 @@ const BOOLEANS: [(&str, SelectionOp); 3] = [
     (n_!("Inter"), DesignerState::perform_boolean_intersection),
 ];
 
+/// GTK's conversions: each replaces the selected shapes by one new shape, a path through
+/// all their outlines or the rectangle of their bounds, as one undo step.
+const CONVERSIONS: [(&str, SelectionOp); 2] = [
+    (
+        n_!("Convert to Path"),
+        DesignerState::convert_selected_to_path,
+    ),
+    (
+        n_!("Convert to Rectangle"),
+        DesignerState::convert_selected_to_rectangle,
+    ),
+];
+
 /// The msgids of the context menu.
 pub fn msgids() -> Vec<&'static str> {
     let mut ids = vec![
@@ -567,14 +581,15 @@ pub fn msgids() -> Vec<&'static str> {
     ids.extend(ROTATIONS.iter().map(|(label, _)| *label));
     ids.extend(ALIGNMENTS.iter().map(|(label, _)| *label));
     ids.extend(BOOLEANS.iter().map(|(label, _)| *label));
+    ids.extend(CONVERSIONS.iter().map(|(label, _)| *label));
     ids
 }
 
 /// The right-click menu, in GTK's order: Cut, Copy, Paste (while the clipboard holds
 /// shapes), Delete, Group and Ungroup (when the selection can be), for two shapes or more
-/// Union, Diff and Inter, Mirror on X and Y, Array..., Rotate by a fixed angle and, for two
-/// shapes or more, Align. Without a selection only Paste is offered. Each edit is one undo
-/// step.
+/// Union, Diff and Inter, Mirror on X and Y, Array..., Rotate by a fixed angle, for two
+/// shapes or more Align, then Convert to Path and Convert to Rectangle. Without a selection
+/// only Paste is offered. Each edit is one undo step.
 ///
 /// # Arguments
 /// * `at` - The world point right-clicked, where Paste centres the clipboard.
@@ -661,6 +676,13 @@ fn context_menu(
                 }
             }
         });
+    }
+    ui.separator();
+    for (label, convert) in CONVERSIONS {
+        if ui.button(tr.tr(label)).clicked() {
+            convert(state);
+            ui.close();
+        }
     }
     array
 }

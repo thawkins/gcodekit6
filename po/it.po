@@ -4646,3 +4646,9 @@ msgstr "Mostra/nascondi movimenti di taglio"
 
 msgid "Align"
 msgstr "Allinea"
+
+msgid "Convert to Path"
+msgstr "Converti in tracciato"
+
+msgid "Convert to Rectangle"
+msgstr "Converti in rettangolo"

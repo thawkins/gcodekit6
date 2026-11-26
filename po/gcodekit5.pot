@@ -4555,3 +4555,9 @@ msgstr ""
 
 msgid "Align"
 msgstr ""
+
+msgid "Convert to Path"
+msgstr ""
+
+msgid "Convert to Rectangle"
+msgstr ""
