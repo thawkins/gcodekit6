@@ -32,7 +32,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgtk-4-dev libadwaita-1-dev libgtksourceview-5-dev libudev-dev libxkbcommon-dev libwayland-dev libx11-dev libxcursor-dev libxrandr-dev libxi-dev libvulkan1 mesa-vulkan-drivers gettext
+          sudo apt-get install -y libudev-dev pkg-config libxkbcommon-dev libwayland-dev libx11-dev libxcursor-dev libxrandr-dev libxi-dev libvulkan1 mesa-vulkan-drivers
 
       - name: Cache cargo registry
         uses: actions/cache@v6
@@ -41,9 +41,9 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             target
-          key: ${{ runner.os }}-cargo-msrv-${{ env.MSRV }}-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-cargo-msrv-v2-${{ env.MSRV }}-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
-            ${{ runner.os }}-cargo-msrv-${{ env.MSRV }}-
+            ${{ runner.os }}-cargo-msrv-v2-${{ env.MSRV }}-
 
       - name: Verify Rust version
         run: |

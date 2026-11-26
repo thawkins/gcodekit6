@@ -24,7 +24,7 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgtk-4-dev libadwaita-1-dev libgtksourceview-5-dev libudev-dev libxkbcommon-dev libwayland-dev libx11-dev libxcursor-dev libxrandr-dev libxi-dev libvulkan1 mesa-vulkan-drivers
+          sudo apt-get install -y libudev-dev pkg-config libxkbcommon-dev libwayland-dev libx11-dev libxcursor-dev libxrandr-dev libxi-dev libvulkan1 mesa-vulkan-drivers
 
       - name: Cache cargo registry
         uses: actions/cache@v6
@@ -33,7 +33,10 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             target
-          key: ${{ runner.os }}-cargo-clippy-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-cargo-clippy-v2-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: check-no-gtk
+        run: "! cargo tree --workspace -e normal | grep -E '^.*(gtk4|libadwaita|sourceview5|glib-sys) '"
 
       - name: Run clippy with unwrap warning
         run: |
@@ -73,7 +76,7 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgtk-4-dev libadwaita-1-dev libgtksourceview-5-dev libudev-dev libxkbcommon-dev libwayland-dev libx11-dev libxcursor-dev libxrandr-dev libxi-dev libvulkan1 mesa-vulkan-drivers
+          sudo apt-get install -y libudev-dev pkg-config libxkbcommon-dev libwayland-dev libx11-dev libxcursor-dev libxrandr-dev libxi-dev libvulkan1 mesa-vulkan-drivers
 
       - name: Cache cargo registry
         uses: actions/cache@v6
@@ -82,7 +85,7 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             target
-          key: ${{ runner.os }}-cargo-clippy-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-cargo-clippy-v2-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Run clippy
         run: cargo clippy --workspace --all-targets -- -D warnings
@@ -99,7 +102,7 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgtk-4-dev libadwaita-1-dev libgtksourceview-5-dev libudev-dev gettext libxkbcommon-dev libwayland-dev libx11-dev libxcursor-dev libxrandr-dev libxi-dev libvulkan1 mesa-vulkan-drivers
+          sudo apt-get install -y libudev-dev pkg-config libxkbcommon-dev libwayland-dev libx11-dev libxcursor-dev libxrandr-dev libxi-dev libvulkan1 mesa-vulkan-drivers
 
       - name: Install cargo-nextest
         uses: taiki-e/install-action@nextest
@@ -111,7 +114,7 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             target
-          key: ${{ runner.os }}-cargo-nextest-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ runner.os }}-cargo-nextest-v2-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Run tests
         run: cargo nextest run --workspace --profile ci
