@@ -385,3 +385,36 @@ fn test_reset_refused_when_the_default_key_is_taken() {
     let _ = h.get_by_label("6 is already used by Stop Streaming");
     let _ = h.get_by_label("Q");
 }
+
+/// Change replaces only the chosen key (the first, or the one clicked), so Redo keeps its
+/// second default; Add gives one more key.
+#[test]
+fn test_change_replaces_one_key_and_add_adds_one() {
+    let mut h = harness(scratch("test_change_replaces_one_key"));
+    filter(&mut h, "Redo");
+    click(&mut h, "Change");
+    press(&mut h, ctrl_shift(), Key::Y);
+    let _ = h.get_by_label("Ctrl+Shift+Y");
+    let _ = h.get_by_label("Ctrl+Shift+Z");
+    assert!(h.query_by_label("Ctrl+Y").is_none());
+    click(&mut h, "Ctrl+Shift+Z");
+    click(&mut h, "Change");
+    press(&mut h, Modifiers::NONE, Key::F4);
+    let _ = h.get_by_label("Ctrl+Shift+Y");
+    let _ = h.get_by_label("F4");
+    assert!(h.query_by_label("Ctrl+Shift+Z").is_none());
+    click(&mut h, "Add");
+    press(&mut h, Modifiers::COMMAND | Modifiers::ALT, Key::Y);
+    click(&mut h, "Apply");
+    let keymap = h
+        .state_mut()
+        .window
+        .take_applied_keymap()
+        .expect("applied shortcuts");
+    let keys: Vec<String> = keymap
+        .bindings(&Command::Redo.command_ref())
+        .iter()
+        .map(|b| b.trigger.to_string())
+        .collect();
+    assert_eq!(keys, ["Cmd+Shift+Y", "F4", "Cmd+Alt+Y"]);
+}

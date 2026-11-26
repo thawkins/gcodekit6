@@ -34,7 +34,8 @@ The **Shortcuts** page of Preferences lists every command, where its keys work (
 only while Machine Control, the Visualizer or the Designer has the keyboard) and its keys:
 
 1. Type part of a command's name in **Filter:** to find it
-2. Click **Change**, then press the new key combination (Escape cancels)
+2. Click **Change**, then press the new key combination (Escape cancels); it replaces the
+   command's first key, or the key you clicked in its row. **Add** gives it one more key
 3. Click **Apply**: the new key works at once and shows in the menus
 
 **Clear** removes a command's keys, **Reset** gives one command its default keys back (unless

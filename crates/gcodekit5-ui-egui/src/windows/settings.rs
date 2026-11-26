@@ -11,8 +11,8 @@
 //! when one is needed. GTK's Controller page had no rows, so there is none here.
 //!
 //! The Shortcuts page (documented in `docs/user/70-settings.md`; GTK's page was empty) lists
-//! every command with its keys: Change records the next key press as the command's key, Clear
-//! removes its keys, Reset gives it its defaults and Reset All every command. A key is given
+//! every command with its keys: Change records the next key press in place of the chosen key
+//! (the first, or the one clicked), Add records one more key, Clear removes its keys, Reset gives it its defaults and Reset All every command. A key is given
 //! only when [`crate::shortcuts`] allows it, which keeps the E-STOP and feed hold keys fixed;
 //! otherwise the page says why. Apply saves the shortcuts with the settings
 //! (`ui.keyboard_shortcuts`) and hands the edited keymap to the app
@@ -21,7 +21,7 @@
 //! Dependencies: `egui`, `craft-ui` (combo boxes), `craft-keymap` (the keymap and recording a
 //! key), `gcodekit5-settings` (the settings and saving them), `gcodekit5-app` (translations).
 
-use craft_keymap::{Key, KeyInput, Keymap, Layout, Mods, Platform, Trigger};
+use craft_keymap::{Binding, Key, KeyInput, Keymap, Layout, Mods, Platform, Trigger};
 use craft_ui::combo::ComboBox;
 use gcodekit5_app::i18n::{Translator, needs_restart, normalized_language};
 use gcodekit5_settings::SettingsManager;
@@ -105,8 +105,11 @@ pub struct Draft {
     error: Option<String>,
     /// The shortcuts as edited.
     keymap: Keymap,
-    /// The command whose key the next key press sets.
-    recording: Option<Command>,
+    /// The command whose key the next key press sets, and which of its keys it replaces
+    /// (`None`: one more key).
+    recording: Option<(Command, Option<Binding>)>,
+    /// The key Change replaces, per row: the one clicked last (the first by default).
+    selected: Option<(Command, Binding)>,
     /// Why the last key was not given, or that it was.
     shortcut_notice: Option<String>,
     /// The Shortcuts page's filter text.
@@ -166,6 +169,7 @@ impl SettingsWindow {
                 error: None,
                 keymap: keymap.clone(),
                 recording: None,
+                selected: None,
                 shortcut_notice: None,
                 filter: String::new(),
             });
@@ -588,7 +592,7 @@ fn advanced_rows(ui: &mut egui::Ui, tr: &Translator, settings: &mut UiSettings) 
 /// widget sees it. Escape alone stops recording; a key the rules refuse leaves the command as
 /// it was and says why.
 fn record_key(ctx: &egui::Context, tr: &Translator, draft: &mut Draft) {
-    let Some(command) = draft.recording else {
+    let Some((command, replace)) = draft.recording.clone() else {
         return;
     };
     let platform: Platform = draft.keymap.platform();
@@ -638,9 +642,13 @@ fn record_key(ctx: &egui::Context, tr: &Translator, draft: &mut Draft) {
         draft.shortcut_notice = None;
         return;
     }
+    let trigger = Trigger::single(chord);
     draft.shortcut_notice =
-        match shortcuts::set_key(&mut draft.keymap, command, Trigger::single(chord)) {
-            Ok(()) => None,
+        match shortcuts::put_key(&mut draft.keymap, command, replace.as_ref(), trigger) {
+            Ok(()) => {
+                draft.selected = Some((command, Binding::new(trigger)));
+                None
+            }
             Err(refusal) => Some(refusal.message(tr, &chord.display(platform))),
         };
 }
@@ -679,7 +687,7 @@ fn shortcut_page(ui: &mut egui::Ui, tr: &Translator, draft: &mut Draft) {
         .max_height((ui.available_height() - 48.0).max(80.0))
         .show(ui, |ui| {
             egui::Grid::new("gcodekit5-shortcut-rows")
-                .num_columns(6)
+                .num_columns(4)
                 .striped(true)
                 .spacing([12.0, 6.0])
                 .show(ui, |ui| {
@@ -698,7 +706,8 @@ fn shortcut_page(ui: &mut egui::Ui, tr: &Translator, draft: &mut Draft) {
         });
 }
 
-/// One command's row: its label, where its keys work, the keys, Change, Clear and Reset.
+/// One command's row: its label, where its keys work, its keys (click one to choose the key
+/// Change replaces), Change, Add, Clear and Reset.
 fn shortcut_row(
     ui: &mut egui::Ui,
     tr: &Translator,
@@ -709,52 +718,67 @@ fn shortcut_row(
 ) {
     let command_ref = command.command_ref();
     let bindings = draft.keymap.bindings(&command_ref);
-    let recording = draft.recording == Some(command);
+    let recording = draft.recording.as_ref().map(|(c, _)| *c) == Some(command);
     let locked = LOCKED.contains(&command);
+    let selected = draft
+        .selected
+        .as_ref()
+        .filter(|(c, b)| *c == command && bindings.contains(b))
+        .map(|(_, b)| b.clone())
+        .or_else(|| bindings.first().cloned());
     ui.label(label);
     ui.label(tr.tr(where_msgid(&draft.keymap, command)));
-    let keys = if recording {
-        tr.tr(n_!("Press a key (Escape cancels)")).into_owned()
-    } else if bindings.is_empty() {
-        tr.tr(n_!("None")).into_owned()
-    } else {
-        bindings
-            .iter()
-            .map(|b| b.trigger.display(platform))
-            .collect::<Vec<_>>()
-            .join(", ")
-    };
-    ui.label(keys);
-    let fixed = || shortcuts::Refusal::Locked.message(tr, "");
-    let change = ui.add_enabled(
-        !locked,
-        egui::Button::new(tr.tr(n_!("Change"))).selected(recording),
-    );
-    if change.clicked() {
-        draft.recording = (!recording).then_some(command);
-        draft.shortcut_notice = None;
-    }
-    change.on_disabled_hover_text(fixed());
-    let clear = ui.add_enabled(
-        !locked && !bindings.is_empty(),
-        egui::Button::new(tr.tr(n_!("Clear"))),
-    );
-    if clear.clicked() {
-        if let Err(refusal) = shortcuts::clear(&mut draft.keymap, command) {
-            draft.shortcut_notice = Some(refusal.message(tr, ""));
+    ui.horizontal(|ui| {
+        if recording {
+            ui.label(tr.tr(n_!("Press a key (Escape cancels)")));
+        } else if bindings.is_empty() {
+            ui.label(tr.tr(n_!("None")));
+        } else {
+            for binding in &bindings {
+                let text = binding.trigger.display(platform);
+                let chosen = selected.as_ref() == Some(binding) && bindings.len() > 1;
+                if ui.selectable_label(chosen, text).clicked() {
+                    draft.selected = Some((command, binding.clone()));
+                }
+            }
         }
-        draft.recording = None;
-    }
-    let changed = bindings != draft.keymap.default_bindings(&command_ref);
-    if ui
-        .add_enabled(!locked && changed, egui::Button::new(tr.tr(n_!("Reset"))))
-        .clicked()
-    {
-        draft.recording = None;
-        draft.shortcut_notice = shortcuts::reset(&mut draft.keymap, command)
-            .err()
-            .map(|(trigger, refusal)| refusal.message(tr, &trigger.display(platform)));
-    }
+    });
+    let fixed = || shortcuts::Refusal::Locked.message(tr, "");
+    ui.horizontal(|ui| {
+        for (msgid, replace) in [(n_!("Change"), true), (n_!("Add"), false)] {
+            let target = if replace { selected.clone() } else { None };
+            let active = draft.recording == Some((command, target.clone()));
+            let enabled = !locked && (replace || !bindings.is_empty());
+            let button = ui.add_enabled(enabled, egui::Button::new(tr.tr(msgid)).selected(active));
+            if button.clicked() {
+                draft.recording = (!active).then_some((command, target));
+                draft.shortcut_notice = None;
+            }
+            if locked {
+                button.on_disabled_hover_text(fixed());
+            }
+        }
+        let clear = ui.add_enabled(
+            !locked && !bindings.is_empty(),
+            egui::Button::new(tr.tr(n_!("Clear"))),
+        );
+        if clear.clicked() {
+            if let Err(refusal) = shortcuts::clear(&mut draft.keymap, command) {
+                draft.shortcut_notice = Some(refusal.message(tr, ""));
+            }
+            draft.recording = None;
+        }
+        let changed = bindings != draft.keymap.default_bindings(&command_ref);
+        if ui
+            .add_enabled(!locked && changed, egui::Button::new(tr.tr(n_!("Reset"))))
+            .clicked()
+        {
+            draft.recording = None;
+            draft.shortcut_notice = shortcuts::reset(&mut draft.keymap, command)
+                .err()
+                .map(|(trigger, refusal)| refusal.message(tr, &trigger.display(platform)));
+        }
+    });
     ui.end_row();
 }
 
@@ -801,6 +825,7 @@ pub fn msgids() -> Vec<&'static str> {
         n_!("Press a key (Escape cancels)"),
         n_!("None"),
         n_!("Change"),
+        n_!("Add"),
         n_!("Clear"),
         n_!("Reset"),
     ]);

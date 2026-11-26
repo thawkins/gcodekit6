@@ -349,3 +349,47 @@ fn test_reset_refused_when_a_default_key_is_now_taken() {
     // Locked commands reset to what they already have.
     assert_eq!(shortcuts::reset(&mut keymap, Command::SoftReset), Ok(()));
 }
+
+#[test]
+fn test_put_key_replaces_one_key_or_adds_one_under_the_rules() {
+    let mut keymap = commands::keymap();
+    let first = keymap.bindings(&Command::Redo.command_ref())[0].clone();
+    assert_eq!(
+        shortcuts::put_key(
+            &mut keymap,
+            Command::Redo,
+            Some(&first),
+            trigger("Cmd+Shift+Y")
+        ),
+        Ok(())
+    );
+    assert_eq!(
+        texts(&keymap, Command::Redo),
+        ["Cmd+Shift+Y", "Cmd+Shift+Z"]
+    );
+    assert_eq!(
+        shortcuts::put_key(&mut keymap, Command::Redo, None, trigger("F4")),
+        Ok(())
+    );
+    assert_eq!(
+        texts(&keymap, Command::Redo),
+        ["Cmd+Shift+Y", "Cmd+Shift+Z", "F4"]
+    );
+    // Adding a key it has changes nothing; a refused key changes nothing.
+    assert_eq!(
+        shortcuts::put_key(&mut keymap, Command::Redo, None, trigger("F4")),
+        Ok(())
+    );
+    assert_eq!(
+        shortcuts::put_key(&mut keymap, Command::Redo, None, trigger("Cmd+S")),
+        Err(Refusal::Taken(Command::FileSave))
+    );
+    assert_eq!(
+        texts(&keymap, Command::Redo),
+        ["Cmd+Shift+Y", "Cmd+Shift+Z", "F4"]
+    );
+    assert_eq!(
+        shortcuts::put_key(&mut keymap, Command::FeedHold, None, trigger("F6")),
+        Err(Refusal::Locked)
+    );
+}

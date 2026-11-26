@@ -239,7 +239,8 @@ pub fn check(keymap: &Keymap, command: Command, binding: &Binding) -> Result<(),
     }
 }
 
-/// Gives `command` the one key `trigger` in place of its current keys, when the rules allow.
+/// Gives `command` the one key `trigger` in place of all its current keys, when the rules
+/// allow.
 ///
 /// # Arguments
 /// * `keymap` - The keymap to change.
@@ -251,8 +252,44 @@ pub fn check(keymap: &Keymap, command: Command, binding: &Binding) -> Result<(),
 pub fn set_key(keymap: &mut Keymap, command: Command, trigger: Trigger) -> Result<(), Refusal> {
     let binding = Binding::new(trigger);
     check(keymap, command, &binding)?;
+    store(keymap, command, vec![binding])
+}
+
+/// Gives `command` the key `trigger` in place of its key `replace`, or as one more key when
+/// `replace` is `None`, keeping its other keys, when the rules allow.
+///
+/// # Arguments
+/// * `keymap` - The keymap to change.
+/// * `command` - The command.
+/// * `replace` - The key it replaces, or `None` to add one.
+/// * `trigger` - The new key, in the command's own scope.
+///
+/// # Errors
+/// The rule the key breaks; the keymap is unchanged then.
+pub fn put_key(
+    keymap: &mut Keymap,
+    command: Command,
+    replace: Option<&Binding>,
+    trigger: Trigger,
+) -> Result<(), Refusal> {
+    let binding = Binding::new(trigger);
+    check(keymap, command, &binding)?;
+    let mut list: Vec<Binding> = keymap
+        .bindings(&command.command_ref())
+        .into_iter()
+        .filter(|b| b.trigger != binding.trigger)
+        .collect();
+    match replace.and_then(|old| list.iter().position(|b| b == old)) {
+        Some(i) => list[i] = binding,
+        None => list.push(binding),
+    }
+    store(keymap, command, list)
+}
+
+/// Stores `command`'s keys, already checked.
+fn store(keymap: &mut Keymap, command: Command, list: Vec<Binding>) -> Result<(), Refusal> {
     keymap
-        .set_bindings(&command.command_ref(), vec![binding], Policy::Refuse)
+        .set_bindings(&command.command_ref(), list, Policy::Refuse)
         .map(|_| ())
         .map_err(|error| {
             // `check` already refused every holder and reserved key; this is the overrides cap.
