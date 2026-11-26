@@ -506,3 +506,118 @@ fn test_stream_selecting_a_wcs_is_followed_by_a_parser_state_query() {
         shared.log()
     );
 }
+
+/// The app with rotary calibration A = 12.5 degrees, connected, its first `$G` answered.
+fn rotary_app() -> (
+    Harness<'static, GcodeKitApp>,
+    std::sync::Arc<LoopbackShared>,
+) {
+    let mut config = crate::machine_support::loopback_config();
+    config
+        .machine
+        .rotary_calibration
+        .insert("A".to_string(), 12.5);
+    let (mut harness, shared) =
+        crate::test_machine_pane::pane_app_with(config, Duration::from_millis(1), true);
+    wait_zero_ready(&mut harness, &shared);
+    (harness, shared)
+}
+
+/// The DRO shows a reported rotary axis in degrees, with its own Zero button; an axis the
+/// machine does not report has neither.
+#[test]
+fn test_rotary_axis_shown_in_degrees() {
+    let (mut harness, shared) = rotary_app();
+    report_state(
+        &mut harness,
+        &shared,
+        "<Hold:0|MPos:0.000,0.000,0.000|FS:0,0>",
+        "Hold:0",
+    );
+    assert!(harness.query_by_label("WA").is_none(), "A shown unreported");
+    assert!(harness.query_by_label("Zero A").is_none());
+    report_state(
+        &mut harness,
+        &shared,
+        "<Idle|MPos:0.000,0.000,0.000,90.000|WCO:0.000,0.000,0.000,10.000|FS:0,0>",
+        "Idle",
+    );
+    assert!(harness.query_by_label("WA").is_some(), "no WA row");
+    assert!(harness.query_by_label("MA:").is_some(), "no MA readout");
+    assert!(
+        harness.query_by_label("90.00\u{b0}").is_some(),
+        "no MA value"
+    );
+    assert!(
+        harness.query_by_label("80.00\u{b0}").is_some(),
+        "no WA value"
+    );
+    assert!(harness.query_by_label("Zero A").is_some());
+    assert!(harness.query_by_label("Zero B").is_none());
+}
+
+/// Review Focus 2: Zero A sends G10 L20 with the active system's P number (here G55, P2)
+/// and the rotary calibration value from Preferences.
+#[test]
+fn test_rotary_zero_uses_active_wcs_and_calibration() {
+    let (mut harness, shared) = rotary_app();
+    report_wcs(&mut harness, &shared, Wcs::G55);
+    report_state(
+        &mut harness,
+        &shared,
+        "<Idle|MPos:0.000,0.000,0.000,90.000|FS:0,0>",
+        "Idle",
+    );
+    assert!(step_enabled(&mut harness, "Zero A"), "Zero A disabled");
+    click(&mut harness, "Zero A");
+    assert!(
+        step_until(&mut harness, |_| wrote(&shared, "G10 L20 P2 A12.5")),
+        "rotary zero not written: {:?}",
+        shared.log()
+    );
+}
+
+/// Review Focus 2: a rotary Zero follows the same rules as X/Y/Z: refused without a fresh
+/// Idle report and while a job runs.
+#[test]
+fn test_rotary_zero_refused_when_not_idle_or_job_running() {
+    let (mut harness, shared) = rotary_app();
+    report_state(
+        &mut harness,
+        &shared,
+        "<Hold:0|MPos:0.000,0.000,0.000,90.000|FS:0,0>",
+        "Hold:0",
+    );
+    click(&mut harness, "Zero A");
+    assert!(shows_notice(
+        &mut harness,
+        "Zero refused: the machine is not idle."
+    ));
+    shared.hold_acks.store(true, Ordering::SeqCst);
+    let program: String = (0..20).map(|i| format!("G1 X{i} F1000\n")).collect();
+    harness
+        .state_mut()
+        .state_mut()
+        .machine
+        .set_program(&program)
+        .expect("program");
+    harness
+        .state_mut()
+        .dispatch(gcodekit5_ui_egui::commands::Command::StreamStart);
+    assert!(
+        step_until(&mut harness, |app| app.state().machine.job_running()),
+        "job never started"
+    );
+    report_state(
+        &mut harness,
+        &shared,
+        "<Idle|MPos:0.000,0.000,0.000,90.000|FS:0,0>",
+        "Idle",
+    );
+    click(&mut harness, "Zero A");
+    assert!(
+        !wrote_prefix(&shared, "G10"),
+        "rotary zeroed: {:?}",
+        shared.log()
+    );
+}

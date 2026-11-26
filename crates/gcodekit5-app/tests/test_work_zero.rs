@@ -3,7 +3,7 @@
 use gcodekit5_app::machine::Axis;
 use gcodekit5_app::work_zero::{
     PARSER_STATE_QUERY, Wcs, WcsWord, go_to_work_zero_command, parser_state_wcs,
-    reports_grbl_parser_state, wcs_in_line, zero_axes_command,
+    reports_grbl_parser_state, wcs_in_line, zero_axes_command, zero_rotary_command,
 };
 
 #[test]
@@ -22,6 +22,21 @@ fn test_zero_axes_command_uses_the_wcs_p_number() {
     assert_eq!(
         zero_axes_command(Wcs::G56, &[Axis::X, Axis::Y, Axis::Z]),
         "G10 L20 P3 X0 Y0 Z0"
+    );
+}
+
+/// Review Focus 2: a rotary zero names the active system's P number, as X/Y/Z do, and
+/// writes the rotary calibration value.
+#[test]
+fn test_zero_rotary_command_uses_p_number_and_calibration() {
+    assert_eq!(zero_rotary_command(Wcs::G54, Axis::A, 0.0), "G10 L20 P1 A0");
+    assert_eq!(
+        zero_rotary_command(Wcs::G55, Axis::B, 12.5),
+        "G10 L20 P2 B12.5"
+    );
+    assert_eq!(
+        zero_rotary_command(Wcs::G59, Axis::C, -3.25),
+        "G10 L20 P6 C-3.25"
     );
 }
 

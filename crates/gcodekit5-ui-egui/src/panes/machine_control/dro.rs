@@ -1,6 +1,8 @@
-//! The digital readout (DRO): machine state, work and machine positions of X, Y and Z, and
-//! the current feed rate and spindle speed, from the latest status report, with a Zero
-//! button beside each work axis (`G10 L20 P<n> X0` in the active work coordinate system).
+//! The digital readout (DRO): machine state, work and machine positions of X, Y and Z (and
+//! of A, B and C in degrees when the machine reports them, as GTK shows them), and the
+//! current feed rate and spindle speed, from the latest status report, with a Zero button
+//! beside each work axis (`G10 L20 P<n> X0` in the active work coordinate system; a rotary
+//! axis takes its calibration value instead of 0).
 //!
 //! Positions are millimetres internally, shown in the user's measurement system (two
 //! decimals for mm, three for inches); ported from the GTK
@@ -105,6 +107,30 @@ pub(super) fn show_work(
                 }
                 ui.end_row();
             }
+            // The rotary axes the machine reports, in degrees (GTK's A/B/C rows).
+            let rotary = status.work_rotary();
+            let reported = status.rotary_reported();
+            for (i, axis) in [Axis::A, Axis::B, Axis::C].into_iter().enumerate() {
+                if !reported[i] {
+                    continue;
+                }
+                let letter = axis.letter();
+                ui.label(
+                    egui::RichText::new(format!("W{letter}"))
+                        .size(DRO_TEXT_SIZE)
+                        .strong(),
+                );
+                let text =
+                    rotary[i].map_or_else(|| "-".to_string(), |v| format!("{v:.2}{DEGREES}"));
+                ui.add_sized(
+                    [110.0, 32.0],
+                    egui::Label::new(egui::RichText::new(text).monospace().size(DRO_TEXT_SIZE)),
+                );
+                if zero_button(ui, zero, letter) {
+                    clicked = Some(axis);
+                }
+                ui.end_row();
+            }
         });
     clicked
 }
@@ -126,6 +152,17 @@ pub(super) fn show_machine(
             ui.label(format!("M{letter}:"));
             ui.label(text);
             ui.add_space(8.0);
+        }
+        let rotary = status.machine_rotary();
+        let reported = status.rotary_reported();
+        for (i, letter) in ['A', 'B', 'C'].into_iter().enumerate() {
+            if reported[i] {
+                let text =
+                    rotary[i].map_or_else(|| "-".to_string(), |v| format!("{v:.2}{DEGREES}"));
+                ui.label(format!("M{letter}:"));
+                ui.label(text);
+                ui.add_space(8.0);
+            }
         }
     });
 }
@@ -205,9 +242,9 @@ pub(super) fn limit_rows(
             (axis, format!("0 - {} {unit}", format_length(max, units)))
         })
         .collect();
-    let reported = status.machine_rotary();
+    let reported = status.rotary_reported();
     for (i, axis) in ['A', 'B', 'C'].into_iter().enumerate() {
-        if reported[i].is_some() {
+        if reported[i] {
             rows.push((axis, format!("0 - {:.1}{DEGREES}", configured[3 + i])));
         }
     }

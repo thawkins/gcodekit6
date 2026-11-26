@@ -44,7 +44,7 @@ use gcodekit5_app::machine::{
     Axis, MachineController, MachineError, MachineEvent, RealtimeCommand,
 };
 use gcodekit5_app::work_zero::{
-    Wcs, go_to_work_zero_command, reports_grbl_parser_state, zero_axes_command,
+    Wcs, go_to_work_zero_command, reports_grbl_parser_state, zero_axes_command, zero_rotary_command,
 };
 use gcodekit5_core::units::{FeedRateUnits, MeasurementSystem};
 use gcodekit5_settings::ConnectionSettings;
@@ -122,6 +122,9 @@ pub struct MachineControlPane {
     feed_units: FeedRateUnits,
     /// The configured travel the Machine Limits section falls back to.
     limits: dro::ConfiguredLimits,
+    /// The rotary calibration of A, B and C in degrees (Preferences > Machine): the value a
+    /// rotary Zero gives the current position.
+    rotary_calibration: [f64; 3],
     /// A refusal of the pane's own (not the controller's), shown until the next action.
     notice: Option<String>,
     /// The emergency stop picture (`images/eStop2.png`): `None` until first drawn, then the
@@ -186,6 +189,7 @@ impl MachineControlPane {
             units: MeasurementSystem::Metric,
             feed_units: FeedRateUnits::MmPerMin,
             limits: [200.0, 200.0, 100.0, 360.0, 360.0, 360.0],
+            rotary_calibration: [0.0; 3],
             notice: None,
             estop_image: None,
         }
@@ -223,6 +227,13 @@ impl MachineControlPane {
             machine.c_limit,
         ]
         .map(|v| v as f32);
+        self.rotary_calibration = ['A', 'B', 'C'].map(|axis| {
+            machine
+                .rotary_calibration
+                .get(&axis.to_string())
+                .copied()
+                .unwrap_or(0.0)
+        });
         self.jog.configure(self.units, self.feed_units, travel);
     }
 
@@ -315,6 +326,23 @@ impl MachineControlPane {
         match self.work_zero_target(machine, ZERO_NOT_IDLE) {
             Ok(wcs) if expected.is_some_and(|e| e != wcs) => self.refuse(tr, WCS_CHANGED),
             Ok(wcs) => self.send_line(&zero_axes_command(wcs, axes)),
+            Err(msgid) => self.refuse(tr, msgid),
+        }
+    }
+
+    /// Sets the rotary `axis` of the active work coordinate system to its calibration value
+    /// (`G10 L20 P<n> A<calibration>`), under the same guards as a linear Zero
+    /// ([`Self::work_zero_target`]).
+    fn zero_rotary(&mut self, machine: Option<&Machine>, tr: &Translator, axis: Axis) {
+        let index = match axis {
+            Axis::A => 0,
+            Axis::B => 1,
+            Axis::C => 2,
+            Axis::X | Axis::Y | Axis::Z => return self.zero_axes(machine, tr, &[axis], None),
+        };
+        let calibration = self.rotary_calibration[index];
+        match self.work_zero_target(machine, ZERO_NOT_IDLE) {
+            Ok(wcs) => self.send_line(&zero_rotary_command(wcs, axis, calibration)),
             Err(msgid) => self.refuse(tr, msgid),
         }
     }
@@ -663,7 +691,7 @@ impl MachineControlPane {
             .inner
         };
         if let Some(axis) = zeroed {
-            self.zero_axes(machine, tr, &[axis], None);
+            self.zero_rotary(machine, tr, axis);
         }
         match wcs_action {
             Some(wcs::Action::ZeroAll) => self.ask_zero_all(machine, tr),

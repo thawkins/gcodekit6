@@ -152,6 +152,17 @@ impl MachineStatus {
         })
     }
 
+    /// Which of A, B and C the latest report carries (in `MPos` or `WPos`): the rotary axes
+    /// the machine has, whose readout rows are shown.
+    pub fn rotary_reported(&self) -> [bool; 3] {
+        let Some(report) = self.report.as_ref() else {
+            return [false; 3];
+        };
+        let m = report.mpos.map_or([None; 3], |p| [p.a, p.b, p.c]);
+        let w = report.wpos.map_or([None; 3], |p| [p.a, p.b, p.c]);
+        [0, 1, 2].map(|i| m[i].is_some() || w[i].is_some())
+    }
+
     /// The work position of A, B and C in degrees, for each rotary axis the latest report
     /// carries (`WPos`, or `MPos - WCO`); `None` for an axis it does not.
     pub fn work_rotary(&self) -> [Option<f32>; 3] {

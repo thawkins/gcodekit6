@@ -103,6 +103,22 @@ pub fn zero_axes_command(wcs: Wcs, axes: &[Axis]) -> String {
         })
 }
 
+/// The line that sets the rotary `axis` of `wcs` so its current position reads
+/// `calibration_deg` (Preferences > Machine > rotary calibration; 0 for a plain zero):
+/// `G10 L20 P2 A12.5`, as GTK's A/B/C Zero buttons send it.
+///
+/// # Arguments
+/// * `wcs` - The system whose offset is set.
+/// * `axis` - The rotary axis (A, B or C).
+/// * `calibration_deg` - The value, in degrees, the current position takes.
+pub fn zero_rotary_command(wcs: Wcs, axis: Axis, calibration_deg: f64) -> String {
+    format!(
+        "G10 L20 P{} {}{calibration_deg}",
+        wcs.p_number(),
+        axis.letter()
+    )
+}
+
 /// The line that rapids to work zero in absolute mode: `G90 G0 X0 Y0`, with ` Z0` when
 /// `include_z` (a Z0 rapid can drive the tool into the work, so it is opt-in). `G90` is
 /// explicit: in `G91` the move would be a zero-length relative one.
