@@ -179,6 +179,10 @@ pub fn device_text(profile: Option<&DeviceProfile>, tr: &Translator) -> String {
     }
 }
 
+/// Smallest size of the bar's eStop, the only emergency stop button on the pages other than
+/// Machine Control: wider and taller than a plain button so it is always easy to hit.
+pub const ESTOP_MIN_SIZE: egui::Vec2 = egui::vec2(72.0, 28.0);
+
 /// Draws the bar's contents into `ui` (a bottom panel's).
 ///
 /// # Arguments
@@ -208,7 +212,8 @@ pub fn show(
                 .strong()
                 .color(egui::Color32::WHITE),
         )
-        .fill(egui::Color32::from_rgb(0xc0, 0x1c, 0x28));
+        .fill(egui::Color32::from_rgb(0xc0, 0x1c, 0x28))
+        .min_size(ESTOP_MIN_SIZE);
         estop_clicked = ui
             .add_enabled(summary.connected, estop)
             .on_hover_text(tr.tr("Emergency stop (soft reset, {shortcut})").replace(

@@ -281,3 +281,17 @@ fn test_status_bar_shows_feed_spindle_in_app() {
             .is_some()
     );
 }
+
+/// The bar's eStop is a usable target on every page: at least
+/// [`gcodekit5_ui_egui::status_bar::ESTOP_MIN_SIZE`].
+#[test]
+fn test_status_bar_estop_has_a_minimum_size() {
+    let (mut harness, _shared) = pane_app(Duration::from_millis(1), false);
+    hide_machine_control(&mut harness);
+    let rect = harness.get_by_label("eStop").rect();
+    let min = gcodekit5_ui_egui::status_bar::ESTOP_MIN_SIZE;
+    assert!(
+        rect.width() >= min.x && rect.height() >= min.y,
+        "eStop is {rect:?}"
+    );
+}
