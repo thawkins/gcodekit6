@@ -684,3 +684,15 @@ fn test_view_keys_run_on_the_canvas_but_not_while_typing() {
         "no view key while typing"
     );
 }
+
+/// GTK's Ctrl+I runs Import Image (laser mode) while the canvas has the keyboard.
+#[test]
+fn test_import_image_key_runs_on_the_canvas() {
+    let (mut h, _designer) = app_with_two_selected();
+    h.key_press_modifiers(Modifiers::COMMAND, egui::Key::I);
+    h.run();
+    assert_eq!(
+        h.state().last_dispatched(),
+        Some(gcodekit5_ui_egui::commands::Command::FileImportImage)
+    );
+}

@@ -217,8 +217,10 @@ pub fn check(keymap: &Keymap, command: Command, binding: &Binding) -> Result<(),
     if command.is_jog() && !jog_key_ok(keymap, chord) {
         return Err(Refusal::JogKeyNotPlain);
     }
+    // The scope the key would work in, not the command's home: a default key in another
+    // scope must not open a way round this rule.
     if command.starts_motion()
-        && home.as_str() != commands::MACHINE_CONTROL_SCOPE
+        && scope.as_str() != commands::MACHINE_CONTROL_SCOPE
         && chord.is_plain()
         && !chord.is_function_key()
     {
