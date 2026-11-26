@@ -610,6 +610,12 @@ You may choose either license for your use of this software.
 - **Firmware**: GRBL, TinyG, g2core, and other open-source CNC firmware projects
 - **Community**: Rust community for excellent tooling and support
 
+## Third-party assets
+
+- **Icons**: the egui front end's toolbar and button icons are from
+  [Tabler Icons](https://tabler.io/icons) 3.31.0 (c) Pawel Kuna, MIT License. The SVGs the
+  code uses and the licence text are in `crates/gcodekit5-ui-egui/resources/icons/tabler/`.
+
 ## Support
 
 - **Bug Reports**: [GitHub Issues](https://github.com/thawkins/gcodekit5/issues)

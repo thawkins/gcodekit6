@@ -106,6 +106,8 @@ mod test_frame;
 mod test_help;
 #[path = "test_hidpi.rs"]
 mod test_hidpi;
+#[path = "test_icons.rs"]
+mod test_icons;
 #[path = "test_machine_jog.rs"]
 mod test_machine_jog;
 #[path = "test_machine_pane.rs"]

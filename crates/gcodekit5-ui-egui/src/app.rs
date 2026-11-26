@@ -372,6 +372,7 @@ impl GcodeKitApp {
     /// * `state` - The front end's state.
     pub fn new(cc: &eframe::CreationContext, state: AppState) -> Self {
         theme::install(&cc.egui_ctx);
+        crate::icons::install(&cc.egui_ctx);
         match &cc.wgpu_render_state {
             Some(render_state) => crate::panes::visualizer::install(render_state),
             None => tracing::warn!("no wgpu renderer; the visualizer shows no toolpath"),

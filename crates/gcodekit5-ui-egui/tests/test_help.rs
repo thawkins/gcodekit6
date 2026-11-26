@@ -300,7 +300,10 @@ fn test_help_embeds_every_resource_file() {
     let names = |dir: &str| -> BTreeSet<String> {
         std::fs::read_dir(root.join(dir))
             .expect("read resource dir")
-            .map(|e| e.expect("entry").file_name().to_string_lossy().into_owned())
+            .map(|e| e.expect("entry"))
+            // Subdirectories (icons/tabler) are embedded by their own module (icons.rs).
+            .filter(|e| e.path().is_file())
+            .map(|e| e.file_name().to_string_lossy().into_owned())
             .collect()
     };
     for lang in resources::HELP_LANGUAGES {

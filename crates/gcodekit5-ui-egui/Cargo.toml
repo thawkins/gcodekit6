@@ -12,6 +12,7 @@ autotests = false
 [dependencies]
 anyhow = { workspace = true }
 egui = { workspace = true }
+egui_extras = { workspace = true, features = ["svg"] }
 eframe = { workspace = true }
 egui-wgpu = { workspace = true }
 bytemuck = { workspace = true }

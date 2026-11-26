@@ -36,7 +36,7 @@ tempfile = "3.8"
 egui = { version = "0.37", default-features = false }
 # `links`: egui-winit opens the URL of a clicked hyperlink (the help browser's web links).
 eframe = { version = "0.37", default-features = false, features = ["default_fonts", "wgpu", "accesskit", "wayland", "x11", "links"] }
-egui_extras = "0.37"
+egui_extras = { version = "0.37", default-features = false }
 # Window handles for craft-dialogs' parent window (the version eframe and craft-dialogs use).
 raw-window-handle = "0.6.2"
 egui_kittest = "0.37"

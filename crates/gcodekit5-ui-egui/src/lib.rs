@@ -21,6 +21,7 @@ pub mod commands;
 pub mod dialogs;
 mod files;
 pub mod frame;
+pub mod icons;
 pub mod machine;
 pub mod menu;
 pub mod panes;
