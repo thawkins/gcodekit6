@@ -38,6 +38,7 @@ pub mod tool_form;
 pub mod tools_manager_backend;
 pub mod types;
 pub mod unsaved_changes;
+pub mod work_zero;
 
 pub use gcodekit5_settings::{tr, trn};
 pub use types::{

@@ -51,3 +51,5 @@ mod test_tool_material_library;
 mod test_tools_manager_backend;
 #[path = "test_unsaved_changes_choice.rs"]
 mod test_unsaved_changes_choice;
+#[path = "test_work_zero.rs"]
+mod test_work_zero;
