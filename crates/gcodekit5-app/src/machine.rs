@@ -2009,6 +2009,8 @@ impl WorkerState {
             link.acks_due = 0;
             link.internal_in_flight = false;
             link.internal.clear();
+            // Nothing sent before the stop may be replayed after it.
+            link.processor = RepetierProcessor::new();
         }
         self.reset_buffers();
         self.end_stream(false);
@@ -2164,6 +2166,11 @@ impl WorkerState {
     /// waits for an acknowledgement of each (GTK's `RepetierSender`). A line no longer known
     /// cannot be sent again: the stream stops.
     fn on_repetier_resend(&mut self, from: u32) -> Result<(), String> {
+        if self.halted.load(Ordering::SeqCst) {
+            // After `M112` only `M112` is written, until the firmware restarts.
+            tracing::info!(from, "Repetier resend ignored: emergency-stopped");
+            return Ok(());
+        }
         let Some(link) = self.repetier.as_mut() else {
             return Ok(());
         };

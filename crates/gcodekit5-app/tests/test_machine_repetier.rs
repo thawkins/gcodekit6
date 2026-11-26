@@ -577,3 +577,25 @@ fn repetier_reconnect_clears_the_halt() {
         .expect("reconnect");
     assert!(!controller.is_halted());
 }
+
+#[test]
+fn repetier_resend_after_m112_writes_nothing() {
+    let shared = Arc::new(LoopbackShared::default());
+    let mut controller = connect_repetier(&shared);
+    shared
+        .hold_acks
+        .store(true, std::sync::atomic::Ordering::SeqCst);
+    controller.start_stream(program(5)).expect("start");
+    assert!(wait_until(|| shared.lines_written() >= 3));
+    controller.stop();
+    assert!(wait_until(|| controller.is_halted()));
+    // A checksum error on a line received before the stop, reported after it.
+    shared.inject("Resend:3\nok\n");
+    std::thread::sleep(Duration::from_millis(100));
+    controller.poll();
+    assert!(
+        written_after_last_m112(&shared).is_empty(),
+        "replayed after M112: {:?}",
+        shared.log()
+    );
+}
