@@ -2,7 +2,11 @@
 
 M7 removes GTK from CI and release packaging. Nothing in CI or the release builds installs or bundles GTK, glib, gettext or MSYS2 any more.
 
+M8 (documentation): the build, architecture, i18n, macOS and Windows guides, SPEC, STATS and the developer and contributor guides describe the egui build; `ADR-012` records the move from GTK4, `ADR-001` is marked superseded, and `GTK4.md` is archived to `docs/archive/`.
+
 ### Changed
+- UI rewritten on egui + craft-libs; GTK4, libadwaita and GtkSourceView are no longer required
+- **Docs**: `README.md` (settings are `config.toml`), `SPEC.md`, `STATS.md`, `ARCHITECTURE.md`, `DEVELOPMENT.md`, `TOOLCHAIN.md`, `CONTRIBUTING.md`, `docs/MACOS_BUILD.md`, `docs/WINDOWS_BUILD.md`, `docs/WINDOWS_QUICK_START.md`, `docs/HOWTO.i18n.md` and `scripts/README.md` no longer describe GTK, MSYS2 or gettext at run time; tests are run with `cargo nextest`
 - **CI workflows**: Code Quality, MSRV, Mutation Testing and Test Coverage install only egui's Linux packages (`libudev-dev pkg-config libxkbcommon-dev libwayland-dev libx11-dev libxcursor-dev libxrandr-dev libxi-dev libvulkan1 mesa-vulkan-drivers`), or `libudev-dev pkg-config` for library-only jobs; cache keys are bumped; the test-isolation and MSRV jobs run `cargo nextest`, and MSRV uploads snapshot diffs on failure
 - **Release workflow**: Linux packages build without GTK; the Flatpak uses the `org.freedesktop.Platform//25.08` runtime and the AppImage no longer uses linuxdeploy's GTK plugin; macOS no longer installs Homebrew GTK or bundles frameworks, and the app gets an `.icns` icon and `LSMinimumSystemVersion` 11.0; Windows builds `x86_64-pc-windows-msvc` with a static C runtime, installs WiX 3.14.1 and ships the MSI and a portable zip with only `gcodekit5.exe` and `License.rtf`
 - **Packages**: the `.deb` depends on `libxkbcommon-x11-0` and `libvulkan1 | libegl1`, the `.rpm` requires `libxkbcommon-x11` and `vulkan-loader`; the `.rpm` version uses `~` for a prerelease (`1.2.0~beta.2`), and the MSI and macOS bundle use the numeric version
@@ -11,6 +15,7 @@ M7 removes GTK from CI and release packaging. Nothing in CI or the release build
 ### Added
 - **`check-no-gtk` in Code Quality**: fails if `gtk4`, `libadwaita`, `sourceview5` or `glib-sys` comes back into the dependency tree
 - **Release dry run**: `release.yml` can be started by hand (`workflow_dispatch`) to build every artefact without publishing; only a tag push publishes
+- **ADR-012**: `docs/adr/ADR-012-egui-craft-libs.md` records the move from GTK4 to egui + craft-libs
 
 ### Removed
 - `scripts/windows-bundle-gtk.ps1`, `scripts/macos-bundle-frameworks.sh`, `scripts/check-dll-dependencies.ps1` and the GTK parts of `wix/main.wxs`

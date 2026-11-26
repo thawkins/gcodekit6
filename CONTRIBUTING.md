@@ -103,7 +103,7 @@ Use descriptive branch names with prefixes:
 | `refactor/` | Code refactoring | `refactor/visualizer-cache` |
 | `docs/` | Documentation only | `docs/update-readme` |
 | `test/` | Test additions/fixes | `test/grbl-parser-coverage` |
-| `chore/` | Build, CI, dependencies | `chore/update-gtk4-version` |
+| `chore/` | Build, CI, dependencies | `chore/update-egui-version` |
 
 ### Examples
 
@@ -199,7 +199,7 @@ This repository uses [Dependabot](https://docs.github.com/en/code-security/depen
    ```bash
    cargo fmt --check
    cargo clippy
-   cargo test
+   cargo nextest run --workspace
    ```
 
 3. **Update CHANGELOG.md** with your changes
@@ -295,17 +295,20 @@ crates/gcodekit5-core/
 ### Running Tests
 
 ```bash
-# All tests
-cargo test
+# All tests (cargo-nextest)
+cargo nextest run --workspace
 
 # Specific crate
-cargo test -p gcodekit5-core
+cargo nextest run -p gcodekit5-core
 
 # With output
-cargo test -- --nocapture
+cargo nextest run --success-output immediate
 
 # Specific test
-cargo test test_name
+cargo nextest run -E 'test(test_name)'
+
+# Doc tests (nextest does not run them)
+cargo test --doc
 ```
 
 ## Documentation

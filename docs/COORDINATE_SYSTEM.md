@@ -291,5 +291,5 @@ fn draw_label(&self, cr: &cairo::Context, world_x: f64, world_y: f64, text: &str
 ## Related Documentation
 
 - [ADR-002: Coordinate System](adr/ADR-002-coordinate-system.md) - Architecture decision record
-- [GTK4.md](../GTK4.md) - GTK4-specific implementation notes
+- [GTK4.md](archive/GTK4.md) - GTK4-specific implementation notes (archived)
 - `crates/gcodekit5-visualizer/src/viewport.rs` - ViewportTransform implementation

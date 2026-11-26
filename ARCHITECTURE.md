@@ -14,21 +14,21 @@ This document describes the high-level architecture of GCodeKit5, including crat
 
 ## Crate Structure
 
-GCodeKit5 is organized as a Cargo workspace with 9 library crates and 1 binary crate:
+GCodeKit5 is organized as a Cargo workspace with 9 library crates and 1 binary crate. The front end is egui on wgpu with the craft-libs widget crates ([ADR-012](docs/adr/ADR-012-egui-craft-libs.md)):
 
 ```
 gcodekit5/
 ├── src/main.rs              # Binary entry point
 └── crates/
-    ├── gcodekit5-core/      # Foundation types and traits
+    ├── gcodekit5-core/           # Foundation types and traits
     ├── gcodekit5-communication/  # Device protocols
-    ├── gcodekit5-gcodeeditor/    # Text editing
-    ├── gcodekit5-visualizer/     # Toolpath rendering
+    ├── gcodekit5-settings/       # Configuration
+    ├── gcodekit5-devicedb/       # Device profiles
+    ├── gcodekit5-visualizer/     # Toolpath parsing and geometry
     ├── gcodekit5-designer/       # CAD/CAM design
     ├── gcodekit5-camtools/       # CAM operations
-    ├── gcodekit5-devicedb/       # Device profiles
-    ├── gcodekit5-settings/       # Configuration
-    └── gcodekit5-ui/             # GTK4 interface
+    ├── gcodekit5-app/            # Toolkit-free application state
+    └── gcodekit5-ui-egui/        # egui + craft-libs front end
 ```
 
 ### Crate Responsibilities
@@ -37,13 +37,13 @@ gcodekit5/
 |-------|---------|-----------|
 | **core** | Shared types, traits, events, state | `MachineState`, `Position`, `GCodeLine`, `AppEvent` |
 | **communication** | Serial/TCP/WebSocket protocols, firmware implementations | `Connection`, `GrblController`, `Protocol` |
-| **gcodeeditor** | G-code text buffer, syntax highlighting, undo/redo | `GCodeBuffer`, `SyntaxHighlighter` |
-| **visualizer** | 2D/3D toolpath rendering, viewport transforms | `ViewportTransform`, `ToolpathRenderer` |
+| **visualizer** | G-code parsing for the toolpath view, viewport transforms | `ViewportTransform` |
 | **designer** | Shape drawing, toolpath generation, CAD operations | `Shape`, `DesignerState`, `ToolpathGenerator` |
 | **camtools** | Box maker, puzzle generator, image engraver | `TabbedBoxMaker`, `JigsawPuzzle`, `LaserEngraver` |
 | **devicedb** | Device profile CRUD, persistence | `DeviceProfile`, `DeviceDatabase` |
 | **settings** | Application preferences, serialization | `AppSettings`, `Preferences` |
-| **ui** | GTK4 widgets, main window, panels | `MainWindow`, `MachineControlPanel`, `VisualizerPanel` |
+| **app** | Toolkit-free application state: machine controller, console model, device and tool forms | `MachineController`, `MachineEvent` |
+| **ui-egui** | egui front end: window, menus, panes, dialogs, wgpu visualizer | `GcodeKitApp`, `Machine` |
 
 ## Crate Dependency Graph
 
@@ -54,15 +54,15 @@ gcodekit5/
                               └────────┬────────┘
                                        │
                               ┌────────▼────────┐
-                              │  gcodekit5-ui   │
-                              │   (GTK4 UI)     │
+                              │ gcodekit5-ui-   │
+                              │      egui       │
                               └────────┬────────┘
                                        │
          ┌─────────────┬───────────────┼───────────────┬─────────────┐
          │             │               │               │             │
          ▼             ▼               ▼               ▼             ▼
 ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ ┌─────────────┐
-│  camtools   │ │  designer   │ │ visualizer  │ │ gcodeeditor │ │communication│
+│  camtools   │ │  designer   │ │ visualizer  │ │     app     │ │communication│
 └──────┬──────┘ └──────┬──────┘ └──────┬──────┘ └──────┬──────┘ └──────┬──────┘
        │               │               │               │               │
        │               │               │               │               │
@@ -93,7 +93,7 @@ gcodekit5/
 
 1. **core** has no internal dependencies (only external crates like `serde`, `thiserror`)
 2. All crates depend on **core**
-3. **ui** depends on all other crates (aggregates everything)
+3. **ui-egui** depends on all other crates (aggregates everything); **app** holds the state it shows and has no GUI dependency
 4. **designer** depends on **visualizer** (reuses rendering)
 5. No circular dependencies allowed
 
@@ -103,13 +103,13 @@ gcodekit5/
 
 ```
 ┌─────────────┐     ┌─────────────┐     ┌─────────────┐     ┌─────────────┐
-│  File Open  │────▶│ GCodeBuffer │────▶│   Parser    │────▶│ Toolpath    │
-│  (UI)       │     │ (editor)    │     │  (core)     │     │ (visualizer)│
+│  File Open  │────▶│ Editor text │────▶│   Parser    │────▶│ Toolpath    │
+│  (UI)       │     │ (ui-egui)   │     │  (core)     │     │ (visualizer)│
 └─────────────┘     └─────────────┘     └─────────────┘     └─────────────┘
                            │                                       │
                            ▼                                       ▼
                     ┌─────────────┐                         ┌─────────────┐
-                    │ Syntax      │                         │ Canvas      │
+                    │ Syntax      │                         │ wgpu        │
                     │ Highlighting│                         │ Rendering   │
                     └─────────────┘                         └─────────────┘
 ```
@@ -154,7 +154,7 @@ gcodekit5/
 ```
 ┌─────────────┐     ┌─────────────┐     ┌─────────────┐     ┌─────────────┐
 │  Shape      │────▶│ Toolpath    │────▶│ G-Code      │────▶│ Editor      │
-│  Drawing    │     │ Generator   │     │ Emitter     │     │ Buffer      │
+│  Drawing    │     │ Generator   │     │ Emitter     │     │ Text        │
 └─────────────┘     └─────────────┘     └─────────────┘     └─────────────┘
        │                   │
        │                   ▼
@@ -173,28 +173,20 @@ gcodekit5/
 
 ## Key Design Patterns
 
-### 1. Interior Mutability (Rc<RefCell<T>>)
+### 1. Immediate-Mode UI over Plain State
 
-Used throughout UI code for GTK callback compatibility:
+egui redraws the UI every frame from plain Rust state, so panes borrow `&mut` state directly and no `Rc<RefCell<T>>` is needed for callbacks. State shared with a worker thread uses `Arc<Mutex<T>>` and channels.
 
 ```rust
-// Pattern: Shared mutable state for GTK callbacks
-struct PanelState {
-    inner: Rc<RefCell<PanelStateInner>>,
-}
-
-impl PanelState {
-    fn update_position(&self, pos: Position) {
-        self.inner.borrow_mut().position = pos;
-    }
-    
-    fn get_position(&self) -> Position {
-        self.inner.borrow().position
+// Pattern: a pane reads and edits its state in one function per frame
+pub fn ui(&mut self, ui: &mut egui::Ui) {
+    if ui.button("Zero").clicked() {
+        self.pending = Some(Action::ZeroAxis(Axis::X));
     }
 }
 ```
 
-See [ADR-004: Interior Mutability](docs/adr/ADR-004-interior-mutability.md) for details.
+See [ADR-004: Interior Mutability](docs/adr/ADR-004-interior-mutability.md) for the history of the GTK-era pattern.
 
 ### 2. Event-Driven Architecture
 
@@ -293,18 +285,16 @@ See [Coordinate System Documentation](docs/COORDINATE_SYSTEM.md) for details.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                           Main Thread (GTK)                             │
+│                        UI Thread (eframe / egui)                        │
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐    │
-│  │  UI Widgets │  │  Event Loop │  │  Rendering  │  │  User Input │    │
+│  │   Panes     │  │ Frame loop  │  │ wgpu render │  │  User Input │    │
 │  └─────────────┘  └─────────────┘  └─────────────┘  └─────────────┘    │
 └─────────────────────────────────────────────────────────────────────────┘
-         │                    │                    │
-         │ spawn              │ channel            │ idle_add
-         ▼                    ▼                    ▼
-┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐
-│  Tokio Runtime  │  │  Status Poller  │  │  File I/O       │
-│  (async tasks)  │  │  (200ms timer)  │  │  (background)   │
-└─────────────────┘  └─────────────────┘  └─────────────────┘
+         │ commands (mpsc)          ▲ events (mpsc) + repaint hook
+         ▼                          │
+┌─────────────────────────────────────────────────────────────────────────┐
+│              Machine worker thread (owns the serial transport)          │
+└─────────────────────────────────────────────────────────────────────────┘
          │
          ▼
 ┌─────────────────┐
@@ -317,39 +307,27 @@ See [Coordinate System Documentation](docs/COORDINATE_SYSTEM.md) for details.
 
 | Thread | Purpose | Communication |
 |--------|---------|---------------|
-| **Main (GTK)** | UI rendering, event handling | Direct access to widgets |
-| **Tokio Runtime** | Async I/O, serial communication | Channels + `glib::idle_add` |
-| **Status Poller** | Periodic machine status queries | Timer + channel |
-| **File I/O** | Large file operations | Spawn + callback |
+| **UI (eframe)** | Frame loop, widgets, rendering | Reads `MachineEvent`s once per frame |
+| **Machine worker** | Serial I/O, GRBL streaming, status polling | `std::sync::mpsc` commands in, events out |
+| **Background jobs** | Stock removal, toolpath preview, large file work | Spawned thread, result sent back, repaint requested |
 
 ### Thread Safety Rules
 
-1. **GTK widgets** must only be accessed from the main thread
-2. Use `glib::idle_add()` to schedule UI updates from background threads
-3. Use channels (`std::sync::mpsc` or `tokio::sync`) for thread communication
-4. Use `Arc<Mutex<T>>` for shared state across threads
-5. Use `Rc<RefCell<T>>` for shared state within main thread only
+1. The transport is owned by the machine worker alone; no lock is held across I/O
+2. The UI thread never blocks on I/O: it sends a command and reads events with `MachineController::poll`
+3. A worker wakes the UI with `egui::Context::request_repaint` (the controller's repaint hook)
+4. Use channels (`std::sync::mpsc`) for thread communication
+5. Use `Arc<Mutex<T>>` for shared state across threads; the lock is held for one call only
 
-### Example: Background Task with UI Update
+### Example: Machine Events on the UI Thread
 
 ```rust
-// Spawn background task
-let (tx, rx) = glib::MainContext::channel(glib::Priority::DEFAULT);
-
-std::thread::spawn(move || {
-    // Do expensive work in background
-    let result = expensive_computation();
-    
-    // Send result to main thread
-    tx.send(result).expect("Channel closed");
-});
-
-// Receive on main thread
-rx.attach(None, move |result| {
-    // Safe to update UI here
-    label.set_text(&format!("Result: {}", result));
-    glib::ControlFlow::Continue
-});
+// Once per frame, from GcodeKitApp
+for event in controller.lock().unwrap_or_else(PoisonError::into_inner).poll() {
+    machine.apply(event); // fold into MachineStatus
+}
+// Any worker thread that needs a redraw calls the hook
+ctx.request_repaint();
 ```
 
 ## Error Handling Strategy
@@ -388,7 +366,8 @@ See [ADR-005: Error Handling](docs/adr/ADR-005-error-handling.md) for details.
 
 ## Related Documentation
 
-- [ADR-001: GTK4 UI Framework](docs/adr/ADR-001-gtk4-ui-framework.md)
+- [ADR-012: egui and craft-libs Front End](docs/adr/ADR-012-egui-craft-libs.md)
+- [ADR-001: GTK4 UI Framework](docs/adr/ADR-001-gtk4-ui-framework.md) (superseded)
 - [ADR-002: Coordinate System](docs/adr/ADR-002-coordinate-system.md)
 - [ADR-003: Modular Crates](docs/adr/ADR-003-modular-crates.md)
 - [ADR-004: Interior Mutability](docs/adr/ADR-004-interior-mutability.md)

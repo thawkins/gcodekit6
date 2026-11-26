@@ -6,7 +6,7 @@ This directory contains Architecture Decision Records (ADRs) for GCodeKit5. ADRs
 
 | ADR | Title | Status | Date |
 |-----|-------|--------|------|
-| [ADR-001](ADR-001-gtk4-ui-framework.md) | GTK4 UI Framework | Accepted | 2026-01-26 |
+| [ADR-001](ADR-001-gtk4-ui-framework.md) | GTK4 UI Framework | Superseded by ADR-012 | 2026-01-26 |
 | [ADR-002](ADR-002-coordinate-system.md) | Coordinate System (Y-flip) | Accepted | 2026-01-26 |
 | [ADR-003](ADR-003-modular-crates.md) | Modular Crates Structure | Accepted | 2026-01-26 |
 | [ADR-004](ADR-004-interior-mutability.md) | Interior Mutability Patterns | Accepted | 2026-01-26 |
@@ -17,6 +17,7 @@ This directory contains Architecture Decision Records (ADRs) for GCodeKit5. ADRs
 | [ADR-009](ADR-009-communication-protocol.md) | Communication Protocol Architecture | Accepted | 2026-02-18 |
 | [ADR-010](ADR-010-dependency-management.md) | Dependency Management Strategy | Accepted | 2026-02-18 |
 | [ADR-011](ADR-011-egui-craft-libs-pin.md) | egui and craft-libs Pin | Accepted | 2026-11-25 |
+| [ADR-012](ADR-012-egui-craft-libs.md) | egui and craft-libs Front End | Accepted | 2026-11-27 |
 
 ## ADR Template
 

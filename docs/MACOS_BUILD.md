@@ -2,138 +2,87 @@
 
 ## Overview
 
-GCodeKit5 now supports building and distributing on macOS (both Intel x86_64 and Apple Silicon ARM64 architectures) with automatic framework bundling via GitHub Actions.
+GCodeKit5 builds on macOS 11 or later. The release workflow builds the Apple Silicon (ARM64) app. You can also build for Intel Macs locally.
+
+The egui front end uses only system frameworks. There is nothing to install with Homebrew and nothing to bundle into the app.
 
 ## GitHub Actions Workflow
 
-The workflow in `.github/workflows/release.yml` includes automated macOS builds that:
+The workflow in `.github/workflows/release.yml` builds `aarch64-apple-darwin` on `macos-14`:
 
-1. **Build for both architectures:**
-   - `x86_64-apple-darwin` (Intel Macs)
-   - `aarch64-apple-darwin` (Apple Silicon Macs)
-
-2. **Automatic dependency management:**
-   - Installs GTK4 and SourceView5 via Homebrew
-   - Bundles frameworks and libraries into the app bundle
-   - Creates distributable DMG files
-
-3. **Release automation:**
-   - Uploads DMG files to GitHub Releases
-   - Maintains separate builds for each architecture
+1. Builds the release binary with `cargo build --release --target aarch64-apple-darwin`.
+2. Creates `GCodeKit.app` with the binary, an `AppIcon.icns` icon and an `Info.plist`. `LSMinimumSystemVersion` is `11.0`.
+3. Creates the DMG with `scripts/macos-create-dmg.sh`.
+4. Uploads the DMG to the GitHub Release.
 
 ## Building Locally
 
 ### Prerequisites
 
 ```bash
-# Install Homebrew dependencies
-brew install gtk4 gtksourceview5 adwaita-icon-theme librsvg libpng jpeg webp
-
 # Install Rust (if not already installed)
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-source $HOME/.shell/env
+source $HOME/.cargo/env
 
-# Add ARM64 target if cross-compiling
-rustup target add aarch64-apple-darwin
+# Add the Intel target if cross-compiling on Apple Silicon
+rustup target add x86_64-apple-darwin
 ```
+
+Rust 1.95 or later is required. Xcode Command Line Tools provide the linker (`xcode-select --install`).
 
 ### Build for Current Architecture
 
 ```bash
 # Debug build
-timeout 600 cargo build
+cargo build
 
 # Release build
-timeout 600 cargo build --release
+cargo build --release
 ```
 
 ### Build for Specific Architecture
 
 ```bash
-# Build for ARM64 (Apple Silicon)
-timeout 600 cargo build --release --target aarch64-apple-darwin
+# Apple Silicon (ARM64)
+cargo build --release --target aarch64-apple-darwin
 
-# Build for x86_64 (Intel)
-timeout 600 cargo build --release --target x86_64-apple-darwin
+# Intel (x86_64)
+cargo build --release --target x86_64-apple-darwin
 ```
 
-### Create App Bundle and DMG
+## Create App Bundle and DMG
 
-After building, the GitHub Actions workflow automatically:
+The release workflow builds the bundle in this layout:
 
-1. **Creates app bundle structure:**
-   ```
-   GCodeKit.app/
-   ├── Contents/
-   │   ├── MacOS/
-   │   │   └── gcodekit5 (executable)
-   │   ├── Resources/
-   │   │   ├── AppIcon.png
-   │   │   └── share/ (icons, schemas, etc.)
-   │   ├── Frameworks/ (optional, for future expansion)
-   │   ├── Libs/ (all dependencies)
-   │   └── Info.plist
-   ```
+```
+GCodeKit.app/
+└── Contents/
+    ├── MacOS/
+    │   └── gcodekit5 (executable)
+    ├── Resources/
+    │   └── AppIcon.icns
+    └── Info.plist
+```
 
-2. **Runs framework bundling:**
-   ```bash
-   bash scripts/macos-bundle-frameworks.sh aarch64-apple-darwin
-   ```
-
-3. **Creates distributable DMG:**
-   ```bash
-   bash scripts/macos-create-dmg.sh v0.44.0-alpha.1 macos-arm64
-   ```
-
-## Manual Build Process
-
-If you need to build manually on macOS:
+To build it by hand:
 
 ```bash
 # 1. Build the release binary
-timeout 600 cargo build --release --target aarch64-apple-darwin
+cargo build --release --target aarch64-apple-darwin
 
-# 2. Create app bundle
-mkdir -p "GCodeKit.app/Contents/MacOS"
-mkdir -p "GCodeKit.app/Contents/Resources"
-
-# 3. Copy binary and resources
+# 2. Create the bundle folders and copy the binary
+mkdir -p "GCodeKit.app/Contents/MacOS" "GCodeKit.app/Contents/Resources"
 cp target/aarch64-apple-darwin/release/gcodekit5 "GCodeKit.app/Contents/MacOS/"
-cp assets/Pictures/com.github.thawkins.gcodekit5.png "GCodeKit.app/Contents/Resources/AppIcon.png"
 
-# 4. Create Info.plist (use the one from the workflow)
+# 3. Add AppIcon.icns and Info.plist (see the "Build (macOS)" step in release.yml)
 
-# 5. Bundle frameworks
-bash scripts/macos-bundle-frameworks.sh aarch64-apple-darwin
-
-# 6. Create DMG
-bash scripts/macos-create-dmg.sh "v0.44.0" "macos-arm64"
+# 4. Create the DMG
+bash scripts/macos-create-dmg.sh "v1.2.0" "macos-arm64"
 ```
-
-## Framework Bundling Details
-
-The `scripts/macos-bundle-frameworks.sh` script:
-
-- Copies all GTK4 and SourceView libraries to `Contents/Libs/`
-- Copies icon themes and GLib schemas to `Contents/Resources/`
-- Updates `install_name_tool` references to point to bundled libraries
-- Configures `@rpath` settings for library discovery at runtime
-
-### Bundled Components
-
-- **GTK4:** Core windowing and UI framework
-- **SourceView5:** Syntax highlighting for code editing
-- **GLib:** Core utilities and data structures
-- **Cairo:** 2D graphics rendering
-- **Pango:** Text layout and rendering
-- **GdkPixbuf:** Image loading and manipulation
-- **HarfBuzz:** Text shaping
-- **Adwaita:** GNOME icon theme
-- **Supporting libraries:** fontconfig, freetype, libpng, jpeg, webp, etc.
 
 ## DMG Distribution
 
-The `scripts/macos-create-dmg.sh` script creates a professional DMG installer that:
+The `scripts/macos-create-dmg.sh` script creates a DMG that:
 
 - Includes a symbolic link to the Applications folder
 - Sets icon view with appropriate sizing
@@ -152,25 +101,19 @@ For production releases, consider adding:
 
 2. **Notarization (required for distribution):**
    - Requires Apple Developer account
-   - Command-line tools available via `altool` or `xcrun notarytool`
+   - Command-line tools available via `xcrun notarytool`
 
 ## Troubleshooting
 
-### Library Not Found Errors
+### App Does Not Start
 
-If the app fails to launch with library path errors:
+Check that the binary links only system libraries:
 
-1. Check that `@rpath` is set correctly:
-   ```bash
-   otool -L "GCodeKit.app/Contents/MacOS/gcodekit5"
-   ```
+```bash
+otool -L "GCodeKit.app/Contents/MacOS/gcodekit5"
+```
 
-2. Verify libraries exist in `Contents/Libs/`
-
-3. Run the bundling script again:
-   ```bash
-   bash scripts/macos-bundle-frameworks.sh aarch64-apple-darwin
-   ```
+Every entry should be under `/usr/lib` or `/System/Library`.
 
 ### Build Failures on M1/M2 Macs
 
@@ -179,29 +122,21 @@ Ensure you have the correct target installed:
 rustup target add aarch64-apple-darwin
 ```
 
-### GTK4 Not Found During Build
-
-Make sure Homebrew GTK4 is installed:
-```bash
-brew install gtk4
-export PKG_CONFIG_PATH="$(brew --prefix gtk4)/lib/pkgconfig:$PKG_CONFIG_PATH"
-```
-
 ## CI/CD Pipeline
 
-The GitHub Actions workflow automatically:
+The GitHub Actions workflow:
 
-1. Triggers on version tags (e.g., `v0.44.0`)
-2. Builds for both x86_64 and aarch64 architectures
-3. Creates DMG files for distribution
-4. Uploads to GitHub Releases
-5. Includes changelog from `CHANGELOG.md`
+1. Triggers on version tags (e.g., `v1.2.0`), or by hand with `workflow_dispatch` for a dry run that builds every artefact without publishing
+2. Builds the macOS ARM64 app, plus the Linux and Windows packages
+3. Creates the DMG for distribution
+4. Uploads to GitHub Releases on a tag push
+5. Includes the changelog from `CHANGELOG.md`
 
 To trigger a release build:
 
 ```bash
-git tag -a v0.44.0 -m "Release 0.44.0"
-git push origin v0.44.0
+git tag -a v1.2.0 -m "Release 1.2.0"
+git push origin v1.2.0
 ```
 
 ## Performance Optimization

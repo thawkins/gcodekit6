@@ -1,47 +1,51 @@
-# HOWTO: i18n / Translations (gettext)
+# HOWTO: i18n / Translations
 
-This project uses **gettext** via the `gettext-rs` crate, with a small translation macro `t!("...")`.
+GCodeKit5 reads its translations from gettext `.po` files, but it does not use gettext at run time. `build.rs` parses `po/*.po` and embeds the catalogs in the binary. You do not need `msgfmt`, `.mo` files or a gettext library to build or run the app.
 
 ## Where translations live
 
 - Template (source strings): `po/gcodekit5.pot`
 - Per-language translations: `po/<lang>.po` (e.g. `po/fr.po`)
-- Runtime setup (bindtextdomain/textdomain): `crates/gcodekit5-ui/src/i18n.rs`
+- Build-time embedding: `crates/gcodekit5-settings/build.rs` (parses the catalogs with `polib`)
+- Runtime lookup: `crates/gcodekit5-settings/src/i18n.rs` (re-exported as `gcodekit5_app::i18n`)
 - Extraction/update script: `scripts/update-po.sh`
 
 ## How strings are translated in code
 
-Use `t!(...)` for any user-visible string:
+In the egui front end, translate through the app's `Translator`:
 
 ```rust
-use crate::t;
+use gcodekit5_app::i18n::Translator;
 
-let label = gtk::Label::new(Some(&t!("Machine Control")));
+let label = translator.tr("Machine Control");
+let lines = translator.trn("line", "lines", n);
 ```
 
-Formatting is supported (gettext returns a format string):
+Model code in `gcodekit5-app` and `gcodekit5-settings` has no translator at hand. It uses the `tr!` and `trn!` macros, which read the process-wide current language:
 
 ```rust
-let msg = t!("Zoom: {0}%", zoom_pct);
+let reason = crate::tr!("the machine must be idle");
 ```
+
+To mark a literal for extraction without translating it where it is written (a `match` arm that is translated later through a variable), wrap it in `n_!("...")`.
 
 Notes:
+- The msgid is the English source string and must match the `.po` entry exactly.
 - Avoid embedding `\n` or other control characters unless you really want them in the UI.
-- Don’t pass strings containing interior NUL bytes (`\0`) to GTK/glib APIs.
 
 ## Updating translations after UI changes
 
-When you add/modify strings wrapped in `t!(...)`, update the POT and merge changes into all PO files:
+When you add or change strings, update the POT and merge the changes into all PO files:
 
 ```bash
 ./scripts/update-po.sh
 ```
 
-This runs `xgettext` across `crates/gcodekit5-ui/src/**` and then `msgmerge`/`msginit` for the configured languages.
+This runs `xgettext --keyword=tr --keyword=trn:1,2` (plus the `t!`, `n_!` and `gettext` keywords) over the tracked Rust sources, then `msgmerge` and `msginit` for the configured languages.
 
 ### Requirements
 
-You need gettext tooling installed (xgettext/msgmerge/msginit). On Fedora:
+Only the maintainer's extraction script needs the gettext tools (`xgettext`, `msgmerge`, `msginit`). Building and running the app does not. On Fedora:
 
 ```bash
 sudo dnf install gettext
@@ -58,11 +62,7 @@ msgid "Visualizer"
 msgstr "Visualiseur"
 ```
 
-After editing, you typically want to validate PO syntax:
-
-```bash
-msgfmt --check po/fr.po
-```
+Untranslated and fuzzy entries are skipped when the catalogs are embedded, so those strings show in English.
 
 ## Adding a new language
 
@@ -83,41 +83,27 @@ LANGS=("fr" "de" "es" "pt" "it" "nl")
 ./scripts/update-po.sh
 ```
 
-This will create `po/nl.po` if it doesn’t exist.
+This will create `po/nl.po` if it doesn't exist.
 
 3) Translate `po/nl.po`.
 
+4) If the language uses a plural rule other than `n != 1` or `n > 1`, add it to `build.rs` and `PluralRule` in `i18n.rs`. The build fails on an unknown `Plural-Forms` rule.
+
 ## Running the app in a specific language
 
-The UI calls `i18n::init(Some(language))` and will set:
-- `LANGUAGE=<lang>`
-- `LANG=<lang>.UTF-8`
-
-You can also force language from the environment when launching:
+Set the language in Preferences; a change takes effect after a restart. With the language set to "system", the app uses the first of `LANGUAGE`, `LC_ALL`, `LC_MESSAGES` and `LANG` that names a language, so you can also force one from the environment:
 
 ```bash
-LANGUAGE=fr LANG=fr_FR.UTF-8 cargo run
+LANGUAGE=fr cargo run
 ```
-
-If the app exposes a UI preference that passes a language string into `i18n::init`, use that instead.
 
 ## Troubleshooting
 
 ### Strings not translating
 
 Checklist:
-- The string is wrapped in `t!("...")`.
+- The string goes through `tr(...)`, `trn(...)`, `tr!(...)`, `trn!(...)` or `n_!(...)`.
 - `po/gcodekit5.pot` contains the `msgid` (run `./scripts/update-po.sh`).
-- Your `po/<lang>.po` has a non-empty `msgstr`.
-- You are running with `LANGUAGE=<lang>` (or app preference set).
-
-### Gettext domain / locale dir issues
-
-Runtime binding is done in:
-- `crates/gcodekit5-ui/src/i18n.rs`
-
-It uses:
-- domain: `gcodekit5`
-- locale dir: `env!("LOCALE_DIR")` (provided at build time)
-
-If translations still do not load, verify what `LOCALE_DIR` points to in `build.rs` and whether compiled catalogs are available there.
+- Your `po/<lang>.po` has a non-empty, non-fuzzy `msgstr`.
+- You rebuilt after editing the `.po` file (`build.rs` re-embeds the catalogs).
+- The language is set in Preferences, or `LANGUAGE=<lang>` is set.

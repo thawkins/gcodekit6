@@ -8,6 +8,7 @@ This document describes how to set up your development environment with Rust and
   - `curl` or `wget` for downloading
   - Git for version control
   - `build-essential` (Linux) or Xcode Command Line Tools (macOS)
+  - Linux only: `libudev-dev pkg-config libxkbcommon-dev libwayland-dev libx11-dev libxcursor-dev libxrandr-dev libxi-dev` (serial ports, Wayland and X11 for egui). At run time wgpu needs a Vulkan or OpenGL driver (for example `libvulkan1 mesa-vulkan-drivers`). Nothing extra is needed on macOS or Windows.
 - **Windows:**
   - Windows 10 or 11
   - [Visual Studio Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) (Desktop development with C++ workload)
@@ -83,7 +84,8 @@ cargo build --release
 
 ### Running Tests
 ```bash
-cargo test
+cargo install cargo-nextest
+cargo nextest run --workspace
 ```
 
 ### Checking Code (Fast)

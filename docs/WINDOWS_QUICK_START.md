@@ -9,83 +9,52 @@ From PowerShell in the project root:
 ```
 
 This will:
-1. Build the release binary
-2. Bundle all GTK4/Libadwaita DLLs
-3. Test the bundled application
-4. Generate WiX installer fragments
-5. Create the MSI installer
+1. Build the release binary for `x86_64-pc-windows-msvc`
+2. Create the MSI installer
+3. Create the portable zip
 
 ## Options
 
 ```powershell
 # Skip the cargo build (use existing binary)
 .\scripts\build-windows-release.ps1 -SkipBuild
-
-# Skip bundling (use existing bundle)
-.\scripts\build-windows-release.ps1 -SkipBundle
-
-# Skip the test phase
-.\scripts\build-windows-release.ps1 -SkipTest
-
-# Custom MSYS2 path
-.\scripts\build-windows-release.ps1 -MsysPath "D:\msys64\ucrt64"
-
-# Custom WiX path
-.\scripts\build-windows-release.ps1 -WixPath "C:\WiX\bin"
 ```
 
 ## Prerequisites
 
 1. **Rust toolchain** (MSVC target)
-2. **MSYS2** with UCRT64 environment at `C:\msys64`
-3. **WiX Toolset** v3.11 or later
+2. **WiX Toolset** v3.14.1
+3. **cargo-wix**: `cargo install cargo-wix`
 
-### Install MSYS2 Packages
-
-```bash
-pacman -S mingw-w64-ucrt-x86_64-gtk4 \
-          mingw-w64-ucrt-x86_64-libadwaita \
-          mingw-w64-ucrt-x86_64-gtksourceview5
-```
+No GTK runtime and no MSYS2 are needed.
 
 ## Output
 
-The MSI installer will be created at:
 ```
 target\wix\gcodekit5-<version>-x64.msi
+target\gcodekit5-<version>-windows-x86_64-portable.zip
 ```
 
 ## Troubleshooting
 
-### Missing DLLs
-
-If the application shows missing DLL errors after installation:
-
-1. Find the DLL in MSYS2: `C:\msys64\ucrt64\bin\<dll-name>`
-2. Add it to `scripts/windows-bundle-gtk.ps1` in the `$DllsToCopy` array
-3. Re-run the build script
-
-### Common Missing DLLs
-
-Check [docs/WINDOWS_BUILD.md](WINDOWS_BUILD.md#common-missing-dlls) for a list of commonly missed dependencies.
-
 ### WiX Not Found
 
-Download and install from: https://wixtoolset.org/
+Install WiX 3.14.1 from https://wixtoolset.org/ and set the `WIX` environment variable to its folder (for example `C:\Program Files (x86)\WiX Toolset v3.14\`), or put its `bin` folder in your PATH.
 
-Make sure the WiX bin directory is in your PATH, or use the `-WixPath` parameter.
+### The App Does Not Start
+
+The egui front end needs a GPU driver with Direct3D 12 or Vulkan. Update the graphics driver.
 
 ## Distribution
 
 Before distributing the MSI:
 
 1. Test on clean Windows 11 VM
-2. Test on clean Windows 10 VM  
+2. Test on clean Windows 10 VM
 3. Verify all functionality works
-4. Check file size is reasonable (~80-165 MB)
 
 ## See Also
 
 - [docs/WINDOWS_BUILD.md](WINDOWS_BUILD.md) - Complete build guide
-- [scripts/windows-bundle-gtk.ps1](../scripts/windows-bundle-gtk.ps1) - GTK bundling script
+- [scripts/build-windows-release.ps1](../scripts/build-windows-release.ps1) - Build script
 - [wix/main.wxs](../wix/main.wxs) - WiX installer configuration

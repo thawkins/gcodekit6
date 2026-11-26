@@ -428,9 +428,11 @@ RUST_LOG=debug cargo run
 
 Settings files are stored in platform-specific locations:
 
-- **Linux**: `~/.config/gcodekit5/config.json`
-- **macOS**: `~/Library/Application Support/gcodekit5/config.json`
-- **Windows**: `%APPDATA%\gcodekit5\config.json`
+- **Linux**: `~/.config/gcodekit5/config.toml`
+- **macOS**: `~/Library/Application Support/gcodekit5/config.toml`
+- **Windows**: `%APPDATA%\gcodekit5\config.toml`
+
+On first start the app imports the settings and data files of the older GTK builds (`config.json` and the JSON data files beside it). The old files are left unchanged.
 
 ## Libraries needed to compile on Linux (Debian/Ubuntu)
 - **Build**:  
