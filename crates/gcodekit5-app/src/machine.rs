@@ -1391,12 +1391,14 @@ impl WorkerState {
                 }
             }
             GrblResponseLine::Reset(banner) => {
+                // The controller restarted: nothing in flight will be acknowledged, and no
+                // line sent before it may run after it. Stamped before the banner is
+                // reported, so a line sent in answer to it (the `$G` that asks the active
+                // system again) is never taken for one sent before the reset.
+                self.reset_at = Some(Instant::now());
                 // Report the banner before the stream end it causes, so a consumer
                 // that stops at `StreamStopped` has already seen why.
                 self.sink.emit(MachineEvent::Received(banner));
-                // The controller restarted: nothing in flight will be acknowledged, and no
-                // line sent before it may run after it.
-                self.reset_at = Some(Instant::now());
                 self.reset_buffers();
                 self.end_stream(false);
             }

@@ -168,6 +168,36 @@ fn test_jog_sent_before_a_reset_never_runs_after_it() {
     assert_eq!(jogs_written(&shared), 0, "{:?}", shared.log());
 }
 
+/// A line sent in answer to the reset banner (the UI's `$G`) is written, never dropped as
+/// sent before the reset: the worker stamps the reset before it reports the banner. The
+/// repaint hook, called by the worker right after each event, holds the worker for a while
+/// so the line is sent before the worker could stamp the reset afterwards.
+#[test]
+fn test_line_sent_in_answer_to_a_reset_banner_is_written() {
+    use std::sync::atomic::AtomicBool;
+    let (mut controller, shared) = connected();
+    let stall = Arc::new(AtomicBool::new(false));
+    let hook_stall = Arc::clone(&stall);
+    controller.set_repaint_hook(Box::new(move || {
+        if hook_stall.load(Ordering::SeqCst) {
+            std::thread::sleep(Duration::from_millis(200));
+        }
+    }));
+    stall.store(true, Ordering::SeqCst);
+    shared.inject("Grbl 1.1h ['$' for help]\n");
+    assert!(
+        wait_event(&mut controller, |e| matches!(
+            e,
+            MachineEvent::Received(line) if line.starts_with("Grbl")
+        )),
+        "banner never read"
+    );
+    controller.send_query("$G").expect("send $G");
+    stall.store(false, Ordering::SeqCst);
+    assert!(wait(&mut controller, MachineController::lines_answered));
+    assert!(written(&shared, "$G"), "$G dropped: {:?}", shared.log());
+}
+
 /// Polls `controller` until an event matching `cond` arrives or [`EVENTUALLY`] passes.
 fn wait_event(controller: &mut MachineController, cond: impl Fn(&MachineEvent) -> bool) -> bool {
     let deadline = Instant::now() + EVENTUALLY;
