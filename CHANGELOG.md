@@ -1,6 +1,7 @@
 ## [Unreleased] - 2026-11-27 (release workflow dry-run fixes)
 
 ### Fixed
+- **Release publishing**: the release steps use the workflow's own token (`contents: write`) when no `RELEASE` secret is set; the v2.0.0-alpha.1 tag run built every installer but could not publish, because this repository has no `RELEASE` secret
 - **Release workflow (dry-run fixes)**: macOS builds on `macos-latest`, since GitHub no longer offers `macos-14`; the Windows leg uses the WiX v3 already on the runner instead of failing on a pinned reinstall
 
 ## [2.0.0-alpha.1] - 2026-11-27
