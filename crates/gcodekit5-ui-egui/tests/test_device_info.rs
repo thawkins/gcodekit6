@@ -99,11 +99,20 @@ fn test_device_info_laser_type_writes_32_and_refresh_asks_again() {
         && app.device_info().identity().laser == Some(true)));
 
     let before = shared.log().len();
+    // The lines written since `before`: the status poll's realtime `?` can land among them
+    // under load and is not part of the refresh.
+    let lines = || -> Vec<Wrote> {
+        shared.log()[before..]
+            .iter()
+            .filter(|w| matches!(w, Wrote::Line(_)))
+            .cloned()
+            .collect()
+    };
     h.get_by_label("Refresh device info").click();
     h.run_steps(2);
-    assert!(wait_until(|| shared.log().len() >= before + 2));
+    assert!(wait_until(|| lines().len() >= 2));
     assert_eq!(
-        shared.log()[before..before + 2],
+        lines()[..2],
         [Wrote::Line("$I".to_string()), Wrote::Line("$$".to_string())]
     );
 }
