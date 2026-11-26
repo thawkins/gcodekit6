@@ -374,31 +374,143 @@ fn test_wcs_outside_g54_g59_disables_zero() {
     assert_eq!(count_dollar_g(&shared), 2);
 }
 
-#[test]
-fn test_work_zero_disabled_for_non_grbl_controller() {
+/// Makes `controller` the active profile's, connects through the pane (with the profile's
+/// protocol) and lets the controller settle.
+fn connect_profile(
+    controller: gcodekit5_devicedb::ControllerType,
+) -> (
+    Harness<'static, GcodeKitApp>,
+    std::sync::Arc<LoopbackShared>,
+) {
     let (mut harness, shared) = pane_app(Duration::from_millis(1), false);
-    harness
-        .state_mut()
-        .workspace_mut()
-        .set_controller(Some(&gcodekit5_devicedb::ControllerType::Repetier));
-    gcodekit5_ui_egui::machine::lock(harness.state().state().machine.controller())
-        .connect(&gcodekit5_app::test_support::tcp_settings())
-        .expect("connect");
-    assert!(
-        step_until(&mut harness, |app| app.state().machine.status().connected),
-        "never connected"
-    );
+    crate::test_machine_repetier_pane::connect_as(&mut harness, controller);
     for _ in 0..20 {
         harness.step();
     }
-    for label in CONTROLS {
-        assert!(!enabled(&harness, label), "{label} enabled for Repetier");
+    (harness, shared)
+}
+
+/// Answers the pending confirmation with Yes.
+fn answer_yes(harness: &mut Harness<'_, GcodeKitApp>) {
+    harness
+        .state_mut()
+        .dialogs_mut()
+        .set_override(Some(Box::new(|_| {
+            craft_dialogs::Answer::Message(craft_dialogs::MessageResult::Yes)
+        })));
+    harness
+        .state_mut()
+        .dialogs_mut()
+        .end_frame(None::<&eframe::Frame>);
+}
+
+/// Whether a numbered Repetier line `N<n> <command> *<checksum>` carried `command`.
+fn wrote_numbered(shared: &LoopbackShared, command: &str) -> bool {
+    shared.log().iter().any(|w| match w {
+        Wrote::Line(line) => line
+            .split_once(' ')
+            .and_then(|(_, rest)| rest.rsplit_once(" *"))
+            .is_some_and(|(body, _)| body == command),
+        Wrote::Realtime(_) => false,
+    })
+}
+
+#[test]
+fn test_work_zero_disabled_for_tinyg_g2core_and_marlin() {
+    for controller in [
+        gcodekit5_devicedb::ControllerType::TinyG,
+        gcodekit5_devicedb::ControllerType::G2Core,
+        gcodekit5_devicedb::ControllerType::Marlin,
+    ] {
+        let (mut harness, shared) = connect_profile(controller.clone());
+        report_idle(&mut harness, &shared);
+        for label in CONTROLS {
+            assert!(
+                !enabled(&harness, label),
+                "{label} enabled for {controller:?}"
+            );
+        }
+        click(&mut harness, "Zero X");
+        assert!(
+            !wrote_prefix(&shared, "G10") && !wrote(&shared, "$G"),
+            "{controller:?}: {:?}",
+            shared.log()
+        );
     }
+}
+
+#[test]
+fn test_repetier_work_zero_sends_g92_without_systems() {
+    let (mut harness, shared) = connect_profile(gcodekit5_devicedb::ControllerType::Repetier);
+    assert!(step_enabled(&mut harness, "Zero X"), "Zero X never enabled");
+    for wcs in ["G54", "G55", "G59"] {
+        assert!(!enabled(&harness, wcs), "{wcs} enabled for Repetier");
+    }
+    click(&mut harness, "Zero X");
     assert!(
-        !wrote(&shared, "$G"),
-        "$G sent to Repetier: {:?}",
+        step_until(&mut harness, |_| wrote_numbered(&shared, "G92 X0")),
+        "Zero X not sent as G92: {:?}",
         shared.log()
     );
+    assert!(step_enabled(&mut harness, "Zero All Axes"));
+    click(&mut harness, "Zero All Axes");
+    assert_eq!(
+        harness.state().dialogs().waiting(),
+        1,
+        "no confirmation asked"
+    );
+    answer_yes(&mut harness);
+    assert!(
+        step_until(&mut harness, |_| wrote_numbered(&shared, "G92 X0 Y0 Z0")),
+        "Zero All not sent as G92: {:?}",
+        shared.log()
+    );
+    assert!(step_enabled(&mut harness, "Go to Work Zero"));
+    click(&mut harness, "Go to Work Zero");
+    assert!(
+        step_until(&mut harness, |_| wrote_numbered(
+            &shared,
+            "G90 G0 X0.00 Y0.00"
+        )),
+        "Go to Work Zero not sent: {:?}",
+        shared.log()
+    );
+    assert!(
+        shared
+            .log()
+            .iter()
+            .all(|w| matches!(w, Wrote::Line(l) if !l.contains('$'))),
+        "GRBL command or byte written: {:?}",
+        shared.log()
+    );
+}
+
+#[test]
+fn test_smoothieware_work_zero_uses_the_selected_system() {
+    let (mut harness, shared) = connect_profile(gcodekit5_devicedb::ControllerType::Smoothieware);
+    report_idle(&mut harness, &shared);
+    assert!(step_enabled(&mut harness, "Zero X"), "Zero X never enabled");
+    click(&mut harness, "Zero X");
+    assert!(
+        step_until(&mut harness, |_| wrote(&shared, "G10 L20 P1 X0")),
+        "{:?}",
+        shared.log()
+    );
+    click(&mut harness, "G55");
+    assert!(step_until(&mut harness, |_| wrote(&shared, "G55")));
+    // A report read after the G55 line, so the zero is not refused as stale.
+    assert!(step_until(&mut harness, |app| app
+        .state()
+        .machine
+        .jog_allowed()));
+    assert!(step_enabled(&mut harness, "Zero Y"));
+    click(&mut harness, "Zero Y");
+    assert!(
+        step_until(&mut harness, |_| wrote(&shared, "G10 L20 P2 Y0")),
+        "{:?}",
+        shared.log()
+    );
+    assert!(!wrote(&shared, "$G"), "$G sent to Smoothieware");
 }
 
 #[test]

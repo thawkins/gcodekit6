@@ -4736,3 +4736,12 @@ msgstr "El desplazamiento continuo requiere la cancelación de jog de GRBL; el f
 
 msgid "Probing is not available on Repetier firmware."
 msgstr "El sondeo no está disponible con el firmware Repetier."
+
+msgid "Work zero is not available for this controller type (set in the device profile)."
+msgstr "El cero de trabajo no está disponible para este tipo de controlador (definido en el perfil del dispositivo)."
+
+msgid "Repetier firmware has no work coordinate systems; Zero sets the position with G92."
+msgstr "El firmware Repetier no tiene sistemas de coordenadas de trabajo; Cero fija la posición con G92."
+
+msgid "This sets the work position (G92) so the current X/Y/Z becomes 0."
+msgstr "Esto fija la posición de trabajo (G92) para que la X/Y/Z actual pase a ser 0."

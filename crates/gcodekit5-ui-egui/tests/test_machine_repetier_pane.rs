@@ -17,7 +17,7 @@ use crate::machine_support::step_until;
 use crate::test_machine_pane::pane_app;
 
 /// Makes `controller` the active profile's and connects through the pane's Connect button.
-fn connect_as(harness: &mut Harness<'_, GcodeKitApp>, controller: ControllerType) {
+pub(crate) fn connect_as(harness: &mut Harness<'_, GcodeKitApp>, controller: ControllerType) {
     harness
         .state_mut()
         .workspace_mut()

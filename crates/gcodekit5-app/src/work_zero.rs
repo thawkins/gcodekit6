@@ -35,6 +35,43 @@ pub fn reports_grbl_parser_state(controller: Option<&ControllerType>) -> bool {
     }
 }
 
+/// How the work zero commands work on a controller type, as the GTK front end sent them
+/// (`G10 L20 P<n>` for Zero, `G54`-`G59` for the selector, `G90 G0 X0 Y0` for Go to Work Zero,
+/// whatever the firmware) where the firmware takes them.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum WorkZeroSupport {
+    /// GRBL family: the active system is read from the parser state (`$G`).
+    #[default]
+    Reported,
+    /// Smoothieware: `G10 L20 P<n>` and G54-G59 work, but there is no `$G`; the active system
+    /// is the last one selected (G54 at first), as GTK tracked it.
+    Selected,
+    /// Repetier: no work coordinate systems; Zero's `G10 L20` is sent as `G92` (the connection
+    /// translates it), and the selector is unavailable.
+    PositionOnly,
+    /// TinyG and g2core (JSON protocols the app does not stream) and Marlin (whose `G10` is a
+    /// filament retract): no work zero.
+    Unavailable,
+}
+
+/// How work zero works on `controller` (see [`WorkZeroSupport`]). Without a profile GRBL is
+/// assumed, the app's default controller.
+///
+/// # Arguments
+/// * `controller` - The active device profile's controller type, if a profile is active.
+pub fn work_zero_support(controller: Option<&ControllerType>) -> WorkZeroSupport {
+    match controller {
+        None | Some(ControllerType::Grbl | ControllerType::GrblHal | ControllerType::FluidNC) => {
+            WorkZeroSupport::Reported
+        }
+        Some(ControllerType::Smoothieware) => WorkZeroSupport::Selected,
+        Some(ControllerType::Repetier) => WorkZeroSupport::PositionOnly,
+        Some(ControllerType::TinyG | ControllerType::G2Core | ControllerType::Marlin) => {
+            WorkZeroSupport::Unavailable
+        }
+    }
+}
+
 /// A work coordinate system.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum Wcs {

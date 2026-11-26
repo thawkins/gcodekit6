@@ -49,7 +49,7 @@ use gcodekit5_app::machine::{
 };
 use gcodekit5_app::override_target::{OverrideTarget, TargetStep};
 use gcodekit5_app::work_zero::{
-    Wcs, go_to_work_zero_command, reports_grbl_parser_state, zero_axes_command, zero_rotary_command,
+    Wcs, go_to_work_zero_command, work_zero_support, zero_axes_command, zero_rotary_command,
 };
 use gcodekit5_communication::firmware::ControllerProtocol;
 use gcodekit5_core::units::{FeedRateUnits, MeasurementSystem};
@@ -424,7 +424,8 @@ impl MachineControlPane {
         match self.work_zero_target(machine, ZERO_NOT_IDLE) {
             Ok(wcs) => {
                 self.notice = None;
-                self.confirm = Some(ConfirmRequest::ZeroAllAxes(wcs));
+                let named = self.wcs.names_system().then_some(wcs);
+                self.confirm = Some(ConfirmRequest::ZeroAllAxes(named));
             }
             Err(msgid) => self.refuse(tr, msgid),
         }
@@ -1243,7 +1244,7 @@ impl Pane for MachineControlPane {
     }
 
     fn set_controller(&mut self, controller: Option<&gcodekit5_devicedb::ControllerType>) {
-        self.wcs.set_grbl(reports_grbl_parser_state(controller));
+        self.wcs.set_support(work_zero_support(controller));
         self.protocol = controller.map_or(ControllerProtocol::Unknown, |c| {
             ControllerProtocol::from_name(c.as_str())
         });
@@ -1265,7 +1266,7 @@ impl Pane for MachineControlPane {
         if choice == ConfirmChoice::Yes {
             // Checked again: the job, the state or the active system may have changed.
             let axes = [Axis::X, Axis::Y, Axis::Z];
-            self.zero_axes(ctx.machine(), ctx.tr, &axes, Some(asked));
+            self.zero_axes(ctx.machine(), ctx.tr, &axes, asked);
         }
         true
     }

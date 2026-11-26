@@ -4736,3 +4736,12 @@ msgstr "Il jog continuo richiede l'annullamento jog di GRBL; il firmware Repetie
 
 msgid "Probing is not available on Repetier firmware."
 msgstr "La tastatura non è disponibile con il firmware Repetier."
+
+msgid "Work zero is not available for this controller type (set in the device profile)."
+msgstr "Lo zero pezzo non è disponibile per questo tipo di controller (impostato nel profilo del dispositivo)."
+
+msgid "Repetier firmware has no work coordinate systems; Zero sets the position with G92."
+msgstr "Il firmware Repetier non ha sistemi di coordinate di lavoro; Zero imposta la posizione con G92."
+
+msgid "This sets the work position (G92) so the current X/Y/Z becomes 0."
+msgstr "Questo imposta la posizione di lavoro (G92) in modo che l'attuale X/Y/Z diventi 0."

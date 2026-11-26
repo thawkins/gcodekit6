@@ -4740,3 +4740,12 @@ msgstr "Le jog continu nécessite l'annulation de jog de GRBL ; le micrologiciel
 
 msgid "Probing is not available on Repetier firmware."
 msgstr "Le palpage n'est pas disponible avec le micrologiciel Repetier."
+
+msgid "Work zero is not available for this controller type (set in the device profile)."
+msgstr "Le zéro pièce n'est pas disponible pour ce type de contrôleur (défini dans le profil de l'appareil)."
+
+msgid "Repetier firmware has no work coordinate systems; Zero sets the position with G92."
+msgstr "Le micrologiciel Repetier n'a pas de systèmes de coordonnées pièce ; Zéro définit la position avec G92."
+
+msgid "This sets the work position (G92) so the current X/Y/Z becomes 0."
+msgstr "Ceci définit la position pièce (G92) pour que la position X/Y/Z actuelle devienne 0."

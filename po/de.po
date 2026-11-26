@@ -4733,3 +4733,12 @@ msgstr "Kontinuierliches Verfahren benötigt den Jog-Abbruch von GRBL; die Repet
 
 msgid "Probing is not available on Repetier firmware."
 msgstr "Antasten ist mit der Repetier-Firmware nicht verfügbar."
+
+msgid "Work zero is not available for this controller type (set in the device profile)."
+msgstr "Werkstücknullpunkt ist für diesen Controllertyp nicht verfügbar (im Geräteprofil festgelegt)."
+
+msgid "Repetier firmware has no work coordinate systems; Zero sets the position with G92."
+msgstr "Die Repetier-Firmware hat keine Werkstückkoordinatensysteme; Null setzt die Position mit G92."
+
+msgid "This sets the work position (G92) so the current X/Y/Z becomes 0."
+msgstr "Dies setzt die Werkstückposition (G92), sodass die aktuelle X/Y/Z-Position 0 wird."

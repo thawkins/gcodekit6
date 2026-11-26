@@ -263,8 +263,9 @@ pub enum ConfirmRequest {
     /// A job is running while the user quits: stop it and quit (Yes) or keep running (No).
     StopJob,
     /// Zero All Axes: set the current X/Y/Z as 0 of the work coordinate system it names,
-    /// the active one when asked (Yes), or not (No).
-    ZeroAllAxes(Wcs),
+    /// the active one when asked (Yes), or not (No). `None`: a controller without systems
+    /// (Repetier), whose zero sets the position with `G92`.
+    ZeroAllAxes(Option<Wcs>),
     /// Clear editor: remove all G-code from the editor (Yes), or keep it (No).
     ClearEditor,
 }
@@ -306,9 +307,13 @@ impl ConfirmRequest {
                 n_!("Clear the editor?"),
                 n_!("All G-code in the editor will be removed."),
             ),
-            Self::ZeroAllAxes(_) => (
+            Self::ZeroAllAxes(Some(_)) => (
                 n_!("Zero all work axes?"),
                 n_!("This sets work coordinate system {wcs} so the current X/Y/Z becomes 0."),
+            ),
+            Self::ZeroAllAxes(None) => (
+                n_!("Zero all work axes?"),
+                n_!("This sets the work position (G92) so the current X/Y/Z becomes 0."),
             ),
         }
     }
@@ -528,7 +533,10 @@ impl Dialogs {
             level,
             title: tr.tr(title).into_owned(),
             description: match request {
-                ConfirmRequest::ZeroAllAxes(wcs) => tr.tr(description).replace("{wcs}", wcs.code()),
+                ConfirmRequest::ZeroAllAxes(Some(wcs)) => {
+                    tr.tr(description).replace("{wcs}", wcs.code())
+                }
+                ConfirmRequest::ZeroAllAxes(None) => tr.tr(description).into_owned(),
                 ConfirmRequest::UnsavedGcode
                 | ConfirmRequest::UnsavedDesign
                 | ConfirmRequest::UnsavedTool
@@ -677,7 +685,8 @@ pub fn msgids() -> Vec<&'static str> {
         ConfirmRequest::UnsavedDevice,
         ConfirmRequest::Restart,
         ConfirmRequest::StopJob,
-        ConfirmRequest::ZeroAllAxes(Wcs::G54),
+        ConfirmRequest::ZeroAllAxes(Some(Wcs::G54)),
+        ConfirmRequest::ZeroAllAxes(None),
         ConfirmRequest::ClearEditor,
     ]
     .into_iter()

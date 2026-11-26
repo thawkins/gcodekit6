@@ -138,3 +138,26 @@ fn test_only_grbl_family_is_asked_for_parser_state() {
         assert!(!reports_grbl_parser_state(Some(&other)), "{other:?}");
     }
 }
+
+#[test]
+fn test_work_zero_support_per_controller() {
+    use gcodekit5_app::work_zero::{WorkZeroSupport, work_zero_support};
+    use gcodekit5_devicedb::ControllerType;
+    assert_eq!(work_zero_support(None), WorkZeroSupport::Reported);
+    for (controller, support) in [
+        (ControllerType::Grbl, WorkZeroSupport::Reported),
+        (ControllerType::GrblHal, WorkZeroSupport::Reported),
+        (ControllerType::FluidNC, WorkZeroSupport::Reported),
+        (ControllerType::Smoothieware, WorkZeroSupport::Selected),
+        (ControllerType::Repetier, WorkZeroSupport::PositionOnly),
+        (ControllerType::TinyG, WorkZeroSupport::Unavailable),
+        (ControllerType::G2Core, WorkZeroSupport::Unavailable),
+        (ControllerType::Marlin, WorkZeroSupport::Unavailable),
+    ] {
+        assert_eq!(
+            work_zero_support(Some(&controller)),
+            support,
+            "{controller:?}"
+        );
+    }
+}

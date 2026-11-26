@@ -14,8 +14,10 @@
 //!
 //! A system outside G54-G59 (grblHAL's `G59.1`, a typed `G54.1`) leaves the zero commands
 //! without a `P` that names it, so they stay disabled until a G54-G59 is active again. `$G`
-//! is a GRBL command: with a device profile for another controller family the work zero
-//! controls stay disabled and say why.
+//! is a GRBL command, asked of the GRBL family only; the other controller types follow
+//! [`WorkZeroSupport`]: Smoothieware uses the last selection, Repetier zeroes with `G92` (its
+//! connection translates `G10 L20`) and has no selector, and TinyG, g2core and Marlin have no
+//! work zero; the disabled controls say why.
 //!
 //! Ported from the GTK `machine_control` view's Work Coordinates section and zero buttons.
 //!
@@ -24,7 +26,7 @@
 use gcodekit5_app::i18n::Translator;
 use gcodekit5_app::machine::grbl_stream::{GrblResponseLine, classify_response};
 use gcodekit5_app::machine::{MachineError, MachineEvent};
-use gcodekit5_app::work_zero::{PARSER_STATE_QUERY, Wcs, WcsWord, wcs_in_line};
+use gcodekit5_app::work_zero::{PARSER_STATE_QUERY, Wcs, WcsWord, WorkZeroSupport, wcs_in_line};
 
 use crate::icons::Icon;
 use crate::machine::{Machine, MachineStatus, lock};
@@ -40,7 +42,8 @@ pub(super) const MSGIDS: &[&str] = &[
     n_!("When checked, Go to Work Zero will also move to Z0"),
     WAITING_FOR_WCS,
     WCS_OUTSIDE,
-    NOT_GRBL,
+    NO_WORK_ZERO,
+    NO_WCS_SYSTEMS,
 ];
 
 /// Shown on the zero buttons while the active system is not known.
@@ -48,9 +51,13 @@ pub(super) const WAITING_FOR_WCS: &str =
     n_!("Waiting for the controller to report the active work coordinate system.");
 /// Shown on the zero buttons while the active system is outside G54-G59.
 pub(super) const WCS_OUTSIDE: &str = n_!("Active work coordinate system is not G54-G59.");
-/// Shown on the work zero controls for a controller outside the GRBL family.
-pub(super) const NOT_GRBL: &str =
-    n_!("Work zero needs a GRBL-family controller (set in the device profile).");
+/// Shown on the work zero controls for a controller without work zero
+/// ([`WorkZeroSupport::Unavailable`]).
+pub(super) const NO_WORK_ZERO: &str =
+    n_!("Work zero is not available for this controller type (set in the device profile).");
+/// Shown on the G54-G59 selector for Repetier, which zeroes with `G92`.
+pub(super) const NO_WCS_SYSTEMS: &str =
+    n_!("Repetier firmware has no work coordinate systems; Zero sets the position with G92.");
 
 /// What the user asked for in the section.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -89,8 +96,9 @@ pub(super) struct WcsPanel {
     /// The last G54-G59 sent on this connection (G54 until one is): the fallback for a
     /// controller that does not report its parser state.
     selected: Wcs,
-    /// Whether the controller is GRBL-family (answers `$G`); see [`WcsPanel::set_grbl`].
-    not_grbl: bool,
+    /// How work zero works on the active profile's controller; see
+    /// [`WcsPanel::set_support`].
+    support: WorkZeroSupport,
     /// Whether Go to Work Zero moves Z too; off by default, a Z0 rapid can crash a tool.
     include_z: bool,
     query: Query,
@@ -102,7 +110,11 @@ pub(super) struct WcsPanel {
 impl WcsPanel {
     /// The system the section shows as active.
     pub(super) fn shown(&self, status: &MachineStatus) -> Option<Wcs> {
-        if self.not_grbl || status.wcs_outside {
+        let systems = matches!(
+            self.support,
+            WorkZeroSupport::Reported | WorkZeroSupport::Selected
+        );
+        if !systems || status.wcs_outside {
             return None;
         }
         match status.active_wcs {
@@ -114,6 +126,10 @@ impl WcsPanel {
 
     /// The system a zero command acts on: the one shown, once no refresh is outstanding.
     pub(super) fn active(&self, status: &MachineStatus) -> Option<Wcs> {
+        if self.support == WorkZeroSupport::PositionOnly {
+            // `G10 L20 P1` is sent as `G92`, which names no system.
+            return Some(Wcs::G54);
+        }
         if self.query == Query::Settled {
             self.shown(status)
         } else {
@@ -124,9 +140,12 @@ impl WcsPanel {
     /// Why the zero commands (and Go to Work Zero) cannot run now, as a msgid; `None` when
     /// they can. Offline is not a reason: the controls are simply disabled.
     pub(super) fn blocked(&self, status: &MachineStatus) -> Option<&'static str> {
-        if self.not_grbl {
-            Some(NOT_GRBL)
-        } else if status.wcs_outside {
+        match self.support {
+            WorkZeroSupport::Unavailable => return Some(NO_WORK_ZERO),
+            WorkZeroSupport::PositionOnly => return None,
+            WorkZeroSupport::Reported | WorkZeroSupport::Selected => {}
+        }
+        if status.wcs_outside {
             Some(WCS_OUTSIDE)
         } else if self.active(status).is_none() {
             Some(WAITING_FOR_WCS)
@@ -135,13 +154,19 @@ impl WcsPanel {
         }
     }
 
-    /// Takes whether the controller is GRBL-family (Grbl, grblHAL, FluidNC), from the active
-    /// device profile; `$G` is asked only of those.
+    /// Takes how work zero works on the active device profile's controller; `$G` is asked
+    /// only of the GRBL family ([`WorkZeroSupport::Reported`]).
     ///
     /// # Arguments
-    /// * `grbl` - Whether it is.
-    pub(super) fn set_grbl(&mut self, grbl: bool) {
-        self.not_grbl = !grbl;
+    /// * `support` - How it works.
+    pub(super) fn set_support(&mut self, support: WorkZeroSupport) {
+        self.support = support;
+    }
+
+    /// Whether a zero command names a work coordinate system (not on Repetier, whose `G92`
+    /// has none), so its confirmation names it.
+    pub(super) fn names_system(&self) -> bool {
+        self.support != WorkZeroSupport::PositionOnly
     }
 
     /// Notes, once per frame (drawn or not) while a stream runs, whether its program may
@@ -210,7 +235,9 @@ impl WcsPanel {
     pub(super) fn drive(&mut self, machine: &Machine) {
         match self.query {
             Query::Settled => {}
-            Query::Wanted if self.not_grbl => self.query = Query::Settled,
+            Query::Wanted if self.support != WorkZeroSupport::Reported => {
+                self.query = Query::Settled;
+            }
             Query::Wanted => {
                 let mut controller = lock(machine.controller());
                 if controller.is_streaming() || !controller.lines_answered() {
@@ -248,7 +275,11 @@ impl WcsPanel {
         status: &MachineStatus,
     ) -> Option<Action> {
         let connected = status.connected;
-        let selector_reason = self.not_grbl.then(|| tr.tr(NOT_GRBL));
+        let selector_reason = match self.support {
+            WorkZeroSupport::Reported | WorkZeroSupport::Selected => None,
+            WorkZeroSupport::PositionOnly => Some(tr.tr(NO_WCS_SYSTEMS)),
+            WorkZeroSupport::Unavailable => Some(tr.tr(NO_WORK_ZERO)),
+        };
         let shown = self.shown(status);
         let mut action = None;
         crate::theme::section_heading(ui, &tr.tr("Work Coordinates"));
@@ -267,7 +298,8 @@ impl WcsPanel {
                             (Icon::BookmarkAdd.themed(ui), wcs.code()),
                         )
                         .min_size(egui::vec2(width, 0.0));
-                        let response = ui.add_enabled(connected && !self.not_grbl, button);
+                        let enabled = connected && selector_reason.is_none();
+                        let response = ui.add_enabled(enabled, button);
                         let response = match &selector_reason {
                             Some(reason) if connected => {
                                 response.on_disabled_hover_text(reason.as_ref())
