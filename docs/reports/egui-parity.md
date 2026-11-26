@@ -1,6 +1,21 @@
 # egui Front End Parity Checklist (M6 cut-over)
 
-Date: 2026-11-26. Branch `claude/egui-m6`, base `6841d84`.
+Date: 2026-11-26. Branch `claude/egui-m6`, base `6841d84`. Signed off by gap-closure Task G7
+(base `c8d4fe3`): every row is Ported, Not applicable or Manual check needed with its reason,
+except the two Gap rows the G7 sweep found (Repetier streaming and E-STOP; connection refused
+on a firmware/profile mismatch), which are listed under Gaps for a decision.
+
+Counts (table rows above Gaps): 141 Ported, 21 Not applicable, 13 Manual check needed,
+2 Gap; 177 rows.
+
+G7 sweep: every user-visible string of `crates/gcodekit5-ui/src/ui/gtk/` and `gtk_app.rs`
+(`t!(...)`, 1066 strings) was looked up in the egui and app sources, and each one missing was
+traced to its widget; every key handler (`EventControllerKey`), right-click and double-click
+gesture and `set_accels_for_action` call was compared with the egui keymap. The GTK features that
+sweep found missing were ported with a test (the *(GTK)* rows for Duplicate, the canvas view
+keys, the shortcuts popover, the empty-design box, preview Cancel, the settings warning, the
+job-end console lines, Save G-code, Unlock in ALARM and the stock tooltip) or are the two Gap
+rows.
 
 One row per user-visible feature from `docs/user/*.md` and the SPEC.md feature list
 (section 2.2 and the panels/dialogs of section 5). Rows marked *(GTK)* are user-visible GTK
@@ -9,8 +24,9 @@ features that the docs do not list but that a user of the GTK build would miss.
 Status values:
 
 - **Ported**: the egui build has it, and the evidence names a test (`file::test`, test
-  names without the `test_` prefix are in `crates/gcodekit5-ui-egui/tests/` unless the path says
-  `app/`, which is `crates/gcodekit5-app/tests/`).
+  names with or without the `test_` prefix are in `crates/gcodekit5-ui-egui/tests/` unless the
+  path says `app/`, which is `crates/gcodekit5-app/tests/`, or `settings/`, which is
+  `crates/gcodekit5-settings/tests/`). Every name cited was checked to exist in G7.
 - **Gap**: the GTK build has it and the egui build does not.
 - **Manual check needed**: the egui code exists but no automated test covers the
   user-visible part, or the check needs real hardware or another OS. No manual checks have
@@ -22,8 +38,8 @@ Status values:
 
 | Feature | Source doc | egui status | Evidence |
 | --- | --- | --- | --- |
-| Main window opens maximized with docked panes | SPEC 5.1 | Ported | `test_smoke::main_window_opens_maximized`, `test_workspace::default_layout_has_all_panes` |
-| Pane layout persists; small windows keep panes reachable | SPEC 5.1 | Ported | `test_workspace::layout_persists`, `test_workspace::tiny_window_keeps_panes_in_overflow_menu` |
+| Main window opens maximized with GTK's page tabs | SPEC 5.1 | Ported | `test_smoke::main_window_opens_maximized`, `test_workspace::test_pages_are_in_gtk_order`, `test_workspace::test_each_page_is_reachable_by_its_tab`, `test_workspace::test_machine_control_page_holds_editor_and_console` (GTK's eight pages; the docked panes of earlier egui builds are gone) |
+| Pages keep their state; small windows keep the controls reachable | SPEC 5.1 | Ported | `test_workspace::test_switching_pages_keeps_pane_state`, `test_workspace::test_old_docking_layout_is_ignored`, `test_machine_control_layout::test_primary_controls_visible_at_1280x800`, `test_machine_control_layout::test_estop_clear_of_the_editor_column_in_narrow_windows`, `test_designer_page_layout::test_designer_primary_controls_visible_at_1280x800`, `test_visualizer_page_layout::test_visualizer_controls_visible_at_1280x800`, `test_manager_pages_layout::test_manager_page_primary_buttons_visible_at_1280x800` (GTK's page layout is fixed, as egui's; a docking layout saved by an earlier egui build is ignored) |
 | Menus with every command and its shortcut | SPEC 5.4 | Ported | `test_commands::menu_contains_every_command`, `test_commands::menu_shows_keymap_shortcuts` |
 | Every GTK accelerator bound, no conflicts | 90-shortcuts | Ported | `test_commands::every_gtk_accelerator_bound`, `test_commands::no_keymap_conflicts`, `test_motion_keys_typing::test_cycle_start_tilde_runs_only_in_machine_control`, `test_commands::test_menu_shows_only_keys_that_work_on_every_page` (deviation from GTK: Cycle Start's `~` works only while Machine Control has the keyboard, not app-wide, since a bare key that resumes a held job must not fire from a stray press on another page; the Machine menu's Cycle Start item, which GTK's menu did not have, therefore shows no key: a menu item shows only a key that works on every page, and Preferences' Shortcuts page lists `~` with where it works) |
 | Quit asks about a running job and unsaved work | 20-gcode-editor | Ported | `test_quit::quit_asks_job_first_then_unsaved_work`, `test_quit::quit_prompts_and_cancel_keeps_app_open` |
@@ -54,6 +70,8 @@ Status values:
 | GRBL family controllers | 05-supported-controllers | Ported | `app/test_firmware_settings_model::firmware_settings_grbl_family_detection`, `app/test_device_profiles_model::device_profiles_grbl_family_controllers_save` |
 | grblHAL against a real controller or the simulator | 05-supported-controllers | Manual check needed | Never run against the grblHAL simulator (CHANGELOG known gap) |
 | TinyG, g2core, Smoothieware, FluidNC streaming | 05-supported-controllers, SPEC 2.2 | Manual check needed | Both front ends stream through the GRBL-style protocol; no test with these firmwares |
+| Repetier streaming and E-STOP | *(GTK)* | Gap | GTK streams to a Repetier profile through its flow-control sender (`RepetierSender`: line numbers, checksums, `Resend:` handling, `M110`/`M115` at connect) and its E-STOP sends `M112`, since Repetier has no realtime reset. egui's `MachineController` speaks only the GRBL character-counting protocol, so with a Repetier profile it would stream without resends and its E-STOP (`0x18`) does nothing on the controller. Found by the G7 sweep; not ported (see Gaps) |
+| Connection refused when the device's firmware differs from the profile | *(GTK)* | Gap | GTK's `protocol_mismatch` (`machine_control/connection.rs`) disconnects at connect when the device announces another firmware than the active profile ("Connection rejected: active machine is configured as ... but the device responded as ..."). egui connects anyway and reports the mismatch only on Firmware Settings > Retrieve (`test_device_manager::device_manager_protocol_mismatch_hints_at_the_profile`). Found by the G7 sweep; not ported (see Gaps) |
 | Repetier settings | *(GTK)* | Ported | `test_device_manager::device_manager_repetier_profile_selects_repetier_retrieve`, `test_firmware_settings::firmware_settings_repetier_float_slot_written_as_float` |
 
 ## Machine control
@@ -167,14 +185,14 @@ Status values:
 | Drawing tools (rectangle, circle, ellipse, line, polyline, triangle, polygon) | 40-designer | Ported | `test_designer_canvas::each_drawing_tool_draws_its_shape`, `test_designer_canvas::polyline_double_click_closes_and_escape_cancels` |
 | Text tool | 40-designer | Ported | `test_designer_text_tool::*` (7 tests) |
 | Gear, sprocket, timing pulley | 40-designer | Ported | `test_designer_properties_shapes::gear_parameters`, `test_designer_properties_shapes::sprocket_pitch_sets_the_standard_roller` |
-| Fast shape gallery | 40-designer | Ported | `test_designer_gallery::*` (template icons not ported: text cards) |
+| Fast shape gallery | 40-designer | Ported | `test_designer_gallery::*` (4 tests), `test_icons::test_icons_every_used_app_icon_decodes`, `test_designer_snapshots::test_snapshot_shape_gallery` (GTK's template SVG icons on each card) |
 | Click, Ctrl+Click, marquee selection | 40-designer | Ported | `test_designer_canvas::click_selects_shape_and_empty_click_deselects`, `test_designer_editing::ctrl_click_toggles_selection`, `test_designer_canvas::marquee_selects_shapes_it_touches` |
-| Select all (Ctrl+A) | 40-designer | Manual check needed | No test |
+| Select all (Ctrl+A) | 40-designer | Not applicable | Not in the GTK source: GTK's canvas keys (`designer/ui_builders.rs`) and app accelerators have no Select All, and neither front end binds Ctrl+A on the canvas |
 | Move, resize, rotate | 40-designer | Ported | `test_designer_editing::drag_moves_selection_and_undo_restores`, `test_designer_editing::resize_by_corner_handle_keeps_aspect`, `test_designer_editing::rotate_from_context_menu` |
 | Exact size, position, rotation | 40-designer | Ported | `test_designer_properties::property_edit_updates_shape`, `test_designer_properties::rotation_is_absolute_for_one_shape_and_locks_its_size` |
 | Mirror X / Y | 40-designer | Ported | `test_designer_shape_ops::test_mirror_x_and_y_from_context_menu_are_undoable` (context menu "Mirror on X" / "Mirror on Y", one undo step each) |
 | Align (left, right, top, bottom, centre) | 40-designer | Ported | `test_designer_shape_ops::test_align_submenu_aligns_the_selection_in_one_undo_step`, `test_designer_shape_ops::test_align_needs_two_shapes`, `test_designer_shape_ops::test_align_keys_run_on_the_canvas_but_not_while_typing`, `test_commands::test_every_gtk_accelerator_bound` (context menu Align submenu for 2+ shapes; GTK's Alt+L/R/T/V in the Designer keymap scope; GTK's Alt+B and Alt+H are menu-title mnemonics here, so Bottom and Center X are Alt+O and Alt+C, `test_commands::test_designer_alt_keys_leave_the_menu_mnemonics`) |
-| Cut / copy / paste shapes | 90-shortcuts | Ported | `test_designer_shape_ops::test_copy_and_paste_from_context_menu_make_new_shapes_at_the_pointer`, `test_designer_shape_ops::test_cut_removes_the_selection_and_paste_brings_it_back`, `test_designer_shape_ops::test_paste_gives_a_copied_group_its_own_group_id`, `test_designer_shape_ops::test_clipboard_keys_run_on_the_canvas_but_not_while_typing`, `test_designer_shape_ops::test_edit_menu_acts_on_a_focused_text_field_not_on_shapes`, `test_designer_shape_ops::test_edit_menu_and_keys_act_on_shapes_anywhere_on_the_designer_page` (routed by page as GTK; a focused text field keeps its text edits; the design's own clipboard, as GTK; Paste centres on the pointer with new ids, one undo step; with only a clipboard the whole menu opens, entries needing a selection disabled) |
+| Cut / copy / paste shapes | 90-shortcuts | Ported | `test_designer_shape_ops::test_copy_and_paste_from_context_menu_make_new_shapes_at_the_pointer`, `test_designer_shape_ops::test_cut_removes_the_selection_and_paste_brings_it_back`, `test_designer_shape_ops::test_paste_gives_a_copied_group_its_own_group_id`, `test_designer_shape_ops::test_clipboard_keys_run_on_the_canvas_but_not_while_typing`, `test_designer_shape_ops::test_edit_menu_acts_on_a_focused_text_field_not_on_shapes`, `test_designer_shape_ops::test_edit_menu_and_keys_act_on_shapes_anywhere_on_the_designer_page` (routed by page as GTK, see the routing note under the Designer table; a focused text field keeps its text edits; the design's own clipboard, as GTK; Paste centres on the pointer with new ids, one undo step; with only a clipboard the whole menu opens, entries needing a selection disabled) |
 | Duplicate (Ctrl+D) | *(GTK)* | Ported | `test_designer_shape_ops::test_duplicate_key_copies_the_selection_10mm_away_in_one_undo_step`, `test_designer_shape_ops::test_duplicate_from_context_menu`, `test_commands::test_every_gtk_accelerator_bound` (GTK's canvas key: copies 10 mm right and up with new ids, one undo step; egui adds a Duplicate entry to the context menu, where every designer key has its place) |
 | Canvas view keys (+ / = / -, F, R, D) and Ctrl+I | *(GTK)* | Ported | `test_designer_shape_ops::test_view_keys_run_on_the_canvas_but_not_while_typing`, `test_commands::test_every_gtk_accelerator_bound` (Designer keymap scope; egui reports the keypad + and - as + and -; GTK's `_` (Shift+-) for zoom out is not bound; Ctrl+I runs Import Image) |
 | Keyboard-shortcut popover ("?") and the status line's Snap / Constraint | *(GTK)* | Ported | `test_designer_page_layout::test_designer_shortcuts_popover_lists_the_canvas_keys`, `test_designer_page_layout::test_designer_status_line_names_snap_and_constraint` (the popover lists the default keys, as GTK's did) |
@@ -194,10 +212,20 @@ Status values:
 | Multi-pass depth stepping | 40-designer | Ported | `test_designer_properties_cam::cam_rejects_unsafe_step_and_ramp_values` |
 | V-carve, drilling operations | 40-designer | Not applicable | Not in the GTK designer |
 | Toolpath preview | 40-designer | Ported | `test_designer_toolpath::show_toolpaths_previews_the_design`, `test_designer_toolpath::test_preview_build_shows_progress_and_cancel` (GTK's spinner, progress and Cancel beside Show Toolpaths; GTK also put the progress in the status bar, egui does not; Cancel clears the preview where GTK kept a stale one) |
-| Undo / redo | 40-designer | Ported | `test_designer_editing::undo_redo_commands`, `test_designer_app::app_routes_undo_to_active_designer_and_tracks_dirty` |
+| Undo / redo | 40-designer | Ported | `test_designer_editing::undo_redo_commands`, `test_designer_app::app_routes_undo_to_active_designer_and_tracks_dirty` (routed by the pane last pressed; see the routing note under the Designer table) |
 | Save / open design files | 40-designer | Ported | `test_designer_files::save_then_open_round_trips_the_design` |
 | Export G-code and SVG | 40-designer | Ported | `test_designer_files::export_gcode_writes_only_visible_shapes`, `test_designer_files::export_svg_writes_visible_shapes` |
 | Device work area on the canvas | *(GTK)* | Ported | `test_designer_work_area::test_work_area_follows_the_active_profile`, `test_designer_work_area::test_fit_to_device_fits_the_profiles_area`, `test_designer_work_area::test_export_limits_are_the_profiles_else_the_preferences` (the active profile's X/Y limits are outlined, fitted by Fit to Device and used for the export limits; 250 x 250 mm and the Preferences limits without a profile) |
+
+Routing note (Designer): Undo, Redo, the Align keys, Group, Ungroup, Duplicate and the
+canvas view keys go to the designer only when the Designer canvas pane is the pane the user
+last pressed the pointer in (`Workspace::active_pane`; a press on a menu keeps it), so Ctrl+Z
+after a click in the editor never undoes a shape. Edit > Cut, Copy and Paste (menu and keys) go by
+page instead, as GTK's Edit actions did: anywhere on the Designer page they act on the shapes,
+unless a text field has (or, for the menu, just had) the keyboard, which keeps its text edit.
+The two rules differ on purpose; both are pinned by tests
+(`test_designer_app::app_routes_undo_to_active_designer_and_tracks_dirty`,
+`test_designer_shape_ops::test_edit_menu_and_keys_act_on_shapes_anywhere_on_the_designer_page`).
 
 ## CAM tools
 
@@ -266,16 +294,62 @@ Status values:
 ## Gaps
 
 Ranked by user impact. Sizes are rough estimates for one developer who knows the codebase.
+The earlier list's last row, the Designer gallery icons, was ported by the visual restore
+(Fast shape gallery row). The two rows below were found by the G7 sweep of the GTK source.
 
 | Rank | Gap | User impact | Rough size |
 | --- | --- | --- | --- |
-| 12 | Designer gallery icons | Low | 1 day |
+| 1 | Repetier streaming and E-STOP (`M112`) | High for Repetier users: no safe streaming, E-STOP does not stop the controller. GRBL-family users are not affected | 2-3 days (port `RepetierSender` into `MachineController` behind the profile's `SenderKind::FlowControl`, `M112` E-STOP, tests on the loopback) |
+| 2 | Connection refused on a firmware/profile mismatch | Medium: a wrong active profile is only reported on Firmware Settings > Retrieve, not at connect | Half a day (check the banner's protocol at connect, disconnect with GTK's message, test) |
 
-Manual checks still to run before GTK is deleted (no automated evidence): TCP and
-WebSocket connections, auto-reconnect, non-GRBL firmwares and the grblHAL simulator, Windows
-and macOS builds, Unlock, spindle and rapid override buttons, console colours and
-auto-scroll, editor undo/clipboard, tool marker, designer Select All and adaptive pocketing,
-firmware settings export/import, probe defaults.
+Until rank 1 is ported, the safe stop-gap is to refuse Connect in egui for a profile whose
+protocol uses the flow-control sender (Repetier), saying to use the GTK build; that is a user
+decision, so it is not done here.
+
+## Manual checks
+
+Things only a person with the hardware or the operating system can check. None has been run
+for this report. Run them before GTK is deleted.
+
+Connection and firmware:
+
+- TCP/IP and WebSocket connections to a real controller (tests use a loopback transport).
+- Auto-reconnect after unplugging the cable or resetting the controller.
+- grblHAL against a real board or the grblHAL simulator.
+- TinyG, g2core, Smoothieware and FluidNC: connect, stream a short program, feed hold,
+  resume, E-STOP.
+- A Repetier controller (after the rank 1 gap is closed).
+
+Platforms:
+
+- Windows build: start, connect, stream, File > Save and Save As to a normal folder and to a
+  read-only one (the Windows save path is untested), the app-drawn title bar and its buttons.
+- macOS build: the native menu bar (every item, its key equivalents, Quit and Preferences in
+  the app menu), Cmd-based shortcuts, and that the E-STOP (`Cmd+Shift+K`) and feed hold
+  (`Cmd+Shift+H`) keys still work while a native menu is open (egui gets no keys then; the
+  in-window bar is covered by `test_machine_pane::test_safety_chords_work_while_a_menu_is_open`).
+- Windows log-off / macOS logout with unsaved work (same as GTK: no prompt).
+- HiDPI on a real 1.5x and 2x monitor, and moving the window between monitors.
+
+Keyboard:
+
+- Keyboard jog on a real numeric keypad (egui reports keypad digits as digits) and with Num
+  Lock off.
+- Cycle Start's `~` (stored as Shift+`) on non-US layouts, where Shift+` is another key.
+
+Translations:
+
+- Each of the 5 translations (de, es, fr, it, pt) read by a native speaker (new strings were translated without
+  one), including the Designer shortcuts popover and the settings load warning.
+
+Features without automated evidence of the user-visible part:
+
+- Console: colour by level and auto-scroll.
+- Editor: the text field's own undo, redo, clipboard and select all.
+- Visualizer: the tool marker following the work position.
+- Designer: the Adaptive pocket strategy.
+- Probing: saved probe defaults and setter plate settings.
+- Firmware settings: Save to file and Load from file.
 
 ## Visual
 
