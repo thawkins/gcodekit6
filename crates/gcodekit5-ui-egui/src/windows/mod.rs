@@ -1,5 +1,6 @@
-//! Windows the app opens over its workspace: Preferences, About, Firmware Settings, Device
-//! Info, Device Manager, CNC Tools, Materials and Help.
+//! Windows the app opens over its pages (Preferences, About, Device Info and Help), and the
+//! manager pages that were windows in earlier builds (Device Manager, Device Config's
+//! firmware settings, CNC Tools and Materials).
 //!
 //! Dependencies: `egui`, `craft-ui`, `gcodekit5-settings`, `gcodekit5-app`,
 //! `gcodekit5-communication`, `gcodekit5-devicedb`.

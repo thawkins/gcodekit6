@@ -1,6 +1,6 @@
 //! The command catalog, its keymap and its menus: every GTK accelerator is bound to the same
-//! command, the keymap has no conflicts, every command but jogging is in the menus, and a key
-//! press runs its command in the app.
+//! command, the keymap has no conflicts, every command is reachable from a menu, a key, a page
+//! tab or a page control, and a key press runs its command in the app.
 
 use craft_keymap::{Active, Chord, Lookup};
 use craft_menu::{LayoutOptions, Target};
@@ -11,7 +11,7 @@ use gcodekit5_settings::config::Config;
 use gcodekit5_ui_egui::commands::{self, Command};
 use gcodekit5_ui_egui::dialogs::{DialogAnswer, FilePurpose};
 use gcodekit5_ui_egui::menu;
-use gcodekit5_ui_egui::workspace::PaneContext;
+use gcodekit5_ui_egui::workspace::{Page, PaneContext};
 use gcodekit5_ui_egui::{AppState, GcodeKitApp};
 
 /// Where a binding works: the whole app, or only while a panel has the keyboard.
@@ -241,6 +241,31 @@ fn test_command_refs_round_trip() {
     assert_eq!(Command::from_ref(&"no.such".into()), None);
 }
 
+/// The commands the menus leave out, each with the page control that runs it instead (its
+/// page and accessible label). GTK's menus have no View or Tools menu: its views are the
+/// page tabs and the visualizer's own buttons, and jogging is in Machine Control.
+const PAGE_CONTROLS: &[(Command, Page, &str)] = &[
+    (Command::JogXPos, Page::MachineControl, "Jog X+"),
+    (Command::JogXNeg, Page::MachineControl, "Jog X-"),
+    (Command::JogYPos, Page::MachineControl, "Jog Y+"),
+    (Command::JogYNeg, Page::MachineControl, "Jog Y-"),
+    (Command::JogZPos, Page::MachineControl, "Jog Z+"),
+    (Command::JogZNeg, Page::MachineControl, "Jog Z-"),
+    (Command::ZoomFit, Page::Visualizer, "Fit to Content"),
+    (Command::ZoomIn, Page::Visualizer, "Zoom In"),
+    (Command::ZoomOut, Page::Visualizer, "Zoom Out"),
+    (Command::ViewTop, Page::Visualizer, "Top View"),
+    (Command::ViewFront, Page::Visualizer, "Front View"),
+    (Command::ViewIso, Page::Visualizer, "Isometric (SE)"),
+];
+
+/// The commands the menus leave out that only a key runs: Reset View (`Cmd+0` while the
+/// Visualizer has the keyboard), which GTK had no menu item for either.
+const KEY_ONLY: &[Command] = &[Command::ResetView];
+
+/// The menus hold every command but those with a page control ([`PAGE_CONTROLS`]), those
+/// only a key runs ([`KEY_ONLY`]) and those a page tab opens ([`Page::for_command`]), on
+/// every platform layout.
 #[test]
 fn test_menu_contains_every_command() {
     let tr = Translator::new("en");
@@ -249,14 +274,82 @@ fn test_menu_contains_every_command() {
     let laid_out = [Target::Linux, Target::Windows, Target::Mac]
         .map(|target| (target, craft_menu::layout(&bar, target, &options).bar));
     for command in Command::ALL {
+        let elsewhere = Page::for_command(command).is_some()
+            || KEY_ONLY.contains(&command)
+            || PAGE_CONTROLS.iter().any(|(c, _, _)| *c == command);
         let wanted = bar.find(&command.command_ref()).is_some();
-        assert_eq!(wanted, !command.is_jog(), "{command:?} in the menu bar");
+        assert_eq!(wanted, !elsewhere, "{command:?} in the menu bar");
         for (target, bar) in &laid_out {
             assert_eq!(
                 bar.find(&command.command_ref()).is_some(),
-                !command.is_jog(),
+                !elsewhere,
                 "{command:?} on {target:?}"
             );
+        }
+    }
+}
+
+/// The menus are GTK's four: File, Edit, Machine, Help.
+#[test]
+fn test_menus_are_gtks_four() {
+    let tr = Translator::new("en");
+    let bar = menu::menu_bar(&tr);
+    let titles: Vec<&str> = bar.menus.iter().map(|m| m.title.as_str()).collect();
+    assert_eq!(titles, ["File", "Edit", "Machine", "Help"]);
+}
+
+/// No command is lost: each is in a menu, has a default key, is opened by a page tab, or has
+/// a control on its page, which is checked to be there.
+#[test]
+fn test_every_command_is_reachable() {
+    use egui_kittest::kittest::Queryable;
+    let tr = Translator::new("en");
+    let bar = menu::menu_bar(&tr);
+    let keymap = commands::keymap();
+    let state = AppState::new(
+        SettingsManager::detached(Config::default()),
+        crate::test_smoke::native_decision(),
+    );
+    let mut h = crate::machine_support::app_harness(GcodeKitApp::from_state(state));
+    h.run_steps(2);
+    for command in Command::ALL {
+        if let Some((_, page, label)) = PAGE_CONTROLS.iter().find(|(c, _, _)| *c == command) {
+            h.state_mut().show_page(*page);
+            h.run_steps(2);
+            assert!(
+                h.query_by_label(label).is_some(),
+                "{command:?}: no {label:?} on {page:?}"
+            );
+            continue;
+        }
+        if let Some(page) = Page::for_command(command) {
+            let label = tr.tr(page.title_msgid()).into_owned();
+            h.get_by_role_and_label(egui::accesskit::Role::Tab, &label)
+                .click();
+            h.run_steps(2);
+            assert_eq!(h.state().page(), page, "{command:?}");
+            continue;
+        }
+        let in_menu = bar.find(&command.command_ref()).is_some();
+        let has_key = !keymap.bindings(&command.command_ref()).is_empty();
+        assert!(
+            in_menu || has_key,
+            "{command:?} is in no menu, has no key and no page control"
+        );
+    }
+}
+
+/// A command that used to open a manager window now shows its page.
+#[test]
+fn test_manager_commands_switch_page() {
+    let mut app = GcodeKitApp::from_state(AppState::new(
+        SettingsManager::detached(Config::default()),
+        crate::test_smoke::native_decision(),
+    ));
+    for command in Command::ALL {
+        if let Some(page) = Page::for_command(command) {
+            app.dispatch(command);
+            assert_eq!(app.page(), page, "{command:?}");
         }
     }
 }

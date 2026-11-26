@@ -1,7 +1,7 @@
 //! egui + craft-libs front end for GCodeKit5.
 //!
 //! Dependencies: `egui` and `eframe` for the UI and native window, `craft-ui` for widgets and
-//! docking, `craft-window` for the window frame policy, `craft-keymap` and `craft-menu` for
+//! page tabs, `craft-window` for the window frame policy, `craft-keymap` and `craft-menu` for
 //! key bindings and menus, `craft-platform` for the desktop's
 //! light/dark preference, `gcodekit5-app` and `gcodekit5-settings` for state and settings.
 

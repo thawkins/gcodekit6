@@ -752,14 +752,11 @@ fn test_editor_read_only_while_job_runs() {
         .borrow_mut()
         .buffer_mut()
         .set_text("G1 X1\n".to_string());
-    // The Editor tab is behind the Visualizer: show it.
-    let shown = harness
+    // Show the editor's page (Machine Control).
+    harness
         .state_mut()
         .workspace_mut()
-        .apply(craft_ui::docking::Action::Activate {
-            panel: gcodekit5_ui_egui::workspace::PaneId::Editor,
-        });
-    assert!(shown.is_ok(), "{shown:?}");
+        .show_pane(gcodekit5_ui_egui::workspace::PaneId::Editor);
     harness.step();
     harness.step();
     assert!(harness.state().editor().borrow().is_locked());

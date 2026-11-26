@@ -1,4 +1,4 @@
-//! The CNC Tools window (GTK's Tools Manager): the tool library searched and filtered by
+//! The CNC Tools page (GTK's Tools Manager): the tool library searched and filtered by
 //! type, material and diameter, an edit form in four tabs (Basic Info, Geometry,
 //! Manufacturer, Notes), and the library actions (New Tool, GTC import, export, reset).
 //!
@@ -129,9 +129,8 @@ impl UiState {
     }
 }
 
-/// The CNC Tools window.
+/// The CNC Tools page.
 pub struct ToolsManagerWindow {
-    open: bool,
     /// The library and its file; `None` without a settings folder.
     backend: Option<ToolsManagerBackend>,
     /// Why the file could not be read, until the window shows it.
@@ -155,7 +154,6 @@ pub struct ToolsManagerWindow {
 impl std::fmt::Debug for ToolsManagerWindow {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("ToolsManagerWindow")
-            .field("open", &self.open)
             .field("filter", &self.filter)
             .field("notice", &self.notice)
             .finish_non_exhaustive()
@@ -189,7 +187,6 @@ impl ToolsManagerWindow {
                 .unwrap_or_default(),
         };
         Self {
-            open: false,
             backend,
             load_error,
             backup_named: None,
@@ -204,12 +201,12 @@ impl ToolsManagerWindow {
         }
     }
 
-    /// Opens the window, telling why the library could not be read if it could not.
+    /// Prepares the page each time it is shown, telling why the library could not be read
+    /// if it could not.
     ///
     /// # Arguments
     /// * `tr` - Translator for a notice.
     pub fn open(&mut self, tr: &Translator) {
-        self.open = true;
         if self.backend.is_none() {
             let text = n_!("No settings folder: custom tools cannot be loaded or saved.");
             self.say(tr.tr(text).into_owned(), true);
@@ -225,24 +222,12 @@ impl ToolsManagerWindow {
         }
     }
 
-    /// Whether the window is open.
-    pub fn is_open(&self) -> bool {
-        self.open
-    }
-
-    /// Closes the window, as its title-bar button does: an unsaved tool stays in the
-    /// form (shown again when the window reopens) and the quit flow asks about it.
-    pub fn close(&mut self) {
-        self.open = false;
-        self.question = None;
-    }
-
     /// Whether the form holds a tool with changes not saved yet.
     pub fn has_unsaved_changes(&self) -> bool {
         self.is_dirty()
     }
 
-    /// Saves the form for the quit flow's Save, opening the window so a refusal shows.
+    /// Saves the form for the quit flow's Save (the app shows the page when it is refused).
     ///
     /// # Arguments
     /// * `tr` - Translator for the notice.
@@ -250,7 +235,6 @@ impl ToolsManagerWindow {
     /// # Returns
     /// Whether the tool was saved.
     pub fn save_for_quit(&mut self, tr: &Translator) -> bool {
-        self.open = true;
         self.save(tr)
     }
 

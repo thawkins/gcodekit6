@@ -1,19 +1,22 @@
-//! The status bar at the bottom of the window: connection, machine state, position, job
-//! progress and the last error.
+//! The status bar at the bottom of the window, laid out as GTK's: the eStop button, the
+//! connection, machine state and position, the active device profile
+//! (`<name> | <firmware> | <type>`), and on the right the job progress and the last error.
 //!
 //! [`summary`] turns the app's [`MachineStatus`] into the strings the bar shows, so they can
 //! be tested without a window; [`show`] draws them. The position is the machine position in
 //! the user's measurement system (two decimals for mm, three for inches, through
 //! `format_length` as the DRO does).
 //!
-//! Ported from the GTK `ui/gtk/status_bar.rs`. Not ported: the E-stop button (Machine
-//! Control has it), the device name, feed/spindle readout, elapsed/remaining time and the
-//! timed notices; the connected port is not known to the status.
+//! Ported from the GTK `ui/gtk/status_bar.rs`. Not ported: the feed/spindle readout,
+//! elapsed/remaining time and the timed notices; the connected port is not known to the
+//! status.
 //!
-//! Dependencies: `egui`, `gcodekit5-app` (translations), `gcodekit5-core` (units).
+//! Dependencies: `egui`, `gcodekit5-app` (translations), `gcodekit5-core` (units),
+//! `gcodekit5-devicedb` (the active profile).
 
 use gcodekit5_app::i18n::Translator;
 use gcodekit5_core::units::{MeasurementSystem, get_unit_label};
+use gcodekit5_devicedb::DeviceProfile;
 
 use crate::machine::{MachineStatus, Xyz};
 use crate::panes::machine_control::format_length;
@@ -22,7 +25,8 @@ use crate::panes::machine_control::format_length;
 pub const MSGIDS: &[&str] = &[
     n_!("Connected"),
     n_!("Disconnected"),
-    n_!("E-STOP"),
+    n_!("eStop"),
+    n_!("No device selected"),
     n_!("Emergency stop (soft reset, {shortcut})"),
 ];
 
@@ -95,6 +99,19 @@ pub fn summary(status: &MachineStatus, units: MeasurementSystem, tr: &Translator
     }
 }
 
+/// The active device profile as GTK's status bar shows it: `<name> | <firmware> | <type>`,
+/// or "No device selected".
+///
+/// # Arguments
+/// * `profile` - The active device profile, if one is set.
+/// * `tr` - Translator for the current UI language.
+pub fn device_text(profile: Option<&DeviceProfile>, tr: &Translator) -> String {
+    match profile {
+        Some(p) => format!("{} | {:?} | {:?}", p.name, p.controller_type, p.device_type),
+        None => tr.tr("No device selected").into_owned(),
+    }
+}
+
 /// Draws the bar's contents into `ui` (a bottom panel's).
 ///
 /// # Arguments
@@ -102,21 +119,23 @@ pub fn summary(status: &MachineStatus, units: MeasurementSystem, tr: &Translator
 /// * `tr` - Translator for the current UI language.
 /// * `status` - The app's machine status.
 /// * `units` - The measurement system lengths are shown in.
+/// * `profile` - The active device profile, if one is set.
 ///
 /// # Returns
-/// Whether the user clicked E-STOP; the caller queues [`crate::commands::Command::SoftReset`],
+/// Whether the user clicked eStop; the caller queues [`crate::commands::Command::SoftReset`],
 /// which the Machine Control pane runs as its own E-STOP button does.
 pub fn show(
     ui: &mut egui::Ui,
     tr: &Translator,
     status: &MachineStatus,
     units: MeasurementSystem,
+    profile: Option<&DeviceProfile>,
 ) -> bool {
     let summary = summary(status, units, tr);
     let mut estop_clicked = false;
     ui.horizontal(|ui| {
         let estop = egui::Button::new(
-            egui::RichText::new(tr.tr("E-STOP"))
+            egui::RichText::new(tr.tr("eStop"))
                 .strong()
                 .color(egui::Color32::WHITE),
         )
@@ -146,6 +165,8 @@ pub fn show(
             ui.separator();
             ui.monospace(position);
         }
+        ui.add_space(8.0);
+        ui.weak(device_text(profile, tr));
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             if let Some((fraction, label)) = &summary.progress {
                 ui.add(

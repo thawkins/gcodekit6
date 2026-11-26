@@ -270,6 +270,7 @@ fn msgids() -> Vec<&'static str> {
     PaneId::ALL
         .into_iter()
         .map(PaneId::title_msgid)
+        .chain(gcodekit5_ui_egui::workspace::msgids())
         .chain([Button::Minimize, Button::Maximize, Button::Close].map(caption_msgid))
         .chain(menu::msgids())
         .chain(settings::msgids())

@@ -14,6 +14,7 @@ use gcodekit5_devicedb::{ControllerType, DeviceManager, DeviceProfile};
 use gcodekit5_settings::SettingsManager;
 use gcodekit5_settings::config::Config;
 use gcodekit5_ui_egui::commands::Command;
+use gcodekit5_ui_egui::workspace::Page;
 use gcodekit5_ui_egui::{AppState, GcodeKitApp};
 
 use crate::machine_support::{
@@ -123,10 +124,7 @@ fn open_manager(app: GcodeKitApp) -> Harness<'static, GcodeKitApp> {
     let mut h = app_harness(app);
     h.state_mut().dispatch(Command::OpenDeviceManager);
     h.run_steps(3);
-    assert!(
-        h.query_by_label("Device Manager").is_some(),
-        "window not open"
-    );
+    assert_eq!(h.state().page(), Page::DeviceManager, "page not shown");
     h
 }
 
@@ -378,7 +376,6 @@ fn test_device_manager_retrieve_stores_settings_and_syncs_the_form() {
     assert!(profiles[0].has_laser);
 
     // Sync from Device fills the form from the same dump; Save keeps it.
-    h.state_mut().firmware_settings_mut().close();
     h.state_mut().dispatch(Command::OpenDeviceManager);
     h.run_steps(3);
     click(&mut h, "Bench Mill");
@@ -498,11 +495,13 @@ fn grbl_dump() -> String {
     format!("{dump}[VER:1.1h.20190825:]\n")
 }
 
-/// Clicks Retrieve and answers it with [`grbl_dump`].
+/// Shows the Device Config page, clicks Retrieve and answers it with [`grbl_dump`].
 fn retrieve_dump(
     h: &mut Harness<'_, GcodeKitApp>,
     shared: &gcodekit5_app::test_support::LoopbackShared,
 ) {
+    h.state_mut().dispatch(Command::OpenFirmwareSettings);
+    h.run_steps(2);
     click(h, "Retrieve");
     assert!(wait_until(|| shared
         .log()
@@ -586,7 +585,7 @@ fn test_device_manager_stored_dump_refreshes_the_open_form() {
         .notice()
         .is_some_and(|n| n.contains("Settings retrieved"))));
     h.run_steps(2);
-    h.state_mut().firmware_settings_mut().close();
+    h.state_mut().dispatch(Command::OpenDeviceManager);
     h.run_steps(2);
     click(&mut h, "Save");
     let (profiles, _) = stored(&file);
@@ -623,10 +622,14 @@ fn test_device_manager_quit_cancel_keeps_the_edit_and_discard_quits() {
     let mut h = app_with(&file);
     click(&mut h, "Router 4040");
     set_field(&mut h, "Name:", "Unsaved Router");
+    // Asked about from another page; Cancel brings the Device Manager page back.
+    h.get_by_role_and_label(Role::Tab, "Visualizer").click();
+    h.run_steps(2);
     let shown =
         crate::test_tools_manager::quit_answering(&mut h, craft_dialogs::MessageResult::Cancel);
     assert_eq!(shown, ["Unsaved changes"]);
     assert!(!h.state().quit_confirmed());
+    assert_eq!(h.state().page(), Page::DeviceManager);
     assert!(h.state().device_manager().has_unsaved_changes());
     assert!(stored(&file).0.iter().all(|p| p.name != "Unsaved Router"));
 

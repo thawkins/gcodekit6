@@ -370,22 +370,20 @@ fn help_buttons(h: &Harness<'static, GcodeKitApp>) -> usize {
     h.query_all_by_label("Help (F1)").count()
 }
 
-/// Clicks the help button inside the window titled `title` and returns the topic opened.
-fn click_window_help(h: &mut Harness<'static, GcodeKitApp>, title: &str) -> HelpTopic {
-    h.get_by_role_and_label(Role::Window, title)
-        .get_by_label("Help (F1)")
-        .click();
+/// Clicks the one help button on the page shown and returns the topic opened.
+fn click_page_help(h: &mut Harness<'static, GcodeKitApp>, title: &str) -> HelpTopic {
+    h.get_by_label("Help (F1)").click();
     h.run_steps(3);
     assert!(h.state().help().is_open(), "{title}: help not open");
     h.state().help().current()
 }
 
 #[test]
-fn test_help_buttons_open_the_window_topic() {
+fn test_help_buttons_open_the_page_topic() {
     for (command, title, topic) in [
         (
             Command::OpenFirmwareSettings,
-            "Firmware Settings",
+            "Device Config",
             HelpTopic::DeviceConfig,
         ),
         (
@@ -400,17 +398,17 @@ fn test_help_buttons_open_the_window_topic() {
         ),
         (
             Command::OpenMaterialsManager,
-            "Materials Manager",
+            "Materials",
             HelpTopic::MaterialsManager,
         ),
     ] {
         let (state, _shared) = loopback_state(std::time::Duration::from_millis(1));
         let mut h = app_harness(GcodeKitApp::from_state(state));
-        let before = help_buttons(&h);
         h.state_mut().dispatch(command);
         h.run_steps(3);
-        assert_eq!(help_buttons(&h), before + 1, "{title}: no help button");
-        assert_eq!(click_window_help(&mut h, title), topic, "{title}");
+        // The manager page replaces Machine Control (and its console's help button).
+        assert_eq!(help_buttons(&h), 1, "{title}: no help button");
+        assert_eq!(click_page_help(&mut h, title), topic, "{title}");
     }
 }
 
@@ -441,14 +439,10 @@ fn test_help_console_and_cam_pages_open_their_topic() {
     let mut h = open_tool(CamTool::Gerber);
     let before = h.state().help().is_open();
     assert!(!before);
+    // The CAM Tools page has no console: the Gerber page's is the only help button.
     let buttons: Vec<_> = h.query_all_by_label("Help (F1)").collect();
-    assert_eq!(buttons.len(), 2, "console and Gerber page help buttons");
-    // The page's button is the one drawn first (the CAM pane is above the console).
-    let page = buttons
-        .iter()
-        .min_by(|a, b| a.rect().top().total_cmp(&b.rect().top()))
-        .expect("page button");
-    page.click();
+    assert_eq!(buttons.len(), 1, "Gerber page help button");
+    buttons[0].click();
     h.run_steps(3);
     assert_eq!(h.state().help().current(), HelpTopic::Gerber);
 }

@@ -1,4 +1,4 @@
-//! Drawing the Firmware Settings window: its toolbar, filter, notice, list and the
+//! Drawing the Firmware Settings page: its toolbar, filter, notice, list and the
 //! editor of the clicked row. The state and what the buttons do live in the parent module.
 //!
 //! Dependencies: `egui`, `gcodekit5-app` (settings model, translations),
@@ -18,10 +18,12 @@ use crate::machine::Machine;
 use crate::windows::help::{self, HelpTopic};
 
 impl FirmwareSettingsWindow {
-    /// Draws the window (and the open editor) while it is open.
+    /// Keeps the settings' reads and writes going, and draws the Device Config page (and the
+    /// open editor) into `page` when the page is shown.
     ///
     /// # Arguments
     /// * `ctx` - The egui context.
+    /// * `page` - The page's `Ui`, when the Device Config page is shown.
     /// * `machine` - The app's machine connection, for reading and writing settings.
     /// * `identity` - What the controller reported about itself (Repetier or GRBL).
     /// * `profile_controller` - The active device profile's controller type, if any.
@@ -29,6 +31,7 @@ impl FirmwareSettingsWindow {
     pub fn show(
         &mut self,
         ctx: &egui::Context,
+        page: Option<&mut egui::Ui>,
         machine: &Machine,
         identity: &DeviceIdentity,
         profile_controller: Option<ControllerType>,
@@ -43,21 +46,10 @@ impl FirmwareSettingsWindow {
         if self.retrieval.is_some() {
             ctx.request_repaint_after(Duration::from_millis(250));
         }
-        if !self.open {
+        let Some(ui) = page else {
             return;
-        }
-        let mut open = self.open;
-        egui::Window::new(tr.tr(n_!("Firmware Settings")))
-            .id(egui::Id::unique("gcodekit5-firmware-settings"))
-            .open(&mut open)
-            .default_size([900.0, 560.0])
-            .show(ctx, |ui| {
-                self.contents(ui, machine, identity, profile_repetier, tr)
-            });
-        self.open = open;
-        if !self.open {
-            self.edit = None;
-        }
+        };
+        self.contents(ui, machine, identity, profile_repetier, tr);
         self.show_editor(ctx, machine, tr);
     }
 
@@ -207,6 +199,9 @@ impl FirmwareSettingsWindow {
             .id(egui::Id::unique("gcodekit5-firmware-settings-edit"))
             // Above the list it edits, which a click would otherwise raise over it.
             .order(egui::Order::Foreground)
+            // Centred over the page, clear of its toolbar (Retrieve, Save, Load).
+            .pivot(egui::Align2::CENTER_CENTER)
+            .default_pos(ctx.content_rect().center())
             .collapsible(false)
             .resizable(false)
             .show(ctx, |ui| {

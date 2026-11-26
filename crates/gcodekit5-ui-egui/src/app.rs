@@ -1,5 +1,5 @@
 //! Application state and root UI of the egui front end: the window frame, the light/dark
-//! theme and the docking workspace.
+//! theme, the page tabs and the page shown ([`Workspace`]), and the status bar.
 //!
 //! Who draws the title bar is decided by `craft_window::policy` before the window opens and
 //! carried in [`AppState::decision`]; [`crate::frame`] draws what that decision leaves to the
@@ -13,7 +13,9 @@
 //!
 //! File dialogs and confirmations go through [`Dialogs`]: queued by a command, shown at the
 //! end of the frame and answered on a later one, so the event loop never blocks. The
-//! Preferences and About windows are drawn over the workspace while open.
+//! Preferences, About, Device Info and Help windows are drawn over the page while open. The
+//! manager pages (Device Manager, Device Config, CNC Tools, Materials) are drawn by the app
+//! ([`GcodeKitApp::show_page`] shows one); their unsaved forms are asked about on quit.
 //!
 //! The machine connection ([`AppState::machine`]) is polled once per frame, in
 //! [`GcodeKitApp::logic`] or, when only [`GcodeKitApp::ui`] runs, there; its events and status
@@ -78,7 +80,7 @@ use crate::windows::{
     AboutWindow, DeviceInfoWindow, DeviceManagerWindow, FirmwareSettingsWindow, HelpWindow,
     MaterialsManagerWindow, SettingsOutcome, SettingsWindow, ToolsManagerWindow, help,
 };
-use crate::workspace::{PaneContext, PaneId, Workspace};
+use crate::workspace::{Page, PaneContext, PaneId, Workspace};
 use designer_files::{DesignFlow, DesignNext, EditorNext, OPEN_BEHIND_HANDOFF};
 use gcodekit5_app::materials_manager_backend::MATERIALS_FILE;
 use gcodekit5_app::tools_manager_backend::TOOLS_FILE;
@@ -259,7 +261,7 @@ struct QuitFlow {
     stop_job: bool,
     /// The documents whose changes the user chose to discard for this quit.
     discarded: DirtyState,
-    /// The user chose to discard the CNC Tools window's unsaved tool for this quit.
+    /// The user chose to discard the CNC Tools page's unsaved tool for this quit.
     discarded_tool: bool,
     /// The user chose to discard the Materials Manager's unsaved material for this quit.
     discarded_material: bool,
@@ -308,15 +310,15 @@ pub struct GcodeKitApp {
     about_window: AboutWindow,
     /// The help browser.
     help_window: HelpWindow,
-    /// The Firmware Settings window.
+    /// The Device Config page's firmware settings.
     firmware_settings: FirmwareSettingsWindow,
     /// The Device Info window.
     device_info: DeviceInfoWindow,
-    /// The Device Manager window, which also holds the device profiles.
+    /// The Device Manager page, which also holds the device profiles.
     device_manager: DeviceManagerWindow,
-    /// The CNC Tools window, which also holds the tool library.
+    /// The CNC Tools page, which also holds the tool library.
     tools_manager: ToolsManagerWindow,
-    /// The Materials Manager window, which also holds the material library.
+    /// The Materials page, which also holds the material library.
     materials_manager: MaterialsManagerWindow,
     /// The last command dispatched.
     last_dispatched: Option<Command>,
@@ -412,7 +414,7 @@ impl GcodeKitApp {
         if state.config().ui.show_about_on_startup {
             about_window.open();
         }
-        let mut workspace = Workspace::default_layout();
+        let mut workspace = Workspace::new();
         workspace.set_pane(Box::new(machine_control_pane(&state)));
         workspace.set_pane(Box::new(ConsolePane::new(Arc::clone(
             state.machine.controller(),
@@ -678,12 +680,22 @@ impl GcodeKitApp {
         let mut queue = std::mem::take(&mut self.queue);
         queue.extend(self.menus.take_native(&ctx, gate));
         self.show_frame_and_menu(ui, gate, &mut queue);
+        let tab = egui::Panel::top("gcodekit5-page-tabs")
+            .show(ui, |ui| {
+                self.workspace.show_tabs(ui, &self.state.translator)
+            })
+            .inner;
+        if let Some(page) = tab {
+            self.show_page(page);
+        }
+        let profile = self.device_manager.active_profile();
         egui::Panel::bottom("gcodekit5-status-bar").show(ui, |ui| {
             if crate::status_bar::show(
                 ui,
                 &self.state.translator,
                 self.state.machine.status(),
                 self.state.config().ui.measurement_system,
+                profile.as_ref(),
             ) {
                 queue.push(Command::SoftReset);
             }
@@ -691,6 +703,9 @@ impl GcodeKitApp {
         let mut panes =
             PaneContext::new(&self.state.translator, &mut queue).with_machine(&self.state.machine);
         self.workspace.show(ui, &mut panes);
+        if self.workspace.page().panes().is_empty() {
+            egui::CentralPanel::default().show(ui, |ui| self.show_manager_page(ui));
+        }
         for request in self.workspace.take_confirms() {
             self.dialogs.confirm(request);
         }
@@ -881,9 +896,9 @@ impl GcodeKitApp {
             }
             Command::OpenSettings => self.settings_window.open(&self.state.settings),
             Command::About => self.about_window.open(),
-            Command::OpenFirmwareSettings => self.firmware_settings.open(),
+            Command::OpenFirmwareSettings => self.show_page(Page::DeviceConfig),
             Command::OpenDeviceInfo => self.device_info.open(),
-            Command::OpenDeviceManager => self.device_manager.open(&self.state.translator),
+            Command::OpenDeviceManager => self.show_page(Page::DeviceManager),
             Command::Quit => self.request_quit(QuitSource::MenuQuit),
             Command::Cut => self
                 .viewport_commands
@@ -938,14 +953,15 @@ impl GcodeKitApp {
                     self.route_pane_command(cmd);
                 }
             }
-            Command::OpenToolsManager => self.tools_manager.open(&self.state.translator),
-            Command::OpenMaterialsManager => self.materials_manager.open(&self.state.translator),
+            Command::OpenToolsManager => self.show_page(Page::CncTools),
+            Command::OpenMaterialsManager => self.show_page(Page::Materials),
             Command::OpenHelp => self.help_window.open(help::HelpTopic::Index),
         }
     }
 
-    /// Draws the Preferences, About, machine, library and help windows while they are
-    /// open, acts on what Preferences decided and opens the topic a help button asked for.
+    /// Draws the Preferences, About, Device Info and help windows while they are open,
+    /// runs the manager pages' per-frame work, acts on what Preferences decided and opens
+    /// the topic a help button asked for.
     fn show_windows(&mut self, ctx: &egui::Context) {
         let outcome =
             self.settings_window
@@ -964,7 +980,7 @@ impl GcodeKitApp {
         }
         self.about_window.show(ctx, &self.state.translator);
         self.show_machine_windows(ctx);
-        self.show_library_windows(ctx);
+        self.show_library_windows();
         if let Some(topic) = help::take_request(ctx) {
             self.help_window.open(topic);
         }
@@ -1285,14 +1301,57 @@ impl GcodeKitApp {
         &mut self.state
     }
 
-    /// The docking workspace, for tests.
+    /// The pages and their panes, for tests.
     pub fn workspace(&self) -> &Workspace {
         &self.workspace
     }
 
-    /// The docking workspace, for layout changes and tests.
+    /// The pages and their panes, for tests.
     pub fn workspace_mut(&mut self) -> &mut Workspace {
         &mut self.workspace
+    }
+
+    /// The page shown.
+    pub fn page(&self) -> Page {
+        self.workspace.page()
+    }
+
+    /// Shows `page`. A manager page that was not shown is prepared first (it tells why its
+    /// file could not be read, CNC Tools reopens the last tool), as opening its window did.
+    ///
+    /// # Arguments
+    /// * `page` - The page to show.
+    pub fn show_page(&mut self, page: Page) {
+        if self.workspace.page() == page {
+            return;
+        }
+        self.workspace.set_page(page);
+        let tr = &self.state.translator;
+        match page {
+            Page::DeviceManager => self.device_manager.open(tr),
+            Page::CncTools => self.tools_manager.open(tr),
+            Page::Materials => self.materials_manager.open(tr),
+            Page::Designer
+            | Page::Visualizer
+            | Page::MachineControl
+            | Page::CamTools
+            | Page::DeviceConfig => {}
+        }
+    }
+
+    /// Draws the manager page shown into `ui`.
+    fn show_manager_page(&mut self, ui: &mut egui::Ui) {
+        let tr = &self.state.translator;
+        match self.workspace.page() {
+            Page::DeviceManager => {
+                self.device_manager
+                    .show(ui, &self.state.machine, self.state.settings.config(), tr);
+            }
+            Page::DeviceConfig => self.show_firmware_settings(Some(ui)),
+            Page::CncTools => self.tools_manager.show(ui, tr),
+            Page::Materials => self.materials_manager.show(ui, tr),
+            Page::Designer | Page::Visualizer | Page::MachineControl | Page::CamTools => {}
+        }
     }
 
     /// The keymap, for the user's shortcut overrides and for tests.

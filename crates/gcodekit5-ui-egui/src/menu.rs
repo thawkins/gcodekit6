@@ -1,7 +1,7 @@
 //! The menus: built from the command catalog, laid out by `craft_menu` for the platform, and
 //! shown natively on macOS or as an in-window bar elsewhere.
 //!
-//! [`menu_bar`] is the app's own menu tree, every [`Command`] but jogging in it. [`Menus`] keeps
+//! [`menu_bar`] is the app's own menu tree: GTK's File, Edit, Machine and Help. [`Menus`] keeps
 //! it laid out for [`Target::current`] with the keymap's shortcuts, and either draws it with
 //! `craft_menu::MenuBarUi` (Windows, Linux, and macOS when AppKit refused the native menus) or
 //! drives the macOS `NativeMenu`, whose key equivalents come back to egui as key presses so the
@@ -52,15 +52,8 @@ pub const LAYOUT_LABELS: [&str; 25] = [
     n_!("Scroll menu down"),
 ];
 
-/// The English msgids of the top-level menu titles, in bar order.
-pub const MENU_TITLES: [&str; 6] = [
-    n_!("File"),
-    n_!("Edit"),
-    n_!("View"),
-    n_!("Machine"),
-    n_!("Tools"),
-    n_!("Help"),
-];
+/// The English msgids of the top-level menu titles, in bar order: GTK's four.
+pub const MENU_TITLES: [&str; 4] = [n_!("File"), n_!("Edit"), n_!("Machine"), n_!("Help")];
 
 /// A menu item running `command`, labelled in the current language.
 fn item(tr: &Translator, command: Command) -> Node {
@@ -80,14 +73,17 @@ fn menu(tr: &Translator, title: &str, role: MenuRole, rows: &[Option<Command>]) 
 }
 
 /// The app's menus, labelled through `tr`, before any platform layout and without shortcuts
-/// (`craft_menu::apply_keymap` adds them). Every [`Command`] but jogging is in them; About,
-/// Preferences and Quit are tagged so each layout puts them where the platform expects.
+/// (`craft_menu::apply_keymap` adds them): GTK's File, Edit, Machine and Help. The commands
+/// left out have a home elsewhere: jogging and the visualizer's view commands are buttons on
+/// their pages (Reset View is its `Cmd+0` key), and the manager windows of earlier builds are
+/// page tabs ([`crate::workspace::Page::for_command`]). About, Preferences and Quit are
+/// tagged so each layout puts them where the platform expects.
 ///
 /// # Arguments
 /// * `tr` - Translator for the labels.
 pub fn menu_bar(tr: &Translator) -> MenuBar {
     use Command as C;
-    let [file, edit, view, machine, tools, help] = MENU_TITLES;
+    let [file, edit, machine, help] = MENU_TITLES;
     let menus = vec![
         menu(
             tr,
@@ -127,21 +123,6 @@ pub fn menu_bar(tr: &Translator) -> MenuBar {
         ),
         menu(
             tr,
-            view,
-            MenuRole::View,
-            &[
-                Some(C::ZoomFit),
-                Some(C::ZoomIn),
-                Some(C::ZoomOut),
-                Some(C::ResetView),
-                None,
-                Some(C::ViewTop),
-                Some(C::ViewFront),
-                Some(C::ViewIso),
-            ],
-        ),
-        menu(
-            tr,
             machine,
             MenuRole::Other,
             &[
@@ -158,18 +139,7 @@ pub fn menu_bar(tr: &Translator) -> MenuBar {
                 Some(C::Home),
                 Some(C::Unlock),
                 Some(C::SoftReset),
-            ],
-        ),
-        menu(
-            tr,
-            tools,
-            MenuRole::Other,
-            &[
-                Some(C::OpenDeviceManager),
-                Some(C::OpenToolsManager),
-                Some(C::OpenMaterialsManager),
                 None,
-                Some(C::OpenFirmwareSettings),
                 Some(C::OpenDeviceInfo),
             ],
         ),

@@ -1,4 +1,4 @@
-//! Drawing the Device Manager window: the searchable device list, the action bar, the
+//! Drawing the Device Manager page: the searchable device list, the action bar, the
 //! delete question and the four-tab edit form. The state and what the buttons do live in
 //! the parent module.
 //!
@@ -28,37 +28,14 @@ enum Action {
 }
 
 impl DeviceManagerWindow {
-    /// Draws the window while it is open.
+    /// Draws the Device Manager page into `ui`.
     ///
     /// # Arguments
-    /// * `ctx` - The egui context.
+    /// * `ui` - The page's `Ui`.
     /// * `machine` - The app's machine connection (job running, connected).
     /// * `config` - The settings (the user's length and feed units).
     /// * `tr` - Translates the labels.
-    pub fn show(
-        &mut self,
-        ctx: &egui::Context,
-        machine: &Machine,
-        config: &Config,
-        tr: &Translator,
-    ) {
-        if !self.open {
-            return;
-        }
-        let mut open = self.open;
-        egui::Window::new(tr.tr(n_!("Device Manager")))
-            .id(egui::Id::unique("gcodekit5-device-manager"))
-            .open(&mut open)
-            .default_size([900.0, 560.0])
-            .show(ctx, |ui| self.contents(ui, machine, config, tr));
-        self.open = open;
-        if !self.open {
-            self.edit = None;
-            self.confirm_delete = None;
-        }
-    }
-
-    fn contents(&mut self, ui: &mut egui::Ui, machine: &Machine, config: &Config, tr: &Translator) {
+    pub fn show(&mut self, ui: &mut egui::Ui, machine: &Machine, config: &Config, tr: &Translator) {
         let (units, feed_units) = (config.ui.measurement_system, config.ui.feed_rate_units);
         help_row(ui, HelpTopic::DeviceManager, tr);
         ui.horizontal_top(|ui| {

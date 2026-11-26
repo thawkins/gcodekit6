@@ -1,4 +1,4 @@
-//! Drawing the Materials Manager window: the searchable, category-filtered material list,
+//! Drawing the Materials Manager page: the searchable, category-filtered material list,
 //! the questions, the action bar and the five-tab edit form. The state and what the
 //! buttons do live in the parent module.
 //!
@@ -24,27 +24,12 @@ enum Action {
 }
 
 impl MaterialsManagerWindow {
-    /// Draws the window while it is open.
+    /// Draws the Materials page into `ui`.
     ///
     /// # Arguments
-    /// * `ctx` - The egui context.
+    /// * `ui` - The page's `Ui`.
     /// * `tr` - Translates the labels.
-    pub fn show(&mut self, ctx: &egui::Context, tr: &Translator) {
-        if !self.open {
-            return;
-        }
-        let mut open = self.open;
-        egui::Window::new(tr.tr(n_!("Materials Manager")))
-            .id(egui::Id::unique("gcodekit5-materials-manager"))
-            .open(&mut open)
-            .default_size([900.0, 600.0])
-            .show(ctx, |ui| self.contents(ui, tr));
-        if !open {
-            self.close();
-        }
-    }
-
-    fn contents(&mut self, ui: &mut egui::Ui, tr: &Translator) {
+    pub fn show(&mut self, ui: &mut egui::Ui, tr: &Translator) {
         help_row(ui, HelpTopic::MaterialsManager, tr);
         ui.horizontal_top(|ui| {
             let size = egui::vec2(260.0, ui.available_height());

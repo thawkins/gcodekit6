@@ -429,7 +429,7 @@ impl Machine {
     /// Takes the events that no observer has taken yet: those of [`Machine::poll`] and
     /// [`Machine::absorb`] since the last call. The app calls this at every point events may
     /// have arrived and hands them to every pane, drawn or not, so a pane that keeps a log
-    /// (the console) misses nothing while its tab is hidden.
+    /// (the console) misses nothing while its page is hidden.
     pub fn take_pending(&mut self) -> Vec<MachineEvent> {
         std::mem::take(&mut self.pending)
     }

@@ -1,4 +1,4 @@
-//! Drawing the CNC Tools window: the searchable, filtered tool list, the library actions,
+//! Drawing the CNC Tools page: the searchable, filtered tool list, the library actions,
 //! the questions, the action bar and the four-tab edit form. The state and what the
 //! buttons do live in the parent module.
 //!
@@ -23,27 +23,12 @@ enum Action {
 }
 
 impl ToolsManagerWindow {
-    /// Draws the window while it is open.
+    /// Draws the CNC Tools page into `ui`.
     ///
     /// # Arguments
-    /// * `ctx` - The egui context.
+    /// * `ui` - The page's `Ui`.
     /// * `tr` - Translates the labels.
-    pub fn show(&mut self, ctx: &egui::Context, tr: &Translator) {
-        if !self.open {
-            return;
-        }
-        let mut open = self.open;
-        egui::Window::new(tr.tr(n_!("CNC Tools")))
-            .id(egui::Id::unique("gcodekit5-tools-manager"))
-            .open(&mut open)
-            .default_size([1000.0, 600.0])
-            .show(ctx, |ui| self.contents(ui, tr));
-        if !open {
-            self.close();
-        }
-    }
-
-    fn contents(&mut self, ui: &mut egui::Ui, tr: &Translator) {
+    pub fn show(&mut self, ui: &mut egui::Ui, tr: &Translator) {
         help_row(ui, HelpTopic::ToolsManager, tr);
         ui.horizontal_top(|ui| {
             let size = egui::vec2(300.0, ui.available_height());

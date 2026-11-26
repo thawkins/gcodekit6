@@ -19,7 +19,7 @@ bytemuck = { workspace = true }
 glam = { workspace = true }
 lyon = "1.0"
 rusttype = "0.9.3"
-craft-ui = { workspace = true, features = ["serde"] }
+craft-ui = { workspace = true }
 craft-window = { workspace = true, features = ["egui"] }
 craft-platform = { workspace = true, features = ["egui", "appearance"] }
 craft-keymap = { workspace = true, features = ["egui"] }

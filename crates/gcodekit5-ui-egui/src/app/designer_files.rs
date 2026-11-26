@@ -379,12 +379,7 @@ impl GcodeKitApp {
             return;
         };
         self.designer.borrow_mut().add_generated_paths(&generated);
-        let shown = self.workspace.apply(craft_ui::docking::Action::Activate {
-            panel: PaneId::Designer,
-        });
-        if let Err(error) = shown {
-            tracing::warn!(?error, "designer not brought to the front");
-        }
+        self.workspace.show_pane(PaneId::Designer);
     }
 
     /// Delivers one handoff, or asks first about the editor's unsaved edits.
@@ -477,12 +472,7 @@ impl GcodeKitApp {
             .replace_with_generated(gcode);
         self.sync_editor(true);
         if handoff == Handoff::Cam(CamDelivery::Preview) {
-            let shown = self.workspace.apply(craft_ui::docking::Action::Activate {
-                panel: PaneId::Visualizer,
-            });
-            if let Err(error) = shown {
-                tracing::warn!(?error, "visualizer not brought to the front");
-            }
+            self.workspace.show_pane(PaneId::Visualizer);
         }
     }
 }

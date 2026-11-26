@@ -21,13 +21,7 @@ fn app_with_designer() -> Harness<'static, gcodekit5_ui_egui::GcodeKitApp> {
         crate::test_smoke::native_decision(),
     ));
     let mut h = crate::machine_support::app_harness(app);
-    let shown = h
-        .state_mut()
-        .workspace_mut()
-        .apply(craft_ui::docking::Action::Activate {
-            panel: PaneId::Designer,
-        });
-    assert!(shown.is_ok(), "{shown:?}");
+    h.state_mut().workspace_mut().show_pane(PaneId::Designer);
     h.run();
     h
 }
@@ -103,16 +97,17 @@ fn test_canvas_keys_do_not_fire_while_typing() {
         .world_to_screen(Vec2::new(40.0, 40.0));
     app_click(&mut h, p);
     assert_eq!(selected(&designer.borrow()).len(), 1);
-    // Give a text field the keyboard: Delete, Escape and Cmd+Z belong to it now.
-    let field = h
-        .get_all_by_role(egui::accesskit::Role::TextInput)
-        .next()
-        .expect("a text field");
+    // Give a text field (the inspector's X) the keyboard: Delete, Cmd+Z and Escape belong
+    // to it now. Each key is its own frame, as typed: Escape ends the field's focus at the
+    // start of its frame, so a Cmd+Z in that same frame would no longer be the field's.
+    let field = h.get_by_role_and_label(egui::accesskit::Role::TextInput, "X:");
     field.focus();
     h.run();
     h.key_press(egui::Key::Delete);
-    h.key_press(egui::Key::Escape);
+    h.run();
     h.key_press_modifiers(Modifiers::COMMAND, egui::Key::Z);
+    h.run();
+    h.key_press(egui::Key::Escape);
     h.run();
     assert_eq!(designer.borrow().state().canvas.shape_count(), 1);
     assert_eq!(selected(&designer.borrow()).len(), 1);

@@ -1,4 +1,4 @@
-//! The app's side of the CNC Tools and Materials windows: drawing them, the GTC import and
+//! The app's side of the CNC Tools and Materials pages: the GTC import and
 //! export file dialogs CNC Tools asks for, handing a changed library to the speeds and
 //! feeds calculator at once, and keeping CNC Tools' search and filters in the settings
 //! whenever they change (GTK remembered them).
@@ -9,35 +9,33 @@ use super::GcodeKitApp;
 use crate::dialogs::{Asked, ConfirmRequest, DialogAnswer, FilePurpose};
 use crate::windows::tools_manager::{GtcFile, ToolsFileRequest};
 use crate::windows::{MaterialsManagerWindow, ToolsManagerWindow};
+use crate::workspace::Page;
 use gcodekit5_app::UnsavedChangesChoice;
 
 impl GcodeKitApp {
-    /// The CNC Tools window.
+    /// The CNC Tools page.
     pub fn tools_manager(&self) -> &ToolsManagerWindow {
         &self.tools_manager
     }
 
-    /// The CNC Tools window, to drive it directly (tests).
+    /// The CNC Tools page, to drive it directly (tests).
     pub fn tools_manager_mut(&mut self) -> &mut ToolsManagerWindow {
         &mut self.tools_manager
     }
 
-    /// The Materials Manager window.
+    /// The Materials page.
     pub fn materials_manager(&self) -> &MaterialsManagerWindow {
         &self.materials_manager
     }
 
-    /// The Materials Manager window, to drive it directly (tests).
+    /// The Materials page, to drive it directly (tests).
     pub fn materials_manager_mut(&mut self) -> &mut MaterialsManagerWindow {
         &mut self.materials_manager
     }
 
-    /// Draws the library windows, shows the file dialog CNC Tools asked for, and hands a
-    /// changed library to the speeds and feeds calculator.
-    pub(super) fn show_library_windows(&mut self, ctx: &egui::Context) {
-        let tr = &self.state.translator;
-        self.tools_manager.show(ctx, tr);
-        self.materials_manager.show(ctx, tr);
+    /// Shows the file dialog CNC Tools asked for, and hands a changed library to the speeds
+    /// and feeds calculator.
+    pub(super) fn show_library_windows(&mut self) {
         self.store_tools_ui_state();
         match self.tools_manager.take_file_request() {
             Some(ToolsFileRequest::Import(GtcFile::Package)) => self.dialogs.open_file(
@@ -87,17 +85,22 @@ impl GcodeKitApp {
     }
 
     /// Acts on the quit flow's question about an unsaved tool or material: Save saves it
-    /// and goes on quitting (a refused save stops the quit and shows the window with the
-    /// reason), Discard goes on without it, Cancel stops the quit and shows the window.
+    /// and goes on quitting (a refused save stops the quit and shows the page with the
+    /// reason), Discard goes on without it, Cancel stops the quit and shows the page.
     pub(super) fn library_quit_answer(
         &mut self,
         request: ConfirmRequest,
         choice: UnsavedChangesChoice,
     ) {
         let tools = request == ConfirmRequest::UnsavedTool;
-        let tr = &self.state.translator;
+        let page = if tools {
+            Page::CncTools
+        } else {
+            Page::Materials
+        };
         match choice {
             UnsavedChangesChoice::Save => {
+                let tr = &self.state.translator;
                 let saved = if tools {
                     self.tools_manager.save_for_quit(tr)
                 } else {
@@ -107,6 +110,7 @@ impl GcodeKitApp {
                 if saved {
                     self.continue_quit();
                 } else {
+                    self.show_page(page);
                     self.cancel_quit();
                 }
             }
@@ -119,11 +123,7 @@ impl GcodeKitApp {
                 self.continue_quit();
             }
             UnsavedChangesChoice::Cancel => {
-                if tools {
-                    self.tools_manager.open(tr);
-                } else {
-                    self.materials_manager.open(tr);
-                }
+                self.show_page(page);
                 self.cancel_quit();
             }
         }

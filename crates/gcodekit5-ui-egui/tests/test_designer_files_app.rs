@@ -51,13 +51,7 @@ pub fn app(state: AppState) -> (Harness<'static, GcodeKitApp>, Shared) {
             s.answers.pop_front().unwrap_or(Answer::Cancelled)
         })));
     let mut h = crate::machine_support::app_harness(app);
-    let shown = h
-        .state_mut()
-        .workspace_mut()
-        .apply(craft_ui::docking::Action::Activate {
-            panel: PaneId::Designer,
-        });
-    assert!(shown.is_ok(), "{shown:?}");
+    h.state_mut().workspace_mut().show_pane(PaneId::Designer);
     h.run();
     // A press in the designer makes it the active pane, as the user's work would.
     let p = h

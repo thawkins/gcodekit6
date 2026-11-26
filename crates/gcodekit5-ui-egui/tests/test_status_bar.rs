@@ -1,15 +1,14 @@
-//! The status bar: what it summarises of the machine status, in the user's units.
+//! The status bar: what it summarises of the machine status, in the user's units, and the
+//! active device profile as GTK showed it.
 
 use std::time::Duration;
-
-use craft_ui::docking::{Action, Placement};
 
 use egui_kittest::kittest::{NodeT, Queryable};
 use gcodekit5_app::i18n::Translator;
 use gcodekit5_communication::firmware::grbl::status_parser::FullStatus;
 use gcodekit5_core::units::MeasurementSystem;
 use gcodekit5_ui_egui::machine::{MachineStatus, Progress};
-use gcodekit5_ui_egui::status_bar::{position_text, summary};
+use gcodekit5_ui_egui::status_bar::{device_text, position_text, summary};
 
 use gcodekit5_app::test_support::Wrote;
 use gcodekit5_ui_egui::GcodeKitApp;
@@ -93,21 +92,12 @@ fn test_status_bar_shows_position_in_app() {
     );
 }
 
-/// Hides the Machine Control pane behind the visualizer's tab.
+/// Shows the Visualizer page, so the Machine Control pane (and its own E-STOP) is hidden.
 fn hide_machine_control(harness: &mut egui_kittest::Harness<'_, GcodeKitApp>) {
-    let workspace = harness.state_mut().workspace_mut();
-    workspace
-        .apply(Action::Move {
-            panel: PaneId::MachineControl,
-            anchor: PaneId::Visualizer,
-            placement: Placement::Tab { before: None },
-        })
-        .expect("move the pane into the visualizer's tabs");
-    workspace
-        .apply(Action::Activate {
-            panel: PaneId::Visualizer,
-        })
-        .expect("show the visualizer");
+    harness
+        .state_mut()
+        .workspace_mut()
+        .show_pane(PaneId::Visualizer);
     harness.step();
     harness.step();
 }
@@ -116,12 +106,7 @@ fn hide_machine_control(harness: &mut egui_kittest::Harness<'_, GcodeKitApp>) {
 fn test_status_bar_estop_disabled_while_disconnected() {
     let (mut harness, _shared) = pane_app(Duration::from_millis(1), false);
     hide_machine_control(&mut harness);
-    assert!(
-        harness
-            .get_by_label("E-STOP")
-            .accesskit_node()
-            .is_disabled()
-    );
+    assert!(harness.get_by_label("eStop").accesskit_node().is_disabled());
 }
 
 #[test]
@@ -131,7 +116,7 @@ fn test_status_bar_estop_stops_stream_without_machine_control() {
     let mut harness = app_harness(GcodeKitApp::from_state(state));
     harness.step();
     hide_machine_control(&mut harness);
-    let estop = harness.get_by_label("E-STOP");
+    let estop = harness.get_by_label("eStop");
     assert!(!estop.accesskit_node().is_disabled());
     estop.click();
     harness.step();
@@ -145,4 +130,29 @@ fn test_status_bar_estop_stops_stream_without_machine_control() {
         step_until(&mut harness, |app| !app.state().machine.status().streaming),
         "stream still running"
     );
+}
+
+#[test]
+fn test_status_bar_device_text() {
+    let tr = Translator::new("en");
+    assert_eq!(device_text(None, &tr), "No device selected");
+    let profile = gcodekit5_devicedb::DeviceProfile {
+        name: "Ray5 10W".to_string(),
+        controller_type: gcodekit5_devicedb::ControllerType::Grbl,
+        device_type: gcodekit5_devicedb::DeviceType::LaserCutter,
+        ..gcodekit5_devicedb::DeviceProfile::default()
+    };
+    assert_eq!(
+        device_text(Some(&profile), &tr),
+        "Ray5 10W | Grbl | LaserCutter"
+    );
+}
+
+/// The bar shows eStop and the active profile, as GTK's does.
+#[test]
+fn test_status_bar_shows_estop_and_device() {
+    let (mut harness, _shared) = pane_app(Duration::from_millis(1), false);
+    hide_machine_control(&mut harness);
+    assert!(harness.query_by_label("eStop").is_some());
+    assert!(harness.query_by_label("No device selected").is_some());
 }

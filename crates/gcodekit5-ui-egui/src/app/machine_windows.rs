@@ -1,6 +1,6 @@
-//! The app's side of the Firmware Settings, Device Info and Device Manager windows: the
-//! machine events handed to them, drawing them, the Save / Load file dialogs Firmware
-//! Settings asks for ([`crate::windows::FirmwareSettingsWindow::save_to`],
+//! The app's side of the Device Config (firmware settings) and Device Manager pages and the
+//! Device Info window: the machine events handed to them, drawing them, the Save / Load file
+//! dialogs Firmware Settings asks for ([`crate::windows::FirmwareSettingsWindow::save_to`],
 //! [`crate::windows::FirmwareSettingsWindow::load_from`]), and what passes between Firmware
 //! Settings and the device profiles (the active profile's controller, a retrieved dump kept
 //! in it, Sync from Device), and the active device given to the CAM tools.
@@ -13,17 +13,18 @@ use crate::dialogs::{Asked, DialogAnswer, FilePurpose};
 use crate::machine::lock;
 use crate::windows::firmware_settings::{EXPORT_FILE_NAME, FileRequest};
 use crate::windows::{DeviceInfoWindow, DeviceManagerWindow, FirmwareSettingsWindow};
+use crate::workspace::Page;
 use gcodekit5_app::UnsavedChangesChoice;
 use gcodekit5_app::machine::MachineEvent;
 use gcodekit5_devicedb::DeviceProfile;
 
 impl GcodeKitApp {
-    /// The Firmware Settings window.
+    /// The Device Config page's firmware settings.
     pub fn firmware_settings(&self) -> &FirmwareSettingsWindow {
         &self.firmware_settings
     }
 
-    /// The Firmware Settings window, to feed it events directly (tests).
+    /// The Device Config page's firmware settings, to feed them events directly (tests).
     pub fn firmware_settings_mut(&mut self) -> &mut FirmwareSettingsWindow {
         &mut self.firmware_settings
     }
@@ -33,7 +34,7 @@ impl GcodeKitApp {
         &self.device_info
     }
 
-    /// The Device Manager window.
+    /// The Device Manager page.
     pub fn device_manager(&self) -> &DeviceManagerWindow {
         &self.device_manager
     }
@@ -43,7 +44,8 @@ impl GcodeKitApp {
         self.device_manager.active_profile()
     }
 
-    /// Hands the machine events no observer has seen yet to the windows, open or not, and
+    /// Hands the machine events no observer has seen yet to the pages and windows, shown or
+    /// not, and
     /// keeps a retrieved dump in the profile of the machine it came from.
     pub(super) fn machine_windows_events(&mut self, events: &[MachineEvent]) {
         let tr = &self.state.translator;
@@ -72,8 +74,8 @@ impl GcodeKitApp {
     }
 
     /// Acts on the quit flow's question about an unsaved device profile: Save saves it and
-    /// goes on quitting (a refused save stops the quit and shows the window with the
-    /// reason), Discard goes on without it, Cancel stops the quit and shows the window.
+    /// goes on quitting (a refused save stops the quit and shows the page with the reason),
+    /// Discard goes on without it, Cancel stops the quit and shows the page.
     pub(super) fn device_quit_answer(&mut self, choice: UnsavedChangesChoice) {
         let tr = &self.state.translator;
         match choice {
@@ -84,6 +86,7 @@ impl GcodeKitApp {
                 if saved {
                     self.continue_quit();
                 } else {
+                    self.show_page(Page::DeviceManager);
                     self.cancel_quit();
                 }
             }
@@ -92,7 +95,7 @@ impl GcodeKitApp {
                 self.continue_quit();
             }
             UnsavedChangesChoice::Cancel => {
-                self.device_manager.open(tr);
+                self.show_page(Page::DeviceManager);
                 self.cancel_quit();
             }
         }
@@ -108,23 +111,34 @@ impl GcodeKitApp {
         }
     }
 
-    /// Draws both windows and shows the file dialog Firmware Settings asked for.
-    pub(super) fn show_machine_windows(&mut self, ctx: &egui::Context) {
-        let tr = &self.state.translator;
+    /// Runs the firmware settings' reads and writes, and draws them into `page` when the
+    /// Device Config page is shown.
+    pub(super) fn show_firmware_settings(&mut self, page: Option<&mut egui::Ui>) {
+        let Some(ctx) = self.wake_ctx.get().cloned() else {
+            return;
+        };
         let profile_controller = self
             .device_manager
             .active_profile()
             .map(|p| p.controller_type);
         self.firmware_settings.show(
-            ctx,
+            &ctx,
+            page,
             &self.state.machine,
             self.device_info.identity(),
             profile_controller,
-            tr,
+            &self.state.translator,
         );
+    }
+
+    /// Runs the firmware settings while their page is not shown, draws the Device Info
+    /// window, takes Sync from Device and shows the file dialog Firmware Settings asked for.
+    pub(super) fn show_machine_windows(&mut self, ctx: &egui::Context) {
+        if self.workspace.page() != Page::DeviceConfig {
+            self.show_firmware_settings(None);
+        }
+        let tr = &self.state.translator;
         self.device_info.show(ctx, &self.state.machine, tr);
-        self.device_manager
-            .show(ctx, &self.state.machine, self.state.settings.config(), tr);
         if self.device_manager.take_sync_request() {
             let reported = self.firmware_settings.reported_values();
             let connected = self.state.machine.status().connected;

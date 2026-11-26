@@ -5,7 +5,6 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use craft_ui::docking::{Action, Placement};
 use egui_kittest::Harness;
 use egui_kittest::kittest::Queryable;
 use gcodekit5_app::machine::RealtimeCommand;
@@ -136,25 +135,16 @@ fn test_hold_cancelled_when_window_loses_focus() {
     harness.input_mut().focused = true;
 }
 
-/// I2b: the Machine Control pane hidden behind another tab ends the hold.
+/// I2b: the Machine Control pane hidden by another page ends the hold.
 #[test]
 fn test_hold_cancelled_when_pane_hidden() {
     let (mut harness, shared) = hold_app(loopback_config(), Some([-100.0, -100.0, -50.0]));
     press(&mut harness, "Jog X+");
     wait_jogs(&shared, 1);
-    let workspace = harness.state_mut().workspace_mut();
-    workspace
-        .apply(Action::Move {
-            panel: PaneId::MachineControl,
-            anchor: PaneId::Visualizer,
-            placement: Placement::Tab { before: None },
-        })
-        .expect("move the pane into the visualizer's tabs");
-    workspace
-        .apply(Action::Activate {
-            panel: PaneId::Visualizer,
-        })
-        .expect("show the visualizer");
+    harness
+        .state_mut()
+        .workspace_mut()
+        .show_pane(PaneId::Visualizer);
     harness.step();
     assert!(wait_until(|| cancels(&shared) == 1), "{:?}", shared.log());
 }

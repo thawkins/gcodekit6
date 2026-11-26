@@ -1,8 +1,11 @@
-//! Docking workspace: the panes of the main window and their arrangement.
+//! The main window's pages and the panes on them, arranged as the GTK front end does: a row
+//! of eight page tabs ([`Page`], in GTK's order) above one page at a time, each page a fixed
+//! layout of panes. The four manager pages (Device Manager, Device Config, CNC Tools,
+//! Materials) hold no pane: the app draws them ([`Workspace::show`] leaves them to it).
+//! Switching pages keeps every pane's state; nothing about the arrangement is saved, so a
+//! docking layout an earlier build may have kept is never read.
 //!
-//! The arrangement is a [`craft_ui::docking::Workspace`] keyed by [`PaneId`]; it serializes
-//! with serde so it can be saved and restored. Each pane implements [`Pane`]. Until the real
-//! panes land (milestones M2 to M5) every pane is a placeholder showing its title.
+//! Each pane implements [`Pane`]; one that is not set yet is a placeholder showing its title.
 //!
 //! Panes ask for commands through [`PaneContext::request`]; the app runs them after drawing.
 //! A command that belongs to a pane (the machine commands belong to Machine Control) is handed
@@ -15,15 +18,12 @@
 //! and the pane the user works in ([`Workspace::active_pane`]), which a press on a menu does
 //! not change, so the app can hand Undo or the zoom commands to the designer.
 //!
-//! Dependencies: `egui`, `craft-ui` (docking, with the `serde` feature), `gcodekit5-app`
-//! (translations).
+//! Dependencies: `egui`, `craft-ui` (accessible tabs), `gcodekit5-app` (translations).
 
-use craft_ui::docking::{self, DockArea, DockContent, DockStyle, Layout, Node, Permissions};
-use craft_ui::layout::{SplitAxis, SplitSize};
+use craft_ui::tabs::Tab;
 use gcodekit5_app::i18n::Translator;
 use gcodekit5_app::machine::MachineEvent;
 use gcodekit5_settings::config::Config;
-use serde::{Deserialize, Serialize};
 
 use crate::commands::{Command, MACHINE_CONTROL_SCOPE, VISUALIZER_SCOPE};
 use crate::dialogs::{ConfirmChoice, ConfirmRequest};
@@ -31,7 +31,7 @@ use crate::machine::Machine;
 use gcodekit5_devicedb::ControllerType;
 
 /// Identifies one pane of the main window.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum PaneId {
     /// Jogging, homing and machine state.
     MachineControl,
@@ -52,7 +52,7 @@ pub enum PaneId {
 }
 
 impl PaneId {
-    /// Every pane, in menu order.
+    /// Every pane.
     pub const ALL: [PaneId; 8] = [
         PaneId::MachineControl,
         PaneId::Console,
@@ -92,6 +92,147 @@ impl PaneId {
             | PaneId::CamTools => None,
         }
     }
+}
+
+/// One page of the main window, as GTK's top row of tabs names them.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum Page {
+    /// Toolbox, canvas, and the inspector over the objects list.
+    Designer,
+    /// The toolpath visualizer.
+    Visualizer,
+    /// Machine controls, with the G-code editor above the console beside them.
+    MachineControl,
+    /// The CAM tool generators.
+    CamTools,
+    /// The device profiles.
+    DeviceManager,
+    /// The controller's firmware settings.
+    DeviceConfig,
+    /// The CNC tool library.
+    CncTools,
+    /// The material library.
+    Materials,
+}
+
+impl Page {
+    /// Every page, in GTK's tab order.
+    pub const ALL: [Page; 8] = [
+        Page::Designer,
+        Page::Visualizer,
+        Page::MachineControl,
+        Page::CamTools,
+        Page::DeviceManager,
+        Page::DeviceConfig,
+        Page::CncTools,
+        Page::Materials,
+    ];
+
+    /// The English msgid of the page's tab, as listed in `po/gcodekit5.pot`.
+    pub fn title_msgid(self) -> &'static str {
+        match self {
+            Page::Designer => n_!("Designer"),
+            Page::Visualizer => n_!("Visualizer"),
+            Page::MachineControl => n_!("Machine Control"),
+            Page::CamTools => n_!("CAM Tools"),
+            Page::DeviceManager => n_!("Device Manager"),
+            Page::DeviceConfig => n_!("Device Config"),
+            Page::CncTools => n_!("CNC Tools"),
+            Page::Materials => n_!("Materials"),
+        }
+    }
+
+    /// The panes the page shows; none for a manager page, which the app draws.
+    pub fn panes(self) -> &'static [PaneId] {
+        match self {
+            Page::Designer => &[
+                PaneId::Designer,
+                PaneId::DesignerProperties,
+                PaneId::DesignerLayers,
+            ],
+            Page::Visualizer => &[PaneId::Visualizer],
+            Page::MachineControl => &[PaneId::MachineControl, PaneId::Editor, PaneId::Console],
+            Page::CamTools => &[PaneId::CamTools],
+            Page::DeviceManager | Page::DeviceConfig | Page::CncTools | Page::Materials => &[],
+        }
+    }
+
+    /// The page that shows `pane`.
+    ///
+    /// # Arguments
+    /// * `pane` - The pane.
+    pub fn of_pane(pane: PaneId) -> Page {
+        match pane {
+            PaneId::MachineControl | PaneId::Editor | PaneId::Console => Page::MachineControl,
+            PaneId::Visualizer => Page::Visualizer,
+            PaneId::Designer | PaneId::DesignerLayers | PaneId::DesignerProperties => {
+                Page::Designer
+            }
+            PaneId::CamTools => Page::CamTools,
+        }
+    }
+
+    /// The page a command shows, for the commands that opened a manager window before the
+    /// managers became pages.
+    ///
+    /// # Arguments
+    /// * `command` - A command.
+    pub fn for_command(command: Command) -> Option<Page> {
+        match command {
+            Command::OpenDeviceManager => Some(Page::DeviceManager),
+            Command::OpenFirmwareSettings => Some(Page::DeviceConfig),
+            Command::OpenToolsManager => Some(Page::CncTools),
+            Command::OpenMaterialsManager => Some(Page::Materials),
+            Command::FileNew
+            | Command::FileNew3d
+            | Command::FileOpen
+            | Command::FileSave
+            | Command::FileSaveAs
+            | Command::FileImport
+            | Command::FileImportImage
+            | Command::FileExportGcode
+            | Command::FileExportSvg
+            | Command::FileRun
+            | Command::Quit
+            | Command::Undo
+            | Command::Redo
+            | Command::Cut
+            | Command::Copy
+            | Command::Paste
+            | Command::Connect
+            | Command::Disconnect
+            | Command::StreamStart
+            | Command::StreamPause
+            | Command::StreamStop
+            | Command::FeedHold
+            | Command::CycleStart
+            | Command::SoftReset
+            | Command::Home
+            | Command::Unlock
+            | Command::JogXPos
+            | Command::JogXNeg
+            | Command::JogYPos
+            | Command::JogYNeg
+            | Command::JogZPos
+            | Command::JogZNeg
+            | Command::ZoomFit
+            | Command::ZoomIn
+            | Command::ZoomOut
+            | Command::ResetView
+            | Command::ViewTop
+            | Command::ViewFront
+            | Command::ViewIso
+            | Command::OpenSettings
+            | Command::OpenDeviceInfo
+            | Command::OpenHelp
+            | Command::About => None,
+        }
+    }
+}
+
+/// Every msgid the page tabs can show, for the translation guard test.
+pub fn msgids() -> Vec<&'static str> {
+    Page::ALL.into_iter().map(Page::title_msgid).collect()
 }
 
 /// What a pane may use while it draws.
@@ -142,12 +283,12 @@ impl<'a> PaneContext<'a> {
     }
 }
 
-/// One pane of the docking workspace.
+/// One pane of a page.
 pub trait Pane {
     /// The pane's identity in the layout.
     fn id(&self) -> PaneId;
 
-    /// The pane's tab title, translated.
+    /// The pane's title, translated.
     ///
     /// # Arguments
     /// * `tr` - Translator for the current UI language.
@@ -261,23 +402,17 @@ fn placeholder_panes() -> Vec<Box<dyn Pane>> {
         .collect()
 }
 
-/// The main window's panes and their docking arrangement.
-///
-/// Only the arrangement is serialized and compared; the panes are rebuilt on load.
-#[derive(Serialize, Deserialize)]
+/// The main window's pages and their panes.
 pub struct Workspace {
-    dock: docking::Workspace<PaneId>,
-    #[serde(skip, default = "placeholder_panes")]
     panes: Vec<Box<dyn Pane>>,
+    /// The page shown.
+    page: Page,
     /// The pane the user last pressed the pointer in; `None` after a press outside every pane.
-    #[serde(skip)]
     focused: Option<PaneId>,
     /// The pane the user last pressed the pointer in, kept through presses outside every
-    /// pane (a menu, a tab bar).
-    #[serde(skip)]
+    /// pane (a menu, a tab).
     active: Option<PaneId>,
     /// The panes whose bodies the last frame drew.
-    #[serde(skip)]
     drawn: Drawn,
 }
 
@@ -288,78 +423,55 @@ type Drawn = Vec<PaneId>;
 impl std::fmt::Debug for Workspace {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Workspace")
-            .field("dock", &self.dock)
+            .field("page", &self.page)
             .finish_non_exhaustive()
     }
 }
 
-impl PartialEq for Workspace {
-    fn eq(&self, other: &Self) -> bool {
-        self.dock == other.dock
+impl Default for Workspace {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
-/// A tab group holding `panels`, the first one shown.
-fn tabs(panels: Vec<PaneId>) -> Node<PaneId> {
-    Node::Tabs { panels, active: 0 }
-}
+/// Height of the page tab row in points.
+const TAB_HEIGHT: f32 = 26.0;
 
-/// A split of `first` and `second` along `axis`, `first` taking `ratio` of the room.
-fn split(axis: SplitAxis, ratio: f32, first: Node<PaneId>, second: Node<PaneId>) -> Node<PaneId> {
-    Node::Split {
-        axis,
-        size: SplitSize::Ratio(ratio),
-        first: Box::new(first),
-        second: Box::new(second),
-    }
-}
-
-/// Every pane may move and float but not close: there is no menu to reopen one yet.
-fn permissions(_pane: &PaneId) -> Permissions {
-    Permissions {
-        closable: false,
-        ..Permissions::default()
-    }
-}
+/// Share of the page's width the Machine Control page's editor and console column takes,
+/// and the Designer page's inspector column.
+const SIDE_COLUMN: f32 = 0.3;
 
 impl Workspace {
-    /// The arrangement a first run starts with: machine control on the left, the visualizer,
-    /// editor, designer and CAM tools in the middle above the console, and the designer's
-    /// layers and properties on the right.
-    pub fn default_layout() -> Workspace {
-        let centre = split(
-            SplitAxis::Vertical,
-            0.75,
-            tabs(vec![
-                PaneId::Visualizer,
-                PaneId::Editor,
-                PaneId::Designer,
-                PaneId::CamTools,
-            ]),
-            tabs(vec![PaneId::Console]),
-        );
-        let inspector = split(
-            SplitAxis::Vertical,
-            0.5,
-            tabs(vec![PaneId::DesignerLayers]),
-            tabs(vec![PaneId::DesignerProperties]),
-        );
-        let root = split(
-            SplitAxis::Horizontal,
-            0.22,
-            tabs(vec![PaneId::MachineControl]),
-            split(SplitAxis::Horizontal, 0.75, centre, inspector),
-        );
+    /// The pages with placeholder panes, showing Machine Control (GTK's default start page).
+    pub fn new() -> Workspace {
         Workspace {
-            dock: docking::Workspace::new(Layout {
-                root: Some(root),
-                floating: Vec::new(),
-            }),
             panes: placeholder_panes(),
+            page: Page::MachineControl,
             focused: None,
             active: None,
             drawn: Drawn::new(),
         }
+    }
+
+    /// The page shown.
+    pub fn page(&self) -> Page {
+        self.page
+    }
+
+    /// Shows `page` from the next frame on.
+    ///
+    /// # Arguments
+    /// * `page` - The page to show.
+    pub fn set_page(&mut self, page: Page) {
+        self.page = page;
+    }
+
+    /// Shows the page that holds `pane` from the next frame on.
+    ///
+    /// # Arguments
+    /// * `pane` - The pane to bring to the front.
+    pub fn show_pane(&mut self, pane: PaneId) {
+        self.page = Page::of_pane(pane);
     }
 
     /// Puts `pane` in place of the pane with the same id.
@@ -470,17 +582,6 @@ impl Workspace {
             .any(|pane| pane.confirmed(request, choice, ctx))
     }
 
-    /// Applies a layout change (move, activate, float...) with the workspace's permissions.
-    ///
-    /// # Arguments
-    /// * `action` - The change.
-    ///
-    /// # Errors
-    /// The docking model's refusal.
-    pub fn apply(&mut self, action: docking::Action<PaneId>) -> Result<(), docking::DockError> {
-        self.dock.apply(action, permissions).map(drop)
-    }
-
     /// The pane the user last pressed the pointer in, or `None` when the last press was
     /// outside every pane.
     pub fn focused_pane(&self) -> Option<PaneId> {
@@ -493,7 +594,7 @@ impl Workspace {
         self.active.filter(|id| self.drawn.contains(id))
     }
 
-    /// Whether the last frame drew the pane `id`'s body (its tab is the one shown).
+    /// Whether the last frame drew the pane `id`'s body (its page is the one shown).
     ///
     /// # Arguments
     /// * `id` - The pane.
@@ -501,34 +602,99 @@ impl Workspace {
         self.drawn.contains(&id)
     }
 
-    /// Draws the workspace into the rest of `ui` and applies the user's layout changes.
+    /// Draws the row of page tabs across `ui`, each the same width, the shown page's filled.
     ///
     /// # Arguments
-    /// * `ui` - The `Ui` whose remaining room the workspace fills.
+    /// * `ui` - A top panel's `Ui`.
+    /// * `tr` - Translator for the tab labels.
+    ///
+    /// # Returns
+    /// The page whose tab was clicked this frame, if any; the caller shows it.
+    pub fn show_tabs(&self, ui: &mut egui::Ui, tr: &Translator) -> Option<Page> {
+        let row = ui.available_rect_before_wrap();
+        let width = row.width() / Page::ALL.len() as f32;
+        let mut clicked = None;
+        for (i, page) in Page::ALL.into_iter().enumerate() {
+            let rect = egui::Rect::from_min_size(
+                egui::pos2(row.left() + width * i as f32, row.top()),
+                egui::vec2(width, TAB_HEIGHT),
+            );
+            let label = tr.tr(page.title_msgid());
+            let selected = page == self.page;
+            let id = egui::Id::unique(("gcodekit5-page-tab", i));
+            let response = Tab::new(id, &label, selected).show_at(ui, rect, |ui, response| {
+                paint_tab(ui, response, rect, &label, selected);
+            });
+            if response.clicked() {
+                clicked = Some(page);
+            }
+        }
+        ui.allocate_rect(
+            egui::Rect::from_min_size(row.min, egui::vec2(row.width(), TAB_HEIGHT)),
+            egui::Sense::hover(),
+        );
+        clicked
+    }
+
+    /// Draws the shown page's panes into the rest of `ui`; a manager page draws nothing
+    /// here (the app draws it).
+    ///
+    /// # Arguments
+    /// * `ui` - The `Ui` whose remaining room the page fills.
     /// * `ctx` - Shared state passed to every pane.
     pub fn show(&mut self, ui: &mut egui::Ui, ctx: &mut PaneContext) {
-        let style = DockStyle::from_ui(ui);
         let press = ui.input(|i| {
             i.pointer
                 .any_pressed()
                 .then(|| i.pointer.press_origin())
                 .flatten()
         });
-        let mut content = Content {
+        let mut frame = Content {
             panes: &mut self.panes,
             ctx,
             press,
             pressed_in: None,
             drawn: Drawn::new(),
         };
-        let output = DockArea::new(egui::Id::unique("gcodekit5-workspace"))
-            .locked(self.dock.locked)
-            .show_content(ui, &self.dock.layout, &style, &mut content);
-        if press.is_some() {
-            self.focused = content.pressed_in;
-            self.active = content.pressed_in.or(self.active);
+        let side = ui.available_width() * SIDE_COLUMN;
+        match self.page {
+            Page::Designer => {
+                egui::Panel::right("gcodekit5-designer-inspector")
+                    .resizable(true)
+                    .default_size(side)
+                    .show(ui, |ui| {
+                        let half = ui.available_height() * 0.5;
+                        egui::Panel::bottom("gcodekit5-designer-objects")
+                            .resizable(true)
+                            .default_size(half)
+                            .show(ui, |ui| frame.pane(ui, PaneId::DesignerLayers));
+                        frame.pane(ui, PaneId::DesignerProperties);
+                    });
+                frame.pane(ui, PaneId::Designer);
+            }
+            Page::MachineControl => {
+                egui::Panel::right("gcodekit5-machine-editor")
+                    .resizable(true)
+                    .default_size(side)
+                    .show(ui, |ui| {
+                        let console = ui.available_height() * 0.3;
+                        egui::Panel::bottom("gcodekit5-machine-console")
+                            .resizable(true)
+                            .default_size(console)
+                            .show(ui, |ui| frame.pane(ui, PaneId::Console));
+                        frame.pane(ui, PaneId::Editor);
+                    });
+                frame.pane(ui, PaneId::MachineControl);
+            }
+            Page::Visualizer => frame.pane(ui, PaneId::Visualizer),
+            Page::CamTools => frame.pane(ui, PaneId::CamTools),
+            Page::DeviceManager | Page::DeviceConfig | Page::CncTools | Page::Materials => {}
         }
-        self.drawn = content.drawn;
+        if press.is_some() {
+            self.focused = frame.pressed_in;
+            self.active = frame.pressed_in.or(self.active);
+        }
+        self.drawn = frame.drawn;
         for pane in self
             .panes
             .iter_mut()
@@ -536,18 +702,46 @@ impl Workspace {
         {
             pane.cancel_hold();
         }
-        if let Some(error) = output.error {
-            tracing::warn!(?error, "workspace layout not drawn");
-        }
-        if !output.actions.is_empty()
-            && let Err(error) = self.dock.apply_all(output.actions, permissions)
-        {
-            tracing::warn!(?error, "workspace layout change rejected");
-        }
     }
 }
 
-/// Adapts the panes to the docking renderer for one frame.
+/// Paints one page tab: filled with the selection colour when it is the shown page, the
+/// hover colour while the pointer is over it, and its label centred (cut short with an
+/// ellipsis when it does not fit).
+fn paint_tab(ui: &egui::Ui, response: &egui::Response, rect: egui::Rect, label: &str, on: bool) {
+    let visuals = ui.visuals();
+    let (fill, text) = if on {
+        (visuals.selection.bg_fill, visuals.selection.stroke.color)
+    } else if response.hovered() {
+        (
+            visuals.widgets.hovered.weak_bg_fill,
+            visuals.widgets.hovered.fg_stroke.color,
+        )
+    } else {
+        (
+            visuals.widgets.inactive.weak_bg_fill,
+            visuals.widgets.inactive.fg_stroke.color,
+        )
+    };
+    let painter = ui.painter();
+    painter.rect_filled(rect, 0.0, fill);
+    painter.vline(
+        rect.right(),
+        rect.y_range(),
+        visuals.widgets.noninteractive.bg_stroke,
+    );
+    let mut job = egui::text::LayoutJob::single_section(
+        label.to_owned(),
+        egui::TextFormat::simple(egui::TextStyle::Button.resolve(ui.style()), text),
+    );
+    job.wrap = egui::text::TextWrapping::truncate_at_width(rect.width() - 8.0);
+    let galley = ui.fonts_mut(|f| f.layout_job(job));
+    let pos = rect.center() - galley.size() * 0.5;
+    painter.galley(pos, galley, text);
+}
+
+/// Draws the panes of one page for one frame, noting which were drawn and which holds the
+/// pointer press.
 struct Content<'p, 'c, 't> {
     panes: &'p mut [Box<dyn Pane>],
     ctx: &'c mut PaneContext<'t>,
@@ -559,25 +753,20 @@ struct Content<'p, 'c, 't> {
     drawn: Drawn,
 }
 
-impl DockContent<PaneId> for Content<'_, '_, '_> {
-    fn body(&mut self, ui: &mut egui::Ui, panel: &PaneId) {
-        self.drawn.push(*panel);
+impl Content<'_, '_, '_> {
+    /// Draws the pane `id` into the rest of `ui`.
+    fn pane(&mut self, ui: &mut egui::Ui, id: PaneId) {
+        egui::CentralPanel::default().show(ui, |ui| self.body(ui, id));
+    }
+
+    /// Draws the pane `id`'s body into `ui`.
+    fn body(&mut self, ui: &mut egui::Ui, id: PaneId) {
+        self.drawn.push(id);
         if self.press.is_some_and(|pos| ui.max_rect().contains(pos)) {
-            self.pressed_in = Some(*panel);
+            self.pressed_in = Some(id);
         }
-        if let Some(pane) = self.panes.iter_mut().find(|p| p.id() == *panel) {
+        if let Some(pane) = self.panes.iter_mut().find(|p| p.id() == id) {
             pane.ui(ui, self.ctx);
         }
-    }
-
-    fn logical_label(&self, panel: &PaneId) -> String {
-        self.panes.iter().find(|p| p.id() == *panel).map_or_else(
-            || self.ctx.tr.tr(panel.title_msgid()).into_owned(),
-            |p| p.title(self.ctx.tr),
-        )
-    }
-
-    fn permissions(&self, panel: &PaneId) -> Permissions {
-        permissions(panel)
     }
 }
