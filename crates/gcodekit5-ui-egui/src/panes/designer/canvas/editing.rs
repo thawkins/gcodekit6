@@ -524,3 +524,13 @@ pub fn work_area() -> Bounds {
         core_constants::DEFAULT_WORK_HEIGHT_MM,
     )
 }
+
+/// GTK's Cut: copies the selection to the design's clipboard, then deletes it as one undo
+/// step.
+///
+/// # Arguments
+/// * `state` - The design.
+pub fn cut_selected(state: &mut DesignerState) {
+    state.copy_selected();
+    state.delete_selected();
+}

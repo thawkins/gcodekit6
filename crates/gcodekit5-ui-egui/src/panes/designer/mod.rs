@@ -375,6 +375,29 @@ impl DesignerPane {
         editing::rotate_selected_by(&mut self.state, degrees);
     }
 
+    /// Cut, Copy or Paste of shapes through the design's own clipboard, as GTK's Edit
+    /// actions on the Designer page: Paste centres the copies on the pointer's last point
+    /// on the canvas, with new ids, as one undo step. Ignored during a canvas drag.
+    ///
+    /// # Arguments
+    /// * `command` - `Cut`, `Copy` or `Paste`; any other command does nothing.
+    fn clipboard(&mut self, command: Command) {
+        if self.dragging() {
+            tracing::debug!(?command, "clipboard ignored during a canvas drag");
+            return;
+        }
+        match command {
+            Command::Cut => editing::cut_selected(&mut self.state),
+            Command::Copy => self.state.copy_selected(),
+            Command::Paste => {
+                let (x, y) = self.input.hover.unwrap_or(self.cursor);
+                self.state.paste_at_location(x, y);
+            }
+            _ => return,
+        }
+        self.touch();
+    }
+
     /// The canvas: input, then painting with the view the input left.
     fn show_canvas(&mut self, ui: &mut egui::Ui, tr: &Translator) {
         let rect = ui.available_rect_before_wrap();
@@ -577,6 +600,7 @@ impl Pane for DesignerPane {
             Command::ZoomOut => self.apply_view(ViewAction::ZoomOut),
             Command::ZoomFit => self.apply_view(ViewAction::FitContent),
             Command::ResetView => self.apply_view(ViewAction::FitViewport),
+            Command::Cut | Command::Copy | Command::Paste => self.clipboard(command),
             Command::AlignLeft => self.state.align_selected_horizontal_left(),
             Command::AlignRight => self.state.align_selected_horizontal_right(),
             Command::AlignTop => self.state.align_selected_vertical_top(),
@@ -594,9 +618,6 @@ impl Pane for DesignerPane {
             | Command::FileExportSvg
             | Command::FileRun
             | Command::Quit
-            | Command::Cut
-            | Command::Copy
-            | Command::Paste
             | Command::Connect
             | Command::Disconnect
             | Command::StreamStart

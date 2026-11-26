@@ -981,15 +981,17 @@ impl GcodeKitApp {
             Command::OpenDeviceInfo => self.show_page(Page::DeviceConfig),
             Command::OpenDeviceManager => self.show_page(Page::DeviceManager),
             Command::Quit => self.request_quit(QuitSource::MenuQuit),
-            Command::Cut => self
-                .viewport_commands
-                .push(egui::ViewportCommand::RequestCut),
-            Command::Copy => self
-                .viewport_commands
-                .push(egui::ViewportCommand::RequestCopy),
-            Command::Paste => self
-                .viewport_commands
-                .push(egui::ViewportCommand::RequestPaste),
+            // GTK's Edit actions: shapes on the Designer page (the design's own clipboard),
+            // text elsewhere.
+            Command::Cut | Command::Copy | Command::Paste => {
+                if !self.route_to_active_designer(cmd) {
+                    self.viewport_commands.push(match cmd {
+                        Command::Cut => egui::ViewportCommand::RequestCut,
+                        Command::Copy => egui::ViewportCommand::RequestCopy,
+                        _ => egui::ViewportCommand::RequestPaste,
+                    });
+                }
+            }
             // Run by `dispatch_design` above.
             Command::FileNew
             | Command::FileNew3d

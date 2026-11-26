@@ -183,3 +183,124 @@ fn test_align_keys_run_on_the_canvas_but_not_while_typing() {
     h.run();
     assert!(close4(bounds_in(&designer, a), (30.0, 15.0, 40.0, 25.0)));
 }
+
+/// Right-clicks world `(x, y)` (keeping the selection) and clicks `item` in the menu.
+fn right_click_item(h: &mut Harness<'_, DesignerPane>, x: f32, y: f32, item: &str) {
+    let p = screen(h, x, y);
+    click_with(h, p, PointerButton::Secondary, Modifiers::NONE);
+    h.get_by_label(item).click();
+    h.run();
+}
+
+#[test]
+fn test_copy_and_paste_from_context_menu_make_new_shapes_at_the_pointer() {
+    let mut h = harness(pane_with_rects(&[(0.0, 0.0, 10.0, 10.0)]));
+    let original = ids(h.state())[0];
+    let p = screen(&h, 5.0, 5.0);
+    crate::test_designer_canvas::click(&mut h, p);
+    right_click_item(&mut h, 5.0, 5.0, "Copy");
+    assert_eq!(ids(h.state()), vec![original], "copy changes nothing");
+    // GTK pastes the clipboard centred on the pointer, selected, as one undo step.
+    h.state_mut().state_mut().deselect_all();
+    h.run();
+    right_click_item(&mut h, 50.0, 40.0, "Paste");
+    let after = ids(h.state());
+    assert_eq!(after.len(), 2);
+    let pasted = after[1];
+    assert_ne!(pasted, original);
+    assert!(close4(bounds(h.state(), pasted), (45.0, 35.0, 55.0, 45.0)));
+    assert!(close4(bounds(h.state(), original), (0.0, 0.0, 10.0, 10.0)));
+    assert_eq!(selected(h.state()), vec![pasted]);
+    // A second paste is another new shape with its own id.
+    right_click_item(&mut h, 80.0, 40.0, "Paste");
+    let third = ids(h.state());
+    assert_eq!(third.len(), 3);
+    assert!(!after.contains(&third[2]));
+    h.state_mut().undo();
+    h.run();
+    h.state_mut().undo();
+    h.run();
+    assert_eq!(ids(h.state()), vec![original]);
+    assert!(close4(bounds(h.state(), original), (0.0, 0.0, 10.0, 10.0)));
+}
+
+#[test]
+fn test_cut_removes_the_selection_and_paste_brings_it_back() {
+    let mut h = harness(pane_with_rects(&[
+        (0.0, 0.0, 10.0, 10.0),
+        (30.0, 0.0, 10.0, 10.0),
+    ]));
+    let [a, b] = [ids(h.state())[0], ids(h.state())[1]];
+    let p = screen(&h, 5.0, 5.0);
+    crate::test_designer_canvas::click(&mut h, p);
+    right_click_item(&mut h, 5.0, 5.0, "Cut");
+    assert_eq!(ids(h.state()), vec![b]);
+    // With nothing selected the menu still offers Paste while the clipboard holds shapes.
+    right_click_item(&mut h, 20.0, 20.0, "Paste");
+    let now = ids(h.state());
+    assert_eq!(now.len(), 2);
+    assert!(!now.contains(&a), "the pasted shape has a new id");
+    assert!(close4(bounds(h.state(), now[1]), (15.0, 15.0, 25.0, 25.0)));
+    // Undo the paste, then the cut.
+    h.state_mut().undo();
+    h.run();
+    h.state_mut().undo();
+    h.run();
+    assert_eq!(ids(h.state()).len(), 2);
+    assert!(ids(h.state()).contains(&a));
+}
+
+#[test]
+fn test_paste_gives_a_copied_group_its_own_group_id() {
+    let mut pane = pane_with_rects(&[(0.0, 0.0, 10.0, 10.0), (20.0, 0.0, 10.0, 10.0)]);
+    pane.state_mut().select_all();
+    pane.state_mut().group_selected();
+    let mut h = harness(pane);
+    let group = |h: &Harness<'_, DesignerPane>, id: u64| {
+        h.state()
+            .state()
+            .canvas
+            .get_shape(id)
+            .and_then(|o| o.group_id)
+    };
+    let original = group(&h, ids(h.state())[0]);
+    assert!(original.is_some());
+    let p = screen(&h, 5.0, 5.0);
+    crate::test_designer_canvas::click(&mut h, p);
+    right_click_item(&mut h, 5.0, 5.0, "Copy");
+    right_click_item(&mut h, 60.0, 60.0, "Paste");
+    let all = ids(h.state());
+    assert_eq!(all.len(), 4);
+    let pasted = [group(&h, all[2]), group(&h, all[3])];
+    assert_eq!(pasted[0], pasted[1], "the copies stay one group");
+    assert!(pasted[0].is_some());
+    assert_ne!(pasted[0], original, "a group of their own");
+    assert_eq!(group(&h, all[0]), original, "the originals keep theirs");
+}
+
+#[test]
+fn test_clipboard_keys_run_on_the_canvas_but_not_while_typing() {
+    let (mut h, designer) = app_with_two_selected();
+    let before = ids(&designer.borrow());
+    // The pointer is over (5, 5) after the click: Cmd+C then Cmd+V pastes there.
+    h.key_press_modifiers(Modifiers::COMMAND, egui::Key::C);
+    h.run();
+    h.key_press_modifiers(Modifiers::COMMAND, egui::Key::V);
+    h.run();
+    let after = ids(&designer.borrow());
+    assert_eq!(after.len(), 4, "Cmd+V pasted both shapes");
+    // Cmd+X cuts the pasted (selected) copies.
+    h.key_press_modifiers(Modifiers::COMMAND, egui::Key::X);
+    h.run();
+    assert_eq!(ids(&designer.borrow()), before);
+    // A text field (the inspector's X, shown for a selection) owns the keyboard: Cmd+V goes
+    // to it, not to the canvas.
+    designer.borrow_mut().state_mut().select_all();
+    h.run();
+    let field = h.get_by_role_and_label(egui::accesskit::Role::TextInput, "X:");
+    field.focus();
+    h.run();
+    h.key_press_modifiers(Modifiers::COMMAND, egui::Key::V);
+    h.run();
+    assert_eq!(ids(&designer.borrow()), before);
+}

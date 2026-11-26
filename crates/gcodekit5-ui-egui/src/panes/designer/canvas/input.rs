@@ -13,8 +13,11 @@
 //! - With the canvas focused (after a press in it): Delete/Backspace delete the selection,
 //!   Escape cancels a polyline or deselects. A text field elsewhere owns the keyboard
 //!   instead, so these never fire while typing.
-//! - Right-click with a selection: GTK's context menu with Delete, Mirror on X / Y, Array...
-//!   (the pane opens the Array dialog), Rotate and Align. Align also has GTK's Alt keys,
+//! - Right-click with a selection: GTK's context menu with Cut, Copy, Paste, Delete, Mirror
+//!   on X / Y, Array... (the pane opens the Array dialog), Rotate and Align; with only a
+//!   clipboard, Paste. Cut, Copy and Paste use the design's own clipboard
+//!   (`DesignerState::clipboard`), as GTK did, not the system clipboard; Paste centres the
+//!   copies on the point right-clicked. Align also has GTK's Alt keys,
 //!   through the app's keymap (`crate::commands`) while the canvas has the keyboard.
 //!
 //! Drawing tools and moves snap to the snap step; selection hit tests use the raw pointer.
@@ -77,6 +80,9 @@ pub struct CanvasInput {
     pub(crate) text_click: Option<(f64, f64)>,
     /// The context menu's "Array..." was chosen, until the pane opens the dialog.
     pub(crate) array_click: bool,
+    /// The world point of the last right-click: where the context menu's Paste puts the
+    /// clipboard (GTK's pointer position).
+    pub(crate) menu_at: (f64, f64),
 }
 
 /// The world point (mm) under `p`.
@@ -197,12 +203,19 @@ impl CanvasInput {
             self.click(state, flags, tool, world(view, p), double, modifiers);
         }
         self.wheel(ui, response, view, state);
+        if response.secondary_clicked()
+            && let Some(p) = response.interact_pointer_pos()
+        {
+            self.menu_at = world(view, p);
+        }
         let finished = response.secondary_clicked()
             && tool == DesignerTool::Polyline
             && self.finish_polyline(state, true);
-        if !finished && state.selected_count() > 0 {
+        // GTK: a menu for a selection, or for Paste while the clipboard holds shapes.
+        if !finished && (state.selected_count() > 0 || !state.clipboard.is_empty()) {
+            let at = self.menu_at;
             response.context_menu(|ui| {
-                self.array_click |= context_menu(ui, state, tr);
+                self.array_click |= context_menu(ui, state, tr, at);
             });
         }
     }
@@ -530,6 +543,9 @@ const ALIGNMENTS: [(&str, SelectionOp); 6] = [
 /// The msgids of the context menu.
 pub fn msgids() -> Vec<&'static str> {
     let mut ids = vec![
+        n_!("Cut"),
+        n_!("Copy"),
+        n_!("Paste"),
         n_!("Delete"),
         n_!("Mirror on X"),
         n_!("Mirror on Y"),
@@ -542,13 +558,38 @@ pub fn msgids() -> Vec<&'static str> {
     ids
 }
 
-/// The right-click menu for the selection, in GTK's order: Delete, Mirror on X and Y,
-/// Array..., Rotate by a fixed angle and, for two shapes or more, Align. Each edit is one
-/// undo step.
+/// The right-click menu, in GTK's order: Cut, Copy, Paste (while the clipboard holds
+/// shapes), Delete, Mirror on X and Y, Array..., Rotate by a fixed angle and, for two
+/// shapes or more, Align. Without a selection only Paste is offered. Each edit is one undo
+/// step.
+///
+/// # Arguments
+/// * `at` - The world point right-clicked, where Paste centres the clipboard.
 ///
 /// # Returns
 /// Whether "Array..." was chosen.
-fn context_menu(ui: &mut egui::Ui, state: &mut DesignerState, tr: &Translator) -> bool {
+fn context_menu(
+    ui: &mut egui::Ui,
+    state: &mut DesignerState,
+    tr: &Translator,
+    at: (f64, f64),
+) -> bool {
+    let selection = state.selected_count() > 0;
+    if selection && ui.button(tr.tr("Cut")).clicked() {
+        editing::cut_selected(state);
+        ui.close();
+    }
+    if selection && ui.button(tr.tr("Copy")).clicked() {
+        state.copy_selected();
+        ui.close();
+    }
+    if !state.clipboard.is_empty() && ui.button(tr.tr("Paste")).clicked() {
+        state.paste_at_location(at.0, at.1);
+        ui.close();
+    }
+    if !selection {
+        return false;
+    }
     if ui.button(tr.tr("Delete")).clicked() {
         state.delete_selected();
         ui.close();
