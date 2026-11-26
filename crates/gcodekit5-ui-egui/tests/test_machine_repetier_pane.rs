@@ -11,6 +11,7 @@ use gcodekit5_app::test_support::{LoopbackShared, Wrote};
 use gcodekit5_communication::firmware::ControllerProtocol;
 use gcodekit5_devicedb::ControllerType;
 use gcodekit5_ui_egui::GcodeKitApp;
+use gcodekit5_ui_egui::commands::Command;
 use gcodekit5_ui_egui::machine::{lock, protocol_mismatch_text};
 
 use crate::machine_support::step_until;
@@ -179,4 +180,108 @@ fn test_repetier_profile_rejects_grbl_firmware() {
         ControllerProtocol::Repetier,
         ControllerProtocol::Grbl,
     );
+}
+
+/// The lines written after the last `M112`, without their number and checksum.
+fn after_last_m112(shared: &LoopbackShared) -> Vec<String> {
+    let lines: Vec<String> = shared
+        .log()
+        .iter()
+        .filter_map(|w| match w {
+            Wrote::Line(l) => Some(l.clone()),
+            Wrote::Realtime(_) => None,
+        })
+        .collect();
+    let last = lines
+        .iter()
+        .rposition(|l| l == "M112")
+        .expect("M112 written");
+    lines[last + 1..].to_vec()
+}
+
+/// Types `line` into the console entry and presses Enter.
+fn console_send(harness: &mut Harness<'_, GcodeKitApp>, line: &str) {
+    let label = "Type a command and press Enter...";
+    harness
+        .get_by_role_and_label(Role::TextInput, label)
+        .click();
+    harness.step();
+    harness
+        .get_by_role_and_label(Role::TextInput, label)
+        .type_text(line);
+    harness.step();
+    harness.key_press(egui::Key::Enter);
+    harness.step();
+}
+
+/// Tries every route that moves the machine: the Home menu command and its key, Start
+/// Streaming, and a console line.
+fn try_every_motion_route(harness: &mut Harness<'_, GcodeKitApp>) {
+    harness.state_mut().dispatch(Command::Home);
+    harness.step();
+    harness.state_mut().dispatch(Command::StreamStart);
+    harness.step();
+    harness.key_press_modifiers(egui::Modifiers::COMMAND, egui::Key::Home);
+    harness.step();
+    console_send(harness, "G0 X5");
+    for _ in 0..20 {
+        harness.step();
+    }
+    std::thread::sleep(std::time::Duration::from_millis(50));
+    for _ in 0..5 {
+        harness.step();
+    }
+}
+
+/// Connects a Repetier profile with a program loaded and its start-up lines answered.
+fn repetier_with_program() -> (
+    Harness<'static, GcodeKitApp>,
+    std::sync::Arc<LoopbackShared>,
+) {
+    let (mut harness, shared) = pane_app(std::time::Duration::from_millis(1), false);
+    connect_as(&mut harness, ControllerType::Repetier);
+    assert!(step_until(&mut harness, |_| shared.lines_written() >= 2));
+    harness
+        .state_mut()
+        .state_mut()
+        .machine
+        .set_program("G1 X1 F100\nG1 X2 F100\n")
+        .expect("program");
+    (harness, shared)
+}
+
+#[test]
+fn test_no_route_moves_a_repetier_board_after_estop() {
+    let (mut harness, shared) = repetier_with_program();
+    harness.state_mut().dispatch(Command::SoftReset);
+    assert!(
+        step_until(&mut harness, |app| app.state().machine.status().estopped),
+        "E-STOP not recorded"
+    );
+    try_every_motion_route(&mut harness);
+    assert!(
+        after_last_m112(&shared).is_empty(),
+        "written after M112: {:?}",
+        shared.log()
+    );
+    assert!(!harness.state().state().machine.status().streaming);
+    assert_no_grbl_writes(&shared);
+}
+
+#[test]
+fn test_typed_m112_locks_out_every_route() {
+    let (mut harness, shared) = repetier_with_program();
+    console_send(&mut harness, "M112");
+    assert!(
+        step_until(&mut harness, |app| app.state().machine.status().estopped),
+        "typed M112 not taken as the emergency stop: {:?}",
+        shared.log()
+    );
+    try_every_motion_route(&mut harness);
+    assert!(
+        after_last_m112(&shared).is_empty(),
+        "written after M112: {:?}",
+        shared.log()
+    );
+    assert_no_grbl_writes(&shared);
 }

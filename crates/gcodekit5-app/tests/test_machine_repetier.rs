@@ -243,7 +243,12 @@ fn repetier_emergency_stop_writes_m112_and_drops_the_rest() {
     assert!(seen.contains(&MachineEvent::Sent(REPETIER_ESTOP_LABEL.to_string())));
     // A jog the user sent before the stop, reaching the worker after it, must not run.
     controller.jog_sent_earlier(Axis::X, 1.0, 1000.0, before_stop);
-    let dropped = |e: &MachineEvent| matches!(e, MachineEvent::Error(m) if m.starts_with(worker_text::NOT_SENT_AFTER_RESET));
+    // Refused by the halted controller, or dropped by the worker's reset stamp while still
+    // in the channel.
+    let dropped = |e: &MachineEvent| {
+        matches!(e, MachineEvent::Error(m)
+            if m.starts_with(worker_text::NOT_SENT_AFTER_RESET) || m == worker_text::HALTED)
+    };
     if !seen.iter().any(dropped) {
         wait_for(&mut controller, &mut seen, dropped).expect("the earlier jog was not dropped");
     }
@@ -479,4 +484,96 @@ fn repetier_endless_resend_stops_the_stream() {
         .filter(|w| matches!(w, Wrote::Line(l) if l.starts_with("N3 ")))
         .count();
     assert_eq!(replays, 6, "N3 written once and replayed 5 times");
+}
+
+/// Whether any line was written after the last `M112`.
+fn written_after_last_m112(shared: &LoopbackShared) -> Vec<String> {
+    let lines = commands(shared);
+    let last = lines
+        .iter()
+        .rposition(|l| l == "M112")
+        .expect("M112 written");
+    lines[last + 1..].to_vec()
+}
+
+#[test]
+fn repetier_controller_refuses_everything_after_m112_until_start() {
+    let shared = Arc::new(LoopbackShared::default());
+    let mut controller = connect_repetier(&shared);
+    controller.stop();
+    assert!(wait_until(|| commands(&shared).iter().any(|l| l == "M112")));
+    assert!(wait_until(|| controller.is_halted()));
+    assert_eq!(controller.send_line("G0 X1"), Err(MachineError::Halted));
+    assert_eq!(controller.send_line("$H"), Err(MachineError::Halted));
+    assert_eq!(controller.send_query("M115"), Err(MachineError::Halted));
+    assert_eq!(
+        controller.start_stream(program(2)),
+        Err(MachineError::Halted)
+    );
+    controller.jog(Axis::X, 1.0, 1000.0);
+    let mut seen = controller.poll();
+    assert!(
+        seen.iter()
+            .any(|e| matches!(e, MachineEvent::Error(m) if m == worker_text::HALTED)),
+        "jog not refused: {seen:?}"
+    );
+    // M112 itself still goes out.
+    controller
+        .send_line("M112")
+        .expect("M112 is always allowed");
+    assert!(wait_until(|| commands(&shared)
+        .iter()
+        .filter(|l| *l == "M112")
+        .count()
+        == 2));
+    std::thread::sleep(Duration::from_millis(50));
+    assert!(written_after_last_m112(&shared).is_empty());
+    // The firmware restarted: lines go out again (after the start-up lines).
+    shared.inject("start\n");
+    assert!(wait_until(|| !controller.is_halted()));
+    seen.extend(controller.poll());
+    controller
+        .send_line("G0 X1")
+        .expect("allowed after the restart");
+    assert!(wait_until(|| commands(&shared)
+        .iter()
+        .any(|l| l.starts_with("G0 X1"))));
+    assert_no_grbl_writes(&shared);
+}
+
+#[test]
+fn repetier_typed_m112_is_the_emergency_stop() {
+    let shared = Arc::new(LoopbackShared::default());
+    let mut controller = connect_repetier(&shared);
+    controller.send_line("M112").expect("send");
+    let mut seen = Vec::new();
+    assert!(
+        wait_for(&mut controller, &mut seen, |e| *e
+            == MachineEvent::Sent(REPETIER_ESTOP_LABEL.to_string()))
+        .is_some(),
+        "typed M112 not taken as the emergency stop: {seen:?}"
+    );
+    assert!(
+        shared.log().contains(&Wrote::Line("M112".to_string())),
+        "typed M112 not written unnumbered: {:?}",
+        shared.log()
+    );
+    assert!(wait_until(|| controller.is_halted()));
+    assert_eq!(controller.send_line("G0 X1"), Err(MachineError::Halted));
+    assert!(wait_until(|| controller.lines_answered()));
+    std::thread::sleep(Duration::from_millis(50));
+    assert!(written_after_last_m112(&shared).is_empty());
+}
+
+#[test]
+fn repetier_reconnect_clears_the_halt() {
+    let shared = Arc::new(LoopbackShared::default());
+    let mut controller = connect_repetier(&shared);
+    controller.stop();
+    assert!(wait_until(|| controller.is_halted()));
+    controller.disconnect();
+    controller
+        .connect_with(&tcp_settings(), ControllerProtocol::Repetier)
+        .expect("reconnect");
+    assert!(!controller.is_halted());
 }

@@ -4722,8 +4722,8 @@ msgstr "no compatible con el firmware Repetier"
 msgid "skipped: no Repetier equivalent"
 msgstr "omitido: sin equivalente en Repetier"
 
-msgid "resend request could not be honoured"
-msgstr "no se pudo atender la solicitud de reenvío"
+msgid "resend request could not be honoured; reconnect to the controller"
+msgstr "no se pudo atender la solicitud de reenvío; vuelva a conectar con el controlador"
 
 msgid "Emergency stop (M112, {shortcut})"
 msgstr "Parada de emergencia (M112, {shortcut})"
@@ -4748,3 +4748,6 @@ msgstr "Esto fija la posición de trabajo (G92) para que la X/Y/Z actual pase a 
 
 msgid "Emergency stop (M112): reset the controller or reconnect to continue."
 msgstr "Parada de emergencia (M112): reinicie el controlador o vuelva a conectar para continuar."
+
+msgid "the controller is emergency-stopped (M112): reset it or reconnect"
+msgstr "el controlador está en parada de emergencia (M112): reinícielo o vuelva a conectar"

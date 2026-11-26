@@ -119,11 +119,15 @@ pub mod worker_text {
     pub const NOT_ON_REPETIER: &str = "not supported by Repetier firmware";
     /// A program line with no Repetier equivalent, skipped; followed by the line.
     pub const NO_REPETIER_EQUIVALENT: &str = "skipped: no Repetier equivalent";
-    /// A Repetier `Resend:N` for a line no longer known; followed by the line number.
-    pub const RESEND_FAILED: &str = "resend request could not be honoured";
+    /// A Repetier `Resend:N` for a line no longer known (or asked for too often); followed
+    /// by the line number.
+    pub const RESEND_FAILED: &str =
+        "resend request could not be honoured; reconnect to the controller";
+    /// [`MachineError::Halted`](super::MachineError::Halted): after a Repetier `M112`.
+    pub const HALTED: &str = "the controller is emergency-stopped (M112): reset it or reconnect";
 
     /// Every text above, for a front end's translation table.
-    pub const ALL: [&str; 18] = [
+    pub const ALL: [&str; 19] = [
         CONNECT_FAILED,
         WRITE_FAILED,
         READ_FAILED,
@@ -142,6 +146,7 @@ pub mod worker_text {
         NOT_ON_REPETIER,
         NO_REPETIER_EQUIVALENT,
         RESEND_FAILED,
+        HALTED,
     ];
 }
 
@@ -186,6 +191,10 @@ pub enum MachineError {
     /// other than `$H` and `$J=`, which are translated, or a stop-on-error stream); holds it.
     #[error("{text}: {0}", text = worker_text::NOT_ON_REPETIER)]
     NotOnRepetier(String),
+    /// A Repetier controller was emergency-stopped (`M112`): nothing but `M112` is sent
+    /// until its firmware restarts (`start`) or the connection is opened again.
+    #[error("{}", worker_text::HALTED)]
+    Halted,
 }
 
 /// A machine axis.
@@ -431,6 +440,9 @@ pub struct MachineController {
     last_connection: Option<ConnectionSettings>,
     /// The protocol of the last connection started (kept after it closes).
     protocol: ControllerProtocol,
+    /// Shared with the worker, per connection: set by a Repetier `M112`, cleared by the
+    /// firmware's `start`; see [`MachineController::is_halted`].
+    halted: Arc<AtomicBool>,
     repaint: SharedHook,
     streaming: Arc<AtomicBool>,
     /// Sequence number of the last command line sent with [`send_line`](Self::send_line).
@@ -484,6 +496,7 @@ impl MachineController {
             factory,
             last_connection: None,
             protocol: ControllerProtocol::Unknown,
+            halted: Arc::new(AtomicBool::new(false)),
             repaint: Arc::new(Mutex::new(None)),
             streaming: Arc::new(AtomicBool::new(false)),
             requested: 0,
@@ -554,6 +567,7 @@ impl MachineController {
         self.answered = Arc::new(AtomicU64::new(0));
         self.jogs_requested = 0;
         self.jogs_answered = Arc::new(AtomicU64::new(0));
+        self.halted = Arc::new(AtomicBool::new(false));
         let state = WorkerState::new(
             (self.factory)(),
             cmd_rx,
@@ -566,7 +580,7 @@ impl MachineController {
             self.fresh.clone(),
             [self.answered.clone(), self.jogs_answered.clone()],
         )
-        .with_protocol(protocol);
+        .with_protocol(protocol, self.halted.clone());
         let handle = std::thread::Builder::new()
             .name("machine-controller".to_string())
             .spawn(move || state.run(&params))
@@ -592,6 +606,14 @@ impl MachineController {
     /// byte or `$` command is written on it, and the emergency stop is `M112`.
     pub fn is_repetier(&self) -> bool {
         self.protocol == ControllerProtocol::Repetier
+    }
+
+    /// Whether the Repetier controller was emergency-stopped (`M112`, from [`stop`](Self::stop)
+    /// or typed as a line): every line, query, jog and stream but `M112` is then refused with
+    /// [`MachineError::Halted`] until its firmware restarts (`start`) or the connection is
+    /// opened again.
+    pub fn is_halted(&self) -> bool {
+        self.halted.load(Ordering::SeqCst)
     }
 
     /// Closes the connection without waiting on I/O.
@@ -668,6 +690,9 @@ impl MachineController {
         }
         // Repetier acknowledges every line with `ok`, refused or not, so a stop-on-error
         // stream (a probe routine) could never stop on its error.
+        if self.is_halted() {
+            return Err(MachineError::Halted);
+        }
         if mode == StreamMode::StopOnError && self.is_repetier() {
             return Err(MachineError::NotOnRepetier(
                 program.first().cloned().unwrap_or_default(),
@@ -749,6 +774,11 @@ impl MachineController {
             ));
             return;
         }
+        if self.is_halted() {
+            self.pending
+                .push(MachineEvent::Error(worker_text::HALTED.to_string()));
+            return;
+        }
         let line = if rotary {
             rotary_jog_line(axis.letter(), distance_mm, feed_mm_min)
         } else {
@@ -806,6 +836,9 @@ impl MachineController {
         }
         if let Some(c) = line.chars().find(|c| matches!(c, '!' | '~' | '?')) {
             return Err(MachineError::RealtimeCharacter(c));
+        }
+        if self.is_halted() && !is_m112(line) {
+            return Err(MachineError::Halted);
         }
         if self.is_repetier() && !repetier_translates(line) {
             return Err(MachineError::NotOnRepetier(line.to_string()));
@@ -969,6 +1002,11 @@ fn repetier_translates(line: &str) -> bool {
     !upper.starts_with('$') || upper.starts_with("$H") || upper.starts_with("$J=")
 }
 
+/// Whether `line` is the emergency stop `M112` (and nothing else).
+fn is_m112(line: &str) -> bool {
+    line.trim().eq_ignore_ascii_case("M112")
+}
+
 /// Maps the stored connection settings to transport parameters.
 fn connection_params(cfg: &ConnectionSettings) -> ConnectionParams {
     let mut params = match cfg.connection_type {
@@ -1075,6 +1113,8 @@ struct WorkerState {
     identity_checked: bool,
     /// The controller identified as another firmware: the worker closes the connection.
     rejected: bool,
+    /// Shared with the controller: the Repetier firmware was emergency-stopped (`M112`).
+    halted: Arc<AtomicBool>,
     commands: Receiver<Command>,
     sink: EventSink,
     streaming: Arc<AtomicBool>,
@@ -1159,6 +1199,7 @@ impl WorkerState {
             repetier: None,
             identity_checked: false,
             rejected: false,
+            halted: Arc::new(AtomicBool::new(false)),
             commands,
             sink,
             streaming,
@@ -1295,6 +1336,43 @@ impl WorkerState {
     }
 
     fn handle_command(&mut self, cmd: Command) -> Result<(), String> {
+        if self.repetier.is_some() {
+            match &cmd {
+                // A typed `M112` is the emergency stop too: written at once, unnumbered.
+                Command::Line(line, _) | Command::StateLine(line, _, _) if is_m112(line) => {
+                    if let Command::StateLine(_, seq, _) = cmd {
+                        self.drop_line(seq);
+                    } else {
+                        self.drop_line(0);
+                    }
+                    return self.repetier_emergency_stop();
+                }
+                // Reached the worker after the controller was halted (still in the channel).
+                Command::Line(line, _) | Command::StateLine(line, _, _)
+                    if self.halted.load(Ordering::SeqCst) =>
+                {
+                    self.sink.emit(MachineEvent::Error(format!(
+                        "{}: {line}",
+                        worker_text::HALTED
+                    )));
+                    match cmd {
+                        Command::StateLine(_, seq, _) => self.drop_line(seq),
+                        _ => self.drop_line(0),
+                    }
+                    return Ok(());
+                }
+                Command::Stream(program, _, _) if self.halted.load(Ordering::SeqCst) => {
+                    let total = program.len();
+                    self.sink
+                        .emit(MachineEvent::Error(worker_text::HALTED.to_string()));
+                    self.streaming.store(false, Ordering::SeqCst);
+                    self.sink
+                        .emit(MachineEvent::StreamStopped { acked: 0, total });
+                    return Ok(());
+                }
+                _ => {}
+            }
+        }
         if self.repetier.is_some()
             && matches!(
                 cmd,
@@ -1824,9 +1902,11 @@ impl WorkerState {
 
 impl WorkerState {
     /// The same worker on a connection opened for `configured`: Repetier's flow control on a
-    /// Repetier connection, and the identity check for a known protocol.
-    fn with_protocol(mut self, configured: ControllerProtocol) -> Self {
+    /// Repetier connection, and the identity check for a known protocol. `halted` is the
+    /// controller's flag for a Repetier `M112`.
+    fn with_protocol(mut self, configured: ControllerProtocol, halted: Arc<AtomicBool>) -> Self {
         self.configured = configured;
+        self.halted = halted;
         self.repetier = (configured == ControllerProtocol::Repetier).then(RepetierLink::new);
         self
     }
@@ -1921,6 +2001,7 @@ impl WorkerState {
     /// number it expects next (a numbered line out of sequence would only be asked again).
     fn repetier_emergency_stop(&mut self) -> Result<(), String> {
         self.write(b"M112\n")?;
+        self.halted.store(true, Ordering::SeqCst);
         self.sink
             .emit(MachineEvent::Sent(REPETIER_ESTOP_LABEL.to_string()));
         self.reset_at = Some(Instant::now());
@@ -2145,6 +2226,7 @@ impl WorkerState {
         }
         if lower == "start" {
             self.reset_at = Some(Instant::now());
+            self.halted.store(false, Ordering::SeqCst);
             self.sink.emit(MachineEvent::Received(line.to_string()));
             self.reset_buffers();
             // The firmware counts lines from the start again: number from scratch and send

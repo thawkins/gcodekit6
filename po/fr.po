@@ -4726,8 +4726,8 @@ msgstr "non pris en charge par le micrologiciel Repetier"
 msgid "skipped: no Repetier equivalent"
 msgstr "ignoré : aucun équivalent Repetier"
 
-msgid "resend request could not be honoured"
-msgstr "la demande de renvoi n'a pas pu être satisfaite"
+msgid "resend request could not be honoured; reconnect to the controller"
+msgstr "la demande de renvoi n'a pas pu être satisfaite ; reconnectez-vous au contrôleur"
 
 msgid "Emergency stop (M112, {shortcut})"
 msgstr "Arrêt d'urgence (M112, {shortcut})"
@@ -4752,3 +4752,6 @@ msgstr "Ceci définit la position pièce (G92) pour que la position X/Y/Z actuel
 
 msgid "Emergency stop (M112): reset the controller or reconnect to continue."
 msgstr "Arrêt d'urgence (M112) : réinitialisez le contrôleur ou reconnectez-vous pour continuer."
+
+msgid "the controller is emergency-stopped (M112): reset it or reconnect"
+msgstr "le contrôleur est en arrêt d'urgence (M112) : réinitialisez-le ou reconnectez-vous"

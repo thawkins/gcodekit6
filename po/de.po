@@ -4719,8 +4719,8 @@ msgstr "von der Repetier-Firmware nicht unterstützt"
 msgid "skipped: no Repetier equivalent"
 msgstr "übersprungen: keine Repetier-Entsprechung"
 
-msgid "resend request could not be honoured"
-msgstr "Wiederholungsanforderung konnte nicht erfüllt werden"
+msgid "resend request could not be honoured; reconnect to the controller"
+msgstr "Wiederholungsanforderung konnte nicht erfüllt werden; Verbindung zum Controller neu herstellen"
 
 msgid "Emergency stop (M112, {shortcut})"
 msgstr "Not-Aus (M112, {shortcut})"
@@ -4745,3 +4745,6 @@ msgstr "Dies setzt die Werkstückposition (G92), sodass die aktuelle X/Y/Z-Posit
 
 msgid "Emergency stop (M112): reset the controller or reconnect to continue."
 msgstr "Not-Aus (M112): Controller zurücksetzen oder neu verbinden, um fortzufahren."
+
+msgid "the controller is emergency-stopped (M112): reset it or reconnect"
+msgstr "der Controller ist im Not-Aus (M112): zurücksetzen oder neu verbinden"

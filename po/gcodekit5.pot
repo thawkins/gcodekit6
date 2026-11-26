@@ -4643,7 +4643,7 @@ msgstr ""
 msgid "skipped: no Repetier equivalent"
 msgstr ""
 
-msgid "resend request could not be honoured"
+msgid "resend request could not be honoured; reconnect to the controller"
 msgstr ""
 
 msgid "Emergency stop (M112, {shortcut})"
@@ -4668,4 +4668,7 @@ msgid "This sets the work position (G92) so the current X/Y/Z becomes 0."
 msgstr ""
 
 msgid "Emergency stop (M112): reset the controller or reconnect to continue."
+msgstr ""
+
+msgid "the controller is emergency-stopped (M112): reset it or reconnect"
 msgstr ""
