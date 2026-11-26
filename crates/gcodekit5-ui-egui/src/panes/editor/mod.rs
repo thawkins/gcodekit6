@@ -654,6 +654,7 @@ impl Pane for EditorPane {
                 | MachineEvent::Error(_)
                 | MachineEvent::StreamFinished { .. }
                 | MachineEvent::StreamHalted { .. }
+                | MachineEvent::ProtocolMismatch { .. }
                 | MachineEvent::StreamStopped { .. } => {}
             }
         }

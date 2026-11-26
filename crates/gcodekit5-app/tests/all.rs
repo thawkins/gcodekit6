@@ -39,6 +39,8 @@ mod test_machine_controller;
 mod test_machine_lines_answered;
 #[path = "test_machine_probe_stream.rs"]
 mod test_machine_probe_stream;
+#[path = "test_machine_repetier.rs"]
+mod test_machine_repetier;
 #[path = "test_machine_sent_events.rs"]
 mod test_machine_sent_events;
 #[path = "test_materials_manager_backend.rs"]

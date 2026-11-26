@@ -383,7 +383,8 @@ impl ProbeRun {
             MachineEvent::Connected
             | MachineEvent::Disconnected
             | MachineEvent::StatusReport(_)
-            | MachineEvent::StreamProgress { .. } => None,
+            | MachineEvent::StreamProgress { .. }
+            | MachineEvent::ProtocolMismatch { .. } => None,
         }
     }
 

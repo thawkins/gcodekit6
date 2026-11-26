@@ -163,6 +163,7 @@ impl PendingWrite {
             | MachineEvent::Received(_)
             | MachineEvent::StreamProgress { .. }
             | MachineEvent::StreamHalted { .. }
+            | MachineEvent::ProtocolMismatch { .. }
             | MachineEvent::StreamFinished { .. }
             | MachineEvent::StreamStopped { .. }
             | MachineEvent::Sent(_)

@@ -37,7 +37,7 @@ use gcodekit5_app::i18n::Translator;
 use gcodekit5_app::machine::{MachineController, MachineEvent};
 
 use crate::icons::{Icon, icon_only_button};
-use crate::machine::{MachineStatus, lock, worker_message};
+use crate::machine::{MachineStatus, lock, protocol_mismatch_text, worker_message};
 use crate::windows::help::{self, HelpTopic};
 use crate::workspace::{Pane, PaneContext, PaneId};
 
@@ -231,6 +231,13 @@ impl ConsolePane {
                     );
                 }
                 MachineEvent::StatusReport(_) => {}
+                MachineEvent::ProtocolMismatch {
+                    configured,
+                    detected,
+                } => self.log.add_message(
+                    MessageLevel::Error,
+                    protocol_mismatch_text(*configured, *detected, tr),
+                ),
             }
         }
     }

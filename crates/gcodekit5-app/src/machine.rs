@@ -13,6 +13,13 @@
 //! ahead of any program line still waiting in the queue. Program lines are streamed
 //! with GRBL's character-counting protocol ([`grbl_stream::CharCountWindow`]).
 //!
+//! On a Repetier connection ([`MachineController::connect_with`] with
+//! [`ControllerProtocol::Repetier`]) the worker speaks Repetier's flow-control protocol
+//! instead, as the GTK front end's `RepetierSender` did: every line is numbered and
+//! checksummed by `gcodekit5-communication`'s [`RepetierProcessor`], one command is in flight
+//! at a time, a `Resend:N` replays the numbered lines from `N`, and no GRBL real-time byte or
+//! `$` command is ever written. The emergency stop is `M112`.
+//!
 //! No lock is held across I/O: the transport is owned by the worker alone, and the
 //! only shared state is the repaint hook and a per-connection atomic "streaming" flag.
 //!
@@ -30,6 +37,10 @@ use std::time::{Duration, Instant};
 
 use gcodekit5_communication::firmware::grbl::status_parser::{FullStatus, StatusParser};
 use gcodekit5_communication::firmware::grbl::{FEED_OVERRIDE_CODES, SPINDLE_OVERRIDE_CODES};
+use gcodekit5_communication::firmware::protocol_registry::detect_protocol;
+use gcodekit5_communication::firmware::repetier::RepetierProcessor;
+use gcodekit5_communication::firmware::repetier::processor::RepetierEvent;
+use gcodekit5_communication::firmware::{ControllerProtocol, protocol_profile};
 use gcodekit5_communication::{Communicator, ConnectionParams, SerialCommunicator};
 use gcodekit5_settings::{ConnectionSettings, ConnectionType};
 
@@ -99,9 +110,16 @@ pub mod worker_text {
     pub const NOT_CONNECTED: &str = "not connected";
     /// [`MachineError::StreamInProgress`](super::MachineError::StreamInProgress).
     pub const STREAM_IN_PROGRESS: &str = "a program is already streaming";
+    /// A command Repetier firmware has no equivalent of (a GRBL `$` command, a real-time
+    /// override, a stop-on-error stream), refused on a Repetier connection; followed by it.
+    pub const NOT_ON_REPETIER: &str = "not supported by Repetier firmware";
+    /// A program line with no Repetier equivalent, skipped; followed by the line.
+    pub const NO_REPETIER_EQUIVALENT: &str = "skipped: no Repetier equivalent";
+    /// A Repetier `Resend:N` for a line no longer known; followed by the line number.
+    pub const RESEND_FAILED: &str = "resend request could not be honoured";
 
     /// Every text above, for a front end's translation table.
-    pub const ALL: [&str; 15] = [
+    pub const ALL: [&str; 18] = [
         CONNECT_FAILED,
         WRITE_FAILED,
         READ_FAILED,
@@ -117,6 +135,9 @@ pub mod worker_text {
         ALREADY_CONNECTED,
         NOT_CONNECTED,
         STREAM_IN_PROGRESS,
+        NOT_ON_REPETIER,
+        NO_REPETIER_EQUIVALENT,
+        RESEND_FAILED,
     ];
 }
 
@@ -157,6 +178,10 @@ pub enum MachineError {
         /// The longest line accepted.
         max: usize,
     },
+    /// The request has no equivalent on the connected Repetier firmware (a GRBL `$` command
+    /// other than `$H` and `$J=`, which are translated, or a stop-on-error stream); holds it.
+    #[error("{text}: {0}", text = worker_text::NOT_ON_REPETIER)]
+    NotOnRepetier(String),
 }
 
 /// A machine axis.
@@ -307,6 +332,15 @@ pub enum MachineEvent {
     Sent(String),
     /// An error from the controller or the transport.
     Error(String),
+    /// The controller identified itself as another firmware than the connection was opened
+    /// for (the active device profile's), so the worker closed the connection, as the GTK
+    /// front end rejected it. [`MachineEvent::Disconnected`] follows.
+    ProtocolMismatch {
+        /// The protocol the connection was opened for.
+        configured: ControllerProtocol,
+        /// The protocol the controller's identity names.
+        detected: ControllerProtocol,
+    },
 }
 
 /// How a stream reacts to an `error:N` reply to one of its lines.
@@ -387,6 +421,8 @@ pub struct MachineController {
     factory: TransportFactory,
     /// The settings of the last connection started (kept after it closes).
     last_connection: Option<ConnectionSettings>,
+    /// The protocol of the last connection started (kept after it closes).
+    protocol: ControllerProtocol,
     repaint: SharedHook,
     streaming: Arc<AtomicBool>,
     /// Sequence number of the last command line sent with [`send_line`](Self::send_line).
@@ -439,6 +475,7 @@ impl MachineController {
         Self {
             factory,
             last_connection: None,
+            protocol: ControllerProtocol::Unknown,
             repaint: Arc::new(Mutex::new(None)),
             streaming: Arc::new(AtomicBool::new(false)),
             requested: 0,
@@ -464,6 +501,24 @@ impl MachineController {
     /// an empty or unresolved `"Auto"` port), or
     /// [`MachineError::WorkerStart`] if the worker thread cannot be spawned.
     pub fn connect(&mut self, cfg: &ConnectionSettings) -> Result<(), MachineError> {
+        self.connect_with(cfg, ControllerProtocol::Unknown)
+    }
+
+    /// Starts connecting with `cfg` to a controller speaking `protocol` (the active device
+    /// profile's), as [`connect`](Self::connect) does.
+    ///
+    /// [`ControllerProtocol::Repetier`] streams with Repetier's flow control (see the module
+    /// docs); any other protocol streams with GRBL's. Once connected, a controller that
+    /// identifies itself as another firmware than a known `protocol` is disconnected with
+    /// [`MachineEvent::ProtocolMismatch`]; [`ControllerProtocol::Unknown`] checks nothing.
+    ///
+    /// # Errors
+    /// As [`connect`](Self::connect).
+    pub fn connect_with(
+        &mut self,
+        cfg: &ConnectionSettings,
+        protocol: ControllerProtocol,
+    ) -> Result<(), MachineError> {
         if self.is_worker_running() {
             return Err(MachineError::AlreadyConnected);
         }
@@ -502,7 +557,8 @@ impl MachineController {
             ready.clone(),
             self.fresh.clone(),
             [self.answered.clone(), self.jogs_answered.clone()],
-        );
+        )
+        .with_protocol(protocol);
         let handle = std::thread::Builder::new()
             .name("machine-controller".to_string())
             .spawn(move || state.run(&params))
@@ -514,7 +570,20 @@ impl MachineController {
             ready,
         });
         self.last_connection = Some(cfg.clone());
+        self.protocol = protocol;
         Ok(())
+    }
+
+    /// The protocol of the last connection started ([`connect_with`](Self::connect_with)),
+    /// [`ControllerProtocol::Unknown`] for one started with [`connect`](Self::connect).
+    pub fn protocol(&self) -> ControllerProtocol {
+        self.protocol
+    }
+
+    /// Whether the last connection started speaks Repetier's protocol: no GRBL real-time
+    /// byte or `$` command is written on it, and the emergency stop is `M112`.
+    pub fn is_repetier(&self) -> bool {
+        self.protocol == ControllerProtocol::Repetier
     }
 
     /// Closes the connection without waiting on I/O.
@@ -589,6 +658,13 @@ impl MachineController {
         if !self.is_worker_running() {
             return Err(MachineError::NotConnected);
         }
+        // Repetier acknowledges every line with `ok`, refused or not, so a stop-on-error
+        // stream (a probe routine) could never stop on its error.
+        if mode == StreamMode::StopOnError && self.is_repetier() {
+            return Err(MachineError::NotOnRepetier(
+                program.first().cloned().unwrap_or_default(),
+            ));
+        }
         if self.streaming.swap(true, Ordering::SeqCst) {
             return Err(MachineError::StreamInProgress);
         }
@@ -609,7 +685,9 @@ impl MachineController {
         self.send_or_report(Command::Resume);
     }
 
-    /// Soft-resets the controller and drops the rest of the program.
+    /// Soft-resets the controller and drops the rest of the program. On a Repetier
+    /// connection: the emergency stop `M112`, written ahead of anything queued, and every line
+    /// sent before it is dropped, never to run.
     pub fn stop(&mut self) {
         self.send_or_report(Command::Stop);
     }
@@ -682,7 +760,8 @@ impl MachineController {
     /// printable ASCII (0x20-0x7E), [`MachineError::RealtimeCharacter`] for `!`, `~` or `?`,
     /// [`MachineError::LineTooLong`] for a line that, with its newline, does not fit the
     /// controller's RX buffer ([`GRBL_RX_BUFFER_BYTES`]; [`MAX_LINE_LENGTH`] is higher),
-    /// [`MachineError::NotConnected`] without a connection, or
+    /// [`MachineError::NotOnRepetier`] for a `$` command other than `$H` and `$J=` on a
+    /// Repetier connection, [`MachineError::NotConnected`] without a connection, or
     /// [`MachineError::StreamInProgress`] while a program streams.
     pub fn send_line(&mut self, line: &str) -> Result<(), MachineError> {
         let line = self.check_line(line)?;
@@ -719,6 +798,9 @@ impl MachineController {
         }
         if let Some(c) = line.chars().find(|c| matches!(c, '!' | '~' | '?')) {
             return Err(MachineError::RealtimeCharacter(c));
+        }
+        if self.is_repetier() && !repetier_translates(line) {
+            return Err(MachineError::NotOnRepetier(line.to_string()));
         }
         // The line and its newline must fit the controller's RX buffer at once; the worker
         // would refuse it otherwise.
@@ -784,6 +866,11 @@ impl MachineController {
     }
 
     /// Writes a real-time byte ahead of any queued program line.
+    ///
+    /// On a Repetier connection no real-time byte is written: soft reset is the emergency
+    /// stop (`M112`, as [`stop`](Self::stop)), feed hold and cycle start pause and resume
+    /// feeding program lines, status query and jog cancel do nothing (Repetier has neither),
+    /// and the overrides are refused with [`MachineEvent::Error`].
     pub fn realtime(&mut self, cmd: RealtimeCommand) {
         self.send_or_report(Command::Realtime(cmd.byte()));
     }
@@ -863,6 +950,17 @@ impl Drop for MachineController {
     }
 }
 
+/// Whether a command line has a Repetier equivalent: anything but a GRBL `$` command, except
+/// homing (`$H`, sent as `G28`) and jogging (`$J=`, sent as `G1` moves), which
+/// [`RepetierProcessor`] translates.
+///
+/// # Arguments
+/// * `line` - One command line.
+fn repetier_translates(line: &str) -> bool {
+    let upper = line.trim().to_ascii_uppercase();
+    !upper.starts_with('$') || upper.starts_with("$H") || upper.starts_with("$J=")
+}
+
 /// Maps the stored connection settings to transport parameters.
 fn connection_params(cfg: &ConnectionSettings) -> ConnectionParams {
     let mut params = match cfg.connection_type {
@@ -923,9 +1021,49 @@ struct Halt {
     stale_reports: usize,
 }
 
+/// The Repetier side of a worker on a Repetier connection: one command in flight at a time,
+/// as GTK's `RepetierSender` streamed.
+struct RepetierLink {
+    /// Numbers and checksums the lines written, keeps them for resends, frames the replies and
+    /// stands in a GRBL-style status report for the position readout.
+    processor: RepetierProcessor,
+    /// Acknowledgements (`ok`, `wait`) still owed to the command in flight; it may have been
+    /// written as several numbered lines (a jog). Zero when nothing is in flight.
+    acks_due: usize,
+    /// Whether the command in flight is one of `internal`'s (not a program or manual line).
+    internal_in_flight: bool,
+    /// Lines the worker sends itself: the protocol's start-up commands (`M110`, `M115`) at
+    /// connect and after the controller restarts.
+    internal: VecDeque<&'static str>,
+}
+
+impl RepetierLink {
+    /// A link that starts with the protocol's start-up commands.
+    fn new() -> Self {
+        Self {
+            processor: RepetierProcessor::new(),
+            acks_due: 0,
+            internal_in_flight: false,
+            internal: protocol_profile(ControllerProtocol::Repetier.as_str())
+                .init_commands
+                .iter()
+                .copied()
+                .collect(),
+        }
+    }
+}
+
 /// Everything the worker thread owns.
 struct WorkerState {
     comm: Box<dyn Communicator>,
+    /// The protocol the connection was opened for.
+    configured: ControllerProtocol,
+    /// Set on a Repetier connection.
+    repetier: Option<RepetierLink>,
+    /// Whether the controller's identity was checked against `configured`.
+    identity_checked: bool,
+    /// The controller identified as another firmware: the worker closes the connection.
+    rejected: bool,
     commands: Receiver<Command>,
     sink: EventSink,
     streaming: Arc<AtomicBool>,
@@ -1006,6 +1144,10 @@ impl WorkerState {
     ) -> Self {
         Self {
             comm,
+            configured: ControllerProtocol::Unknown,
+            repetier: None,
+            identity_checked: false,
+            rejected: false,
             commands,
             sink,
             streaming,
@@ -1051,7 +1193,7 @@ impl WorkerState {
         let exit = self.io_loop();
         if let Exit::TransportError(msg) = exit {
             self.sink.emit(MachineEvent::Error(msg));
-        } else if self.jog_outstanding {
+        } else if self.jog_outstanding && self.repetier.is_none() {
             // A jog toward the far end of travel must not outlive the connection.
             if let Err(e) = self.write(&[RealtimeCommand::JogCancel.byte()]) {
                 tracing::warn!("jog cancel on disconnect failed: {e}");
@@ -1069,6 +1211,9 @@ impl WorkerState {
         let mut next_status = Instant::now();
         let mut idle = false;
         loop {
+            if self.rejected {
+                return Exit::Shutdown;
+            }
             // 1. Commands first, so real-time bytes overtake queued lines.
             let mut wait = if idle { IDLE_WAIT } else { Duration::ZERO };
             loop {
@@ -1087,7 +1232,12 @@ impl WorkerState {
             }
 
             // 2. Feed lines while the controller's RX buffer has room.
-            if let Err(e) = self.feed() {
+            let fed = if self.repetier.is_some() {
+                self.feed_repetier()
+            } else {
+                self.feed()
+            };
+            if let Err(e) = fed {
                 return Exit::TransportError(e);
             }
 
@@ -1096,9 +1246,9 @@ impl WorkerState {
                 return Exit::TransportError(e);
             }
 
-            // 3. Periodic status request.
+            // 3. Periodic status request (GRBL's `?`; Repetier has none).
             let now = Instant::now();
-            if now >= next_status {
+            if now >= next_status && self.repetier.is_none() {
                 if let Err(e) = self.write_status_query() {
                     return Exit::TransportError(e);
                 }
@@ -1107,6 +1257,12 @@ impl WorkerState {
 
             // 4. Read and handle responses.
             match self.comm.receive() {
+                Ok(data) if self.repetier.is_some() => {
+                    idle = data.is_empty();
+                    if !idle && let Err(e) = self.receive_repetier(data) {
+                        return Exit::TransportError(e);
+                    }
+                }
                 Ok(data) => {
                     idle = data.is_empty();
                     for line in self.splitter.push(&data) {
@@ -1128,6 +1284,14 @@ impl WorkerState {
     }
 
     fn handle_command(&mut self, cmd: Command) -> Result<(), String> {
+        if self.repetier.is_some()
+            && matches!(
+                cmd,
+                Command::Realtime(_) | Command::Pause | Command::Resume | Command::Stop
+            )
+        {
+            return self.handle_repetier_command(cmd);
+        }
         match cmd {
             Command::Realtime(byte) if byte == RealtimeCommand::StatusQuery.byte() => {
                 self.write_status_query()?;
@@ -1146,17 +1310,7 @@ impl WorkerState {
                 if byte == RealtimeCommand::JogCancel.byte()
                     || byte == RealtimeCommand::SoftReset.byte()
                 {
-                    // A jog still waiting in the queue must not start after the cancel or
-                    // the reset; it is answered by never running.
-                    let (jogs, kept): (Vec<_>, Vec<_>) = self
-                        .manual
-                        .drain(..)
-                        .partition(|(line, _)| line.starts_with("$J="));
-                    self.manual = kept.into();
-                    for (_, seq) in jogs {
-                        self.drop_line(seq);
-                    }
-                    self.jog_outstanding = false;
+                    self.drop_queued_jogs();
                 }
                 if byte == RealtimeCommand::SoftReset.byte() {
                     // The reset drops the controller's buffered program lines: end the
@@ -1415,6 +1569,9 @@ impl WorkerState {
     }
 
     fn handle_response(&mut self, line: &str) {
+        if self.rejected || self.check_identity(line) {
+            return;
+        }
         match classify_response(line) {
             GrblResponseLine::Ok => self.on_ack(None),
             GrblResponseLine::Error(code) => self.on_ack(Some(code)),
@@ -1492,6 +1649,12 @@ impl WorkerState {
             }
             return;
         }
+        self.complete_oldest(error);
+    }
+
+    /// Takes the oldest line in flight as answered (`error` is `None` for `ok`): counts a
+    /// manual line answered, a program line acknowledged.
+    fn complete_oldest(&mut self, error: Option<String>) {
         let is_program = self.in_flight_is_program.pop_front().unwrap_or(false);
         if !is_program && let Some(seq) = self.in_flight_seq.pop_front() {
             if seq == 0 {
@@ -1645,5 +1808,329 @@ impl WorkerState {
         self.in_flight_seq.clear();
         self.answered.fetch_max(self.written_seq, Ordering::SeqCst);
         self.splitter.clear();
+    }
+}
+
+impl WorkerState {
+    /// The same worker on a connection opened for `configured`: Repetier's flow control on a
+    /// Repetier connection, and the identity check for a known protocol.
+    fn with_protocol(mut self, configured: ControllerProtocol) -> Self {
+        self.configured = configured;
+        self.repetier = (configured == ControllerProtocol::Repetier).then(RepetierLink::new);
+        self
+    }
+
+    /// Drops the jogs still waiting in the queue (after a jog cancel or a reset): they must
+    /// not start afterwards, and are answered by never running.
+    fn drop_queued_jogs(&mut self) {
+        let (jogs, kept): (Vec<_>, Vec<_>) = self
+            .manual
+            .drain(..)
+            .partition(|(line, _)| line.starts_with("$J="));
+        self.manual = kept.into();
+        for (_, seq) in jogs {
+            self.drop_line(seq);
+        }
+        self.jog_outstanding = false;
+    }
+
+    /// Checks a received line against the protocol the connection was opened for, until the
+    /// controller names its firmware (GTK's `protocol_mismatch`). Another known firmware
+    /// rejects the connection: the line and [`MachineEvent::ProtocolMismatch`] are reported
+    /// and the worker closes the connection.
+    ///
+    /// # Returns
+    /// Whether the connection was rejected.
+    fn check_identity(&mut self, line: &str) -> bool {
+        if self.identity_checked || !protocol_profile(self.configured.as_str()).announces_identity {
+            return false;
+        }
+        let Some(detected) = detect_protocol(line) else {
+            return false;
+        };
+        self.identity_checked = true;
+        if detected == ControllerProtocol::Unknown || detected == self.configured {
+            return false;
+        }
+        tracing::warn!(
+            configured = %self.configured,
+            %detected,
+            "the controller's firmware differs from the active profile; disconnecting"
+        );
+        self.sink
+            .emit(MachineEvent::Received(line.trim().to_string()));
+        self.sink.emit(MachineEvent::ProtocolMismatch {
+            configured: self.configured,
+            detected,
+        });
+        self.rejected = true;
+        true
+    }
+
+    /// Handles a stop, pause, resume or real-time command on a Repetier connection, where no
+    /// GRBL real-time byte is ever written (see [`MachineController::realtime`]).
+    fn handle_repetier_command(&mut self, cmd: Command) -> Result<(), String> {
+        let realtime = |byte: u8, command: RealtimeCommand| byte == command.byte();
+        match cmd {
+            Command::Stop => self.repetier_emergency_stop()?,
+            Command::Realtime(byte) if realtime(byte, RealtimeCommand::SoftReset) => {
+                self.repetier_emergency_stop()?;
+            }
+            Command::Pause => self.paused = true,
+            Command::Realtime(byte) if realtime(byte, RealtimeCommand::FeedHold) => {
+                self.paused = true;
+            }
+            Command::Resume => self.paused = false,
+            Command::Realtime(byte) if realtime(byte, RealtimeCommand::CycleStart) => {
+                self.paused = false;
+            }
+            Command::Realtime(byte) if realtime(byte, RealtimeCommand::JogCancel) => {
+                // Repetier cannot cancel a jog it runs; one still queued never starts.
+                self.drop_queued_jogs();
+            }
+            Command::Realtime(byte) if realtime(byte, RealtimeCommand::StatusQuery) => {
+                tracing::trace!("status query: Repetier has none; nothing written");
+            }
+            Command::Realtime(byte) => self.sink.emit(MachineEvent::Error(format!(
+                "{}: 0x{byte:02X}",
+                worker_text::NOT_ON_REPETIER
+            ))),
+            // Routed to `handle_command`'s shared arms by the caller.
+            Command::Line(..)
+            | Command::StateLine(..)
+            | Command::Stream(..)
+            | Command::Shutdown => {}
+        }
+        Ok(())
+    }
+
+    /// The Repetier emergency stop: `M112` written at once, then every line queued, in
+    /// flight or still in the channel is dropped (never to run, as after a GRBL reset) and
+    /// the stream ends. `M112` is written unnumbered, so the firmware acts on it whatever line
+    /// number it expects next (a numbered line out of sequence would only be asked again).
+    fn repetier_emergency_stop(&mut self) -> Result<(), String> {
+        self.write(b"M112\n")?;
+        self.sink.emit(MachineEvent::Sent("M112".to_string()));
+        self.reset_at = Some(Instant::now());
+        if let Some(link) = self.repetier.as_mut() {
+            link.acks_due = 0;
+            link.internal_in_flight = false;
+            link.internal.clear();
+        }
+        self.reset_buffers();
+        self.end_stream(false);
+        Ok(())
+    }
+
+    /// Numbers, checksums and writes one command for Repetier.
+    ///
+    /// # Returns
+    /// How many numbered lines were written (one acknowledgement is due for each), or `None`
+    /// when the command has no Repetier equivalent and nothing was written: a GRBL `$`
+    /// command (other than `$H` and `$J=`) or real-time character is never written.
+    fn write_repetier(&mut self, line: &str) -> Result<Option<usize>, String> {
+        let upper = line.trim().to_ascii_uppercase();
+        let Some(link) = self.repetier.as_mut() else {
+            return Ok(None);
+        };
+        if matches!(upper.as_str(), "?" | "!" | "~") || !repetier_translates(&upper) {
+            return Ok(None);
+        }
+        let Some(bytes) = link.processor.process_outgoing(line.trim().as_bytes()) else {
+            return Ok(None);
+        };
+        let count = bytes.iter().filter(|b| **b == b'\n').count();
+        if count == 0 {
+            return Ok(None);
+        }
+        // A move: the stand-in status report says `Run` until it is acknowledged.
+        if upper.starts_with('G') || upper.starts_with('X') || upper.starts_with("$J=") {
+            link.processor.mark_buffer_full();
+        }
+        self.write(&bytes)?;
+        Ok(Some(count))
+    }
+
+    /// Notes a command written as `count` numbered lines as the one in flight.
+    fn set_in_flight(&mut self, count: usize, internal: bool) {
+        if let Some(link) = self.repetier.as_mut() {
+            link.acks_due = count;
+            link.internal_in_flight = internal;
+        }
+    }
+
+    /// Writes the next command once the one in flight is acknowledged: the worker's own
+    /// start-up lines first, then manual lines, then program lines (unless paused). A
+    /// command with no Repetier equivalent is reported and skipped.
+    fn feed_repetier(&mut self) -> Result<(), String> {
+        while self.repetier.as_ref().is_some_and(|l| l.acks_due == 0) {
+            if let Some(line) = self.repetier.as_mut().and_then(|l| l.internal.pop_front()) {
+                if let Some(count) = self.write_repetier(line)? {
+                    self.set_in_flight(count, true);
+                    self.sink.emit(MachineEvent::Sent(line.to_string()));
+                }
+                continue;
+            }
+            if let Some((line, seq)) = self.manual.pop_front() {
+                match self.write_repetier(&line)? {
+                    Some(count) => {
+                        self.set_in_flight(count, false);
+                        self.in_flight_is_program.push_back(false);
+                        self.in_flight_seq.push_back(seq);
+                        self.written_seq = self.written_seq.max(seq);
+                        self.sink.emit(MachineEvent::Sent(line));
+                    }
+                    None => {
+                        self.sink.emit(MachineEvent::Error(format!(
+                            "{}: {line}",
+                            worker_text::NOT_ON_REPETIER
+                        )));
+                        self.drop_line(seq);
+                    }
+                }
+                continue;
+            }
+            if self.paused {
+                return Ok(());
+            }
+            let Some(line) = self
+                .stream
+                .as_ref()
+                .and_then(|s| s.program.get(s.sent))
+                .map(|l| l.trim().to_string())
+            else {
+                return Ok(());
+            };
+            let written = self.write_repetier(&line)?;
+            match written {
+                Some(count) => {
+                    self.set_in_flight(count, false);
+                    self.in_flight_is_program.push_back(true);
+                }
+                None => self.sink.emit(MachineEvent::Error(format!(
+                    "{}: {line}",
+                    worker_text::NO_REPETIER_EQUIVALENT
+                ))),
+            }
+            if let Some(stream) = self.stream.as_mut() {
+                stream.sent += 1;
+                if written.is_none() {
+                    // Skipped, as GTK's sender did: nothing to acknowledge.
+                    stream.acked += 1;
+                }
+                let event = MachineEvent::StreamProgress {
+                    sent: stream.sent,
+                    acked: stream.acked,
+                    total: stream.program.len(),
+                };
+                self.sink.emit(event);
+            }
+            if written.is_none() {
+                self.finish_if_done();
+            }
+        }
+        Ok(())
+    }
+
+    /// Handles bytes read on a Repetier connection: acknowledgements and resend requests
+    /// first, then the reply lines (with the processor's stand-in status report).
+    fn receive_repetier(&mut self, data: Vec<u8>) -> Result<(), String> {
+        let Some(link) = self.repetier.as_mut() else {
+            return Ok(());
+        };
+        let result = link.processor.process_incoming(data);
+        for event in result.events {
+            match event {
+                RepetierEvent::Ack => self.on_repetier_ack(),
+                RepetierEvent::Resend(from) => self.on_repetier_resend(from)?,
+            }
+        }
+        for line in self.splitter.push(&result.display) {
+            self.handle_repetier_line(&line);
+        }
+        Ok(())
+    }
+
+    /// One acknowledgement (`ok`, `wait`): the command in flight is answered once every
+    /// numbered line it was written as is. Nothing in flight (Repetier's idle `wait`): ignored.
+    fn on_repetier_ack(&mut self) {
+        let Some(link) = self.repetier.as_mut() else {
+            return;
+        };
+        if link.acks_due == 0 {
+            return;
+        }
+        link.acks_due -= 1;
+        if link.acks_due > 0 || std::mem::take(&mut link.internal_in_flight) {
+            return;
+        }
+        self.complete_oldest(None);
+    }
+
+    /// A `Resend:N`: writes the numbered lines from `N` again, exactly as first sent, and
+    /// waits for an acknowledgement of each (GTK's `RepetierSender`). A line no longer known
+    /// cannot be sent again: the stream stops.
+    fn on_repetier_resend(&mut self, from: u32) -> Result<(), String> {
+        let Some(link) = self.repetier.as_mut() else {
+            return Ok(());
+        };
+        match link.processor.resend_lines(from) {
+            Some(lines) if lines.is_empty() => Ok(()),
+            Some(lines) => {
+                link.acks_due = lines.len();
+                link.processor.mark_buffer_full();
+                tracing::info!(from, count = lines.len(), "Repetier resend");
+                self.write(lines.concat().as_bytes())
+            }
+            None => {
+                tracing::warn!(from, "Repetier resend of an unknown line");
+                self.sink.emit(MachineEvent::Error(format!(
+                    "{}: N{from}",
+                    worker_text::RESEND_FAILED
+                )));
+                self.end_stream(false);
+                Ok(())
+            }
+        }
+    }
+
+    /// Handles one reply line on a Repetier connection. Acknowledgements were counted from
+    /// the processor's events; the stand-in `<...>` report is the status report (fresh once
+    /// no line waits for its acknowledgement); `start` means the firmware restarted, which
+    /// drops every line queued or in flight, as a GRBL reset banner does.
+    fn handle_repetier_line(&mut self, line: &str) {
+        if self.rejected || self.check_identity(line) {
+            return;
+        }
+        let line = line.trim();
+        let lower = line.to_ascii_lowercase();
+        if line.is_empty() || lower.starts_with("ok") || lower.contains("wait") {
+            return;
+        }
+        if line.starts_with('<') && line.ends_with('>') {
+            let status = StatusParser::parse_full(line);
+            self.sink.emit(MachineEvent::StatusReport(Box::new(status)));
+            if self.repetier.as_ref().is_some_and(|l| l.acks_due == 0) && self.manual.is_empty() {
+                self.fresh.store(self.written_seq, Ordering::SeqCst);
+            }
+            return;
+        }
+        if lower == "start" {
+            self.reset_at = Some(Instant::now());
+            self.sink.emit(MachineEvent::Received(line.to_string()));
+            self.reset_buffers();
+            // The firmware counts lines from the start again: number from scratch and send
+            // the start-up lines once more.
+            if let Some(link) = self.repetier.as_mut() {
+                *link = RepetierLink::new();
+            }
+            self.end_stream(false);
+            return;
+        }
+        if lower.starts_with("error:") {
+            self.sink.emit(MachineEvent::Error(line.to_string()));
+        } else {
+            self.sink.emit(MachineEvent::Received(line.to_string()));
+        }
     }
 }

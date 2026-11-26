@@ -4636,3 +4636,12 @@ msgstr ""
 
 msgid "Unlock ignored: the machine is not in ALARM."
 msgstr ""
+
+msgid "not supported by Repetier firmware"
+msgstr ""
+
+msgid "skipped: no Repetier equivalent"
+msgstr ""
+
+msgid "resend request could not be honoured"
+msgstr ""

@@ -195,6 +195,7 @@ impl WcsPanel {
                 MachineEvent::StatusReport(_)
                 | MachineEvent::StreamProgress { .. }
                 | MachineEvent::StreamHalted { .. }
+                | MachineEvent::ProtocolMismatch { .. }
                 | MachineEvent::Error(_) => {}
             }
         }

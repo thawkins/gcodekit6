@@ -932,6 +932,7 @@ impl Pane for VisualizerPane {
                 | MachineEvent::Received(_)
                 | MachineEvent::Sent(_)
                 | MachineEvent::StreamHalted { .. }
+                | MachineEvent::ProtocolMismatch { .. }
                 | MachineEvent::Error(_) => {}
             }
         }

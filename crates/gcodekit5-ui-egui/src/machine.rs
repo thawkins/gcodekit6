@@ -23,6 +23,7 @@ use gcodekit5_app::machine::grbl_stream::{
 };
 use gcodekit5_app::machine::{MachineController, MachineEvent, worker_text};
 use gcodekit5_app::work_zero::{Wcs, WcsWord, parser_state_wcs, wcs_in_line};
+use gcodekit5_communication::firmware::ControllerProtocol;
 use gcodekit5_communication::firmware::grbl::status_parser::{
     FullStatus, OverrideState, WorkCoordinateOffset, parse_probe_report_in,
 };
@@ -331,6 +332,9 @@ impl MachineStatus {
                 }
                 MachineEvent::Error(message) => self.last_error = Some(message.clone()),
                 MachineEvent::StreamHalted { reason } => self.last_error = Some(reason.clone()),
+                // `Disconnected` follows; the panes word the rejection
+                // ([`protocol_mismatch_text`]).
+                MachineEvent::ProtocolMismatch { .. } => {}
             }
         }
     }
@@ -354,9 +358,35 @@ pub fn coalesce_progress(events: Vec<MachineEvent>) -> Vec<MachineEvent> {
         .collect()
 }
 
+/// GTK's notice when the controller identified as another firmware than the active machine's
+/// (`{}` the configured, then the detected protocol).
+pub const PROTOCOL_MISMATCH: &str = n_!(
+    "Connection rejected: active machine is configured as {} but the device responded as {}. Change the active machine in the Device Manager."
+);
+
+/// The notice for [`MachineEvent::ProtocolMismatch`], naming both protocols, as GTK's
+/// `protocol_mismatch` worded it.
+///
+/// # Arguments
+/// * `configured` - The protocol the connection was opened for.
+/// * `detected` - The protocol the controller identified as.
+/// * `tr` - Translator for the current UI language.
+pub fn protocol_mismatch_text(
+    configured: ControllerProtocol,
+    detected: ControllerProtocol,
+    tr: &Translator,
+) -> String {
+    tr.tr(PROTOCOL_MISMATCH)
+        .replacen("{}", configured.as_str(), 1)
+        .replacen("{}", detected.as_str(), 1)
+}
+
 /// The controller's own message texts, for the translation check.
 pub fn worker_msgids() -> Vec<&'static str> {
-    worker_text::ALL.to_vec()
+    worker_text::ALL
+        .into_iter()
+        .chain([PROTOCOL_MISMATCH])
+        .collect()
 }
 
 /// Translates `message` when it is one of `msgids`, alone or followed by `": "` and a

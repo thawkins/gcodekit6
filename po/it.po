@@ -4715,3 +4715,12 @@ msgstr "Duplica"
 
 msgid "Unlock ignored: the machine is not in ALARM."
 msgstr "Sblocco ignorato: la macchina non è in ALLARME."
+
+msgid "not supported by Repetier firmware"
+msgstr "non supportato dal firmware Repetier"
+
+msgid "skipped: no Repetier equivalent"
+msgstr "saltato: nessun equivalente Repetier"
+
+msgid "resend request could not be honoured"
+msgstr "impossibile soddisfare la richiesta di reinvio"
