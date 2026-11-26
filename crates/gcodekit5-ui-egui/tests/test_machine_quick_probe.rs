@@ -152,3 +152,33 @@ fn test_quick_probe_disabled_offline_and_during_a_job() {
         assert!(!enabled(&harness, label), "{label} enabled during a job");
     }
 }
+
+/// The quick probe's backstop fires through `Pane::wake_in` when the controller goes quiet
+/// after refusing a line without halting: the app hands Machine Control an empty batch of
+/// events once it is due, and the run resets the controller.
+#[test]
+fn test_quick_probe_backstop_fires_with_no_machine_events() {
+    use gcodekit5_ui_egui::panes::cam_tools::probe_routines::run::UNCONFIRMED_BACKSTOP_DELAY;
+    let (mut harness, shared) = idle_app();
+    click(&mut harness, "Probe Z");
+    wait_program(&mut harness, &shared, "G38.2");
+    // The controller goes quiet: no status reply and no ack from now on.
+    *shared.reply_budget.lock().expect("budget") = Some(0);
+    for _ in 0..10 {
+        harness.step();
+    }
+    // A refused line the controller does not halt for (no feed hold echoed).
+    harness.state_mut().state_mut().machine.absorb(vec![
+        gcodekit5_app::machine::MachineEvent::Error("error:9 on program line 1".to_string()),
+    ]);
+    let deadline = std::time::Instant::now() + UNCONFIRMED_BACKSTOP_DELAY * 3;
+    while !crate::test_cam_probe_run::reset_written(&shared) && std::time::Instant::now() < deadline
+    {
+        harness.step();
+        std::thread::sleep(Duration::from_millis(20));
+    }
+    assert!(
+        crate::test_cam_probe_run::reset_written(&shared),
+        "the backstop never fired"
+    );
+}
