@@ -11,7 +11,8 @@
 //! are travel (grey), powered feed moves and arcs are cuts coloured by spindle/laser power,
 //! and arcs are split into segments of at most 5 degrees.
 //!
-//! The same pass builds the run preview's path ([`super::preview::PathBuilder`]), so the
+//! The same pass takes GTK's inspector statistics of the S values ([`Intensity`]) and
+//! builds the run preview's path ([`super::preview::PathBuilder`]), so the
 //! preview needs no second parse.
 //!
 //! Dependencies: `glam`, `bytemuck`, `gcodekit5-visualizer` (parser, arc maths).
@@ -59,6 +60,48 @@ impl ToolpathVertex {
     }
 }
 
+/// GTK's inspector statistics of the spindle/laser power: over every move and arc that
+/// carries an S value, one value per command.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Intensity {
+    /// The lowest S.
+    pub min: f32,
+    /// The highest S.
+    pub max: f32,
+    /// The mean S.
+    pub avg: f32,
+}
+
+/// Sums S values for [`Intensity`].
+#[derive(Debug, Default)]
+struct IntensitySum {
+    min: f32,
+    max: f32,
+    sum: f64,
+    count: u64,
+}
+
+impl IntensitySum {
+    fn add(&mut self, s: f32) {
+        if self.count == 0 {
+            (self.min, self.max) = (s, s);
+        } else {
+            self.min = self.min.min(s);
+            self.max = self.max.max(s);
+        }
+        self.sum += f64::from(s);
+        self.count += 1;
+    }
+
+    fn finish(&self) -> Option<Intensity> {
+        (self.count > 0).then_some(Intensity {
+            min: self.min,
+            max: self.max,
+            avg: (self.sum / self.count as f64) as f32,
+        })
+    }
+}
+
 /// The toolpath of one program, ready to upload.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct ToolpathMesh {
@@ -70,6 +113,8 @@ pub struct ToolpathMesh {
     pub cut_bounds: Option<Aabb>,
     /// The run preview's path.
     pub preview: Vec<Vec3>,
+    /// The S-value statistics, or `None` when no move sets a power.
+    pub intensity: Option<Intensity>,
 }
 
 /// The program text with a marker dwell after every line.
@@ -180,7 +225,17 @@ pub fn build(lines: &[String]) -> ToolpathMesh {
         path: PathBuilder::default(),
     };
     let v = |p: &Point3D| Vec3::new(p.x, p.y, p.z);
+    let mut intensity = IntensitySum::default();
     for command in vis.commands() {
+        if let GCodeCommand::Move {
+            intensity: Some(s), ..
+        }
+        | GCodeCommand::Arc {
+            intensity: Some(s), ..
+        } = command
+        {
+            intensity.add(*s);
+        }
         match command {
             GCodeCommand::Dwell { duration, pos } => {
                 if (duration - MARKER_DWELL).abs() < 1e-3 {
@@ -218,5 +273,6 @@ pub fn build(lines: &[String]) -> ToolpathMesh {
     }
     let mut mesh = builder.mesh;
     mesh.preview = builder.path.finish();
+    mesh.intensity = intensity.finish();
     mesh
 }

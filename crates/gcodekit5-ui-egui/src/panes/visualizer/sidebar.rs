@@ -8,7 +8,8 @@
 //!
 //! Ported from the GTK `ui/gtk/visualizer/mod.rs` sidebar. GTK's Fit to Viewport button
 //! (`view-restore`) is Reset View here, which `Cmd+0` also runs. Left out, because the
-//! egui visualizer lacks the feature: the inspector's S-value statistics.
+//! egui visualizer lacks the feature: none. The Inspector has GTK's Bounds X/Y and the S-value
+//! statistics (Min S, Max S, Avg S with one decimal, N/A when no move sets a power).
 //!
 //! The Simulation section ("Show Stock Removal", and the stock, tool and zero references
 //! while it is checked) is shown only while the `enable_stock_removal_3d` setting is on, as
@@ -25,6 +26,7 @@ use gcodekit5_visualizer::visualizer::{StockXyReference, StockZeroReference};
 
 use super::camera::Aabb;
 use super::stock::StockSetup;
+use super::toolpath::Intensity;
 use crate::icons::{Icon, icon_only_button};
 use crate::panes::machine_control::format_length;
 use crate::workspace::named_icon_button;
@@ -57,6 +59,10 @@ pub fn msgids() -> Vec<&'static str> {
         n_!("Show Sidebar"),
         n_!("Inspector"),
         n_!("Bounds"),
+        n_!("Min S:"),
+        n_!("Max S:"),
+        n_!("Avg S:"),
+        n_!("N/A"),
         n_!("to"),
         n_!("Simulation"),
         n_!("Show Stock Removal"),
@@ -288,11 +294,30 @@ fn range(min: f32, max: f32, units: MeasurementSystem, tr: &Translator) -> Strin
     )
 }
 
+/// What the Inspector describes.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct Inspector<'a> {
+    /// The program's bounds, once built.
+    pub bounds: Option<&'a Aabb>,
+    /// The program's S-value statistics, once built.
+    pub intensity: Option<Intensity>,
+}
+
+/// A row of the Inspector: `key` at the left, `value` at the right.
+fn inspector_row(ui: &mut egui::Ui, key: &str, value: String) {
+    ui.horizontal(|ui| {
+        ui.small(key);
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            ui.monospace(value)
+        });
+    });
+}
+
 /// Draws the sidebar's contents.
 ///
 /// # Arguments
 /// * `ui` - The sidebar panel's `Ui`.
-/// * `bounds` - The program's bounds, once built.
+/// * `inspector` - What the Inspector describes.
 /// * `view_2d` - Whether the 2D view mode is on.
 /// * `display_state` - The Toolpath and Guides toggles, edited in place.
 /// * `units` - The measurement system to show.
@@ -304,7 +329,7 @@ fn range(min: f32, max: f32, units: MeasurementSystem, tr: &Translator) -> Strin
 /// The action of the button clicked this frame, if any.
 pub fn show(
     ui: &mut egui::Ui,
-    bounds: Option<&Aabb>,
+    inspector: Inspector<'_>,
     view_2d: bool,
     display_state: &mut Display,
     units: MeasurementSystem,
@@ -354,17 +379,20 @@ pub fn show(
         .show(ui, |ui| {
             let label = tr.tr("Bounds");
             for (axis, name) in ["X", "Y"].into_iter().enumerate() {
-                let value = bounds.map_or_else(
+                let value = inspector.bounds.map_or_else(
                     || "-".to_owned(),
                     |b| range(b.min[axis], b.max[axis], units, tr),
                 );
-                ui.horizontal(|ui| {
-                    ui.small(format!("{label} {name}"));
-                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        ui.monospace(value)
-                    });
-                });
+                inspector_row(ui, &format!("{label} {name}"), value);
             }
+            let stat = |pick: fn(&Intensity) -> f32| {
+                inspector
+                    .intensity
+                    .map_or_else(|| tr.tr("N/A").into_owned(), |s| format!("{:.1}", pick(&s)))
+            };
+            inspector_row(ui, &tr.tr("Min S:"), stat(|s| s.min));
+            inspector_row(ui, &tr.tr("Max S:"), stat(|s| s.max));
+            inspector_row(ui, &tr.tr("Avg S:"), stat(|s| s.avg));
         });
     action
 }

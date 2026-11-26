@@ -41,7 +41,7 @@
 //!
 //! Ported from the GTK `ui/gtk/visualizer/mod.rs`, `renderer_3d.rs`, `shaders.rs` and
 //! `nav_cube.rs`. Not ported: scrollbars, the zoom/centre/cursor
-//! status line (commented out in the GTK source) and intensity statistics.
+//! status line (commented out in the GTK source).
 //!
 //! [`Machine::program`]: crate::machine::Machine::program
 //!
@@ -144,6 +144,8 @@ pub struct VisualizerPane {
     bounds: Option<Aabb>,
     /// Bounds of its cutting moves.
     cut_bounds: Option<Aabb>,
+    /// Its S-value statistics.
+    intensity: Option<toolpath::Intensity>,
     /// A newly loaded toolpath is to be fitted once this frame's view size is known.
     refit_pending: bool,
     worker: BuildWorker,
@@ -207,6 +209,7 @@ impl VisualizerPane {
             mesh: None,
             bounds: None,
             cut_bounds: None,
+            intensity: None,
             refit_pending: false,
             worker: BuildWorker::new(),
             building: false,
@@ -527,6 +530,7 @@ impl VisualizerPane {
         self.mesh = None;
         self.bounds = None;
         self.cut_bounds = None;
+        self.intensity = None;
         self.refit_pending = false;
         self.preview.set_points(Vec::new());
     }
@@ -558,7 +562,9 @@ impl VisualizerPane {
             bounds,
             cut_bounds,
             preview,
+            intensity,
         } = mesh;
+        self.intensity = intensity;
         self.preview.set_points(preview);
         if std::mem::take(&mut self.preview_on_build) {
             self.run_preview();
@@ -699,6 +705,7 @@ impl Pane for VisualizerPane {
             let enabled = self.stock_enabled;
             let display = &mut self.display;
             let view_2d = self.view_2d;
+            let intensity = self.intensity;
             let clicked = egui::Panel::left("gcodekit5-visualizer-sidebar")
                 .resizable(true)
                 .default_size(sidebar::WIDTH)
@@ -715,14 +722,12 @@ impl Pane for VisualizerPane {
                                 progress,
                                 notice,
                             });
+                            let inspector = sidebar::Inspector {
+                                bounds: bounds.as_ref(),
+                                intensity,
+                            };
                             sidebar::show(
-                                ui,
-                                bounds.as_ref(),
-                                view_2d,
-                                display,
-                                units,
-                                simulation,
-                                ctx.tr,
+                                ui, inspector, view_2d, display, units, simulation, ctx.tr,
                             )
                         })
                         .inner
