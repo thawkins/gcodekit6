@@ -676,11 +676,12 @@ fn title_mnemonics(language: &str) -> Vec<String> {
     let mut h = crate::machine_support::app_harness(GcodeKitApp::from_state(state));
     h.run_steps(2);
     let tr = Translator::new(language);
-    menu::MENU_TITLES
+    // The titles as the menus define them, not a copy of their msgids.
+    menu::menu_bar(&tr)
+        .menus
         .iter()
-        .filter_map(|title| {
-            let label = tr.tr(title).into_owned();
-            let node = h.get_by_role_and_label(egui::accesskit::Role::MenuItem, &label);
+        .filter_map(|m| {
+            let node = h.get_by_role_and_label(egui::accesskit::Role::MenuItem, &m.title);
             node.accesskit_node()
                 .data()
                 .access_key()
@@ -716,6 +717,42 @@ fn test_designer_alt_keys_leave_the_menu_mnemonics() {
             assert!(
                 !mnemonics.contains(letter),
                 "{language}: Alt+{letter} is a menu mnemonic ({mnemonics:?})"
+            );
+        }
+    }
+}
+
+/// `menu::MENU_MNEMONICS` has a row for every shipped language (English and each po file),
+/// and each letter is in its menu title as the menus define it in that language.
+#[test]
+fn test_mnemonic_table_covers_every_shipped_language() {
+    let po_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../po");
+    let mut shipped: Vec<String> = std::fs::read_dir(po_dir)
+        .expect("po folder")
+        .filter_map(|e| {
+            let path = e.ok()?.path();
+            (path.extension()? == "po").then(|| path.file_stem()?.to_str().map(str::to_string))?
+        })
+        .collect();
+    shipped.push("en".to_string());
+    shipped.sort();
+    let mut table: Vec<String> = menu::MENU_MNEMONICS
+        .iter()
+        .map(|(language, _)| (*language).to_string())
+        .collect();
+    table.sort();
+    assert_eq!(table, shipped);
+    for (language, letters) in menu::MENU_MNEMONICS {
+        let titles: Vec<String> = menu::menu_bar(&Translator::new(language))
+            .menus
+            .iter()
+            .map(|m| m.title.to_lowercase())
+            .collect();
+        assert_eq!(titles.len(), letters.len(), "{language}");
+        for (title, letter) in titles.iter().zip(letters) {
+            assert!(
+                title.contains(letter),
+                "{language}: {letter} not in {title}"
             );
         }
     }
