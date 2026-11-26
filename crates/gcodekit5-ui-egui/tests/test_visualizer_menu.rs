@@ -6,6 +6,7 @@ use egui_kittest::kittest::Queryable;
 use gcodekit5_core::units::MeasurementSystem;
 use gcodekit5_ui_egui::panes::visualizer::menu::{coordinates_text, cursor_on_plane};
 use gcodekit5_ui_egui::panes::visualizer::{Camera, StdView, VisualizerPane};
+use gcodekit5_ui_egui::workspace::Pane;
 use glam::{Vec2, Vec3};
 
 use crate::test_designer_canvas::click_with;
@@ -98,7 +99,20 @@ fn test_copy_cursor_coordinates_copies_the_clicked_point() {
 
 #[test]
 fn test_menu_toggles_and_fits() {
-    let mut harness = pane_harness(VisualizerPane::new());
+    let mut pane = VisualizerPane::new();
+    let axis = |max: f64| gcodekit5_devicedb::AxisLimits {
+        min: 0.0,
+        max,
+        enabled: true,
+    };
+    let profile = gcodekit5_devicedb::DeviceProfile {
+        x_axis: axis(300.0),
+        y_axis: axis(200.0),
+        z_axis: axis(0.0),
+        ..gcodekit5_devicedb::DeviceProfile::default()
+    };
+    pane.set_device(Some(&profile));
+    let mut harness = pane_harness(pane);
     harness.run();
     for (label, read) in [
         (
@@ -131,8 +145,8 @@ fn test_menu_toggles_and_fits() {
     harness.run();
     assert_eq!(
         harness.state().camera().target(),
-        Vec3::new(125.0, 125.0, 0.0),
-        "no profile: GTK's default area"
+        Vec3::new(150.0, 100.0, 0.0),
+        "the profile's work area"
     );
     assert!(
         harness.query_by_label("Toggle Grid").is_none(),

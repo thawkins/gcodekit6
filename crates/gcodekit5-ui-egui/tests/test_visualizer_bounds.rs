@@ -5,7 +5,7 @@
 use egui_kittest::kittest::Queryable;
 use gcodekit5_devicedb::{AxisLimits, DeviceProfile};
 use gcodekit5_ui_egui::panes::visualizer::{
-    self, Aabb, Camera, Display, StdView, VisualizerPane, default_work_area, work_area_of,
+    self, Aabb, Camera, Display, StdView, VisualizerPane, work_area_of,
 };
 use gcodekit5_ui_egui::workspace::Pane;
 use glam::Vec3;
@@ -79,15 +79,17 @@ fn test_fit_to_device_buttons_fit_the_work_area() {
 }
 
 #[test]
-fn test_fit_to_device_without_a_profile_uses_the_default_area() {
+fn test_fit_to_device_without_a_profile_does_nothing() {
     let mut pane = VisualizerPane::new();
+    pane.camera_mut().zoom(30.0);
+    let before = *pane.camera();
     pane.fit_device();
     assert_eq!(
         pane.camera().target(),
-        Vec3::new(125.0, 125.0, 0.0),
-        "GTK's 250 x 250 mm default"
+        before.target(),
+        "as GTK's 3D button"
     );
-    assert_eq!(default_work_area().max, Vec3::new(250.0, 250.0, 0.0));
+    assert_eq!(pane.camera().distance(), before.distance());
 }
 
 /// Machine bounds blue.

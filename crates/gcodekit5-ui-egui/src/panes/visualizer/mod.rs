@@ -32,7 +32,7 @@
 //!
 //! The machine bounds and Fit to Device Working Area use the active device profile's X, Y
 //! and Z limits ([`work_area_of`], handed in through [`Pane::set_device`]); with no profile,
-//! Fit to Device fits GTK's default 250 x 250 mm area and no bounds are drawn.
+//! Fit to Device does nothing and no bounds are drawn, as in GTK's 3D view.
 //!
 //! With the `enable_stock_removal_3d` setting on, the sidebar's Simulation section shows
 //! GTK's "Show Stock Removal": the stock is cut by the program on a worker ([`stock`]) and
@@ -66,7 +66,6 @@ use std::sync::Arc;
 
 use gcodekit5_app::i18n::Translator;
 use gcodekit5_app::machine::MachineEvent;
-use gcodekit5_core::constants::{DEFAULT_WORK_HEIGHT_MM, DEFAULT_WORK_WIDTH_MM};
 use gcodekit5_core::units::MeasurementSystem;
 use gcodekit5_devicedb::DeviceProfile;
 use gcodekit5_settings::config::Config;
@@ -109,18 +108,6 @@ pub fn work_area_of(profile: &DeviceProfile) -> Aabb {
     let a = Vec3::new(x0, y0, z0);
     let b = Vec3::new(x1, y1, z1);
     Aabb::new(a.min(b), a.max(b))
-}
-
-/// GTK's work area when no device profile is active: 250 x 250 mm at the origin.
-pub fn default_work_area() -> Aabb {
-    Aabb::new(
-        Vec3::ZERO,
-        Vec3::new(
-            DEFAULT_WORK_WIDTH_MM as f32,
-            DEFAULT_WORK_HEIGHT_MM as f32,
-            0.0,
-        ),
-    )
 }
 
 /// The msgids the pane shows, for the translation check.
@@ -470,11 +457,12 @@ impl VisualizerPane {
         self.work_area
     }
 
-    /// Fits the active device's work area (else GTK's default area) into the view
-    /// (Fit to Device Working Area).
+    /// Fits the active device's work area into the view (Fit to Device Working Area); with
+    /// no active profile it does nothing, as GTK's 3D button did.
     pub fn fit_device(&mut self) {
-        self.camera
-            .fit(self.work_area.unwrap_or_else(default_work_area));
+        if let Some(area) = self.work_area {
+            self.camera.fit(area);
+        }
     }
 
     /// Sets the sidebar's Toolpath and Guides toggles.
