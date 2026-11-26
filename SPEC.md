@@ -1,6 +1,6 @@
 # GCodeKit5 - Specification Document
 
-**Version**: 2.0.0-alpha.2
+**Version**: 2.0.0-alpha.3
 **Last Updated**: 2026-11-27
 **Status**: Alpha Release
 

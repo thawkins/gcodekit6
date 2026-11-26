@@ -623,11 +623,14 @@ You may choose either license for your use of this software.
 
 ## Project Status
 
-  - **Current Version**: 2.0.0-alpha.2
+  - **Current Version**: 2.0.0-alpha.3
   - **Status**: Active Development
   - **Stability**: Alpha
 
 ## Updates
+
+### Recent Updates (2.0.0-alpha.3) - Full release notes (2026-11-27)
+- Each GitHub release now carries the full CHANGELOG notes for its version, and suffixed versions are marked as pre-releases. The application is unchanged from 2.0.0-alpha.2.
 
 ### Recent Updates (2.0.0-alpha.2) - Release workflow fixed (2026-11-27)
 - Republishes 2.0.0-alpha.1 with installers for Linux, macOS and Windows; the application is unchanged. The v2.0.0-alpha.1 tag has no published release.

@@ -1,4 +1,6 @@
-## [Unreleased] - 2026-11-27 (release page fixes)
+## [2.0.0-alpha.3] - 2026-11-27
+
+Release page fixes only; the application is unchanged from 2.0.0-alpha.2.
 
 ### Fixed
 - **Release notes**: each GitHub release now carries the full CHANGELOG.md notes for its version (all of its sections, plus older versions with no published release), a downloads table and a link to the full history, built by `scripts/release_notes.py`; it replaces the short pull-request list. A tag whose version has no CHANGELOG section fails before publishing
