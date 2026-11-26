@@ -212,7 +212,6 @@ pub fn visuals(mode: egui::Theme) -> Visuals {
         egui::Theme::Light => Color32::from_gray(0xf0),
         egui::Theme::Dark => Color32::from_gray(0x2a),
     };
-    visuals.selection.bg_fill = p.accent_bg;
     visuals.faint_bg_color = p.headerbar_bg;
     visuals.window_stroke = Stroke::new(1.0, p.borders);
     visuals.hyperlink_color = p.accent;
@@ -272,6 +271,8 @@ pub fn apply_style(style: &mut egui::Style, mode: egui::Theme) {
     spacing.window_margin = Margin::same(PAGE_MARGIN);
     spacing.menu_margin = Margin::same(6);
     spacing.indent = 18.0;
+    // Rows are taller than egui's, so the default 200 px would show fewer entries.
+    spacing.combo_height = 300.0;
     spacing.icon_width = 18.0;
     spacing.icon_width_inner = 10.0;
     spacing.icon_spacing = 6.0;
@@ -316,11 +317,7 @@ pub fn section_heading(ui: &mut egui::Ui, text: &str) -> egui::Response {
 /// # Arguments
 /// * `ui` - The ui the group goes into; its theme decides the colours.
 pub fn group_frame(ui: &egui::Ui) -> egui::Frame {
-    let p = palette(if ui.visuals().dark_mode {
-        egui::Theme::Dark
-    } else {
-        egui::Theme::Light
-    });
+    let p = palette(mode_of(ui));
     egui::Frame::new()
         .fill(p.card_bg)
         .stroke(Stroke::new(1.0, p.borders))
@@ -352,8 +349,68 @@ pub fn primary_button(text: impl Into<String>) -> egui::Button<'static> {
 ///
 /// # Arguments
 /// * `text` - The button label, already translated.
-pub fn destructive_button(text: impl Into<String>) -> egui::Button<'static> {
-    filled_button(text, destructive_fill(egui::Theme::Dark))
+pub fn destructive_button(ui: &egui::Ui, text: impl Into<String>) -> egui::Button<'static> {
+    filled_button(text, destructive_fill(mode_of(ui)))
+}
+
+/// The light/dark mode `ui` is drawn in.
+fn mode_of(ui: &egui::Ui) -> egui::Theme {
+    if ui.visuals().dark_mode {
+        egui::Theme::Dark
+    } else {
+        egui::Theme::Light
+    }
+}
+
+/// Runs `add` (which adds one checkbox) with the box drawn accent blue and its tick white
+/// when `checked`, as libadwaita draws a checked check button. The label keeps its colour.
+///
+/// egui's checkbox does not know its own state when it picks its fill, so the colour is set
+/// by the caller from the value it is about to show.
+///
+/// # Arguments
+/// * `ui` - Where the checkbox goes.
+/// * `checked` - The value the checkbox shows.
+/// * `add` - Adds the checkbox and returns its result.
+pub fn checked_scope<R>(
+    ui: &mut egui::Ui,
+    checked: bool,
+    add: impl FnOnce(&mut egui::Ui) -> R,
+) -> R {
+    ui.scope(|ui| {
+        if checked {
+            let text = ui.visuals().widgets.noninteractive.fg_stroke.color;
+            let visuals = ui.visuals_mut();
+            visuals.override_text_color = Some(text);
+            for state in [
+                &mut visuals.widgets.inactive,
+                &mut visuals.widgets.hovered,
+                &mut visuals.widgets.active,
+            ] {
+                state.bg_fill = ACCENT_BLUE;
+                state.bg_stroke = Stroke::NONE;
+                state.fg_stroke = Stroke::new(1.5, Color32::WHITE);
+            }
+        }
+        add(ui)
+    })
+    .inner
+}
+
+/// A checkbox that is accent blue with a white tick when checked, in both themes. Use it in
+/// place of `ui.checkbox`.
+///
+/// # Arguments
+/// * `ui` - Where the checkbox goes.
+/// * `checked` - The value to edit.
+/// * `atoms` - The label.
+pub fn checkbox<'a>(
+    ui: &mut egui::Ui,
+    checked: &'a mut bool,
+    atoms: impl egui::IntoAtoms<'a>,
+) -> egui::Response {
+    let on = *checked;
+    checked_scope(ui, on, |ui| ui.checkbox(checked, atoms))
 }
 
 /// Installs the light and dark styles in `ctx`, so switching mode is one `set_theme`.

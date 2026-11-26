@@ -427,7 +427,7 @@ pub fn combo_row<T: Copy + PartialEq>(
 /// * `value` - The checkbox's state.
 pub fn check_row(ui: &mut egui::Ui, tr: &Translator, label: &'static str, value: &mut bool) {
     let name = ui.label(tr.tr(label));
-    ui.checkbox(value, "").labelled_by(name.id);
+    crate::theme::checkbox(ui, value, "").labelled_by(name.id);
     ui.end_row();
 }
 

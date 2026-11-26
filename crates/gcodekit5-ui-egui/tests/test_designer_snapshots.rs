@@ -22,7 +22,7 @@ fn snapshot_options() -> SnapshotOptions {
 fn gpu_harness() -> Harness<'static, DesignerPane> {
     let tr = Translator::new("en");
     let mut harness = Harness::builder()
-        .with_size(egui::vec2(640.0, 400.0))
+        .with_size(egui::vec2(640.0, 560.0))
         .with_step_dt(STEP_DT)
         .with_theme(egui::Theme::Dark)
         .wgpu()
@@ -100,8 +100,8 @@ fn test_snapshot_each_drawing_tool() {
 fn test_snapshot_toolbox_cnc() {
     use egui_kittest::kittest::Queryable;
     let mut h = gpu_harness();
-    // The theme's taller rows no longer fit the stock settings in 400 px.
-    h.set_size(egui::vec2(640.0, 560.0));
+    // The theme's taller rows need more room for the stock settings.
+    h.set_size(egui::vec2(640.0, 680.0));
     h.state_mut()
         .state_mut()
         .set_machine_mode(gcodekit5_designer::designer_state::MachineMode::Cnc3D);

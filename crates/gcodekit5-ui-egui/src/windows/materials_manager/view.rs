@@ -412,7 +412,7 @@ fn safety(ui: &mut egui::Ui, f: &mut MaterialForm, tr: &Translator) {
                 |h| tr.tr(hazard_level_label(h)).into_owned(),
             );
         });
-    ui.checkbox(&mut f.coolant_required, tr.tr(n_!("Coolant Required")));
+    crate::theme::checkbox(ui, &mut f.coolant_required, tr.tr(n_!("Coolant Required")));
 }
 
 fn notes(ui: &mut egui::Ui, f: &mut MaterialForm, tr: &Translator) {

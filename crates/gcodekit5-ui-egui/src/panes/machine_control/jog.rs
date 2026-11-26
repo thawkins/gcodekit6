@@ -367,7 +367,7 @@ impl JogPanel {
         self.show_step(ui, tr);
         self.show_feed(ui, tr);
         let was_continuous = self.continuous;
-        ui.checkbox(&mut self.continuous, tr.tr("Continuous"));
+        crate::theme::checkbox(ui, &mut self.continuous, tr.tr("Continuous"));
         if was_continuous && !self.continuous && self.take_hold() {
             actions.push(Action::Cancel);
         }

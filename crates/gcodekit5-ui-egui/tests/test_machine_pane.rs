@@ -183,9 +183,10 @@ fn test_dro_shows_two_decimals() {
 #[test]
 fn test_feed_override_plus_10() {
     let (mut harness, shared) = pane_app(Duration::from_millis(1), true);
-    // Below the fold of the Machine Control page at 1280x800 (the page is laid out again in
-    // its GTK columns later): a taller window shows it.
-    harness.set_size(egui::vec2(1280.0, 1000.0));
+    // Below the fold of the Machine Control page at 1280x1000 (the page is laid out again in
+    // its GTK columns later, and the theme's taller rows push it further down): a taller
+    // window shows it.
+    harness.set_size(egui::vec2(1280.0, 1300.0));
     harness.step();
     harness.get_by_label("Increase feed rate by 10%").click();
     harness.step();

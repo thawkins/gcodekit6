@@ -204,8 +204,8 @@ impl TextTool {
                         ui.end_row();
                         ui.label(tr.tr("Style:"));
                         ui.horizontal(|ui| {
-                            ui.checkbox(&mut self.bold, tr.tr("Bold"));
-                            ui.checkbox(&mut self.italic, tr.tr("Italic"));
+                            crate::theme::checkbox(ui, &mut self.bold, tr.tr("Bold"));
+                            crate::theme::checkbox(ui, &mut self.italic, tr.tr("Italic"));
                         });
                         ui.end_row();
                     });

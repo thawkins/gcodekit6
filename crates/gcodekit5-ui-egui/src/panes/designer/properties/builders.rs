@@ -147,7 +147,7 @@ pub fn section(
     egui::Frame::group(ui.style())
         .show(ui, |ui| {
             ui.set_width(ui.available_width());
-            ui.strong(title);
+            crate::theme::section_heading(ui, title);
             egui::Grid::new(("gcodekit5-properties", title))
                 .num_columns(3)
                 .spacing([8.0, 6.0])
@@ -253,9 +253,10 @@ pub fn text_field(
 /// * `enabled` - Whether it can be toggled.
 pub fn check(ui: &mut egui::Ui, label: &str, value: bool, enabled: bool) -> Option<bool> {
     let mut v = value;
-    let changed = ui
-        .add_enabled(enabled, egui::Checkbox::new(&mut v, label))
-        .changed();
+    let changed = crate::theme::checked_scope(ui, value, |ui| {
+        ui.add_enabled(enabled, egui::Checkbox::new(&mut v, label))
+    })
+    .changed();
     ui.end_row();
     changed.then_some(v)
 }

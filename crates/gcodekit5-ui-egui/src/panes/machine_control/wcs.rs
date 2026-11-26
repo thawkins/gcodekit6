@@ -300,10 +300,13 @@ impl WcsPanel {
                     include_z: self.include_z,
                 });
             }
-            ui.add_enabled(
-                connected,
-                egui::Checkbox::new(&mut self.include_z, tr.tr("Include Z")),
-            )
+            let include_z = self.include_z;
+            crate::theme::checked_scope(ui, include_z, |ui| {
+                ui.add_enabled(
+                    connected,
+                    egui::Checkbox::new(&mut self.include_z, tr.tr("Include Z")),
+                )
+            })
             .on_hover_text(tr.tr("When checked, Go to Work Zero will also move to Z0"));
         });
         action

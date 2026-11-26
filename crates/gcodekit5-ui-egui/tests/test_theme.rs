@@ -1,6 +1,7 @@
 //! The Adwaita-like theme: a sample of widgets built with the theme helpers, as a snapshot in
 //! dark and light, and the global metrics the helpers rely on.
 
+use egui_kittest::kittest::NodeT;
 use egui_kittest::{Harness, SnapshotOptions};
 use gcodekit5_ui_egui::theme;
 
@@ -21,7 +22,7 @@ fn sample(ui: &mut egui::Ui, text: &mut String, checked: &mut [bool; 2], choice:
             ui.horizontal(|ui| {
                 ui.add(theme::primary_button("Connect"));
                 let _ = ui.button("Refresh");
-                ui.add(theme::destructive_button("Stop"));
+                ui.add(theme::destructive_button(ui, "Stop"));
             });
             theme::group_frame(ui).show(ui, |ui| {
                 theme::section_heading(ui, "Size");
@@ -31,8 +32,8 @@ fn sample(ui: &mut egui::Ui, text: &mut String, checked: &mut [bool; 2], choice:
                         .labelled_by(label.id);
                     ui.label("mm");
                 });
-                ui.checkbox(&mut checked[0], "Lock");
-                ui.checkbox(&mut checked[1], "Show grid");
+                theme::checkbox(ui, &mut checked[0], "Lock");
+                theme::checkbox(ui, &mut checked[1], "Show grid");
                 ui.horizontal(|ui| {
                     ui.radio_value(choice, 0, "Laser 2D");
                     ui.radio_value(choice, 1, "CNC 3D");
@@ -98,5 +99,22 @@ fn test_theme_accent_and_destructive_colours() {
     assert_ne!(
         theme::destructive_fill(egui::Theme::Dark),
         theme::ACCENT_BLUE
+    );
+}
+
+#[test]
+fn test_theme_checked_checkbox_keeps_label_and_state() {
+    use egui_kittest::kittest::Queryable;
+    let mut value = false;
+    let mut harness = Harness::new_ui(move |ui| {
+        theme::install(ui.ctx());
+        theme::checkbox(ui, &mut value, "Lock");
+    });
+    harness.run();
+    harness.get_by_label("Lock").click();
+    harness.run();
+    assert_eq!(
+        harness.get_by_label("Lock").accesskit_node().toggled(),
+        Some(egui::accesskit::Toggled::True)
     );
 }

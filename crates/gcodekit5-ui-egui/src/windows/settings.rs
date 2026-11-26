@@ -338,7 +338,7 @@ fn number_row(
 /// A checkbox row; the checkbox carries the label.
 fn check_row(ui: &mut egui::Ui, tr: &Translator, msgid: &str, value: &mut bool) {
     ui.label("");
-    ui.checkbox(value, tr.tr(msgid));
+    crate::theme::checkbox(ui, value, tr.tr(msgid));
     ui.end_row();
 }
 

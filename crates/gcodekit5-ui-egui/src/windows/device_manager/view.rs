@@ -310,7 +310,7 @@ fn connection(ui: &mut egui::Ui, f: &mut ProfileForm, tr: &Translator) {
             field(ui, &tr.tr(n_!("Timeout (ms):")), &mut f.timeout_ms, true);
             ui.end_row();
         });
-    ui.checkbox(&mut f.auto_reconnect, tr.tr(n_!("Auto Reconnect")));
+    crate::theme::checkbox(ui, &mut f.auto_reconnect, tr.tr(n_!("Auto Reconnect")));
 }
 
 fn dimensions(ui: &mut egui::Ui, f: &mut ProfileForm, unit: &str, tr: &Translator) {
@@ -355,7 +355,7 @@ fn capabilities(ui: &mut egui::Ui, f: &mut ProfileForm, feed_unit: &str, tr: &Tr
         .show(ui, |ui| {
             field(ui, &tr.tr(n_!("No of Axes:")), &mut f.num_axes, true);
             ui.end_row();
-            ui.checkbox(&mut f.has_spindle, tr.tr(n_!("Has Spindle")));
+            crate::theme::checkbox(ui, &mut f.has_spindle, tr.tr(n_!("Has Spindle")));
             ui.end_row();
             let spindle = f.has_spindle;
             field(
@@ -372,7 +372,7 @@ fn capabilities(ui: &mut egui::Ui, f: &mut ProfileForm, feed_unit: &str, tr: &Tr
                 spindle,
             );
             ui.end_row();
-            ui.checkbox(&mut f.has_laser, tr.tr(n_!("Has Laser")));
+            crate::theme::checkbox(ui, &mut f.has_laser, tr.tr(n_!("Has Laser")));
             ui.end_row();
             let laser = f.has_laser;
             field(
@@ -383,8 +383,9 @@ fn capabilities(ui: &mut egui::Ui, f: &mut ProfileForm, feed_unit: &str, tr: &Tr
             );
             ui.end_row();
         });
-    ui.checkbox(&mut f.has_coolant, tr.tr(n_!("Has Coolant")));
-    ui.checkbox(
+    crate::theme::checkbox(ui, &mut f.has_coolant, tr.tr(n_!("Has Coolant")));
+    crate::theme::checkbox(
+        ui,
         &mut f.pen_mode,
         tr.tr(n_!("Pen Mode (Repetier: M3/M5 become pen down/up Z moves)")),
     );

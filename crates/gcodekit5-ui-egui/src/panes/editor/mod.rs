@@ -372,7 +372,7 @@ impl EditorPane {
             if self.is_large() {
                 ui.separator();
                 ui.label(tr.tr("Large file: shown read-only to stay fast."));
-                ui.checkbox(&mut self.edit_large, tr.tr("Edit anyway"));
+                crate::theme::checkbox(ui, &mut self.edit_large, tr.tr("Edit anyway"));
             }
         });
         if let Some(notice) = &self.notice {

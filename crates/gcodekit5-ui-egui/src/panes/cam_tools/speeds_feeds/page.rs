@@ -339,17 +339,24 @@ fn inputs(
     grid(ui, "cam-sf-options", |ui| {
         let has_coolant = params.device.as_ref().is_some_and(|d| d.has_coolant);
         ui.label(tr.tr("Coolant:"));
-        let coolant = ui.add_enabled(
-            has_coolant,
-            egui::Checkbox::new(&mut params.coolant, tr.tr("Coolant Enabled")),
-        );
+        let on = params.coolant;
+        let coolant = crate::theme::checked_scope(ui, on, |ui| {
+            ui.add_enabled(
+                has_coolant,
+                egui::Checkbox::new(&mut params.coolant, tr.tr("Coolant Enabled")),
+            )
+        });
         if !has_coolant {
             coolant.on_disabled_hover_text(tr.tr("Device does not support coolant"));
         }
         ui.end_row();
         ui.label(tr.tr("Safety Factor:"));
-        ui.checkbox(&mut params.conservative, tr.tr("Conservative Calculation"))
-            .on_hover_text(tr.tr("Reduce calculated values by 20%"));
+        crate::theme::checkbox(
+            ui,
+            &mut params.conservative,
+            tr.tr("Conservative Calculation"),
+        )
+        .on_hover_text(tr.tr("Reduce calculated values by 20%"));
         ui.end_row();
     });
     common::page_errors(ui, tr, errors);

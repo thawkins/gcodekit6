@@ -98,9 +98,9 @@ pub fn show(
             ui.label(egui::RichText::new(tr.tr("Fast Shapes")).small());
             out.gallery = ui.button(tr.tr("Shape Gallery…")).clicked();
             ui.separator();
-            ui.checkbox(&mut state.show_grid, tr.tr("Show Grid"));
-            ui.checkbox(&mut state.snap_enabled, tr.tr("Snap to grid"));
-            ui.checkbox(&mut state.show_toolpaths, tr.tr("Show Toolpaths"));
+            crate::theme::checkbox(ui, &mut state.show_grid, tr.tr("Show Grid"));
+            crate::theme::checkbox(ui, &mut state.snap_enabled, tr.tr("Snap to grid"));
+            crate::theme::checkbox(ui, &mut state.show_toolpaths, tr.tr("Show Toolpaths"));
             ui.separator();
             machine_mode(ui, state, tr);
             ui.horizontal(|ui| {

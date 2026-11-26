@@ -148,8 +148,7 @@ pub fn show(
     heading(ui, tr, n_!("Image Transformations"));
     grid(ui, "cam-bitmap-transform", |ui| {
         let name = ui.label(tr.tr(INVERT));
-        ui.checkbox(&mut params.invert, tr.tr(INVERT_HELP))
-            .labelled_by(name.id);
+        crate::theme::checkbox(ui, &mut params.invert, tr.tr(INVERT_HELP)).labelled_by(name.id);
         ui.end_row();
         check_row(ui, tr, MIRROR_X, &mut params.mirror_x);
         check_row(ui, tr, MIRROR_Y, &mut params.mirror_y);
