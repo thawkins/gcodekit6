@@ -97,6 +97,7 @@ const MSGIDS: &[&str] = &[
     n_!("Unlock"),
     n_!("Unlock from ALARM ($X)"),
     n_!("Connect to enable controls."),
+    ALARM_UNLOCK,
     COMMAND_DURING_JOB,
     WCS_CHANGE_DURING_JOB,
     GO_TO_ZERO_NOT_IDLE,
@@ -105,6 +106,18 @@ const MSGIDS: &[&str] = &[
     OVERRIDE_NOT_CONFIRMED,
     CALIBRATION_NOT_A_NUMBER,
 ];
+
+/// GTK's hint while the machine is in ALARM.
+const ALARM_UNLOCK: &str = n_!("ALARM: Unlock required.");
+
+/// Whether the latest status report says ALARM (GTK enables Unlock only then).
+fn in_alarm(status: &MachineStatus) -> bool {
+    status
+        .report
+        .as_ref()
+        .and_then(|r| r.machine_state.as_deref())
+        .is_some_and(|state| state.starts_with("Alarm"))
+}
 
 /// A work zero command refused while a job runs.
 const COMMAND_DURING_JOB: &str = n_!("Command ignored: a job is running.");
@@ -767,8 +780,9 @@ impl MachineControlPane {
             }
             let unlock = egui::Button::image_and_text(Icon::Unlock.themed(ui), tr.tr("Unlock"))
                 .min_size(egui::vec2(width, 0.0));
+            // GTK: Unlock is only useful in ALARM.
             if ui
-                .add_enabled(idle, unlock)
+                .add_enabled(idle && in_alarm(status), unlock)
                 .on_hover_text(tr.tr("Unlock from ALARM ($X)"))
                 .clicked()
             {
@@ -832,6 +846,8 @@ impl MachineControlPane {
         }
         if !status.connected {
             ui.weak(tr.tr("Connect to enable controls."));
+        } else if in_alarm(status) {
+            ui.colored_label(ui.visuals().warn_fg_color, tr.tr(ALARM_UNLOCK));
         }
         if let Some(notice) = &self.notice {
             // A controller refusal is kept in English; translated here.

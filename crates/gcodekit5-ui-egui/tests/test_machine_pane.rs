@@ -506,3 +506,40 @@ fn test_work_zero_query_runs_while_hidden() {
             .is_drawn(gcodekit5_ui_egui::workspace::PaneId::MachineControl)
     );
 }
+
+/// GTK's Unlock: enabled only in ALARM, where "ALARM: Unlock required." says why, and a click
+/// sends `$X`.
+#[test]
+fn test_unlock_only_in_alarm_and_sends_dollar_x() {
+    use egui_kittest::kittest::NodeT;
+    let (mut harness, shared) = pane_app(Duration::from_millis(1), true);
+    report_state(
+        &mut harness,
+        &shared,
+        "<Idle|MPos:0.000,0.000,0.000|FS:0,0>",
+        "Idle",
+    );
+    harness.run();
+    assert!(
+        harness
+            .get_by_label("Unlock")
+            .accesskit_node()
+            .is_disabled()
+    );
+    assert!(harness.query_by_label("ALARM: Unlock required.").is_none());
+    report_state(
+        &mut harness,
+        &shared,
+        "<Alarm|MPos:0.000,0.000,0.000|FS:0,0>",
+        "Alarm",
+    );
+    harness.run();
+    let _ = harness.get_by_label("ALARM: Unlock required.");
+    harness.get_by_label("Unlock").click();
+    harness.run();
+    assert!(
+        wait_until(|| shared.log().contains(&Wrote::Line("$X".to_string()))),
+        "{:?}",
+        shared.log()
+    );
+}
