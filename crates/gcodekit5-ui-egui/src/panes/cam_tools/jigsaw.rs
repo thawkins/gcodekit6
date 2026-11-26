@@ -286,52 +286,68 @@ impl JigsawParams {
 /// # Returns
 /// The action button pressed, if any; never Generate while the input has problems.
 pub fn show(ui: &mut egui::Ui, params: &mut JigsawParams, tr: &Translator) -> CamAction {
-    ui.label(tr.tr(DESCRIPTION));
     let errors = params.parameters().err().unwrap_or_default();
-    let unit = units::get_unit_label(params.units);
-    heading(ui, tr, n_!("Puzzle Dimensions"));
-    grid(ui, "cam-jigsaw-dimensions", |ui| {
-        field_row(ui, tr, WIDTH, &mut params.width, unit, &errors);
-        field_row(ui, tr, HEIGHT, &mut params.height, unit, &errors);
-        field_row(
-            ui,
-            tr,
-            CORNER_RADIUS,
-            &mut params.corner_radius,
-            unit,
-            &errors,
-        );
-    });
-    heading(ui, tr, n_!("Grid Configuration"));
-    grid(ui, "cam-jigsaw-grid", |ui| {
-        field_row(
-            ui,
-            tr,
-            PIECES_ACROSS,
-            &mut params.pieces_across,
-            "",
-            &errors,
-        );
-        field_row(ui, tr, PIECES_DOWN, &mut params.pieces_down, "", &errors);
-    });
-    heading(ui, tr, n_!("Puzzle Parameters"));
-    grid(ui, "cam-jigsaw-parameters", |ui| {
-        field_row(ui, tr, TAB_SIZE, &mut params.tab_size, "", &errors);
-        field_row(ui, tr, JITTER, &mut params.jitter, "", &errors);
-        field_row(ui, tr, SEED, &mut params.seed, "", &errors);
-        ui.label("");
-        if crate::icons::icon_button(ui, crate::icons::Icon::Shuffle, &tr.tr(n_!("Randomize")))
-            .clicked()
-        {
-            params.randomize_seed();
-        }
-        ui.end_row();
-    });
-    common::page_errors(ui, tr, &errors);
-    common::action_row(
+    common::cam_page(
         ui,
-        tr,
-        errors.is_empty(),
-        &[(n_!("Generate"), CamAction::SendToDesigner)],
+        common::SIDEBAR_SHARE,
+        params,
+        |ui, _| {
+            ui.label(tr.tr(DESCRIPTION));
+        },
+        |ui, params| {
+            let unit = units::get_unit_label(params.units);
+            heading(ui, tr, n_!("Puzzle Dimensions"));
+            grid(ui, "cam-jigsaw-dimensions", |ui| {
+                field_row(ui, tr, WIDTH, &mut params.width, unit, &errors);
+                field_row(ui, tr, HEIGHT, &mut params.height, unit, &errors);
+                field_row(
+                    ui,
+                    tr,
+                    CORNER_RADIUS,
+                    &mut params.corner_radius,
+                    unit,
+                    &errors,
+                );
+            });
+            heading(ui, tr, n_!("Grid Configuration"));
+            grid(ui, "cam-jigsaw-grid", |ui| {
+                field_row(
+                    ui,
+                    tr,
+                    PIECES_ACROSS,
+                    &mut params.pieces_across,
+                    "",
+                    &errors,
+                );
+                field_row(ui, tr, PIECES_DOWN, &mut params.pieces_down, "", &errors);
+            });
+            heading(ui, tr, n_!("Puzzle Parameters"));
+            grid(ui, "cam-jigsaw-parameters", |ui| {
+                field_row(ui, tr, TAB_SIZE, &mut params.tab_size, "", &errors);
+                field_row(ui, tr, JITTER, &mut params.jitter, "", &errors);
+                field_row(ui, tr, SEED, &mut params.seed, "", &errors);
+                ui.label("");
+                if crate::icons::icon_button(
+                    ui,
+                    crate::icons::Icon::Shuffle,
+                    &tr.tr(n_!("Randomize")),
+                )
+                .clicked()
+                {
+                    params.randomize_seed();
+                }
+                ui.end_row();
+            });
+            common::page_errors(ui, tr, &errors);
+            CamAction::None
+        },
+        |ui, _| {
+            common::action_row(
+                ui,
+                tr,
+                errors.is_empty(),
+                &[(n_!("Generate"), CamAction::SendToDesigner)],
+            )
+        },
     )
 }

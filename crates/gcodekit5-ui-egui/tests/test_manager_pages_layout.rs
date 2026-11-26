@@ -121,7 +121,7 @@ struct PageCase {
     primary: &'static [&'static str],
 }
 
-const CASES: [PageCase; 7] = [
+const CASES: [PageCase; 8] = [
     PageCase {
         page: Page::CamTools,
         name: "cam_tools_page_dark",
@@ -146,6 +146,12 @@ const CASES: [PageCase; 7] = [
         name: "cam_tool_probe_dark",
         select: &["Probe Tools", "Open"],
         primary: &["Back", "Generate", "Probe"],
+    },
+    PageCase {
+        page: Page::CamTools,
+        name: "cam_tool_speeds_feeds_dark",
+        select: &["Speeds and Feeds Calculator", "Open"],
+        primary: &["Back", "Calculate", "Reset"],
     },
     PageCase {
         page: Page::DeviceManager,

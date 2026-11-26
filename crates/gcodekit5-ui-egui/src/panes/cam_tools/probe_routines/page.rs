@@ -148,101 +148,113 @@ pub fn show(
     view: &ProbeView,
     tr: &Translator,
 ) -> CamAction {
-    ui.label(tr.tr(DESCRIPTION));
-    ui.horizontal(|ui| {
-        ui.label(format!(
-            "{} {}",
-            tr.tr(STATUS),
-            view.state.as_deref().unwrap_or("-")
-        ));
-        let pin = if view.probe_pin == Some(true) {
-            TRIGGERED
-        } else {
-            OPEN
-        };
-        ui.label(format!("{} {}", tr.tr(PROBE_INPUT), tr.tr(pin)));
-    });
-    if !view.connected {
-        ui.colored_label(ui.visuals().error_fg_color, tr.tr(OFFLINE));
-    }
     let errors = params.parameters().err().unwrap_or_default();
-    let unit = units::get_unit_label(params.units);
-    heading(ui, tr, n_!("Routine Selection"));
-    grid(ui, "cam-probe-routine", |ui| {
-        let kinds = RoutineKind::ALL.map(|k| (k, k.msgid()));
-        common::combo_row(
-            ui,
-            tr,
-            "cam-probe-kind",
-            ROUTINE,
-            &mut params.routine,
-            &kinds,
-        );
-    });
-    heading(ui, tr, n_!("Parameters"));
-    grid(ui, "cam-probe-params", |ui| {
-        field_row(ui, tr, SAFE_HEIGHT, &mut params.safe_height, unit, &errors);
-        field_row(ui, tr, FAST_FEED, &mut params.fast_feed, "mm/min", &errors);
-        field_row(ui, tr, SLOW_FEED, &mut params.slow_feed, "mm/min", &errors);
-        field_row(ui, tr, BACKOFF, &mut params.backoff, unit, &errors);
-        field_row(ui, tr, MAX_DEPTH, &mut params.max_depth, unit, &errors);
-        let wcs: Vec<(u8, &'static str)> = vec![
-            (54, "G54"),
-            (55, "G55"),
-            (56, "G56"),
-            (57, "G57"),
-            (58, "G58"),
-            (59, "G59"),
-        ];
-        common::combo_row(ui, tr, "cam-probe-wcs", TARGET_WCS, &mut params.wcs, &wcs);
-        check_row(ui, tr, AUTO_UPDATE, &mut params.auto_update);
-    });
-    ui.weak(tr.tr(AUTO_UPDATE_HELP));
-    heading(ui, tr, n_!("Routine Settings"));
-    grid(ui, "cam-probe-settings", |ui| {
-        routine_settings(ui, params, tr, &errors, unit);
-    });
-    if let Some(result) = &view.result {
-        heading(ui, tr, n_!("Results"));
-        ui.label(result);
-    }
-    common::page_errors(ui, tr, &errors);
-    // A field the routine does not show (one loaded from a preset) is named here.
-    let shown = shown_fields(params.routine);
-    for error in &errors {
-        if let Some(field) = error.field.filter(|f| !shown.contains(f)) {
-            let text = format!("{} {}", tr.tr(field), tr.tr(error.message));
-            ui.colored_label(ui.visuals().error_fg_color, text);
-        }
-    }
-    let valid = errors.is_empty();
-    let mut action = common::gcode_actions(ui, tr, valid);
-    ui.horizontal_wrapped(|ui| {
-        let ready = view.not_ready.is_none();
-        if ui
-            .add_enabled(valid && ready, egui::Button::new(tr.tr(PROBE)))
-            .clicked()
-        {
-            action = CamAction::Probe;
-        }
-        if ui
-            .add_enabled(view.can_apply && ready, egui::Button::new(tr.tr(APPLY)))
-            .clicked()
-        {
-            action = CamAction::ApplyWcs;
-        }
-        if view.streaming
-            && ui
-                .add(crate::theme::destructive_button(ui, tr.tr(STOP)))
-                .clicked()
-        {
-            action = CamAction::StopProbe;
-        }
-        if let Some(reason) = &view.not_ready {
-            ui.weak(reason);
-        }
-    });
-    action
+    common::cam_page(
+        ui,
+        common::SIDEBAR_SHARE,
+        params,
+        |ui, _| {
+            ui.label(tr.tr(DESCRIPTION));
+        },
+        |ui, params| {
+            ui.horizontal(|ui| {
+                ui.label(format!(
+                    "{} {}",
+                    tr.tr(STATUS),
+                    view.state.as_deref().unwrap_or("-")
+                ));
+                let pin = if view.probe_pin == Some(true) {
+                    TRIGGERED
+                } else {
+                    OPEN
+                };
+                ui.label(format!("{} {}", tr.tr(PROBE_INPUT), tr.tr(pin)));
+            });
+            if !view.connected {
+                ui.colored_label(ui.visuals().error_fg_color, tr.tr(OFFLINE));
+            }
+            let unit = units::get_unit_label(params.units);
+            heading(ui, tr, n_!("Routine Selection"));
+            grid(ui, "cam-probe-routine", |ui| {
+                let kinds = RoutineKind::ALL.map(|k| (k, k.msgid()));
+                common::combo_row(
+                    ui,
+                    tr,
+                    "cam-probe-kind",
+                    ROUTINE,
+                    &mut params.routine,
+                    &kinds,
+                );
+            });
+            heading(ui, tr, n_!("Parameters"));
+            grid(ui, "cam-probe-params", |ui| {
+                field_row(ui, tr, SAFE_HEIGHT, &mut params.safe_height, unit, &errors);
+                field_row(ui, tr, FAST_FEED, &mut params.fast_feed, "mm/min", &errors);
+                field_row(ui, tr, SLOW_FEED, &mut params.slow_feed, "mm/min", &errors);
+                field_row(ui, tr, BACKOFF, &mut params.backoff, unit, &errors);
+                field_row(ui, tr, MAX_DEPTH, &mut params.max_depth, unit, &errors);
+                let wcs: Vec<(u8, &'static str)> = vec![
+                    (54, "G54"),
+                    (55, "G55"),
+                    (56, "G56"),
+                    (57, "G57"),
+                    (58, "G58"),
+                    (59, "G59"),
+                ];
+                common::combo_row(ui, tr, "cam-probe-wcs", TARGET_WCS, &mut params.wcs, &wcs);
+                check_row(ui, tr, AUTO_UPDATE, &mut params.auto_update);
+            });
+            ui.weak(tr.tr(AUTO_UPDATE_HELP));
+            heading(ui, tr, n_!("Routine Settings"));
+            grid(ui, "cam-probe-settings", |ui| {
+                routine_settings(ui, params, tr, &errors, unit);
+            });
+            if let Some(result) = &view.result {
+                heading(ui, tr, n_!("Results"));
+                ui.label(result);
+            }
+            common::page_errors(ui, tr, &errors);
+            // A field the routine does not show (one loaded from a preset) is named here.
+            let shown = shown_fields(params.routine);
+            for error in &errors {
+                if let Some(field) = error.field.filter(|f| !shown.contains(f)) {
+                    let text = format!("{} {}", tr.tr(field), tr.tr(error.message));
+                    ui.colored_label(ui.visuals().error_fg_color, text);
+                }
+            }
+            CamAction::None
+        },
+        |ui, _| {
+            let valid = errors.is_empty();
+            let mut action = common::gcode_actions(ui, tr, valid);
+            ui.horizontal_wrapped(|ui| {
+                let ready = view.not_ready.is_none();
+                if ui
+                    .add_enabled(valid && ready, egui::Button::new(tr.tr(PROBE)))
+                    .clicked()
+                {
+                    action = CamAction::Probe;
+                }
+                if ui
+                    .add_enabled(view.can_apply && ready, egui::Button::new(tr.tr(APPLY)))
+                    .clicked()
+                {
+                    action = CamAction::ApplyWcs;
+                }
+                if view.streaming
+                    && ui
+                        .add(crate::theme::destructive_button(ui, tr.tr(STOP)))
+                        .clicked()
+                {
+                    action = CamAction::StopProbe;
+                }
+                if let Some(reason) = &view.not_ready {
+                    ui.weak(reason);
+                }
+            });
+            action
+        },
+    )
 }
 
 /// The rows of the settings the chosen routine uses (GTK's visibility rules).

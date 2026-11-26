@@ -307,56 +307,66 @@ impl DrillPressParams {
 /// # Returns
 /// The action button pressed, if any; never one while the input has problems.
 pub fn show(ui: &mut egui::Ui, params: &mut DrillPressParams, tr: &Translator) -> CamAction {
-    ui.label(tr.tr(DESCRIPTION));
     let errors = params.parameters().err().unwrap_or_default();
-    let unit = units::get_unit_label(params.units);
-    heading(ui, tr, n_!("Hole Geometry"));
-    grid(ui, "cam-drill-hole", |ui| {
-        field_row(
-            ui,
-            tr,
-            HOLE_DIAMETER,
-            &mut params.hole_diameter,
-            unit,
-            &errors,
-        );
-        field_row(
-            ui,
-            tr,
-            TOOL_DIAMETER,
-            &mut params.tool_diameter,
-            unit,
-            &errors,
-        );
-        field_row(ui, tr, CENTER_X, &mut params.x, unit, &errors);
-        field_row(ui, tr, CENTER_Y, &mut params.y, unit, &errors);
-    });
-    heading(ui, tr, n_!("Depth and Pecking"));
-    grid(ui, "cam-drill-depth", |ui| {
-        field_row(ui, tr, TOP_Z, &mut params.top_z, unit, &errors);
-        field_row(ui, tr, BOTTOM_Z, &mut params.bottom_z, unit, &errors);
-        field_row(ui, tr, PECK_DEPTH, &mut params.peck_depth, unit, &errors);
-    });
-    heading(ui, tr, n_!("Machine Settings"));
-    grid(ui, "cam-drill-machine", |ui| {
-        field_row(ui, tr, PLUNGE_RATE, &mut params.plunge_rate, "", &errors);
-        field_row(ui, tr, FEED_RATE, &mut params.feed_rate, "", &errors);
-        field_row(
-            ui,
-            tr,
-            SPINDLE_SPEED,
-            &mut params.spindle_speed,
-            "",
-            &errors,
-        );
-        field_row(ui, tr, SAFE_Z, &mut params.safe_z, unit, &errors);
-        common::check_row(
-            ui,
-            tr,
-            n_!("Home Device Before Start"),
-            &mut params.home_before,
-        );
-    });
-    common::page_errors(ui, tr, &errors);
-    common::gcode_actions(ui, tr, errors.is_empty())
+    common::cam_page(
+        ui,
+        common::SIDEBAR_SHARE,
+        params,
+        |ui, _| {
+            ui.label(tr.tr(DESCRIPTION));
+        },
+        |ui, params| {
+            let unit = units::get_unit_label(params.units);
+            heading(ui, tr, n_!("Hole Geometry"));
+            grid(ui, "cam-drill-hole", |ui| {
+                field_row(
+                    ui,
+                    tr,
+                    HOLE_DIAMETER,
+                    &mut params.hole_diameter,
+                    unit,
+                    &errors,
+                );
+                field_row(
+                    ui,
+                    tr,
+                    TOOL_DIAMETER,
+                    &mut params.tool_diameter,
+                    unit,
+                    &errors,
+                );
+                field_row(ui, tr, CENTER_X, &mut params.x, unit, &errors);
+                field_row(ui, tr, CENTER_Y, &mut params.y, unit, &errors);
+            });
+            heading(ui, tr, n_!("Depth and Pecking"));
+            grid(ui, "cam-drill-depth", |ui| {
+                field_row(ui, tr, TOP_Z, &mut params.top_z, unit, &errors);
+                field_row(ui, tr, BOTTOM_Z, &mut params.bottom_z, unit, &errors);
+                field_row(ui, tr, PECK_DEPTH, &mut params.peck_depth, unit, &errors);
+            });
+            heading(ui, tr, n_!("Machine Settings"));
+            grid(ui, "cam-drill-machine", |ui| {
+                field_row(ui, tr, PLUNGE_RATE, &mut params.plunge_rate, "", &errors);
+                field_row(ui, tr, FEED_RATE, &mut params.feed_rate, "", &errors);
+                field_row(
+                    ui,
+                    tr,
+                    SPINDLE_SPEED,
+                    &mut params.spindle_speed,
+                    "",
+                    &errors,
+                );
+                field_row(ui, tr, SAFE_Z, &mut params.safe_z, unit, &errors);
+                common::check_row(
+                    ui,
+                    tr,
+                    n_!("Home Device Before Start"),
+                    &mut params.home_before,
+                );
+            });
+            common::page_errors(ui, tr, &errors);
+            CamAction::None
+        },
+        |ui, _| common::gcode_actions(ui, tr, errors.is_empty()),
+    )
 }

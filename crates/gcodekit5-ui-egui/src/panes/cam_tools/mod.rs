@@ -556,19 +556,24 @@ impl CamToolsPane {
             }
         });
         ui.separator();
+        // The page lays itself out (`common::cam_page`): sidebar | form over the actions.
+        let action = self.show_page(ui, tool, tr, machine);
+        self.act(tool, action, tr, machine);
+        // The pane's own items go under the page's sidebar text.
+        let Some(rest) = ui.data(|d| d.get_temp::<egui::Rect>(common::sidebar_rest_id())) else {
+            return;
+        };
+        let layout = egui::Layout::top_down(egui::Align::Min);
+        let mut side = ui.new_child(egui::UiBuilder::new().max_rect(rest).layout(layout));
         egui::ScrollArea::vertical()
-            .id_salt("cam-tool-page")
+            .id_salt("cam-tool-sidebar")
             .auto_shrink([false, false])
-            .show(ui, |ui| {
+            .show(&mut side, |ui| {
                 if tool == CamTool::BitmapEngraving {
                     self.show_bitmap_progress(ui, tr);
                 }
-                let action = self.show_page(ui, tool, tr, machine);
-                self.act(tool, action, tr, machine);
                 if let Some(gcode) = self.output() {
                     let mut text = gcode;
-                    ui.add_space(8.0);
-                    ui.add_space(4.0);
                     let name = crate::theme::section_heading(ui, &tr.tr("Generated G-Code"));
                     ui.add(
                         egui::TextEdit::multiline(&mut text)

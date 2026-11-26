@@ -224,44 +224,54 @@ impl SpoilboardGridParams {
 /// # Returns
 /// The action button pressed, if any; never one while the input has problems.
 pub fn show(ui: &mut egui::Ui, params: &mut SpoilboardGridParams, tr: &Translator) -> CamAction {
-    ui.label(tr.tr(DESCRIPTION));
     let errors = params.parameters().err().unwrap_or_default();
-    let unit = units::get_unit_label(params.units);
-    heading(ui, tr, n_!("Spoilboard Dimensions"));
-    grid(ui, "cam-grid-dimensions", |ui| {
-        field_row(ui, tr, WIDTH, &mut params.width, unit, &errors);
-        field_row(ui, tr, HEIGHT, &mut params.height, unit, &errors);
-        field_row(
-            ui,
-            tr,
-            GRID_SPACING,
-            &mut params.grid_spacing,
-            unit,
-            &errors,
-        );
-    });
-    heading(ui, tr, n_!("Laser Settings"));
-    grid(ui, "cam-grid-laser", |ui| {
-        field_row(ui, tr, LASER_POWER, &mut params.laser_power, "", &errors);
-        field_row(ui, tr, FEED_RATE, &mut params.feed_rate, "", &errors);
-        let name = ui.label(tr.tr(LASER_MODE));
-        egui::ComboBox::from_id_salt("cam-grid-laser-mode")
-            .selected_text(tr.tr(params.laser_mode.msgid()))
-            .show_ui(ui, |ui| {
-                for mode in [LaserMode::M3, LaserMode::M4] {
-                    ui.selectable_value(&mut params.laser_mode, mode, tr.tr(mode.msgid()));
-                }
-            })
-            .response
-            .labelled_by(name.id);
-        ui.end_row();
-        common::check_row(
-            ui,
-            tr,
-            n_!("Home Device Before Start"),
-            &mut params.home_before,
-        );
-    });
-    common::page_errors(ui, tr, &errors);
-    common::gcode_actions(ui, tr, errors.is_empty())
+    common::cam_page(
+        ui,
+        common::SIDEBAR_SHARE,
+        params,
+        |ui, _| {
+            ui.label(tr.tr(DESCRIPTION));
+        },
+        |ui, params| {
+            let unit = units::get_unit_label(params.units);
+            heading(ui, tr, n_!("Spoilboard Dimensions"));
+            grid(ui, "cam-grid-dimensions", |ui| {
+                field_row(ui, tr, WIDTH, &mut params.width, unit, &errors);
+                field_row(ui, tr, HEIGHT, &mut params.height, unit, &errors);
+                field_row(
+                    ui,
+                    tr,
+                    GRID_SPACING,
+                    &mut params.grid_spacing,
+                    unit,
+                    &errors,
+                );
+            });
+            heading(ui, tr, n_!("Laser Settings"));
+            grid(ui, "cam-grid-laser", |ui| {
+                field_row(ui, tr, LASER_POWER, &mut params.laser_power, "", &errors);
+                field_row(ui, tr, FEED_RATE, &mut params.feed_rate, "", &errors);
+                let name = ui.label(tr.tr(LASER_MODE));
+                egui::ComboBox::from_id_salt("cam-grid-laser-mode")
+                    .selected_text(tr.tr(params.laser_mode.msgid()))
+                    .show_ui(ui, |ui| {
+                        for mode in [LaserMode::M3, LaserMode::M4] {
+                            ui.selectable_value(&mut params.laser_mode, mode, tr.tr(mode.msgid()));
+                        }
+                    })
+                    .response
+                    .labelled_by(name.id);
+                ui.end_row();
+                common::check_row(
+                    ui,
+                    tr,
+                    n_!("Home Device Before Start"),
+                    &mut params.home_before,
+                );
+            });
+            common::page_errors(ui, tr, &errors);
+            CamAction::None
+        },
+        |ui, _| common::gcode_actions(ui, tr, errors.is_empty()),
+    )
 }

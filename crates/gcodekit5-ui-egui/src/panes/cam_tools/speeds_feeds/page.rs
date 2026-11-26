@@ -270,23 +270,33 @@ fn show_picker(ui: &mut egui::Ui, params: &mut SpeedsFeedsParams, tr: &Translato
 /// [`CamAction::Generate`] when Calculate is pressed (never while the input has problems).
 pub fn show(ui: &mut egui::Ui, params: &mut SpeedsFeedsParams, tr: &Translator) -> CamAction {
     let errors = params.input().err().unwrap_or_default();
-    let mut action = CamAction::None;
-    // GTK's layout: the results beside the input.
-    ui.columns(2, |columns| {
-        results(&mut columns[0], params, tr);
-        action = inputs(&mut columns[1], params, tr, &errors);
-    });
+    // GTK's layout: the results in the sidebar (35%), the input beside them, Calculate
+    // and Reset at the bottom right.
+    let action = common::cam_page(
+        ui,
+        SIDEBAR_SHARE,
+        params,
+        |ui, params| results(ui, params, tr),
+        |ui, params| {
+            inputs(ui, params, tr, &errors);
+            CamAction::None
+        },
+        |ui, params| buttons(ui, params, tr, &errors),
+    );
     show_picker(ui, params, tr);
     action
 }
 
-/// The selections, operation, cutting parameters, options and Calculate / Reset.
+/// Share of the width the results take (GTK's paned starts at 35%).
+const SIDEBAR_SHARE: f32 = 0.35;
+
+/// The selections, operation, cutting parameters and options.
 fn inputs(
     ui: &mut egui::Ui,
     params: &mut SpeedsFeedsParams,
     tr: &Translator,
     errors: &[FieldError],
-) -> CamAction {
+) {
     heading(ui, tr, n_!("Selections"));
     let mut open = None;
     grid(ui, "cam-sf-selection", |ui| {
@@ -360,6 +370,15 @@ fn inputs(
         ui.end_row();
     });
     common::page_errors(ui, tr, errors);
+}
+
+/// Calculate and Reset.
+fn buttons(
+    ui: &mut egui::Ui,
+    params: &mut SpeedsFeedsParams,
+    tr: &Translator,
+    errors: &[FieldError],
+) -> CamAction {
     let mut action = CamAction::None;
     ui.add_space(8.0);
     ui.horizontal(|ui| {
