@@ -1,3 +1,28 @@
+## [Unreleased] - 2026-11-26 (egui + craft-libs migration, milestone M5: managers and help)
+
+### Added
+- **Firmware Settings (egui)**: read, filter and write `$` settings (GRBL family) and Repetier EEPROM values; typed values are checked before sending (classic GRBL byte settings 0-255, no negatives, Repetier type ranges); every write is read back and a different stored value is reported as "Setting stored with another value"; rows not yet read from the controller cannot be edited
+- **Device Info (egui)**: firmware, version, options and build info parsed from `$I`/banner replies
+- **Device Manager (egui)**: edits `devices.json` (same file as GTK) with an active profile always set; retrieved settings go only to the profile on the connected port; a timestamped backup is kept before replacing the file; unsaved edits join the quit prompt
+- **Tools and Materials managers (egui)**: use `custom_tools.json` / `custom_materials.json`; filters persist; unsaved edits join the quit prompt; tool lengths show 3 decimals
+- **Help browser (egui)**: opens with F1 or Help > Documentation and from the Help buttons; help files are embedded in the app
+
+### Changed
+- grblHAL and FluidNC device profiles can be saved (GTK and egui)
+- The byte rule for GRBL mask settings applies to classic GRBL only; a reported value above 255 or with a fraction lifts it on any firmware
+- Device identity parsing accepts grblHAL/FluidNC firmware names and option strings
+- Help resources moved to `crates/gcodekit5-ui-egui/resources/`; GTK reads them from there; `dirll_press.md` renamed to `drill_press.md`
+- `write_atomic` moved to `gcodekit5-core`, syncs to disk, refuses read-only targets and removes its temp file on failure; `devices.json` is saved through it
+
+### Fixed
+- **Probe safety**: after an `error:` the soft reset waits for a fresh `Hold:0` or alarm (up to about 10 s) instead of acting on a stale Idle report; the backstop is checked every frame
+- **Streaming**: the lost-reply timeout adapts (2 s floor, 10 s cap); a soft reset ends a running stream
+- Tool form refuses NaN, infinite, zero and negative lengths
+
+### Known gaps
+- Not run against the grblHAL simulator; Windows saves untested on Windows
+- New translations need checking by native speakers
+
 ## [Unreleased] - 2026-11-26 (egui + craft-libs migration, milestone M4: designer and CAM tools)
 
 ### Added
