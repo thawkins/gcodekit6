@@ -308,7 +308,7 @@ fn test_console_logs_the_end_of_a_job() {
         &[
             progress.clone(),
             MachineEvent::StreamFinished { lines: 2 },
-            received("[MSG:Program End]"),
+            received("[MSG:Pgm End]"),
         ],
         &tr,
     );
@@ -316,7 +316,7 @@ fn test_console_logs_the_end_of_a_job() {
         pane.lines(),
         vec![
             "Job Completed".to_string(),
-            "[MSG:Program End]".to_string(),
+            "[MSG:Pgm End]".to_string(),
             "\u{2705} Work completed in: 0:00".to_string(),
         ]
     );
@@ -363,5 +363,51 @@ fn test_console_clear_empties_the_log() {
     assert!(
         harness.query_by_label("Error: ALARM:1").is_none(),
         "log cleared"
+    );
+}
+
+/// GRBL 1.1 and grblHAL report M2/M30 as `[MSG:Pgm End]`; GTK's `Program End` is matched
+/// too. A line typed after the job forgets its start; a realtime byte does not.
+#[test]
+fn test_console_program_end_lines_and_a_later_manual_m2() {
+    use gcodekit5_ui_egui::panes::console::is_program_end;
+    assert!(is_program_end("[MSG:Pgm End]"));
+    assert!(is_program_end("[MSG:Program End]"));
+    assert!(!is_program_end("ok"));
+    let (mut pane, tr) = console();
+    let progress = MachineEvent::StreamProgress {
+        sent: 1,
+        acked: 0,
+        total: 1,
+    };
+    pane.apply(
+        &[
+            progress.clone(),
+            MachineEvent::StreamFinished { lines: 1 },
+            MachineEvent::Sent("0x21 (Feed Hold)".to_string()),
+            received("[MSG:Pgm End]"),
+        ],
+        &tr,
+    );
+    assert!(
+        pane.lines()
+            .last()
+            .is_some_and(|l| l.contains("Work completed in:")),
+        "a realtime byte keeps the job: {:?}",
+        pane.lines()
+    );
+    pane.apply(
+        &[
+            progress,
+            MachineEvent::StreamFinished { lines: 1 },
+            MachineEvent::Sent("M2".to_string()),
+            received("[MSG:Pgm End]"),
+        ],
+        &tr,
+    );
+    assert_eq!(
+        pane.lines().last().map(String::as_str),
+        Some("[MSG:Pgm End]"),
+        "a typed M2 after the job reports no stale time"
     );
 }

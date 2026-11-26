@@ -19,7 +19,9 @@
 //! and Help. As GTK, the end of a job is logged: "Job Completed" when every line is
 //! acknowledged, "Job stopped:" with the lines done when it ends early, and "Work completed
 //! in: m:ss" (from the job's start) when the controller reports the program's end
-//! (`[MSG:Program End]`, from M2 or M30).
+//! (GRBL 1.1 and grblHAL send `[MSG:Pgm End]` for M2 or M30; `Program End` is matched too).
+//! A command typed after the job (not a realtime byte) forgets its start, so an M2 sent by
+//! hand later reports no stale time.
 //!
 //! Ported from the GTK `ui/gtk/device_console.rs` view. Not ported: the `ok` pairing of the
 //! GTK listener (acknowledgements are not events here).
@@ -68,6 +70,15 @@ const JOB_COMPLETED: &str = n_!("Job Completed");
 const JOB_STOPPED: &str = n_!("Job stopped:");
 /// GTK's log prefix when the controller reports the program's end; `m:ss` follows.
 const WORK_COMPLETED: &str = n_!("\u{2705} Work completed in:");
+
+/// Whether `line` is the controller's report that the program ended (M2/M30): GRBL 1.1 and
+/// grblHAL send `[MSG:Pgm End]`; `Program End` is what GTK matched.
+///
+/// # Arguments
+/// * `line` - A received line.
+pub fn is_program_end(line: &str) -> bool {
+    line.contains("Pgm End") || line.contains("Program End")
+}
 
 /// `elapsed` as GTK's `m:ss`.
 ///
@@ -174,7 +185,14 @@ impl ConsolePane {
                     MessageLevel::Error,
                     format!("{}: {}", tr.tr("Error"), worker_message(message, tr)),
                 ),
-                MachineEvent::Sent(line) => self.log.add_command(line),
+                MachineEvent::Sent(line) => {
+                    // A manual line after the job ends it: its program end is not the job's.
+                    // Realtime bytes (`0x..`, a feed hold or resume) leave the job running.
+                    if !self.streaming && !line.starts_with("0x") {
+                        self.job_started = None;
+                    }
+                    self.log.add_command(line);
+                }
                 MachineEvent::StreamHalted { reason } => self.log.add_message(
                     MessageLevel::Error,
                     format!("{}: {}", tr.tr(PROGRAM_HALTED), worker_message(reason, tr)),
@@ -184,7 +202,7 @@ impl ConsolePane {
                     if !line.is_empty() && !is_status_report(line) {
                         self.log.add_message(received_level(line), line);
                     }
-                    if line.contains("Program End")
+                    if is_program_end(line)
                         && let Some(started) = self.job_started.take()
                     {
                         self.log.add_message(

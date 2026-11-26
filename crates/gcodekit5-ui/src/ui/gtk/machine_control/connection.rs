@@ -555,7 +555,7 @@ impl MachineControlView {
         comm: &mut SerialCommunicator,
         firmware_detected: &mut bool,
     ) {
-        if line.contains("Program End") {
+        if line.contains("Pgm End") || line.contains("Program End") {
             let elapsed = self
                 .job_start_time
                 .lock()
