@@ -639,7 +639,9 @@ impl MachineControlPane {
             | Command::AlignTop
             | Command::AlignBottom
             | Command::AlignCenterX
-            | Command::AlignCenterY => return false,
+            | Command::AlignCenterY
+            | Command::Group
+            | Command::Ungroup => return false,
         }
         true
     }

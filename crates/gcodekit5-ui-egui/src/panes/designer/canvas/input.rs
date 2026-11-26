@@ -14,8 +14,8 @@
 //!   Escape cancels a polyline or deselects. A text field elsewhere owns the keyboard
 //!   instead, so these never fire while typing.
 //! - Right-click with a selection: GTK's context menu with Cut, Copy, Paste, Delete, Mirror
-//!   on X / Y, Array... (the pane opens the Array dialog), Rotate, Align and the boolean
-//!   operations (Union, Diff, Inter); with only a
+//!   on X / Y, Array... (the pane opens the Array dialog), Rotate, Align, Group / Ungroup
+//!   (also Ctrl+G / Ctrl+Shift+G) and the boolean operations (Union, Diff, Inter); with only a
 //!   clipboard, Paste. Cut, Copy and Paste use the design's own clipboard
 //!   (`DesignerState::clipboard`), as GTK did, not the system clipboard; Paste centres the
 //!   copies on the point right-clicked. Align also has GTK's Alt keys,
@@ -556,6 +556,8 @@ pub fn msgids() -> Vec<&'static str> {
         n_!("Copy"),
         n_!("Paste"),
         n_!("Delete"),
+        n_!("Group"),
+        n_!("Ungroup"),
         n_!("Mirror on X"),
         n_!("Mirror on Y"),
         n_!("Rotate"),
@@ -569,7 +571,8 @@ pub fn msgids() -> Vec<&'static str> {
 }
 
 /// The right-click menu, in GTK's order: Cut, Copy, Paste (while the clipboard holds
-/// shapes), Delete, for two shapes or more Union, Diff and Inter, Mirror on X and Y, Array..., Rotate by a fixed angle and, for two
+/// shapes), Delete, Group and Ungroup (when the selection can be), for two shapes or more
+/// Union, Diff and Inter, Mirror on X and Y, Array..., Rotate by a fixed angle and, for two
 /// shapes or more, Align. Without a selection only Paste is offered. Each edit is one undo
 /// step.
 ///
@@ -605,6 +608,19 @@ fn context_menu(
         ui.close();
     }
     ui.separator();
+    let can_group = state.can_group();
+    let can_ungroup = state.can_ungroup();
+    if can_group && ui.button(tr.tr("Group")).clicked() {
+        state.group_selected();
+        ui.close();
+    }
+    if can_ungroup && ui.button(tr.tr("Ungroup")).clicked() {
+        state.ungroup_selected();
+        ui.close();
+    }
+    if can_group || can_ungroup {
+        ui.separator();
+    }
     // GTK offers the boolean operations for two shapes or more.
     if state.can_perform_boolean_op() {
         for (label, op) in BOOLEANS {

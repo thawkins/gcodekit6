@@ -1022,7 +1022,9 @@ impl GcodeKitApp {
             | Command::AlignTop
             | Command::AlignBottom
             | Command::AlignCenterX
-            | Command::AlignCenterY => {
+            | Command::AlignCenterY
+            | Command::Group
+            | Command::Ungroup => {
                 if !self.route_to_active_designer(cmd) {
                     tracing::debug!(?cmd, "no design to edit");
                 }

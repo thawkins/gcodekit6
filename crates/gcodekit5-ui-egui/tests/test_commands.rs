@@ -329,7 +329,7 @@ const PAGE_CONTROLS: &[(Command, Page, &str)] = &[
 ];
 
 /// The designer shape commands, with the label of their entry in the canvas context menu
-/// (GTK's menus had none of them): the Align submenu's entries.
+/// (GTK's menus had none of them): the Align submenu's entries, Group and Ungroup.
 const DESIGNER_MENU: &[(Command, &str)] = &[
     (Command::AlignLeft, "Align Left"),
     (Command::AlignRight, "Align Right"),
@@ -337,6 +337,8 @@ const DESIGNER_MENU: &[(Command, &str)] = &[
     (Command::AlignBottom, "Align Bottom"),
     (Command::AlignCenterX, "Align Center X"),
     (Command::AlignCenterY, "Align Center Y"),
+    (Command::Group, "Group"),
+    (Command::Ungroup, "Ungroup"),
 ];
 
 /// The menus hold every command but those with a page control ([`PAGE_CONTROLS`]), those a
@@ -433,8 +435,9 @@ fn test_every_command_is_reachable() {
     }
 }
 
-/// Whether the designer's context menu, opened over two selected squares, has `label` (in
-/// its Align submenu when the label starts with "Align "). Closes the menu again.
+/// Whether the designer's context menu, opened over two selected squares (grouped for
+/// "Ungroup"), has `label` (in its Align submenu when the label starts with "Align ").
+/// Closes the menu again.
 fn designer_menu_has(h: &mut Harness<'static, GcodeKitApp>, label: &str) -> bool {
     use egui_kittest::kittest::Queryable;
     use gcodekit5_designer::model::{DesignRectangle, Shape};
@@ -450,7 +453,15 @@ fn designer_menu_has(h: &mut Harness<'static, GcodeKitApp>, label: &str) -> bool
         }
     }
     designer.borrow_mut().state_mut().select_all();
+    // Group is offered for an ungrouped selection, Ungroup for a grouped one.
+    if label == "Ungroup" {
+        designer.borrow_mut().state_mut().group_selected();
+    } else {
+        designer.borrow_mut().state_mut().ungroup_selected();
+    }
     h.run_steps(2);
+    // The Layers pane has Group and Ungroup buttons too: the menu adds one more.
+    let before = h.query_all_by_label(label).count();
     let p = designer
         .borrow()
         .view()
@@ -465,7 +476,7 @@ fn designer_menu_has(h: &mut Harness<'static, GcodeKitApp>, label: &str) -> bool
         h.get_by_label("Align").click();
         h.run();
     }
-    let found = h.query_by_label(label).is_some();
+    let found = h.query_all_by_label(label).count() > before;
     h.key_press(egui::Key::Escape);
     h.run();
     found

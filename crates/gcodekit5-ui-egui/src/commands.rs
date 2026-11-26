@@ -7,8 +7,9 @@
 //! overrides under, so they must not change once released.
 //!
 //! Most bindings work anywhere in the window; the visualizer's view keys work only while the
-//! Visualizer has the keyboard, and the designer's shape keys (GTK's Alt+L/R/T/B/H/V align)
-//! only while the Designer canvas has it, never while a text field does. The jog keys are GTK's numeric keypad digits (8/2 Y+/Y-, 4/6
+//! Visualizer has the keyboard, and the designer's shape keys (GTK's Alt+L/R/T/B/H/V align,
+//! Ctrl+G group and Ctrl+Shift+G ungroup) only while the Designer canvas has it, never while
+//! a text field does. GTK's other ungroup key, Ctrl+U, stays Unlock everywhere. The jog keys are GTK's numeric keypad digits (8/2 Y+/Y-, 4/6
 //! X-/X+, 9/3 Z+/Z-), bound in the Machine Control scope only: they run only after the user
 //! pressed in that pane, never while a widget (a text field, an open dropdown) has the
 //! keyboard. egui reports the keypad digits as the top-row digits, so those jog too, as they
@@ -146,6 +147,10 @@ pub enum Command {
     AlignCenterX,
     /// Align the designer selection on its vertical centre.
     AlignCenterY,
+    /// Group the designer selection.
+    Group,
+    /// Ungroup the designer selection.
+    Ungroup,
 }
 
 /// Where a default binding works.
@@ -167,7 +172,7 @@ struct Spec {
 
 impl Command {
     /// Every command, in menu order.
-    pub const ALL: [Command; 53] = [
+    pub const ALL: [Command; 55] = [
         Command::FileNew,
         Command::FileNew3d,
         Command::FileOpen,
@@ -221,6 +226,8 @@ impl Command {
         Command::AlignBottom,
         Command::AlignCenterX,
         Command::AlignCenterY,
+        Command::Group,
+        Command::Ungroup,
     ];
 
     /// The command's catalog entry.
@@ -324,6 +331,8 @@ impl Command {
                 DES,
                 &["Alt+V"],
             ),
+            Command::Group => ("designer.group", n_!("Group"), DES, &["Cmd+G"]),
+            Command::Ungroup => ("designer.ungroup", n_!("Ungroup"), DES, &["Cmd+Shift+G"]),
         };
         Spec {
             id,
@@ -370,6 +379,8 @@ impl Command {
                 | Command::AlignBottom
                 | Command::AlignCenterX
                 | Command::AlignCenterY
+                | Command::Group
+                | Command::Ungroup
         )
     }
 

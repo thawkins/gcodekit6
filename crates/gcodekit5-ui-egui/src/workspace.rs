@@ -232,7 +232,9 @@ impl Page {
             | Command::AlignTop
             | Command::AlignBottom
             | Command::AlignCenterX
-            | Command::AlignCenterY => None,
+            | Command::AlignCenterY
+            | Command::Group
+            | Command::Ungroup => None,
         }
     }
 }

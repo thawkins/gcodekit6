@@ -358,3 +358,70 @@ fn test_boolean_ops_need_two_shapes() {
         assert!(h.query_by_label(item).is_none(), "{item}");
     }
 }
+
+/// The group id of each shape of `designer`, in draw order.
+fn groups(designer: &DesignerPane) -> Vec<Option<u64>> {
+    ids(designer)
+        .into_iter()
+        .map(|id| {
+            designer
+                .state()
+                .canvas
+                .get_shape(id)
+                .and_then(|o| o.group_id)
+        })
+        .collect()
+}
+
+#[test]
+fn test_group_and_ungroup_keys_run_on_the_canvas_but_not_while_typing() {
+    let (mut h, designer) = app_with_two_selected();
+    // GTK's Ctrl+G groups the selection, Ctrl+Shift+G ungroups it, one undo step each.
+    h.key_press_modifiers(Modifiers::COMMAND, egui::Key::G);
+    h.run();
+    let grouped = groups(&designer.borrow());
+    assert!(
+        grouped[0].is_some() && grouped[0] == grouped[1],
+        "{grouped:?}"
+    );
+    h.key_press_modifiers(Modifiers::COMMAND | Modifiers::SHIFT, egui::Key::G);
+    h.run();
+    assert_eq!(groups(&designer.borrow()), vec![None, None]);
+    h.key_press_modifiers(Modifiers::COMMAND, egui::Key::Z);
+    h.run();
+    assert_eq!(groups(&designer.borrow()), grouped, "undo regroups");
+    h.key_press_modifiers(Modifiers::COMMAND, egui::Key::Z);
+    h.run();
+    assert_eq!(
+        groups(&designer.borrow()),
+        vec![None, None],
+        "undo ungroups"
+    );
+    // A text field owns the keyboard: Ctrl+G groups nothing.
+    let field = h.get_by_role_and_label(egui::accesskit::Role::TextInput, "X:");
+    field.focus();
+    h.run();
+    h.key_press_modifiers(Modifiers::COMMAND, egui::Key::G);
+    h.run();
+    assert_eq!(groups(&designer.borrow()), vec![None, None]);
+}
+
+#[test]
+fn test_group_and_ungroup_from_context_menu() {
+    let mut h = harness(pane_with_rects(&[
+        (0.0, 0.0, 10.0, 10.0),
+        (30.0, 0.0, 10.0, 10.0),
+    ]));
+    menu_item(&mut h, 5.0, 5.0, "Group");
+    let grouped = groups(h.state());
+    assert!(
+        grouped[0].is_some() && grouped[0] == grouped[1],
+        "{grouped:?}"
+    );
+    // A grouped selection offers Ungroup, not Group.
+    open_menu_with_all_selected(&mut h, 5.0, 5.0);
+    assert!(h.query_by_label("Group").is_none());
+    h.get_by_label("Ungroup").click();
+    h.run();
+    assert_eq!(groups(h.state()), vec![None, None]);
+}

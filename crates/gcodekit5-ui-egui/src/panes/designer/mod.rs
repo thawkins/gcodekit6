@@ -607,6 +607,8 @@ impl Pane for DesignerPane {
             Command::AlignBottom => self.state.align_selected_vertical_bottom(),
             Command::AlignCenterX => self.state.align_selected_horizontal_center(),
             Command::AlignCenterY => self.state.align_selected_vertical_center(),
+            Command::Group => self.state.group_selected(),
+            Command::Ungroup => self.state.ungroup_selected(),
             Command::FileNew
             | Command::FileNew3d
             | Command::FileOpen
