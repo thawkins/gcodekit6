@@ -1,4 +1,6 @@
-## [Unreleased] - 2026-11-27 (release workflow dry-run fixes)
+## [2.0.0-alpha.2] - 2026-11-27
+
+Republishes 2.0.0-alpha.1 with a working release workflow. The application is unchanged from 2.0.0-alpha.1; the v2.0.0-alpha.1 tag has no published release.
 
 ### Fixed
 - **Release publishing**: the release steps use the workflow's own token (`contents: write`) when no `RELEASE` secret is set; the v2.0.0-alpha.1 tag run built every installer but could not publish, because this repository has no `RELEASE` secret

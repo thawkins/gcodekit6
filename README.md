@@ -623,11 +623,14 @@ You may choose either license for your use of this software.
 
 ## Project Status
 
-  - **Current Version**: 2.0.0-alpha.1
+  - **Current Version**: 2.0.0-alpha.2
   - **Status**: Active Development
   - **Stability**: Alpha
 
 ## Updates
+
+### Recent Updates (2.0.0-alpha.2) - Release workflow fixed (2026-11-27)
+- Republishes 2.0.0-alpha.1 with installers for Linux, macOS and Windows; the application is unchanged. The v2.0.0-alpha.1 tag has no published release.
 
 ### Recent Updates (2.0.0-alpha.1) - UI rewritten on egui + craft-libs (2026-11-27)
 - The GTK4 front end is replaced by egui + craft-libs. GTK4, libadwaita and GtkSourceView are no longer needed to build, run or package GCodeKit5.
