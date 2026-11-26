@@ -3,10 +3,10 @@
 Date: 2026-11-26. Branch `claude/egui-m6`, base `6841d84`. Signed off by gap-closure Task G7
 (base `c8d4fe3`): every row is Ported, Not applicable or Manual check needed with its reason,
 except the two Gap rows the G7 sweep found (Repetier streaming and E-STOP; connection refused
-on a firmware/profile mismatch), which are listed under Gaps for a decision.
+on a firmware/profile mismatch), which gap-closure Task G8 then ported.
 
-Counts (table rows above Gaps): 141 Ported, 21 Not applicable, 13 Manual check needed,
-2 Gap; 177 rows.
+Counts (table rows above Gaps, recounted by G8): 144 Ported, 23 Not applicable, 13 Manual
+check needed, 0 Gap; 180 rows.
 
 G7 sweep: every user-visible string of `crates/gcodekit5-ui/src/ui/gtk/` and `gtk_app.rs`
 (`t!(...)`, 1066 strings) was looked up in the egui and app sources, and each one missing was
@@ -14,8 +14,8 @@ traced to its widget; every key handler (`EventControllerKey`), right-click and 
 gesture and `set_accels_for_action` call was compared with the egui keymap. The GTK features that
 sweep found missing were ported with a test (the *(GTK)* rows for Duplicate, the canvas view
 keys, the shortcuts popover, the empty-design box, preview Cancel, the settings warning, the
-job-end console lines, Save G-code, Unlock in ALARM and the stock tooltip) or are the two Gap
-rows.
+job-end console lines, Save G-code, Unlock in ALARM and the stock tooltip) or were the two Gap
+rows, ported by G8.
 
 One row per user-visible feature from `docs/user/*.md` and the SPEC.md feature list
 (section 2.2 and the panels/dialogs of section 5). Rows marked *(GTK)* are user-visible GTK
@@ -70,8 +70,8 @@ Status values:
 | GRBL family controllers | 05-supported-controllers | Ported | `app/test_firmware_settings_model::firmware_settings_grbl_family_detection`, `app/test_device_profiles_model::device_profiles_grbl_family_controllers_save` |
 | grblHAL against a real controller or the simulator | 05-supported-controllers | Manual check needed | Never run against the grblHAL simulator (CHANGELOG known gap) |
 | TinyG, g2core, Smoothieware, FluidNC streaming | 05-supported-controllers, SPEC 2.2 | Manual check needed | Both front ends stream through the GRBL-style protocol; no test with these firmwares |
-| Repetier streaming and E-STOP | *(GTK)* | Gap | GTK streams to a Repetier profile through its flow-control sender (`RepetierSender`: line numbers, checksums, `Resend:` handling, `M110`/`M115` at connect) and its E-STOP sends `M112`, since Repetier has no realtime reset. egui's `MachineController` speaks only the GRBL character-counting protocol, so with a Repetier profile it would stream without resends and its E-STOP (`0x18`) does nothing on the controller. Found by the G7 sweep; not ported (see Gaps) |
-| Connection refused when the device's firmware differs from the profile | *(GTK)* | Gap | GTK's `protocol_mismatch` (`machine_control/connection.rs`) disconnects at connect when the device announces another firmware than the active profile ("Connection rejected: active machine is configured as ... but the device responded as ..."). egui connects anyway and reports the mismatch only on Firmware Settings > Retrieve (`test_device_manager::device_manager_protocol_mismatch_hints_at_the_profile`). Found by the G7 sweep; not ported (see Gaps) |
+| Repetier streaming and E-STOP | *(GTK)* | Ported | `app/test_machine_repetier::repetier_stream_numbers_every_line_and_finishes`, `app/test_machine_repetier::repetier_resend_replays_the_requested_line`, `app/test_machine_repetier::repetier_emergency_stop_writes_m112_and_drops_the_rest`, `app/test_machine_repetier::repetier_never_writes_grbl_bytes_or_dollar_commands`, `app/test_machine_repetier::repetier_restart_drops_the_stream_and_renumbers`, `test_machine_repetier_pane::test_repetier_profile_streams_repetier_and_disables_grbl_controls`. Ported by G8: `MachineController::connect_with` streams with `RepetierProcessor`'s numbering, checksums and `Resend:` replays (GTK's `RepetierSender`: one command in flight), `M110`/`M115` at connect; E-STOP writes `M112`. Overrides, continuous jog and probing are disabled with a reason, as GTK had no Repetier equivalent. Safer than GTK: no `0x18` at connect, `M112` unnumbered, and lines sent before it never run |
+| Connection refused when the device's firmware differs from the profile | *(GTK)* | Ported | `app/test_machine_repetier::grbl_profile_rejects_a_repetier_controller`, `app/test_machine_repetier::repetier_profile_rejects_a_grbl_controller`, `app/test_machine_repetier::matching_identity_keeps_the_connection`, `test_machine_repetier_pane::test_grbl_profile_rejects_repetier_firmware`, `test_machine_repetier_pane::test_repetier_profile_rejects_grbl_firmware`. Ported by G8: the worker checks the controller's first identity against the profile's protocol (GTK's `protocol_mismatch`) and disconnects; the pane and console show GTK's "Connection rejected: ..." notice naming both |
 | Repetier settings | *(GTK)* | Ported | `test_device_manager::device_manager_repetier_profile_selects_repetier_retrieve`, `test_firmware_settings::firmware_settings_repetier_float_slot_written_as_float` |
 
 ## Machine control
@@ -300,14 +300,8 @@ Ranked by user impact. Sizes are rough estimates for one developer who knows the
 The earlier list's last row, the Designer gallery icons, was ported by the visual restore
 (Fast shape gallery row). The two rows below were found by the G7 sweep of the GTK source.
 
-| Rank | Gap | User impact | Rough size |
-| --- | --- | --- | --- |
-| 1 | Repetier streaming and E-STOP (`M112`) | High for Repetier users: no safe streaming, E-STOP does not stop the controller. GRBL-family users are not affected | 2-3 days (port `RepetierSender` into `MachineController` behind the profile's `SenderKind::FlowControl`, `M112` E-STOP, tests on the loopback) |
-| 2 | Connection refused on a firmware/profile mismatch | Medium: a wrong active profile is only reported on Firmware Settings > Retrieve, not at connect | Half a day (check the banner's protocol at connect, disconnect with GTK's message, test) |
-
-Until rank 1 is ported, the safe stop-gap is to refuse Connect in egui for a profile whose
-protocol uses the flow-control sender (Repetier), saying to use the GTK build; that is a user
-decision, so it is not done here.
+None. The two rows the G7 sweep found (Repetier streaming and E-STOP; connection refused on
+a firmware/profile mismatch) were ported by gap-closure Task G8.
 
 ## Manual checks
 
@@ -321,7 +315,9 @@ Connection and firmware:
 - grblHAL against a real board or the grblHAL simulator.
 - TinyG, g2core, Smoothieware and FluidNC: connect, stream a short program, feed hold,
   resume, E-STOP.
-- A Repetier controller (after the rank 1 gap is closed).
+- A Repetier controller: connect (`M110`/`M115`), stream a short program, a resend after a
+  line error, pause and resume, E-STOP (`M112`), and a GRBL board on a Repetier profile (and the
+  reverse) refused at connect.
 
 Platforms:
 
