@@ -14,11 +14,17 @@
 //! ([`osd`]) shows the bounds and the tool position. The left sidebar ([`sidebar`]) has
 //! GTK's toolbar (Fit to Content, Reset View, Hide) and Inspector.
 //!
+//! With the `enable_stock_removal_3d` setting on, the sidebar's Simulation section shows
+//! GTK's "Show Stock Removal": the stock is cut by the program on a worker ([`stock`]) and
+//! drawn lit and depth-tested with the toolpath. The run restarts when the program or the
+//! stock changes, and stops when the toggle or the setting is turned off.
+//!
 //! Ported from the GTK `ui/gtk/visualizer/mod.rs`, `renderer_3d.rs`, `shaders.rs` and
 //! `nav_cube.rs`. Not ported: the 2D mode, the sidebar's toggles (show/hide rapids, cuts,
 //! grid, machine bounds and tool marker; grid spacing), machine bounds (no device profiles
-//! in the egui front end yet), stock removal simulation, run preview, scrollbars, fit to
-//! device, the zoom/centre/cursor status line, intensity statistics and depth testing.
+//! in the egui front end yet), run preview, scrollbars, fit to device, the zoom/centre/cursor
+//! status line, intensity statistics, and copying the Designer's stock into the simulation
+//! (the stock is edited in the sidebar instead).
 //!
 //! [`Machine::program`]: crate::machine::Machine::program
 //!
@@ -31,6 +37,7 @@ pub mod nav_cube;
 pub mod osd;
 pub mod pipeline;
 pub mod sidebar;
+pub mod stock;
 pub mod toolpath;
 
 use std::sync::Arc;
@@ -43,9 +50,11 @@ use glam::Vec3;
 
 use build::{BuildWorker, Outcome};
 pub use camera::{Aabb, Camera, StdView};
+use gcodekit5_visualizer::visualizer::StockZeroReference;
 pub use nav_cube::NavAction;
 pub use pipeline::install;
 use pipeline::{Upload, UploadedMesh, VisualizerCallback};
+pub use stock::{StockSetup, StockSimulation};
 pub use toolpath::ToolpathMesh;
 
 use crate::commands::Command;
@@ -62,6 +71,7 @@ pub fn msgids() -> Vec<&'static str> {
         .into_iter()
         .chain(osd::msgids())
         .chain(sidebar::msgids())
+        .chain(stock::msgids())
         .collect()
 }
 
@@ -93,6 +103,15 @@ pub struct VisualizerPane {
     view_rect: egui::Rect,
     /// Whether the user hid the sidebar.
     sidebar_hidden: bool,
+    /// The `enable_stock_removal_3d` setting.
+    stock_enabled: bool,
+    /// Whether "Show Stock Removal" is checked.
+    show_stock: bool,
+    /// The stock and tool simulated.
+    stock_setup: StockSetup,
+    /// The user's last Stock Z0 choice, used when a program records none.
+    stock_zero_choice: StockZeroReference,
+    stock: StockSimulation,
 }
 
 impl Default for VisualizerPane {
@@ -119,6 +138,68 @@ impl VisualizerPane {
             units: MeasurementSystem::Metric,
             view_rect: egui::Rect::NOTHING,
             sidebar_hidden: false,
+            stock_enabled: false,
+            show_stock: false,
+            stock_setup: StockSetup::default(),
+            stock_zero_choice: StockZeroReference::default(),
+            stock: StockSimulation::new(),
+        }
+    }
+
+    /// The stock removal simulation.
+    pub fn stock(&self) -> &StockSimulation {
+        &self.stock
+    }
+
+    /// Whether "Show Stock Removal" is checked.
+    pub fn stock_shown(&self) -> bool {
+        self.show_stock
+    }
+
+    /// The stock and tool simulated.
+    pub fn stock_setup(&self) -> StockSetup {
+        self.stock_setup
+    }
+
+    /// Checks or unchecks "Show Stock Removal" (only while the setting is on), starting or
+    /// stopping the simulation.
+    ///
+    /// # Arguments
+    /// * `show` - Whether to show the stock.
+    /// * `repaint` - Context to wake on progress.
+    pub fn set_stock_shown(&mut self, show: bool, repaint: &egui::Context) {
+        let show = show && self.stock_enabled;
+        if show == self.show_stock {
+            return;
+        }
+        self.show_stock = show;
+        self.restart_stock(repaint);
+    }
+
+    /// Changes the stock and tool, restarting a shown simulation.
+    ///
+    /// # Arguments
+    /// * `setup` - The new stock and tool.
+    /// * `repaint` - Context to wake on progress.
+    pub fn set_stock_setup(&mut self, setup: StockSetup, repaint: &egui::Context) {
+        if setup == self.stock_setup {
+            return;
+        }
+        if setup.zero != self.stock_setup.zero {
+            self.stock_zero_choice = setup.zero;
+        }
+        self.stock_setup = setup;
+        self.restart_stock(repaint);
+    }
+
+    /// Starts the simulation afresh when shown (GTK's `restart_stock_simulation`), else
+    /// stops it.
+    fn restart_stock(&mut self, repaint: &egui::Context) {
+        if self.show_stock {
+            self.stock
+                .start(self.stock_setup, self.program.clone(), repaint);
+        } else {
+            self.stock.stop();
         }
     }
 
@@ -194,6 +275,12 @@ impl VisualizerPane {
         self.generation = self.generation.wrapping_add(1);
         self.progress = 0;
         self.program = program.clone();
+        // A program that records its stock Z0 sets it; otherwise the user's choice holds.
+        self.stock_setup.zero = program
+            .as_deref()
+            .and_then(stock::recorded_zero)
+            .unwrap_or(self.stock_zero_choice);
+        self.restart_stock(repaint);
         match program {
             Some(lines) => {
                 self.building = true;
@@ -322,9 +409,15 @@ impl Pane for VisualizerPane {
             tool = status.work_position().filter(|_| status.connected);
         }
         self.poll_build();
+        self.stock.poll();
         let bounds = self.cut_bounds.or(self.bounds);
         if !self.sidebar_hidden {
             let units = self.units;
+            let mut show_stock = self.show_stock;
+            let mut setup = self.stock_setup;
+            let notice = self.stock.notice().map(|n| n.text(ctx.tr));
+            let progress = self.stock.progress();
+            let enabled = self.stock_enabled;
             let clicked = egui::Panel::left("gcodekit5-visualizer-sidebar")
                 .resizable(true)
                 .default_size(sidebar::WIDTH)
@@ -334,10 +427,20 @@ impl Pane for VisualizerPane {
                     egui::ScrollArea::vertical()
                         .id_salt("visualizer-sidebar")
                         .auto_shrink([false, false])
-                        .show(ui, |ui| sidebar::show(ui, bounds.as_ref(), units, ctx.tr))
+                        .show(ui, |ui| {
+                            let simulation = enabled.then_some(sidebar::Simulation {
+                                show: &mut show_stock,
+                                setup: &mut setup,
+                                progress,
+                                notice,
+                            });
+                            sidebar::show(ui, bounds.as_ref(), units, simulation, ctx.tr)
+                        })
                         .inner
                 })
                 .inner;
+            self.set_stock_setup(setup, ui.ctx());
+            self.set_stock_shown(show_stock, ui.ctx());
             match clicked {
                 Some(sidebar::SidebarAction::Fit) => self.fit(),
                 Some(sidebar::SidebarAction::ResetView) => self.reset_view(),
@@ -370,6 +473,9 @@ impl Pane for VisualizerPane {
             done_color: srgb_floats(crate::theme::palette(mode).accent),
             mesh: self.mesh.clone(),
             tool: tool.map(Vec3::from_array),
+            view: self.camera.view_matrix(),
+            stock: self.stock.mesh().filter(|_| self.show_stock).cloned(),
+            rect,
         };
         ui.painter()
             .add(egui_wgpu::Callback::new_paint_callback(rect, callback));
@@ -456,6 +562,11 @@ impl Pane for VisualizerPane {
 
     fn configure(&mut self, config: &Config) {
         self.units = config.ui.measurement_system;
+        self.stock_enabled = config.ui.enable_stock_removal_3d;
+        if !self.stock_enabled && self.show_stock {
+            self.show_stock = false;
+            self.stock.stop();
+        }
     }
 
     fn machine_events(&mut self, events: &[MachineEvent], _tr: &Translator) {

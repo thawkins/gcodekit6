@@ -4531,3 +4531,15 @@ msgstr ""
 
 msgid "This sets work coordinate system {wcs} so the current X/Y/Z becomes 0."
 msgstr ""
+
+msgid "Cannot simulate stock removal: {reason}"
+msgstr ""
+
+msgid "Nothing to simulate: the program has no moves."
+msgstr ""
+
+msgid "Stock removal simulation failed."
+msgstr ""
+
+msgid "Stock removal too large to display on this GPU."
+msgstr ""

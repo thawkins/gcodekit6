@@ -142,5 +142,7 @@ mod test_translations;
 mod test_visualizer;
 #[path = "test_visualizer_page_layout.rs"]
 mod test_visualizer_page_layout;
+#[path = "test_visualizer_stock.rs"]
+mod test_visualizer_stock;
 #[path = "test_workspace.rs"]
 mod test_workspace;

@@ -4614,3 +4614,15 @@ msgstr "Tout mettre à zéro refusé : le système de coordonnées pièce a chan
 
 msgid "This sets work coordinate system {wcs} so the current X/Y/Z becomes 0."
 msgstr "Cela règle le système de coordonnées pièce {wcs} pour que les X/Y/Z actuels deviennent 0."
+
+msgid "Cannot simulate stock removal: {reason}"
+msgstr "Impossible de simuler l'enlèvement de matière : {reason}"
+
+msgid "Nothing to simulate: the program has no moves."
+msgstr "Rien à simuler : le programme ne contient aucun mouvement."
+
+msgid "Stock removal simulation failed."
+msgstr "La simulation d'enlèvement de matière a échoué."
+
+msgid "Stock removal too large to display on this GPU."
+msgstr "Enlèvement de matière trop volumineux pour être affiché sur ce GPU."

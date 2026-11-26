@@ -4602,3 +4602,15 @@ msgstr "Zerar tudo recusado: o sistema de coordenadas de trabalho mudou."
 
 msgid "This sets work coordinate system {wcs} so the current X/Y/Z becomes 0."
 msgstr "Isto define o sistema de coordenadas de trabalho {wcs} para que o X/Y/Z atual passe a 0."
+
+msgid "Cannot simulate stock removal: {reason}"
+msgstr "Não é possível simular a remoção de material: {reason}"
+
+msgid "Nothing to simulate: the program has no moves."
+msgstr "Nada para simular: o programa não tem movimentos."
+
+msgid "Stock removal simulation failed."
+msgstr "A simulação de remoção de material falhou."
+
+msgid "Stock removal too large to display on this GPU."
+msgstr "Remoção de material demasiado grande para mostrar nesta GPU."

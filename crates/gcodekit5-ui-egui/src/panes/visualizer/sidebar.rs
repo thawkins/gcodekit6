@@ -5,14 +5,23 @@
 //! (`view-restore`) is Reset View here, which `Cmd+0` also runs. Left out, because the
 //! egui visualizer lacks the features: Fit to Device Working Area, the 2D/3D switch, the
 //! Toolpath and Guides toggles (rapids, cuts, laser/spindle, grid, grid spacing, machine
-//! bounds), the Simulation section and the inspector's S-value statistics.
+//! bounds) and the inspector's S-value statistics.
 //!
-//! Dependencies: `egui`, `gcodekit5-app` (translations), `gcodekit5-core` (units).
+//! The Simulation section ("Show Stock Removal", and the stock, tool and zero references
+//! while it is checked) is shown only while the `enable_stock_removal_3d` setting is on, as
+//! in GTK. GTK's stock fields are read-only copies of the Designer's stock; here they are
+//! edited in place.
+//!
+//! Dependencies: `egui`, `gcodekit5-app` (translations), `gcodekit5-core` (units),
+//! `gcodekit5-visualizer` (stock references).
 
 use gcodekit5_app::i18n::Translator;
 use gcodekit5_core::units::{MeasurementSystem, get_unit_label};
 
+use gcodekit5_visualizer::visualizer::{StockXyReference, StockZeroReference};
+
 use super::camera::Aabb;
+use super::stock::StockSetup;
 use crate::icons::{Icon, icon_only_button};
 use crate::panes::machine_control::format_length;
 use crate::workspace::named_icon_button;
@@ -33,7 +42,140 @@ pub fn msgids() -> Vec<&'static str> {
         n_!("Inspector"),
         n_!("Bounds"),
         n_!("to"),
+        n_!("Simulation"),
+        n_!("Show Stock Removal"),
+        n_!("Stock"),
+        n_!("Width"),
+        n_!("Height"),
+        n_!("Thickness"),
+        n_!("Tool Diameter"),
+        n_!("Stock Z0 at:"),
+        n_!("Top"),
+        n_!("Bottom"),
+        n_!("Stock XY0 at:"),
+        n_!("Lower left"),
+        n_!("Center"),
+        n_!("Simulating stock removal\u{2026}"),
+        n_!("Cancel"),
     ]
+}
+
+/// The Simulation section's state, which [`show`] edits in place.
+#[derive(Debug)]
+pub struct Simulation<'a> {
+    /// Whether "Show Stock Removal" is checked.
+    pub show: &'a mut bool,
+    /// The stock and tool.
+    pub setup: &'a mut StockSetup,
+    /// The running simulation's progress in percent.
+    pub progress: Option<u8>,
+    /// Why no stock is shown, translated.
+    pub notice: Option<String>,
+}
+
+/// A labelled length field in mm.
+fn length_row(ui: &mut egui::Ui, label: &str, value: &mut f32) {
+    ui.horizontal(|ui| {
+        ui.label(label);
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            ui.add(
+                egui::DragValue::new(value)
+                    .range(0.0..=10_000.0)
+                    .speed(0.1)
+                    .max_decimals(3)
+                    .suffix(" mm"),
+            )
+            .on_hover_text(label);
+        });
+    });
+}
+
+/// A labelled choice of two values.
+fn choice_row<T: PartialEq + Copy>(
+    ui: &mut egui::Ui,
+    id: &str,
+    label: &str,
+    value: &mut T,
+    options: [(T, String); 2],
+) {
+    ui.horizontal(|ui| {
+        let label = ui.label(label);
+        let selected = options
+            .iter()
+            .find(|(v, _)| *v == *value)
+            .map_or_else(String::new, |(_, text)| text.clone());
+        egui::ComboBox::from_id_salt(id)
+            .selected_text(selected)
+            .show_ui(ui, |ui| {
+                for (v, text) in options {
+                    ui.selectable_value(value, v, text);
+                }
+            })
+            .response
+            .labelled_by(label.id);
+    });
+}
+
+/// The Simulation section.
+fn simulation(ui: &mut egui::Ui, sim: Simulation<'_>, tr: &Translator) {
+    egui::CollapsingHeader::new(tr.tr("Simulation"))
+        .id_salt("visualizer-simulation")
+        .default_open(true)
+        .show(ui, |ui| {
+            crate::theme::checkbox(ui, sim.show, tr.tr("Show Stock Removal"));
+            if !*sim.show {
+                return;
+            }
+            crate::theme::group_frame(ui).show(ui, |ui| {
+                crate::theme::section_heading(ui, &tr.tr("Stock"));
+                let setup = sim.setup;
+                length_row(ui, &tr.tr("Width"), &mut setup.width);
+                length_row(ui, &tr.tr("Height"), &mut setup.height);
+                length_row(ui, &tr.tr("Thickness"), &mut setup.thickness);
+                length_row(ui, &tr.tr("Tool Diameter"), &mut setup.tool_diameter);
+                choice_row(
+                    ui,
+                    "visualizer-stock-z0",
+                    &tr.tr("Stock Z0 at:"),
+                    &mut setup.zero,
+                    [
+                        (StockZeroReference::Top, tr.tr("Top").into_owned()),
+                        (StockZeroReference::Bottom, tr.tr("Bottom").into_owned()),
+                    ],
+                );
+                choice_row(
+                    ui,
+                    "visualizer-stock-xy0",
+                    &tr.tr("Stock XY0 at:"),
+                    &mut setup.xy,
+                    [
+                        (
+                            StockXyReference::LowerLeft,
+                            tr.tr("Lower left").into_owned(),
+                        ),
+                        (StockXyReference::Centre, tr.tr("Center").into_owned()),
+                    ],
+                );
+            });
+            if let Some(pct) = sim.progress {
+                ui.add_space(4.0);
+                ui.label(tr.tr("Simulating stock removal\u{2026}"));
+                ui.horizontal(|ui| {
+                    ui.add(
+                        egui::ProgressBar::new(f32::from(pct) / 100.0)
+                            .show_percentage()
+                            .desired_width(ui.available_width() - 70.0),
+                    );
+                    if ui.button(tr.tr("Cancel")).clicked() {
+                        *sim.show = false;
+                    }
+                });
+            }
+            if let Some(notice) = sim.notice {
+                ui.add_space(4.0);
+                ui.colored_label(ui.visuals().warn_fg_color, notice);
+            }
+        });
 }
 
 /// What a sidebar button asks for.
@@ -64,6 +206,8 @@ fn range(min: f32, max: f32, units: MeasurementSystem, tr: &Translator) -> Strin
 /// * `ui` - The sidebar panel's `Ui`.
 /// * `bounds` - The program's bounds, once built.
 /// * `units` - The measurement system to show.
+/// * `simulation` - The Simulation section's state, or `None` to leave the section out (the
+///   `enable_stock_removal_3d` setting is off).
 /// * `tr` - Translator for the current UI language.
 ///
 /// # Returns
@@ -72,6 +216,7 @@ pub fn show(
     ui: &mut egui::Ui,
     bounds: Option<&Aabb>,
     units: MeasurementSystem,
+    simulation: Option<Simulation<'_>>,
     tr: &Translator,
 ) -> Option<SidebarAction> {
     let mut action = None;
@@ -107,6 +252,9 @@ pub fn show(
                 });
             }
         });
+    if let Some(sim) = simulation {
+        self::simulation(ui, sim, tr);
+    }
     action
 }
 

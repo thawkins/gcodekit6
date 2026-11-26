@@ -4607,3 +4607,15 @@ msgstr "Alle nullen abgelehnt: Das Werkstückkoordinatensystem hat sich geänder
 
 msgid "This sets work coordinate system {wcs} so the current X/Y/Z becomes 0."
 msgstr "Dies setzt das Werkstückkoordinatensystem {wcs} so, dass das aktuelle X/Y/Z zu 0 wird."
+
+msgid "Cannot simulate stock removal: {reason}"
+msgstr "Materialabtrag kann nicht simuliert werden: {reason}"
+
+msgid "Nothing to simulate: the program has no moves."
+msgstr "Nichts zu simulieren: Das Programm enthält keine Bewegungen."
+
+msgid "Stock removal simulation failed."
+msgstr "Die Simulation des Materialabtrags ist fehlgeschlagen."
+
+msgid "Stock removal too large to display on this GPU."
+msgstr "Materialabtrag zu groß für die Anzeige auf dieser GPU."

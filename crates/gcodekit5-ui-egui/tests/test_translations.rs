@@ -17,7 +17,10 @@ const LANGUAGES: [&str; 5] = ["de", "es", "fr", "it", "pt"];
 
 /// Translations that are spelled like the English msgid; the Translator cannot tell them
 /// from a missing entry, so the po file is checked for them instead.
-const IDENTICAL: [(&str, &str); 237] = [
+const IDENTICAL: [(&str, &str); 239] = [
+    // Visualizer Simulation section.
+    ("de", "Simulation"),
+    ("fr", "Simulation"),
     ("de", "G-Code Editor"),
     ("de", "Designer"),
     ("it", "Designer"),
