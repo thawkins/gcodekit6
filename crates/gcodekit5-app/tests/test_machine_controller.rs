@@ -919,7 +919,8 @@ fn test_report_fresh_only_after_line_written() {
     assert!(wait_fresh(&mut controller), "never fresh after the write");
 }
 
-/// A soft reset written as a raw real-time byte drops a queued jog, like jog cancel.
+/// A soft reset written as a raw real-time byte drops a queued jog and the queued line
+/// before it, as `stop()` does.
 #[test]
 fn test_soft_reset_drops_queued_jog() {
     let (shared, mut controller) = full_window();
@@ -928,12 +929,13 @@ fn test_soft_reset_drops_queued_jog() {
     controller.realtime(RealtimeCommand::SoftReset);
     assert!(wait_until(|| shared.log().contains(&Wrote::Realtime(0x18))));
     shared.hold_acks.store(false, Ordering::SeqCst);
-    assert!(
-        wait_until(|| shared.lines_written() == 4),
-        "{:?}",
+    std::thread::sleep(Duration::from_millis(50));
+    assert_eq!(
+        shared.lines_written(),
+        3,
+        "queued line written after the reset: {:?}",
         shared.log()
     );
-    std::thread::sleep(Duration::from_millis(50));
     assert!(
         !shared
             .log()
@@ -1046,4 +1048,41 @@ fn test_lagging_replies_err_stale() {
         !controller.report_fresh(),
         "a lagging reply to a query before $H counted as fresh"
     );
+}
+
+/// `realtime(SoftReset)` keeps the rule `stop()` keeps: no line sent before the reset runs
+/// after it, not even one still queued behind a full receive window.
+#[test]
+fn test_soft_reset_drops_lines_queued_before_it() {
+    let shared = Arc::new(LoopbackShared::default());
+    shared.hold_acks.store(true, Ordering::SeqCst);
+    let mut controller = loopback_controller(&shared, Duration::from_millis(1));
+    connect(&mut controller);
+    let lines: Vec<String> = (0..20)
+        .map(|i| format!("G1 X{i}.000 Y{i}.000 F1000"))
+        .collect();
+    for line in &lines {
+        controller.send_line(line).expect("send_line");
+    }
+    // The window fills: some lines are written, the rest wait behind it.
+    assert!(wait_until(|| shared.lines_written() > 0), "no line sent");
+    controller.realtime(RealtimeCommand::SoftReset);
+    assert!(wait_until(|| shared.log().contains(&Wrote::Realtime(0x18))));
+    // The controller answers what it had; nothing queued before the reset may follow it.
+    shared.hold_acks.store(false, Ordering::SeqCst);
+    let settle = Instant::now() + Duration::from_millis(300);
+    while Instant::now() < settle {
+        controller.poll();
+        std::thread::sleep(Duration::from_millis(5));
+    }
+    let log = shared.log();
+    let reset_at = log
+        .iter()
+        .position(|w| *w == Wrote::Realtime(0x18))
+        .expect("soft reset written");
+    let after: Vec<&Wrote> = log[reset_at..]
+        .iter()
+        .filter(|w| matches!(w, Wrote::Line(l) if lines.contains(l)))
+        .collect();
+    assert!(after.is_empty(), "written after the reset: {after:?}");
 }

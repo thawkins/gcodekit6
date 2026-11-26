@@ -917,7 +917,9 @@ impl MachineController {
         self.streaming.load(Ordering::SeqCst)
     }
 
-    /// Writes a real-time byte ahead of any queued program line.
+    /// Writes a real-time byte ahead of any queued program line. A soft reset is
+    /// [`stop`](Self::stop): every line in flight or queued is dropped, never to be written
+    /// after the reset.
     ///
     /// On a Repetier connection no real-time byte is written: soft reset is the emergency
     /// stop (`M112`, as [`stop`](Self::stop)), feed hold and cycle start pause and resume
@@ -1422,18 +1424,15 @@ impl WorkerState {
                 self.refuse_cycle_start();
             }
             Command::Resume if self.halt.is_some() => self.refuse_cycle_start(),
+            // A soft reset is a stop: nothing sent before it may be written after it.
+            Command::Realtime(byte) if byte == RealtimeCommand::SoftReset.byte() => {
+                self.soft_reset()?;
+            }
             Command::Realtime(byte) => {
                 self.write(&[byte])?;
                 self.echo_realtime(byte);
-                if byte == RealtimeCommand::JogCancel.byte()
-                    || byte == RealtimeCommand::SoftReset.byte()
-                {
+                if byte == RealtimeCommand::JogCancel.byte() {
                     self.drop_queued_jogs();
-                }
-                if byte == RealtimeCommand::SoftReset.byte() {
-                    // The reset drops the controller's buffered program lines: end the
-                    // stream (and any halt) now rather than feed a resetting controller.
-                    self.end_stream(false);
                 }
             }
             Command::Pause => {
@@ -1446,13 +1445,7 @@ impl WorkerState {
                 self.echo_realtime(RealtimeCommand::CycleStart.byte());
                 self.paused = false;
             }
-            Command::Stop => {
-                self.write(&[RealtimeCommand::SoftReset.byte()])?;
-                self.echo_realtime(RealtimeCommand::SoftReset.byte());
-                self.jog_outstanding = false;
-                self.reset_buffers();
-                self.end_stream(false);
-            }
+            Command::Stop => self.soft_reset()?,
             Command::Line(line, sent) => self.queue_manual(line, 0, sent),
             Command::StateLine(line, seq, sent) => self.queue_manual(line, seq, sent),
             Command::Stream(program, _, sent)
@@ -1900,6 +1893,18 @@ impl WorkerState {
                 total,
             }
         });
+    }
+
+    /// Writes the soft reset byte and forgets every line in flight or queued, ending the
+    /// stream (and any halt): the controller drops its buffered lines, and none queued
+    /// before the reset may be written after it.
+    fn soft_reset(&mut self) -> Result<(), String> {
+        self.write(&[RealtimeCommand::SoftReset.byte()])?;
+        self.echo_realtime(RealtimeCommand::SoftReset.byte());
+        self.jog_outstanding = false;
+        self.reset_buffers();
+        self.end_stream(false);
+        Ok(())
     }
 
     /// Forgets in-flight and queued lines after the controller was reset.
