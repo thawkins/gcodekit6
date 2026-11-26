@@ -1,3 +1,8 @@
+## [Unreleased] - 2026-11-27 (release page fixes)
+
+### Fixed
+- **Release page**: a tag with a version suffix (`v2.0.0-alpha.2`) is published as a pre-release, and the Linux upload takes only the app's AppImage, no longer the `linuxdeploy` build tool
+
 ## [2.0.0-alpha.2] - 2026-11-27
 
 Republishes 2.0.0-alpha.1 with a working release workflow. The application is unchanged from 2.0.0-alpha.1; the v2.0.0-alpha.1 tag has no published release.
