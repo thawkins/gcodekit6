@@ -152,6 +152,8 @@ mod test_tools_manager;
 mod test_translations;
 #[path = "test_visualizer.rs"]
 mod test_visualizer;
+#[path = "test_visualizer_display.rs"]
+mod test_visualizer_display;
 #[path = "test_visualizer_page_layout.rs"]
 mod test_visualizer_page_layout;
 #[path = "test_visualizer_stock.rs"]

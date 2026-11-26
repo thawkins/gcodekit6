@@ -21,6 +21,7 @@
 - **Feed and spindle in the egui status bar**: GTK's `F: <feed>  S: <rpm> RPM` readout follows the position while connected, from the status report, in Preferences' feed units with two decimals
 - **Console history kept across sessions in egui**: the console's Up/Down history is GTK's model and file, `command_history.json` in the legacy settings folder, at most 250 commands; both front ends now save it through the shared atomic writer, and a damaged file starts an empty history
 - **Replace and Replace All in the egui editor**: GTK's replace row under the find row ("Replace with ...", Replace, Replace All), enabled when the query has matches and the replacement is not empty; Replace changes the current match and moves to the next, Replace All changes every match (ASCII case ignored, as find) as one undo step, and both are disabled and refused while a job runs or a large file is shown read-only
+- **Visualizer display toggles in egui**: the sidebar has GTK's Toolpath section (Show Rapid Moves, Show Cutting Moves, Show Laser/Spindle) and Guides section (Show Grid, Grid spacing 1/5/10/25/50 mm), all on with a 50 mm grid at start; hidden moves are dropped in the shader, so toggling costs no rebuild of the toolpath
 
 ### Fixed
 - **Stock removal mesh memory**: the face list a stock mesh is built from stops as soon as it holds more faces than the mesh budget can take, so a stock near the vertex budget no longer holds a transient face list of up to about 1 GB before falling back to a coarser mesh (both front ends)

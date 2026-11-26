@@ -3,11 +3,14 @@
 //! [`install`] builds the pipelines for the window's colour format once and keeps them in
 //! the egui renderer's callback resources (as eframe's custom-3D pattern does). Each frame
 //! the pane adds a [`VisualizerCallback`]; its `prepare` writes one small uniform (camera,
-//! progress) and uploads the toolpath only when a new program was built, so a frame costs the
-//! same for a million-line program as for ten lines. The upload takes the vertices out of
+//! progress, which moves are shown) and uploads the toolpath only when a new program was
+//! built, so a frame costs the same for a million-line program as for ten lines; the grid is
+//! rebuilt only when its spacing changes. The upload takes the vertices out of
 //! their [`Upload`], freeing the CPU copy; a toolpath larger than the device's
 //! `max_buffer_size` is not uploaded ([`toolpath_fits`]) and the pane says so. Its `paint`
-//! draws, in order: the grid and origin axes, the toolpath, and the tool marker.
+//! draws, in order: the grid (when shown) and the origin axes, the toolpath (its travel and
+//! its cuts each when shown, GTK's Show Rapid Moves and Show Cutting Moves), and the tool
+//! marker.
 //!
 //! The shaders are WGSL ports of the GTK `ui/gtk/shaders.rs` line and stock removal shaders.
 //! The callback draws inside egui's render pass, which has no depth buffer, so later draws
@@ -41,8 +44,8 @@ use super::toolpath::ToolpathVertex;
 
 /// Grid size (mm, centred on the origin), as GTK draws it.
 const GRID_SIZE: f32 = 4000.0;
-/// Grid spacing in mm (GTK's default).
-const GRID_STEP: f32 = 50.0;
+/// The grid spacing in mm until the sidebar changes it (GTK's default).
+pub const DEFAULT_GRID_SPACING: f32 = 50.0;
 /// Grid colour (GTK's 30% grey).
 const GRID_COLOR: [u8; 4] = [77, 77, 77, 255];
 /// Length of the origin axes in mm.
@@ -72,12 +75,19 @@ struct Uniforms {
     done_color: [f32; 4],
     progress: u32,
     srgb_target: u32,
-    pad: [u32; 2],
+    /// Toolpath shader: [`SHOW_TRAVEL`] and [`SHOW_CUTS`].
+    show: u32,
+    pad: u32,
     /// Stock shader: the inverse transpose of the view's rotation (upper-left 3x3).
     normal_matrix: [[f32; 4]; 4],
     /// Stock shader: the light direction in view space.
     light_dir: [f32; 4],
 }
+
+/// The toolpath shader draws travel (rapids and moves with the spindle/laser off).
+const SHOW_TRAVEL: u32 = 1;
+/// The toolpath shader draws cuts.
+const SHOW_CUTS: u32 = 2;
 
 /// The stock shader's light direction in view space (GTK's `uLightDir`).
 const STOCK_LIGHT_DIR: [f32; 4] = [0.35, 0.35, 1.0, 0.0];
@@ -102,9 +112,11 @@ struct GpuResources {
     marker_pipeline: wgpu::RenderPipeline,
     uniforms: wgpu::Buffer,
     bind_group: wgpu::BindGroup,
-    /// Grid and axes, built once.
-    scene: wgpu::Buffer,
-    scene_count: u32,
+    /// The grid, rebuilt when its spacing changes: buffer, vertex count and spacing.
+    grid: (wgpu::Buffer, u32, f32),
+    /// The origin axes, built once.
+    axes: wgpu::Buffer,
+    axes_count: u32,
     /// The tool marker, rewritten when the tool moves.
     marker: wgpu::Buffer,
     /// The uploaded toolpath: its generation, buffer and vertex count.
@@ -123,43 +135,67 @@ struct GpuResources {
     format: wgpu::TextureFormat,
 }
 
-/// The grid lines (Z = 0) and the X, Y and Z axes from the origin.
-fn scene_vertices() -> Vec<SceneVertex> {
+/// Pushes the line `a` to `b` in `color` onto `v`.
+fn push_line(v: &mut Vec<SceneVertex>, a: Vec3, b: Vec3, color: [u8; 4]) {
+    v.push(SceneVertex {
+        pos: a.to_array(),
+        color,
+    });
+    v.push(SceneVertex {
+        pos: b.to_array(),
+        color,
+    });
+}
+
+/// The grid lines at Z = 0, `step` mm apart (GTK's `generate_grid_data`); a step under
+/// 1 mm is taken as 1 mm.
+///
+/// # Arguments
+/// * `step` - The spacing in mm.
+pub fn grid_vertices(step: f32) -> Vec<SceneVertex> {
+    let step = if step.is_finite() { step.max(1.0) } else { 1.0 };
     let mut v = Vec::new();
-    let mut line = |a: Vec3, b: Vec3, color: [u8; 4]| {
-        v.push(SceneVertex {
-            pos: a.to_array(),
-            color,
-        });
-        v.push(SceneVertex {
-            pos: b.to_array(),
-            color,
-        });
-    };
     let half = GRID_SIZE / 2.0;
-    let steps = (GRID_SIZE / GRID_STEP) as i32;
+    let steps = (GRID_SIZE / step) as i32;
     for i in 0..=steps {
-        let p = -half + i as f32 * GRID_STEP;
-        line(
+        let p = -half + i as f32 * step;
+        push_line(
+            &mut v,
             Vec3::new(-half, p, 0.0),
             Vec3::new(half, p, 0.0),
             GRID_COLOR,
         );
-        line(
+        push_line(
+            &mut v,
             Vec3::new(p, -half, 0.0),
             Vec3::new(p, half, 0.0),
             GRID_COLOR,
         );
     }
+    v
+}
+
+/// The X, Y and Z axes from the origin.
+fn axis_vertices() -> Vec<SceneVertex> {
+    let mut v = Vec::new();
     let axes = [
         (Vec3::X, [255, 0, 0, 255]),
         (Vec3::Y, [0, 255, 0, 255]),
         (Vec3::Z, [0, 0, 255, 255]),
     ];
     for (axis, color) in axes {
-        line(Vec3::ZERO, axis * AXIS_LENGTH, color);
+        push_line(&mut v, Vec3::ZERO, axis * AXIS_LENGTH, color);
     }
     v
+}
+
+/// A vertex buffer holding `vertices`.
+fn scene_buffer(device: &wgpu::Device, vertices: &[SceneVertex]) -> wgpu::Buffer {
+    device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+        label: Some("gcodekit5_visualizer_scene"),
+        contents: bytemuck::cast_slice(vertices),
+        usage: wgpu::BufferUsages::VERTEX,
+    })
 }
 
 /// The tool marker: a cone with its tip at `tip` and its base 10 mm above.
@@ -294,7 +330,8 @@ pub fn install(render_state: &egui_wgpu::RenderState) {
         attributes: &wgpu::vertex_attr_array![0 => Float32x3, 1 => Unorm8x4],
     };
     let lines = wgpu::PrimitiveTopology::LineList;
-    let scene = scene_vertices();
+    let grid = grid_vertices(DEFAULT_GRID_SPACING);
+    let axes = axis_vertices();
     let stock_shader = device.create_shader_module(wgpu::include_wgsl!("shaders/stock.wgsl"));
     let composite_shader =
         device.create_shader_module(wgpu::include_wgsl!("shaders/composite.wgsl"));
@@ -402,12 +439,13 @@ pub fn install(render_state: &egui_wgpu::RenderState) {
         format,
         uniforms,
         bind_group,
-        scene: device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("gcodekit5_visualizer_scene"),
-            contents: bytemuck::cast_slice(&scene),
-            usage: wgpu::BufferUsages::VERTEX,
-        }),
-        scene_count: scene.len() as u32,
+        grid: (
+            scene_buffer(device, &grid),
+            grid.len() as u32,
+            DEFAULT_GRID_SPACING,
+        ),
+        axes: scene_buffer(device, &axes),
+        axes_count: axes.len() as u32,
         marker: device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("gcodekit5_visualizer_marker"),
             size: (MARKER_VERTICES * std::mem::size_of::<SceneVertex>()) as u64,
@@ -531,6 +569,12 @@ pub struct VisualizerCallback {
     pub stock: Option<StockMesh>,
     /// The view's rectangle in points, to size the offscreen target.
     pub rect: egui::Rect,
+    /// Whether travel (rapids and moves with the spindle/laser off) is drawn.
+    pub show_travel: bool,
+    /// Whether cuts are drawn.
+    pub show_cuts: bool,
+    /// The grid's spacing in mm, or `None` to leave the grid out.
+    pub grid: Option<f32>,
 }
 
 /// The view's size in physical pixels, as egui sets the callback's viewport (rounded per
@@ -715,12 +759,19 @@ impl egui_wgpu::CallbackTrait for VisualizerCallback {
             done_color: self.done_color,
             progress: self.progress,
             srgb_target: u32::from(gpu.srgb_target),
-            pad: [0; 2],
+            show: u32::from(self.show_travel) * SHOW_TRAVEL + u32::from(self.show_cuts) * SHOW_CUTS,
+            pad: 0,
             normal_matrix: Mat4::from_mat3(glam::Mat3::from_mat4(self.view).inverse().transpose())
                 .to_cols_array_2d(),
             light_dir: STOCK_LIGHT_DIR,
         };
         queue.write_buffer(&gpu.uniforms, 0, bytemuck::bytes_of(&uniforms));
+        if let Some(step) = self.grid
+            && step != gpu.grid.2
+        {
+            let grid = grid_vertices(step);
+            gpu.grid = (scene_buffer(device, &grid), grid.len() as u32, step);
+        }
         let generation = self.mesh.as_ref().map(|m| m.generation);
         if gpu.toolpath.as_ref().map(|t| t.0) != generation {
             gpu.toolpath = self.mesh.as_ref().map(|m| {
@@ -767,8 +818,12 @@ impl egui_wgpu::CallbackTrait for VisualizerCallback {
         };
         pass.set_bind_group(0, &gpu.bind_group, &[]);
         pass.set_pipeline(&gpu.line_pipeline);
-        pass.set_vertex_buffer(0, gpu.scene.slice(..));
-        pass.draw(0..gpu.scene_count, 0..1);
+        if self.grid.is_some() {
+            pass.set_vertex_buffer(0, gpu.grid.0.slice(..));
+            pass.draw(0..gpu.grid.1, 0..1);
+        }
+        pass.set_vertex_buffer(0, gpu.axes.slice(..));
+        pass.draw(0..gpu.axes_count, 0..1);
         if gpu.stock_drawn()
             && let Some(offscreen) = &gpu.offscreen
         {

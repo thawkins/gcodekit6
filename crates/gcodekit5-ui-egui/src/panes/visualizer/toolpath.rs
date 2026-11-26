@@ -25,7 +25,13 @@ pub const MARKER_DWELL: f32 = 12345.678;
 /// Colour of travel: rapids and moves with the spindle/laser off (GTK's 50% grey).
 pub const TRAVEL_COLOR: [u8; 4] = [128, 128, 128, 255];
 
-/// One toolpath vertex: position, colour and the program line it belongs to.
+/// The bit of [`ToolpathVertex`]'s tag set on travel (rapids and moves with the
+/// spindle/laser off), so the shader can hide travel or cuts (the sidebar's Show Rapid Moves
+/// and Show Cutting Moves) without a second buffer. The other bits are the program line.
+pub const TRAVEL_BIT: u32 = 1 << 31;
+
+/// One toolpath vertex: position, colour, and a tag holding the program line it belongs to
+/// and whether it is travel ([`TRAVEL_BIT`]).
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialEq, bytemuck::Pod, bytemuck::Zeroable)]
 pub struct ToolpathVertex {
@@ -33,8 +39,20 @@ pub struct ToolpathVertex {
     pub pos: [f32; 3],
     /// sRGB colour with alpha.
     pub color: [u8; 4],
+    /// The program line, with [`TRAVEL_BIT`] set on travel.
+    tag: u32,
+}
+
+impl ToolpathVertex {
     /// Index of the program line (as streamed) this segment came from.
-    pub line: u32,
+    pub fn line(&self) -> u32 {
+        self.tag & !TRAVEL_BIT
+    }
+
+    /// Whether the segment is travel: a rapid, or a move with the spindle/laser off.
+    pub fn is_travel(&self) -> bool {
+        self.tag & TRAVEL_BIT != 0
+    }
 }
 
 /// The toolpath of one program, ready to upload.
@@ -78,11 +96,14 @@ struct Builder {
 
 impl Builder {
     fn segment(&mut self, from: Vec3, to: Vec3, color: [u8; 4], cut: bool) {
+        // A program of 2^31 lines is far beyond any buffer the GPU takes.
+        let line = self.line.min(!TRAVEL_BIT);
+        let tag = if cut { line } else { line | TRAVEL_BIT };
         for p in [from, to] {
             self.mesh.vertices.push(ToolpathVertex {
                 pos: p.to_array(),
                 color,
-                line: self.line,
+                tag,
             });
             grow(&mut self.mesh.bounds, p);
             if cut {

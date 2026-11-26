@@ -12,7 +12,8 @@
 //! Mouse, as in GTK: left drag orbits, Shift + left drag pans, the wheel zooms. The nav cube
 //! ([`nav_cube`]) and the View commands switch to standard views, zoom and fit; the OSD
 //! ([`osd`]) shows the bounds and the tool position. The left sidebar ([`sidebar`]) has
-//! GTK's toolbar (Fit to Content, Reset View, Hide) and Inspector.
+//! GTK's toolbar (Fit to Content, Reset View, Hide), its Toolpath and Guides toggles
+//! ([`Display`]: rapids, cuts, the tool marker, the grid and its spacing) and Inspector.
 //!
 //! With the `enable_stock_removal_3d` setting on, the sidebar's Simulation section shows
 //! GTK's "Show Stock Removal": the stock is cut by the program on a worker ([`stock`]) and
@@ -23,10 +24,8 @@
 //! in the sidebar hold until the next one.
 //!
 //! Ported from the GTK `ui/gtk/visualizer/mod.rs`, `renderer_3d.rs`, `shaders.rs` and
-//! `nav_cube.rs`. Not ported: the 2D mode, the sidebar's toggles (show/hide rapids, cuts,
-//! grid, machine bounds and tool marker; grid spacing), machine bounds (no device profiles
-//! in the egui front end yet), run preview, scrollbars, fit to device, the zoom/centre/cursor
-//! status line and intensity statistics.
+//! `nav_cube.rs`. Not ported: the 2D mode, machine bounds and their toggle, run preview,
+//! scrollbars, fit to device, the zoom/centre/cursor status line and intensity statistics.
 //!
 //! [`Machine::program`]: crate::machine::Machine::program
 //!
@@ -56,6 +55,7 @@ use gcodekit5_visualizer::visualizer::StockZeroReference;
 pub use nav_cube::NavAction;
 pub use pipeline::install;
 use pipeline::{Upload, UploadedMesh, VisualizerCallback};
+pub use sidebar::Display;
 pub use stock::{StockSeed, StockSetup, StockSimulation};
 pub use toolpath::ToolpathMesh;
 
@@ -109,6 +109,8 @@ pub struct VisualizerPane {
     view_rect: egui::Rect,
     /// Whether the user hid the sidebar.
     sidebar_hidden: bool,
+    /// The sidebar's Toolpath and Guides toggles.
+    display: Display,
     /// The `enable_stock_removal_3d` setting.
     stock_enabled: bool,
     /// Whether "Show Stock Removal" is checked.
@@ -149,6 +151,7 @@ impl VisualizerPane {
             units: MeasurementSystem::Metric,
             view_rect: egui::Rect::NOTHING,
             sidebar_hidden: false,
+            display: Display::default(),
             stock_enabled: false,
             show_stock: false,
             stock_setup: StockSetup::default(),
@@ -320,6 +323,19 @@ impl VisualizerPane {
     /// Whether the sidebar is hidden.
     pub fn sidebar_hidden(&self) -> bool {
         self.sidebar_hidden
+    }
+
+    /// The sidebar's Toolpath and Guides toggles.
+    pub fn display(&self) -> Display {
+        self.display
+    }
+
+    /// Sets the sidebar's Toolpath and Guides toggles.
+    ///
+    /// # Arguments
+    /// * `display` - What the view draws.
+    pub fn set_display(&mut self, display: Display) {
+        self.display = display;
     }
 
     /// Shows `program` (the program as the machine streams it), building its toolpath on the
@@ -496,6 +512,7 @@ impl Pane for VisualizerPane {
             let notice = self.stock.notice().map(|n| n.text(ctx.tr));
             let progress = self.stock.progress();
             let enabled = self.stock_enabled;
+            let display = &mut self.display;
             let clicked = egui::Panel::left("gcodekit5-visualizer-sidebar")
                 .resizable(true)
                 .default_size(sidebar::WIDTH)
@@ -512,7 +529,7 @@ impl Pane for VisualizerPane {
                                 progress,
                                 notice,
                             });
-                            sidebar::show(ui, bounds.as_ref(), units, simulation, ctx.tr)
+                            sidebar::show(ui, bounds.as_ref(), display, units, simulation, ctx.tr)
                         })
                         .inner
                 })
@@ -551,15 +568,19 @@ impl Pane for VisualizerPane {
         } else {
             egui::Theme::Light
         };
+        let marker = tool.filter(|_| self.display.marker);
         let callback = VisualizerCallback {
             view_proj: self.camera.view_proj(rect.width() / rect.height().max(1.0)),
             progress: self.progress,
             done_color: srgb_floats(crate::theme::palette(mode).accent),
             mesh: self.mesh.clone(),
-            tool: tool.map(Vec3::from_array),
+            tool: marker.map(Vec3::from_array),
             view: self.camera.view_matrix(),
             stock: self.stock.mesh().filter(|_| self.show_stock).cloned(),
             rect,
+            show_travel: self.display.rapids,
+            show_cuts: self.display.cuts,
+            grid: self.display.grid.then_some(self.display.grid_spacing),
         };
         ui.painter()
             .add(egui_wgpu::Callback::new_paint_callback(rect, callback));

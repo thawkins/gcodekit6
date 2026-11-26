@@ -1,11 +1,13 @@
 //! The visualizer's left sidebar, laid out as the GTK one: a toolbar (Fit to Content,
-//! Reset View and Hide) above a collapsible Inspector with the program's bounds.
+//! Reset View and Hide) above collapsible sections: Toolpath (Show Rapid Moves, Show
+//! Cutting Moves, Show Laser/Spindle), Guides (Show Grid, Grid spacing), Simulation and the
+//! Inspector with the program's bounds. The toggles are [`Display`], which the pane hands to
+//! the renderer; they start on, with a 50 mm grid, as in GTK.
 //!
 //! Ported from the GTK `ui/gtk/visualizer/mod.rs` sidebar. GTK's Fit to Viewport button
 //! (`view-restore`) is Reset View here, which `Cmd+0` also runs. Left out, because the
-//! egui visualizer lacks the features: Fit to Device Working Area, the 2D/3D switch, the
-//! Toolpath and Guides toggles (rapids, cuts, laser/spindle, grid, grid spacing, machine
-//! bounds) and the inspector's S-value statistics.
+//! egui visualizer lacks the features: Fit to Device Working Area, the 2D/3D switch, Show
+//! Machine Bounds and the inspector's S-value statistics.
 //!
 //! The Simulation section ("Show Stock Removal", and the stock, tool and zero references
 //! while it is checked) is shown only while the `enable_stock_removal_3d` setting is on, as
@@ -35,6 +37,13 @@ pub const MIN_WIDTH: f32 = 200.0;
 pub fn msgids() -> Vec<&'static str> {
     vec![
         n_!("Fit to Content"),
+        n_!("Toolpath"),
+        n_!("Show Rapid Moves"),
+        n_!("Show Cutting Moves"),
+        n_!("Show Laser/Spindle"),
+        n_!("Guides"),
+        n_!("Show Grid"),
+        n_!("Grid spacing"),
         n_!("Reset View"),
         n_!("Hide"),
         n_!("Hide Sidebar"),
@@ -58,6 +67,70 @@ pub fn msgids() -> Vec<&'static str> {
         n_!("Simulating stock removal\u{2026}"),
         n_!("Cancel"),
     ]
+}
+
+/// The grid spacings offered, in mm (GTK's list).
+pub const GRID_SPACINGS: [f32; 5] = [1.0, 5.0, 10.0, 25.0, 50.0];
+
+/// What the view draws: the sidebar's Toolpath and Guides toggles.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Display {
+    /// Show Rapid Moves: travel (rapids and moves with the spindle/laser off).
+    pub rapids: bool,
+    /// Show Cutting Moves.
+    pub cuts: bool,
+    /// Show Laser/Spindle: the tool marker.
+    pub marker: bool,
+    /// Show Grid.
+    pub grid: bool,
+    /// Grid spacing in mm, one of [`GRID_SPACINGS`].
+    pub grid_spacing: f32,
+}
+
+impl Default for Display {
+    /// GTK's start: everything shown, a 50 mm grid.
+    fn default() -> Self {
+        Self {
+            rapids: true,
+            cuts: true,
+            marker: true,
+            grid: true,
+            grid_spacing: super::pipeline::DEFAULT_GRID_SPACING,
+        }
+    }
+}
+
+/// The Toolpath and Guides sections.
+fn display(ui: &mut egui::Ui, display: &mut Display, units: MeasurementSystem, tr: &Translator) {
+    egui::CollapsingHeader::new(tr.tr("Toolpath"))
+        .id_salt("visualizer-toolpath")
+        .default_open(true)
+        .show(ui, |ui| {
+            crate::theme::checkbox(ui, &mut display.rapids, tr.tr("Show Rapid Moves"));
+            crate::theme::checkbox(ui, &mut display.cuts, tr.tr("Show Cutting Moves"));
+            crate::theme::checkbox(ui, &mut display.marker, tr.tr("Show Laser/Spindle"));
+        });
+    egui::CollapsingHeader::new(tr.tr("Guides"))
+        .id_salt("visualizer-guides")
+        .default_open(true)
+        .show(ui, |ui| {
+            crate::theme::checkbox(ui, &mut display.grid, tr.tr("Show Grid"));
+            let spacing =
+                |mm: f32| format!("{} {}", format_length(mm, units), get_unit_label(units));
+            ui.horizontal(|ui| {
+                let label = ui.small(tr.tr("Grid spacing"));
+                egui::ComboBox::from_id_salt("visualizer-grid-spacing")
+                    .selected_text(spacing(display.grid_spacing))
+                    .show_ui(ui, |ui| {
+                        for mm in GRID_SPACINGS {
+                            ui.selectable_value(&mut display.grid_spacing, mm, spacing(mm));
+                        }
+                    })
+                    .response
+                    .on_hover_text(tr.tr("Grid spacing"))
+                    .labelled_by(label.id);
+            });
+        });
 }
 
 /// The Simulation section's state, which [`show`] edits in place.
@@ -205,6 +278,7 @@ fn range(min: f32, max: f32, units: MeasurementSystem, tr: &Translator) -> Strin
 /// # Arguments
 /// * `ui` - The sidebar panel's `Ui`.
 /// * `bounds` - The program's bounds, once built.
+/// * `display_state` - The Toolpath and Guides toggles, edited in place.
 /// * `units` - The measurement system to show.
 /// * `simulation` - The Simulation section's state, or `None` to leave the section out (the
 ///   `enable_stock_removal_3d` setting is off).
@@ -215,6 +289,7 @@ fn range(min: f32, max: f32, units: MeasurementSystem, tr: &Translator) -> Strin
 pub fn show(
     ui: &mut egui::Ui,
     bounds: Option<&Aabb>,
+    display_state: &mut Display,
     units: MeasurementSystem,
     simulation: Option<Simulation<'_>>,
     tr: &Translator,
@@ -234,6 +309,10 @@ pub fn show(
         }
     });
     ui.add_space(4.0);
+    display(ui, display_state, units, tr);
+    if let Some(sim) = simulation {
+        self::simulation(ui, sim, tr);
+    }
     egui::CollapsingHeader::new(tr.tr("Inspector"))
         .id_salt("visualizer-inspector")
         .default_open(false)
@@ -252,9 +331,6 @@ pub fn show(
                 });
             }
         });
-    if let Some(sim) = simulation {
-        self::simulation(ui, sim, tr);
-    }
     action
 }
 
