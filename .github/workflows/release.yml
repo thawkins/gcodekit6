@@ -25,7 +25,7 @@ jobs:
             bin: gcodekit5
             name_suffix: linux-x86_64
           - os_name: macOS-ARM64
-            os: macos-14
+            os: macos-latest
             target: aarch64-apple-darwin
             bin: gcodekit5
             name_suffix: macos-arm64
@@ -201,11 +201,23 @@ jobs:
       if: matrix.platform.os == 'windows-latest'
       shell: pwsh
       run: |
-        choco install wixtoolset --version 3.14.1 -y --no-progress
+        # The runner image may already ship WiX v3 (choco then refuses a
+        # pinned reinstall); install it only when no v3 folder exists.
+        function Find-Wix {
+          Get-ChildItem "${env:ProgramFiles(x86)}" -Directory -Filter 'WiX Toolset v3*' |
+            Sort-Object Name -Descending | Select-Object -First 1
+        }
+        $wix = Find-Wix
+        if (-not $wix) {
+          choco install wixtoolset -y --no-progress
+          if ($LASTEXITCODE -ne 0) { throw "choco install wixtoolset failed" }
+          $wix = Find-Wix
+        }
+        if (-not $wix) { throw "WiX Toolset v3 not found after install" }
+        Write-Host "Using $($wix.FullName)"
         # cargo-wix finds candle.exe/light.exe through WIX (or PATH)
-        $wix = "${env:ProgramFiles(x86)}\WiX Toolset v3.14\"
-        "WIX=$wix" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
-        "${wix}bin" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+        "WIX=$($wix.FullName)\" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+        "$($wix.FullName)\bin" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
 
     - name: Create Windows MSI Installer
       if: matrix.platform.os == 'windows-latest'
