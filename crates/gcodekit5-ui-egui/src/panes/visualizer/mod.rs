@@ -11,13 +11,14 @@
 //!
 //! Mouse, as in GTK: left drag orbits, Shift + left drag pans, the wheel zooms. The nav cube
 //! ([`nav_cube`]) and the View commands switch to standard views, zoom and fit; the OSD
-//! ([`osd`]) shows the bounds, the tool position and the mouse help.
+//! ([`osd`]) shows the bounds and the tool position. The left sidebar ([`sidebar`]) has
+//! GTK's toolbar (Fit to Content, Reset View, Hide) and Inspector.
 //!
 //! Ported from the GTK `ui/gtk/visualizer/mod.rs`, `renderer_3d.rs`, `shaders.rs` and
-//! `nav_cube.rs`. Not ported: the 2D mode, the sidebar (show/hide rapids, cuts, grid,
-//! machine bounds and tool marker; grid spacing), machine bounds (no device profiles in the
-//! egui front end yet), stock removal simulation, run preview, scrollbars, fit to device,
-//! intensity statistics and depth testing.
+//! `nav_cube.rs`. Not ported: the 2D mode, the sidebar's toggles (show/hide rapids, cuts,
+//! grid, machine bounds and tool marker; grid spacing), machine bounds (no device profiles
+//! in the egui front end yet), stock removal simulation, run preview, scrollbars, fit to
+//! device, the zoom/centre/cursor status line, intensity statistics and depth testing.
 //!
 //! [`Machine::program`]: crate::machine::Machine::program
 //!
@@ -29,6 +30,7 @@ pub mod camera;
 pub mod nav_cube;
 pub mod osd;
 pub mod pipeline;
+pub mod sidebar;
 pub mod toolpath;
 
 use std::sync::Arc;
@@ -59,6 +61,7 @@ pub fn msgids() -> Vec<&'static str> {
     nav_cube::msgids()
         .into_iter()
         .chain(osd::msgids())
+        .chain(sidebar::msgids())
         .collect()
 }
 
@@ -88,6 +91,8 @@ pub struct VisualizerPane {
     units: MeasurementSystem,
     /// The view's rectangle on the last frame.
     view_rect: egui::Rect,
+    /// Whether the user hid the sidebar.
+    sidebar_hidden: bool,
 }
 
 impl Default for VisualizerPane {
@@ -113,6 +118,7 @@ impl VisualizerPane {
             progress: 0,
             units: MeasurementSystem::Metric,
             view_rect: egui::Rect::NOTHING,
+            sidebar_hidden: false,
         }
     }
 
@@ -161,6 +167,11 @@ impl VisualizerPane {
     /// The view's rectangle on the last frame.
     pub fn view_rect(&self) -> egui::Rect {
         self.view_rect
+    }
+
+    /// Whether the sidebar is hidden.
+    pub fn sidebar_hidden(&self) -> bool {
+        self.sidebar_hidden
     }
 
     /// Shows `program` (the program as the machine streams it), building its toolpath on the
@@ -255,6 +266,12 @@ impl VisualizerPane {
         }
     }
 
+    /// Resets the camera, then fits the toolpath (Reset View).
+    fn reset_view(&mut self) {
+        self.camera.reset();
+        self.fit();
+    }
+
     /// Runs a nav cube action.
     ///
     /// # Arguments
@@ -305,6 +322,29 @@ impl Pane for VisualizerPane {
             tool = status.work_position().filter(|_| status.connected);
         }
         self.poll_build();
+        let bounds = self.cut_bounds.or(self.bounds);
+        if !self.sidebar_hidden {
+            let units = self.units;
+            let clicked = egui::Panel::left("gcodekit5-visualizer-sidebar")
+                .resizable(true)
+                .default_size(sidebar::WIDTH)
+                .min_size(sidebar::MIN_WIDTH)
+                .show(ui, |ui| {
+                    // Fill the panel, so it keeps its width rather than shrinking to fit.
+                    egui::ScrollArea::vertical()
+                        .id_salt("visualizer-sidebar")
+                        .auto_shrink([false, false])
+                        .show(ui, |ui| sidebar::show(ui, bounds.as_ref(), units, ctx.tr))
+                        .inner
+                })
+                .inner;
+            match clicked {
+                Some(sidebar::SidebarAction::Fit) => self.fit(),
+                Some(sidebar::SidebarAction::ResetView) => self.reset_view(),
+                Some(sidebar::SidebarAction::Hide) => self.sidebar_hidden = true,
+                None => {}
+            }
+        }
         let rect = ui.available_rect_before_wrap();
         self.view_rect = rect;
         let response = ui.allocate_rect(rect, egui::Sense::click_and_drag());
@@ -337,9 +377,11 @@ impl Pane for VisualizerPane {
         if let Some(action) = nav_cube::show(ui, rect, ctx.tr) {
             self.apply(action);
         }
+        if self.sidebar_hidden && sidebar::show_button(ui, rect, ctx.tr) {
+            self.sidebar_hidden = false;
+        }
         let loaded = self.program.is_some();
         let too_large = self.mesh.as_ref().is_some_and(|m| m.upload.too_large());
-        let bounds = self.cut_bounds.or(self.bounds);
         osd::show(
             ui,
             rect,
@@ -364,8 +406,7 @@ impl Pane for VisualizerPane {
             Command::ViewFront => NavAction::View(StdView::Front),
             Command::ViewIso => NavAction::View(StdView::IsoSe),
             Command::ResetView => {
-                self.camera.reset();
-                self.fit();
+                self.reset_view();
                 return true;
             }
             Command::FileNew

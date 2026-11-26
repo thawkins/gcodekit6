@@ -1,9 +1,10 @@
 //! The visualizer's on-screen display: the program's bounds and the tool position in the
-//! bottom-left corner, the mouse help, the empty-state message when no program is loaded,
-//! and a note when the toolpath is too large for the GPU.
+//! bottom-left corner, the empty-state message when no program is loaded, and a note when
+//! the toolpath is too large for the GPU.
 //!
 //! Ported from the GTK `ui/gtk/visualizer/mod.rs`: its inspector's "Bounds X/Y" rows (the
-//! cutting moves' bounds, else every move's), its empty state and its "Mouse Controls" help.
+//! cutting moves' bounds, else every move's) and its empty state. The "Mouse Controls" help
+//! button is with the nav cube ([`super::nav_cube`]), where GTK floats it.
 //! Lengths are in the user's measurement system, two decimals for mm and three for inches,
 //! as the DRO shows them.
 //!
@@ -23,10 +24,6 @@ pub fn msgids() -> Vec<&'static str> {
         n_!("Position"),
         n_!("No G-code loaded"),
         n_!("Open a file to preview toolpaths."),
-        n_!("Mouse Controls"),
-        n_!("Left Button+Drag: Orbit"),
-        n_!("Shift+Left button+Drag: Pan"),
-        n_!("Mouse wheel: Zoom+/-"),
         n_!("Toolpath too large to display on this GPU."),
         n_!("Could not draw this toolpath."),
     ]
@@ -141,21 +138,6 @@ pub fn show(
         let corner = rect.left_bottom() + egui::vec2(margin, -margin);
         panel(ui, corner, egui::Align2::LEFT_BOTTOM, &rows);
     }
-    let help = [
-        tr.tr("Left Button+Drag: Orbit").into_owned(),
-        tr.tr("Shift+Left button+Drag: Pan").into_owned(),
-        tr.tr("Mouse wheel: Zoom+/-").into_owned(),
-    ]
-    .join("\n");
-    let help_rect = egui::Rect::from_min_size(
-        rect.right_bottom() - egui::vec2(margin + 24.0, margin + 24.0),
-        egui::vec2(24.0, 24.0),
-    );
-    let name = tr.tr("Mouse Controls").into_owned();
-    let response = ui
-        .put(help_rect, egui::Button::new("?"))
-        .on_hover_text(format!("{name}\n{help}"));
-    response.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, &name));
     if too_large {
         let note = [tr
             .tr("Toolpath too large to display on this GPU.")

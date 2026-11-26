@@ -268,9 +268,21 @@ fn test_nav_cube_click_front_sets_view() -> TestResult {
     harness.get_by_label("Front View").click();
     harness.run();
     assert_eq!(harness.state().camera().angles(), StdView::Front.angles());
-    harness.get_by_label("Top View").click();
-    harness.run();
-    assert_eq!(harness.state().camera().angles(), StdView::Top.angles());
+    // The nav cube's T comes first; the floating Top View button under it is the second.
+    assert_eq!(harness.get_all_by_label("Top View").count(), 2);
+    for index in 0..2 {
+        harness
+            .state_mut()
+            .apply(visualizer::NavAction::View(StdView::Front));
+        harness.run();
+        harness
+            .get_all_by_label("Top View")
+            .nth(index)
+            .ok_or("Top View button")?
+            .click();
+        harness.run();
+        assert_eq!(harness.state().camera().angles(), StdView::Top.angles());
+    }
     Ok(())
 }
 
@@ -386,7 +398,8 @@ fn test_toolpath_fits_buffer_limit() {
     );
 }
 
-/// The pane in a harness that renders through wgpu with the visualizer installed.
+/// The pane in a harness that renders through wgpu with the visualizer installed; the view
+/// beside the sidebar is 480x360, the size these tests were written for.
 fn gpu_harness(pane: VisualizerPane) -> Harness<'static, VisualizerPane> {
     let render_state = egui_kittest::wgpu::create_render_state(
         egui_kittest::wgpu::default_wgpu_setup(),
@@ -394,8 +407,9 @@ fn gpu_harness(pane: VisualizerPane) -> Harness<'static, VisualizerPane> {
     );
     visualizer::install(&render_state);
     let tr = Translator::new("en");
+    // 250 points of sidebar and a 480x360 view.
     Harness::builder()
-        .with_size(egui::vec2(480.0, 360.0))
+        .with_size(egui::vec2(730.0, 360.0))
         .with_theme(egui::Theme::Dark)
         .renderer(egui_kittest::wgpu::WgpuTestRenderer::from_render_state(
             render_state,
@@ -413,7 +427,7 @@ fn gpu_harness(pane: VisualizerPane) -> Harness<'static, VisualizerPane> {
 
 /// Snapshot options: the checked-in references (made with Mesa lavapipe on Fedora; CI runs
 /// Ubuntu's lavapipe). A pixel fails beyond a YIQ distance of 1.0 (kittest's default is
-/// 0.6), and up to 40 failing pixels of the 172,800 pass: enough for a Mesa line-rasteriser
+/// 0.6), and up to 40 failing pixels of the 262,800 pass: enough for a Mesa line-rasteriser
 /// difference on a few line ends, while a missing, recoloured or moved line (hundreds of
 /// pixels) still fails.
 fn snapshot_options() -> SnapshotOptions {

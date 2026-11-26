@@ -1,10 +1,12 @@
 //! The nav cube: the 3x3 view buttons and the zoom row in the visualizer's top-right corner,
-//! ported from the GTK `ui/gtk/nav_cube.rs`.
+//! ported from the GTK `ui/gtk/nav_cube.rs`, and under it GTK's floating Top View and Mouse
+//! Controls buttons.
 //!
 //! The layout is GTK's: isometric corners around Top, Left, Front, Right and Bottom, then
 //! Zoom Out, Fit and Zoom In. Each button's accessible name is its tooltip. The one-letter
-//! view labels (T, F, L, R, B) stay untranslated, as in GTK; the isometric corners are
-//! labelled NW, NE, SW and SE (GTK draws arrows, which the bundled fonts lack).
+//! view labels (T, F, L, R, B) stay untranslated, as in GTK; the isometric corners draw an
+//! arrow toward their corner, as GTK's icons do. GTK's Toggle Scrollbars and Fit to Device
+//! Working Area buttons are left out: the egui visualizer has neither feature.
 //!
 //! Dependencies: `egui`, `gcodekit5-app` (translations).
 
@@ -41,15 +43,20 @@ pub fn msgids() -> Vec<&'static str> {
         n_!("Zoom Out"),
         n_!("Fit to Content"),
         n_!("Fit"),
+        n_!("Mouse Controls"),
+        n_!("Left Button+Drag: Orbit"),
+        n_!("Shift+Left button+Drag: Pan"),
+        n_!("Mouse wheel: Zoom+/-"),
     ]
 }
 
-/// The view buttons, row by row: label, tooltip msgid and view.
+/// The view buttons, row by row: label (empty for the isometric corners, which draw an
+/// arrow), tooltip msgid and view.
 const VIEWS: [[(&str, &str, StdView); 3]; 3] = [
     [
-        ("NW", "Isometric (NW)", StdView::IsoNw),
+        ("", "Isometric (NW)", StdView::IsoNw),
         ("T", "Top View", StdView::Top),
-        ("NE", "Isometric (NE)", StdView::IsoNe),
+        ("", "Isometric (NE)", StdView::IsoNe),
     ],
     [
         ("L", "Left View", StdView::Left),
@@ -57,9 +64,9 @@ const VIEWS: [[(&str, &str, StdView); 3]; 3] = [
         ("R", "Right View", StdView::Right),
     ],
     [
-        ("SW", "Isometric (SW)", StdView::IsoSw),
+        ("", "Isometric (SW)", StdView::IsoSw),
         ("B", "Bottom View", StdView::Bottom),
-        ("SE", "Isometric (SE)", StdView::IsoSe),
+        ("", "Isometric (SE)", StdView::IsoSe),
     ],
 ];
 
@@ -67,19 +74,62 @@ const VIEWS: [[(&str, &str, StdView); 3]; 3] = [
 const BUTTON: f32 = 30.0;
 /// Gap between buttons in points.
 const GAP: f32 = 2.0;
+/// Gap between the grid and the column of extra buttons under it, in points.
+const COLUMN_GAP: f32 = 8.0;
 /// Margin from the pane's top-right corner in points.
 const MARGIN: f32 = 10.0;
 
-/// A square button named `name` for accessibility, with `name` as its tooltip.
-fn button(ui: &mut egui::Ui, label: &str, name: &str) -> bool {
-    let response = ui
-        .add_sized([BUTTON, BUTTON], egui::Button::new(label))
-        .on_hover_text(name);
-    response.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, name));
-    response.clicked()
+/// The screen direction of the arrow each isometric corner draws (GTK's arrow icons).
+fn corner_arrow(view: StdView) -> Option<egui::Vec2> {
+    match view {
+        StdView::IsoNw => Some(egui::vec2(-1.0, -1.0)),
+        StdView::IsoNe => Some(egui::vec2(1.0, -1.0)),
+        StdView::IsoSw => Some(egui::vec2(-1.0, 1.0)),
+        StdView::IsoSe => Some(egui::vec2(1.0, 1.0)),
+        StdView::Top | StdView::Bottom | StdView::Front | StdView::Left | StdView::Right => None,
+    }
 }
 
-/// Draws the nav cube in the top-right corner of `rect`.
+/// A square button at `rect` showing `label` in GTK's small bold type, named `name` for
+/// accessibility, with `name` as its tooltip.
+fn button(ui: &mut egui::Ui, rect: egui::Rect, label: &str, name: &str) -> egui::Response {
+    let text = egui::RichText::new(label).small().strong();
+    let response = ui
+        .put(rect, framed(ui, egui::Button::new(text)))
+        .on_hover_text(name);
+    response.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, name));
+    response
+}
+
+/// `button` in GTK's OSD look: a lighter fill and a border, so it stands out on the view,
+/// with its text kept on one line.
+fn framed<'a>(ui: &egui::Ui, button: egui::Button<'a>) -> egui::Button<'a> {
+    let visuals = &ui.visuals().widgets;
+    button
+        .fill(visuals.hovered.weak_bg_fill)
+        .stroke(visuals.noninteractive.bg_stroke)
+        .wrap_mode(egui::TextWrapMode::Extend)
+}
+
+/// Draws a small arrow pointing along `direction` in the middle of `rect`.
+fn paint_arrow(ui: &egui::Ui, rect: egui::Rect, direction: egui::Vec2) {
+    let dir = direction.normalized();
+    let stroke = egui::Stroke::new(1.5, ui.visuals().text_color());
+    ui.painter()
+        .arrow(rect.center() - dir * 5.0, dir * 10.0, stroke);
+}
+
+/// The rectangle of the button in grid `row` and `col` of the nav cube placed at `origin`.
+fn cell(origin: egui::Pos2, row: usize, col: usize) -> egui::Rect {
+    let pitch = BUTTON + GAP;
+    egui::Rect::from_min_size(
+        origin + egui::vec2(col as f32 * pitch, row as f32 * pitch),
+        egui::vec2(BUTTON, BUTTON),
+    )
+}
+
+/// Draws the nav cube in the top-right corner of `rect`: the 3x3 view grid, the zoom row
+/// and, under its right column, GTK's floating Top View and Mouse Controls buttons.
 ///
 /// # Arguments
 /// * `ui` - The visualizer's `Ui`.
@@ -89,37 +139,65 @@ fn button(ui: &mut egui::Ui, label: &str, name: &str) -> bool {
 /// # Returns
 /// The action of the button clicked this frame, if any.
 pub fn show(ui: &mut egui::Ui, rect: egui::Rect, tr: &Translator) -> Option<NavAction> {
+    ui.scope_builder(egui::UiBuilder::new().max_rect(rect), |ui| {
+        // Small padding, so no label or icon makes its button outgrow the 30-point cell.
+        ui.spacing_mut().button_padding = egui::vec2(2.0, 2.0);
+        show_buttons(ui, rect, tr)
+    })
+    .inner
+}
+
+/// Draws the nav cube's buttons; see [`show`].
+fn show_buttons(ui: &mut egui::Ui, rect: egui::Rect, tr: &Translator) -> Option<NavAction> {
     let width = 3.0 * BUTTON + 2.0 * GAP;
-    let height = 4.0 * BUTTON + 3.0 * GAP;
-    let area = egui::Rect::from_min_size(
-        egui::pos2(rect.right() - MARGIN - width, rect.top() + MARGIN),
-        egui::vec2(width, height),
-    );
+    let origin = egui::pos2(rect.right() - MARGIN - width, rect.top() + MARGIN);
     let mut action = None;
-    ui.scope_builder(egui::UiBuilder::new().max_rect(area), |ui| {
-        ui.spacing_mut().item_spacing = egui::vec2(GAP, GAP);
-        for row in VIEWS {
-            ui.horizontal(|ui| {
-                for (label, msgid, view) in row {
-                    if button(ui, label, &tr.tr(msgid)) {
-                        action = Some(NavAction::View(view));
-                    }
-                }
-            });
-        }
-        ui.horizontal(|ui| {
-            let fit = tr.tr("Fit");
-            let zoom = [
-                ("-", "Zoom Out", NavAction::ZoomOut),
-                (fit.as_ref(), "Fit to Content", NavAction::Fit),
-                ("+", "Zoom In", NavAction::ZoomIn),
-            ];
-            for (label, msgid, act) in zoom {
-                if button(ui, label, &tr.tr(msgid)) {
-                    action = Some(act);
-                }
+    for (row, views) in VIEWS.into_iter().enumerate() {
+        for (col, (label, msgid, view)) in views.into_iter().enumerate() {
+            let at = cell(origin, row, col);
+            if button(ui, at, label, &tr.tr(msgid)).clicked() {
+                action = Some(NavAction::View(view));
             }
-        });
-    });
+            if let Some(direction) = corner_arrow(view) {
+                paint_arrow(ui, at, direction);
+            }
+        }
+    }
+    let fit = tr.tr("Fit");
+    let zoom = [
+        ("-", "Zoom Out", NavAction::ZoomOut),
+        (fit.as_ref(), "Fit to Content", NavAction::Fit),
+        ("+", "Zoom In", NavAction::ZoomIn),
+    ];
+    for (col, (label, msgid, act)) in zoom.into_iter().enumerate() {
+        if button(ui, cell(origin, 3, col), label, &tr.tr(msgid)).clicked() {
+            action = Some(act);
+        }
+    }
+    let column = origin + egui::vec2(0.0, COLUMN_GAP);
+    let top = tr.tr("Top View");
+    let top_rect = cell(column, 4, 2);
+    let image = crate::icons::app_icon(ui, "top_view.svg", BUTTON * 0.6);
+    let response = match image {
+        Some(image) => ui.put(top_rect, framed(ui, egui::Button::image(image))),
+        None => ui.put(top_rect, framed(ui, egui::Button::new("T"))),
+    }
+    .on_hover_text(top.as_ref());
+    response.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, top.as_ref()));
+    if response.clicked() {
+        action = Some(NavAction::View(StdView::Top));
+    }
+    let help = [
+        tr.tr("Left Button+Drag: Orbit").into_owned(),
+        tr.tr("Shift+Left button+Drag: Pan").into_owned(),
+        tr.tr("Mouse wheel: Zoom+/-").into_owned(),
+    ]
+    .join("\n");
+    let name = tr.tr("Mouse Controls").into_owned();
+    let text = egui::RichText::new("?").small().strong();
+    let response = ui
+        .put(cell(column, 5, 2), framed(ui, egui::Button::new(text)))
+        .on_hover_text(format!("{name}\n{help}"));
+    response.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, &name));
     action
 }

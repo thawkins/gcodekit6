@@ -257,11 +257,12 @@ const PAGE_CONTROLS: &[(Command, Page, &str)] = &[
     (Command::ViewTop, Page::Visualizer, "Top View"),
     (Command::ViewFront, Page::Visualizer, "Front View"),
     (Command::ViewIso, Page::Visualizer, "Isometric (SE)"),
+    (Command::ResetView, Page::Visualizer, "Reset View"),
 ];
 
-/// The commands the menus leave out that only a key runs: Reset View (`Cmd+0` while the
-/// Visualizer has the keyboard), which GTK had no menu item for either.
-const KEY_ONLY: &[Command] = &[Command::ResetView];
+/// The commands the menus leave out that only a key runs: none since Reset View got its
+/// sidebar button (it keeps `Cmd+0`).
+const KEY_ONLY: &[Command] = &[];
 
 /// The menus hold every command but those with a page control ([`PAGE_CONTROLS`]), those
 /// only a key runs ([`KEY_ONLY`]) and those a page tab opens ([`Page::for_command`]), on
@@ -316,8 +317,9 @@ fn test_every_command_is_reachable() {
         if let Some((_, page, label)) = PAGE_CONTROLS.iter().find(|(c, _, _)| *c == command) {
             h.state_mut().show_page(*page);
             h.run_steps(2);
+            // Fit to Content and Top View are each on two buttons, as in GTK.
             assert!(
-                h.query_by_label(label).is_some(),
+                h.query_all_by_label(label).next().is_some(),
                 "{command:?}: no {label:?} on {page:?}"
             );
             continue;

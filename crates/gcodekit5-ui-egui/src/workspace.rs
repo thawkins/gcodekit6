@@ -773,7 +773,12 @@ fn inspector_header(ui: &mut egui::Ui, tr: &Translator) -> bool {
 ///
 /// # Returns
 /// Whether it was clicked.
-fn named_icon_button(ui: &mut egui::Ui, icon: crate::icons::Icon, label: &str, name: &str) -> bool {
+pub(crate) fn named_icon_button(
+    ui: &mut egui::Ui,
+    icon: crate::icons::Icon,
+    label: &str,
+    name: &str,
+) -> bool {
     let response = crate::icons::icon_button(ui, icon, label);
     let enabled = response.enabled();
     response.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, enabled, name));

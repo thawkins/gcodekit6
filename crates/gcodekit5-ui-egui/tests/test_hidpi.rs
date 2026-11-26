@@ -83,7 +83,9 @@ fn test_nav_cube_faces_hit_at_every_scale() -> TestResult {
                     },
                 ));
             harness.run();
-            let rect = harness.get_by_label(name).rect();
+            // The nav cube's button comes first: "Top View" is also the floating button
+            // under it, as in GTK.
+            let rect = harness.get_all_by_label(name).next().ok_or(name)?.rect();
             // Centre and a point just inside each corner: the edges of the hit area.
             let inset = egui::vec2(1.0, 1.0);
             let spots = [
