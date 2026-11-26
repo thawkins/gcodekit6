@@ -498,3 +498,48 @@ fn test_click_on_a_window_over_the_pane_does_not_arm_jog() {
         shared.log()
     );
 }
+
+/// A click on the menu bar takes the keyboard from Machine Control, and leaving the page
+/// then remembers no pane: coming back, a digit does not jog.
+#[test]
+fn test_menu_bar_click_then_page_return_does_not_arm_jog() {
+    let (mut harness, shared) = keyboard_app(false);
+    harness.get_by_label("File").click();
+    harness.step();
+    harness.key_press(egui::Key::Escape);
+    harness.step();
+    harness.step();
+    tab(&mut harness, "Visualizer");
+    tab(&mut harness, "Machine Control");
+    tap(&mut harness, egui::Key::Num6);
+    assert!(
+        settled_jogs(&harness, &shared).is_empty(),
+        "{:?}",
+        shared.log()
+    );
+}
+
+/// Machine Control gets the keys back on every return it had them when left, even after a
+/// press in another page in between.
+#[test]
+fn test_keys_return_with_the_page_after_a_press_elsewhere() {
+    let (mut harness, shared) = keyboard_app(false);
+    tab(&mut harness, "Visualizer");
+    // A press in the Visualizer's view (below the tabs).
+    let view = harness
+        .get_by_role_and_label(egui::accesskit::Role::Button, "Zoom In")
+        .rect();
+    click_at(
+        &mut harness,
+        egui::pos2(view.center().x, view.bottom() + 200.0),
+    );
+    tab(&mut harness, "Machine Control");
+    tab(&mut harness, "Visualizer");
+    tab(&mut harness, "Machine Control");
+    tap(&mut harness, egui::Key::Num6);
+    assert!(
+        wait_until(|| jogs(&shared).len() == 1),
+        "{:?}",
+        shared.log()
+    );
+}

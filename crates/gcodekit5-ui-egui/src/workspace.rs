@@ -491,9 +491,12 @@ pub struct Workspace {
     /// For each page left, the pane that had the keyboard there, restored on return; none
     /// when a widget (a text field) had it, since its focus does not survive the hidden page.
     page_keyboard: Vec<(Page, Option<PaneId>)>,
-    /// Whether a widget had the keyboard at the end of the last frame without a press
-    /// outside every pane (the press on a page tab does not count).
+    /// Whether a widget had the keyboard at the end of the last frame without a press on
+    /// the page tabs.
     widget_focused: bool,
+    /// Where the page tabs were last drawn: a press on them changes the page, not which
+    /// pane has the keyboard.
+    tabs_rect: Option<egui::Rect>,
 }
 
 /// The panes whose bodies a frame drew; the others have their holds cancelled
@@ -536,6 +539,7 @@ impl Workspace {
             inspector_hidden: false,
             page_keyboard: Vec::new(),
             widget_focused: false,
+            tabs_rect: None,
         }
     }
 
@@ -557,7 +561,7 @@ impl Workspace {
             // digit typed on return must not jog. A press in the pane gives it back then.
             self.cancel_holds();
             let left = self
-                .active
+                .focused
                 .filter(|pane| self.page.panes().contains(pane) && !self.widget_focused);
             self.page_keyboard.retain(|(p, _)| *p != self.page);
             self.page_keyboard.push((self.page, left));
@@ -735,8 +739,12 @@ impl Workspace {
     ///
     /// # Returns
     /// The page whose tab was clicked this frame, if any; the caller shows it.
-    pub fn show_tabs(&self, ui: &mut egui::Ui, tr: &Translator) -> Option<Page> {
+    pub fn show_tabs(&mut self, ui: &mut egui::Ui, tr: &Translator) -> Option<Page> {
         let row = ui.available_rect_before_wrap();
+        self.tabs_rect = Some(egui::Rect::from_min_size(
+            row.min,
+            egui::vec2(row.width(), TAB_HEIGHT),
+        ));
         let width = row.width() / Page::ALL.len() as f32;
         let mut clicked = None;
         for (i, page) in Page::ALL.into_iter().enumerate() {
@@ -833,11 +841,21 @@ impl Workspace {
             Page::CamTools => frame.pane(ui, PaneId::CamTools),
             Page::DeviceManager | Page::DeviceConfig | Page::CncTools | Page::Materials => {}
         }
-        if press.is_some() {
+        // A press on the page tabs only changes the page: the keyboard stays with the pane
+        // that has it, so leaving the page remembers that pane. Any other press outside
+        // every pane (the menu bar, the status bar, a window) takes the keyboard from them.
+        let on_tabs = press.is_some_and(|pos| {
+            self.tabs_rect.is_some_and(|tabs| tabs.contains(pos))
+                && ui
+                    .ctx()
+                    .layer_id_at(pos)
+                    .is_none_or(|layer| layer == ui.layer_id())
+        });
+        if press.is_some() && !on_tabs {
             self.focused = frame.pressed_in;
             self.active = frame.pressed_in.or(self.active);
         }
-        if press.is_none() || self.focused.is_some() {
+        if !on_tabs {
             self.widget_focused = ui.ctx().memory(|m| m.focused().is_some());
         }
         self.drawn = frame.drawn;
