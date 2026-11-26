@@ -74,6 +74,8 @@ mod test_designer_gallery;
 mod test_designer_import;
 #[path = "test_designer_layers.rs"]
 mod test_designer_layers;
+#[path = "test_designer_page_layout.rs"]
+mod test_designer_page_layout;
 #[path = "test_designer_properties.rs"]
 mod test_designer_properties;
 #[path = "test_designer_properties_cam.rs"]
