@@ -68,6 +68,7 @@ Status values:
 | Enter a position by clicking the DRO | 10-machine-control | Not applicable | Not in the GTK source |
 | Step jog with the step presets | 10-machine-control | Ported | `test_machine_pane::jog_x_positive_sends_jog`, `test_machine_jog::jog_step_in_inches` |
 | Continuous (press-and-hold) jog | 10-machine-control | Ported | `test_machine_jog::hold_survives_long_press_and_cancels_once_on_release` and 9 more `hold_*` tests |
+| Rotary jog (A, B, C) | 10-machine-control, 6AXIS | Ported | `test_machine_rotary_jog::rotary_jog_steps_by_the_rotary_increment`, `test_machine_rotary_jog::rotary_jog_disabled_outside_idle`, `test_machine_rotary_jog::rotary_hold_cancels_on_release`, `test_machine_rotary_jog::rotary_hold_cancelled_when_the_axis_row_goes` (GTK's `-`/`+` buttons in each reported rotary axis row; step in degrees from the rotary jog increment; Continuous holds up to the axis limit) |
 | Jog feed rate | 10-machine-control | Ported | `app/test_machine_controller::jog_writes_jog_command` |
 | Jog blocked in Alarm and while a job runs | 10-machine-control | Ported | `test_machine_jog::jog_refused_in_home_and_alarm`, `test_machine_jog::hold_cancelled_on_stream_start` |
 | Jog limited to machine travel (soft limits) | 10-machine-control, 85-safety | Ported | `test_machine_jog::hold_clamped_to_remaining_travel`, `test_machine_jog::hold_refused_at_limit` |

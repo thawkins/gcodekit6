@@ -51,6 +51,7 @@ pub(super) const MSGIDS: &[&str] = &[
     n_!("Jog refused: the machine position is unknown."),
     n_!("Jog refused: no travel left in that direction."),
     n_!("Jog refused: the machine is not idle."),
+    n_!("Jog"),
 ];
 
 /// Default step, feed and travel, as `MachineSettings` defaults them.
@@ -189,13 +190,20 @@ pub(super) struct JogPanel {
     continuous: bool,
     /// The hold in continuous mode.
     held: Option<Hold>,
+    /// The rotary jog step in degrees (Preferences > Machine > rotary jog increment).
+    rotary_step_deg: f32,
+    /// A, B and C limits in degrees: how far a continuous rotary hold moves at most.
+    rotary_limit_deg: [f32; 3],
+    /// Whether this frame drew the button of the pointer hold in progress.
+    hold_button_drawn: bool,
 }
 
 /// A continuous jog in progress.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct Hold {
-    /// The jog command (which button, or which key's command).
-    command: Command,
+    /// The axis jogged and whether toward + (before inversion): which button, or which
+    /// key's command.
+    target: (Axis, bool),
     /// The key held, for a hold a key started; `None` for a button hold.
     key: Option<JogKey>,
     /// When a frame last confirmed a keyboard hold (its key still down, nothing ending it).
@@ -239,6 +247,9 @@ impl JogPanel {
             feed_units: FeedRateUnits::MmPerMin,
             continuous: false,
             held: None,
+            rotary_step_deg: 1.0,
+            rotary_limit_deg: [360.0; 3],
+            hold_button_drawn: false,
         }
     }
 
@@ -259,6 +270,39 @@ impl JogPanel {
                 current[i]
             }
         });
+    }
+
+    /// Starts a frame of the jog buttons: no hold button drawn yet.
+    pub(super) fn begin_frame(&mut self) {
+        self.hold_button_drawn = false;
+    }
+
+    /// Ends a frame of the jog buttons: a pointer hold whose button was not drawn (a rotary
+    /// axis the machine stopped reporting) ends.
+    ///
+    /// # Returns
+    /// Whether a hold ended (the caller sends 0x85).
+    pub(super) fn end_frame(&mut self) -> bool {
+        let orphan = self
+            .held
+            .is_some_and(|h| h.key.is_none() && !self.hold_button_drawn);
+        if orphan {
+            self.held = None;
+        }
+        orphan
+    }
+
+    /// Sets the rotary jog step and the A, B and C limits, in degrees; values that are not
+    /// positive keep the current ones.
+    pub(super) fn configure_rotary(&mut self, step_deg: f32, limits_deg: [f32; 3]) {
+        if step_deg.is_finite() && step_deg > 0.0 {
+            self.rotary_step_deg = step_deg;
+        }
+        for (limit, new) in self.rotary_limit_deg.iter_mut().zip(limits_deg) {
+            if new.is_finite() && new > 0.0 {
+                *limit = new;
+            }
+        }
     }
 
     /// The step in mm.
@@ -307,7 +351,7 @@ impl JogPanel {
         match self.hold_distance(button, status) {
             Ok(distance_mm) => {
                 self.held = Some(Hold {
-                    command,
+                    target: (button.axis, button.sign > 0.0),
                     key: Some(key),
                     confirmed: Instant::now(),
                 });
@@ -408,11 +452,40 @@ impl JogPanel {
         .sense(egui::Sense::click_and_drag());
         let response = ui.add_enabled(enabled, widget).on_hover_text(label.clone());
         response.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, enabled, &label));
+        let step = self.step_mm;
+        self.drive_button(
+            ui,
+            &response,
+            (button.axis, button.sign),
+            (enabled, step),
+            actions,
+            |panel| panel.hold_distance(button, status),
+        );
+    }
+
+    /// Runs a jog button's step click or press-and-hold, for a pad button or a rotary one.
+    ///
+    /// # Arguments
+    /// * `ui` - The button's `Ui` (for the pointer).
+    /// * `response` - The button.
+    /// * `(axis, sign)` - The axis and +1 or -1, before inversion.
+    /// * `(enabled, step)` - Whether the button is enabled, and the step (mm or degrees).
+    /// * `actions` - Where what it asks for goes.
+    /// * `hold` - The distance of a hold, or why it is refused.
+    fn drive_button(
+        &mut self,
+        ui: &egui::Ui,
+        response: &egui::Response,
+        (axis, sign): (Axis, f32),
+        (enabled, step): (bool, f32),
+        actions: &mut Vec<Action>,
+        hold: impl FnOnce(&Self) -> Result<f32, &'static str>,
+    ) {
         if !self.continuous {
             if response.clicked() {
                 actions.push(Action::Move {
-                    axis: button.axis,
-                    distance_mm: directed(button.axis, button.sign * self.step_mm),
+                    axis,
+                    distance_mm: directed(axis, sign * step),
                     feed_mm_min: self.feed_mm_min,
                 });
             }
@@ -427,10 +500,11 @@ impl JogPanel {
             )
         });
         let on_button = |p: Option<egui::Pos2>| p.is_some_and(|p| response.rect.contains(p));
-        let pointer_hold = |held: Option<Hold>| {
-            held.is_some_and(|h| h.key.is_none() && h.command == button.command)
-        };
+        let target = (axis, sign > 0.0);
+        let pointer_hold =
+            |held: Option<Hold>| held.is_some_and(|h| h.key.is_none() && h.target == target);
         if pointer_hold(self.held) {
+            self.hold_button_drawn = true;
             if !(enabled && down && on_button(pos)) {
                 self.held = None;
                 actions.push(Action::Cancel);
@@ -441,21 +515,72 @@ impl JogPanel {
             && on_button(press_origin)
             && response.contains_pointer()
         {
-            match self.hold_distance(button, status) {
+            match hold(self) {
                 Ok(distance_mm) => {
                     self.held = Some(Hold {
-                        command: button.command,
+                        target,
                         key: None,
                         confirmed: Instant::now(),
                     });
+                    self.hold_button_drawn = true;
                     actions.push(Action::Move {
-                        axis: button.axis,
+                        axis,
                         distance_mm,
                         feed_mm_min: self.feed_mm_min,
                     });
                 }
                 Err(msgid) => actions.push(Action::Refused(msgid)),
             }
+        }
+    }
+
+    /// Draws the `-` and `+` jog buttons of the rotary `axis` (GTK's buttons in the axis's
+    /// readout row), stepping by the rotary step in degrees, or in continuous mode holding
+    /// a move of the axis's configured limit, under the pad's rules and guards.
+    ///
+    /// # Arguments
+    /// * `ui` - Where to draw.
+    /// * `tr` - Translator.
+    /// * `axis` - A, B or C.
+    /// * `enabled` - As the pad's buttons: connected, no stream, jogging allowed.
+    /// * `actions` - Where what they ask for goes.
+    pub(super) fn rotary_buttons(
+        &mut self,
+        ui: &mut egui::Ui,
+        tr: &Translator,
+        axis: Axis,
+        enabled: bool,
+        actions: &mut Vec<Action>,
+    ) {
+        let index = match axis {
+            Axis::A => 0,
+            Axis::B => 1,
+            Axis::C => 2,
+            Axis::X | Axis::Y | Axis::Z => return,
+        };
+        let limit = self.rotary_limit_deg[index];
+        let step = self.rotary_step_deg;
+        for (text, sign) in [("-", -1.0_f32), ("+", 1.0)] {
+            let name = format!("{} {}{text}", tr.tr("Jog"), axis.letter());
+            let widget = egui::Button::new(egui::RichText::new(text).strong())
+                .min_size(egui::vec2(32.0, 32.0))
+                .sense(egui::Sense::click_and_drag());
+            let response = ui.add_enabled(enabled, widget).on_hover_text(&name);
+            response.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, enabled, &name));
+            self.drive_button(
+                ui,
+                &response,
+                (axis, sign),
+                (enabled, step),
+                actions,
+                |_| {
+                    if limit > 0.0 {
+                        Ok(directed(axis, sign * limit))
+                    } else {
+                        Err(n_!("Jog refused: no travel left in that direction."))
+                    }
+                },
+            );
         }
     }
 

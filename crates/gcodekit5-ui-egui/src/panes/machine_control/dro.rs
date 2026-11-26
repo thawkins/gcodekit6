@@ -76,13 +76,15 @@ pub(super) fn work_title(tr: &Translator, units: MeasurementSystem) -> String {
     )
 }
 
-/// Draws the work position rows (`WX 0.00 [Zero]`), each with its Zero button; returns the
-/// axis whose Zero was clicked.
+/// Draws the work position rows (`WX 0.00 [Zero]`), each with its Zero button, and after a
+/// rotary axis's Zero its jog buttons (`rotary_jog`); returns the axis whose Zero was
+/// clicked.
 pub(super) fn show_work(
     ui: &mut egui::Ui,
     status: &MachineStatus,
     units: MeasurementSystem,
     zero: &ZeroButtons,
+    rotary_jog: &mut dyn FnMut(&mut egui::Ui, Axis),
 ) -> Option<Axis> {
     let position = status.work_position();
     let mut clicked = None;
@@ -129,6 +131,7 @@ pub(super) fn show_work(
                 if zero_button(ui, zero, letter) {
                     clicked = Some(axis);
                 }
+                ui.horizontal(|ui| rotary_jog(ui, axis));
                 ui.end_row();
             }
         });

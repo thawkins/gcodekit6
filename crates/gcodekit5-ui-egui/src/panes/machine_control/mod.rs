@@ -259,6 +259,10 @@ impl MachineControlPane {
                 .unwrap_or(0.0)
         });
         self.jog.configure(self.units, self.feed_units, travel);
+        self.jog.configure_rotary(
+            machine.jog_increment_rotary as f32,
+            [machine.a_limit, machine.b_limit, machine.c_limit].map(|v| v as f32),
+        );
     }
 
     /// Ends a hold-to-jog in progress with jog cancel (0x85).
@@ -859,8 +863,18 @@ impl MachineControlPane {
         let probe_enabled =
             status.connected && self.probe.is_none() && !machine.is_some_and(Machine::job_running);
         let probe_text = self.probe_text.as_deref();
+        self.jog.begin_frame();
+        // Rotary jog buttons in the readout rows: the pad's guards (read after this frame's
+        // Home/Unlock buttons) and rules.
+        let rotary_enabled =
+            status.connected && !status.streaming && machine.is_some_and(|m| m.jog_allowed());
+        let mut rotary_actions = Vec::new();
+        let jog = &mut self.jog;
+        let mut rotary_jog = |ui: &mut egui::Ui, axis: Axis| {
+            jog.rotary_buttons(ui, tr, axis, rotary_enabled, &mut rotary_actions);
+        };
         let (zeroed, wcs_action, quick) = if stacked {
-            let zeroed = dro::show_work(ui, status, units, &zero);
+            let zeroed = dro::show_work(ui, status, units, &zero, &mut rotary_jog);
             ui.add_space(6.0);
             let action = wcs.show_zero_actions(ui, tr, status);
             let quick = quick_probe::show(ui, tr, probe_enabled, probe_text);
@@ -868,7 +882,7 @@ impl MachineControlPane {
         } else {
             ui.horizontal(|ui| {
                 let zeroed = ui
-                    .vertical(|ui| dro::show_work(ui, status, units, &zero))
+                    .vertical(|ui| dro::show_work(ui, status, units, &zero, &mut rotary_jog))
                     .inner;
                 ui.add_space(16.0);
                 ui.vertical(|ui| {
@@ -885,6 +899,12 @@ impl MachineControlPane {
             })
             .inner
         };
+        for action in rotary_actions {
+            if !matches!(action, jog::Action::Refused(_)) {
+                self.notice = None;
+            }
+            self.jog_action(action, tr);
+        }
         if let Some(quick) = quick {
             self.start_quick_probe(machine, tr, quick);
         }
@@ -913,6 +933,9 @@ impl MachineControlPane {
                 });
             }
         });
+        if self.jog.end_frame() {
+            self.with_controller(|c| c.realtime(RealtimeCommand::JogCancel));
+        }
         if estop {
             self.emergency_stop();
         }
