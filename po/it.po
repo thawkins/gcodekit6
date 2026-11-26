@@ -4625,3 +4625,6 @@ msgstr "Rimozione del materiale troppo grande per essere visualizzata su questa 
 
 msgid "The controller did not confirm the override change."
 msgstr "Il controller non ha confermato la modifica dell'override."
+
+msgid "Rotary calibration is not a number: check Preferences > Machine."
+msgstr "La calibrazione dell'asse rotativo non è un numero: controllare Preferenze > Macchina."

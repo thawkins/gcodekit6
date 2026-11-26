@@ -101,6 +101,7 @@ const MSGIDS: &[&str] = &[
     ZERO_NOT_IDLE,
     WCS_CHANGED,
     OVERRIDE_NOT_CONFIRMED,
+    CALIBRATION_NOT_A_NUMBER,
 ];
 
 /// A work zero command refused while a job runs.
@@ -113,6 +114,9 @@ const GO_TO_ZERO_NOT_IDLE: &str = n_!("Go to Work Zero refused: the machine is n
 const ZERO_NOT_IDLE: &str = n_!("Zero refused: the machine is not idle.");
 /// Zero All Axes refused at Yes: the active system is no longer the one the question named.
 const WCS_CHANGED: &str = n_!("Zero All refused: the work coordinate system changed.");
+/// A rotary Zero refused: Preferences hold a calibration that is not a number.
+const CALIBRATION_NOT_A_NUMBER: &str =
+    n_!("Rotary calibration is not a number: check Preferences > Machine.");
 /// A Set % target ended without the controller confirming a step.
 const OVERRIDE_NOT_CONFIRMED: &str = n_!("The controller did not confirm the override change.");
 
@@ -370,7 +374,13 @@ impl MachineControlPane {
         };
         let calibration = self.rotary_calibration[index];
         match self.work_zero_target(machine, ZERO_NOT_IDLE) {
-            Ok(wcs) => self.send_line(&zero_rotary_command(wcs, axis, calibration)),
+            Ok(wcs) => match zero_rotary_command(wcs, axis, calibration) {
+                Some(line) => self.send_line(&line),
+                None => {
+                    tracing::warn!(?axis, calibration, "rotary calibration not finite");
+                    self.refuse(tr, CALIBRATION_NOT_A_NUMBER);
+                }
+            },
             Err(msgid) => self.refuse(tr, msgid),
         }
     }

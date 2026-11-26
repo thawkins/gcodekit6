@@ -29,15 +29,31 @@ fn test_zero_axes_command_uses_the_wcs_p_number() {
 /// writes the rotary calibration value.
 #[test]
 fn test_zero_rotary_command_uses_p_number_and_calibration() {
-    assert_eq!(zero_rotary_command(Wcs::G54, Axis::A, 0.0), "G10 L20 P1 A0");
+    let line = |wcs, axis, value| zero_rotary_command(wcs, axis, value);
     assert_eq!(
-        zero_rotary_command(Wcs::G55, Axis::B, 12.5),
-        "G10 L20 P2 B12.5"
+        line(Wcs::G54, Axis::A, 0.0).as_deref(),
+        Some("G10 L20 P1 A0")
     );
     assert_eq!(
-        zero_rotary_command(Wcs::G59, Axis::C, -3.25),
-        "G10 L20 P6 C-3.25"
+        line(Wcs::G55, Axis::B, 12.5).as_deref(),
+        Some("G10 L20 P2 B12.5")
     );
+    assert_eq!(
+        line(Wcs::G59, Axis::C, -3.25).as_deref(),
+        Some("G10 L20 P6 C-3.25")
+    );
+}
+
+/// A calibration is sent with at most 3 decimals, and a non-finite one not at all.
+#[test]
+fn test_zero_rotary_command_rounds_and_refuses_non_finite() {
+    let line = |value| zero_rotary_command(Wcs::G54, Axis::A, value);
+    assert_eq!(line(0.1 + 0.2).as_deref(), Some("G10 L20 P1 A0.3"));
+    assert_eq!(line(90.00049).as_deref(), Some("G10 L20 P1 A90"));
+    assert_eq!(line(-0.0001).as_deref(), Some("G10 L20 P1 A0"));
+    assert_eq!(line(100.0).as_deref(), Some("G10 L20 P1 A100"));
+    assert_eq!(line(f64::NAN), None);
+    assert_eq!(line(f64::INFINITY), None);
 }
 
 #[test]

@@ -4546,3 +4546,6 @@ msgstr ""
 
 msgid "The controller did not confirm the override change."
 msgstr ""
+
+msgid "Rotary calibration is not a number: check Preferences > Machine."
+msgstr ""

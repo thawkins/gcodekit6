@@ -4625,3 +4625,6 @@ msgstr "Eliminación de material demasiado grande para mostrarse en esta GPU."
 
 msgid "The controller did not confirm the override change."
 msgstr "El controlador no confirmó el cambio de ajuste."
+
+msgid "Rotary calibration is not a number: check Preferences > Machine."
+msgstr "La calibración del eje rotativo no es un número: revise Preferencias > Máquina."

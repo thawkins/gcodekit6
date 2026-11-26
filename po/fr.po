@@ -4629,3 +4629,6 @@ msgstr "Enlèvement de matière trop volumineux pour être affiché sur ce GPU."
 
 msgid "The controller did not confirm the override change."
 msgstr "Le contrôleur n'a pas confirmé la modification de la correction."
+
+msgid "Rotary calibration is not a number: check Preferences > Machine."
+msgstr "L'étalonnage de l'axe rotatif n'est pas un nombre : vérifiez Préférences > Machine."
