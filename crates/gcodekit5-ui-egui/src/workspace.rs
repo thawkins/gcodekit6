@@ -543,9 +543,15 @@ impl Workspace {
     pub fn set_page(&mut self, page: Page) {
         if page != self.page {
             // Leaving a page ends its keyboard and pointer holds at once, and its panes lose
-            // the keyboard: a key pressed on the new page never reaches them.
+            // the keyboard. The new page's main pane takes it, when it has keys (Machine
+            // Control, the Visualizer), as in GTK, where the page's keys worked once it was
+            // shown; a focused text field still keeps every plain key from it.
             self.cancel_holds();
-            self.focused = None;
+            self.focused = page
+                .panes()
+                .first()
+                .copied()
+                .filter(|pane| pane.keymap_scope().is_some());
         }
         self.page = page;
     }

@@ -348,3 +348,48 @@ fn test_continuous_key_hold_cancelled_when_frames_stop() {
         "still connected"
     );
 }
+
+/// Clicks the page tab `label`.
+fn tab(harness: &mut Harness<'_, GcodeKitApp>, label: &str) {
+    harness
+        .get_by_role_and_label(egui::accesskit::Role::Tab, label)
+        .click();
+    harness.step();
+    harness.step();
+}
+
+/// As in GTK, the jog keys work again once the Machine Control page is shown, without a
+/// click in the pane; on another page they never jog.
+#[test]
+fn test_keys_jog_again_after_returning_to_machine_control() {
+    let (mut harness, shared) = keyboard_app(false);
+    tab(&mut harness, "Visualizer");
+    tap(&mut harness, egui::Key::Num6);
+    assert!(
+        settled_jogs(&harness, &shared).is_empty(),
+        "{:?}",
+        shared.log()
+    );
+    tab(&mut harness, "Machine Control");
+    tap(&mut harness, egui::Key::Num6);
+    assert!(
+        wait_until(|| jogs(&shared) == ["$J=G91 G21 X1.00 F1000"]),
+        "{:?}",
+        shared.log()
+    );
+}
+
+/// After returning to Machine Control, a focused text field still keeps the keys.
+#[test]
+fn test_keys_never_jog_after_return_while_typing() {
+    let (mut harness, shared) = keyboard_app(false);
+    tab(&mut harness, "Visualizer");
+    tab(&mut harness, "Machine Control");
+    crate::test_machine_pane::focus_entry(&mut harness);
+    tap(&mut harness, egui::Key::Num6);
+    assert!(
+        settled_jogs(&harness, &shared).is_empty(),
+        "{:?}",
+        shared.log()
+    );
+}
