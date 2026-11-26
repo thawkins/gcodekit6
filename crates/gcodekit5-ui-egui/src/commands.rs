@@ -7,11 +7,15 @@
 //! overrides under, so they must not change once released.
 //!
 //! Most bindings work anywhere in the window; the visualizer's view keys work only while the
-//! Visualizer has the keyboard. For machine safety, the jog commands have no default keys and
-//! Escape is bound to nothing: GTK never registered Escape or the arrow keys (the
-//! accelerators.rs constants were unused), an Escape or arrow key meant for a widget must never
-//! move or reset the machine, and craft-keymap cannot tell GTK's numeric-keypad jog keys from
-//! the top-row digits. Jogging stays in the Machine Control pane.
+//! Visualizer has the keyboard. The jog keys are GTK's numeric keypad digits (8/2 Y+/Y-, 4/6
+//! X-/X+, 9/3 Z+/Z-), bound in the Machine Control scope only: they run only after the user
+//! pressed in that pane, never while a widget (a text field, an open dropdown) has the
+//! keyboard. egui reports the keypad digits as the top-row digits, so those jog too, as they
+//! did in GTK, which matched the typed character. A held key jogs continuously in Continuous
+//! mode, until it is released (see `panes::machine_control`). For machine safety Escape and
+//! the arrow keys are bound to nothing: GTK never registered them (the accelerators.rs
+//! constants were unused), and an Escape or arrow key meant for a widget must never move or
+//! reset the machine.
 //!
 //! Feed hold and soft reset each have a modifier chord, `Cmd+Shift+H` and `Cmd+Shift+K` (Ctrl
 //! off macOS), that works anywhere in the window, also while a text field has the keyboard:
@@ -243,14 +247,14 @@ impl Command {
             Command::SoftReset => ("machine.soft_reset", n_!("Reset"), App, &["Cmd+Shift+K"]),
             Command::Home => ("machine.home", n_!("Home"), App, &["Cmd+Home"]),
             Command::Unlock => ("machine.unlock", n_!("Unlock"), App, &["Cmd+U"]),
-            // No default keys: GTK jogs from the numeric keypad (8/2/4/6/9/3), which
-            // craft-keymap folds into the top-row digits, and arrows move between widgets.
-            Command::JogXPos => ("jog.x_pos", n_!("Jog X+"), MC, &[]),
-            Command::JogXNeg => ("jog.x_neg", n_!("Jog X-"), MC, &[]),
-            Command::JogYPos => ("jog.y_pos", n_!("Jog Y+"), MC, &[]),
-            Command::JogYNeg => ("jog.y_neg", n_!("Jog Y-"), MC, &[]),
-            Command::JogZPos => ("jog.z_pos", n_!("Jog Z+"), MC, &[]),
-            Command::JogZNeg => ("jog.z_neg", n_!("Jog Z-"), MC, &[]),
+            // GTK's numeric keypad keys (egui folds them into the top-row digits), in the
+            // Machine Control scope only; arrows move between widgets.
+            Command::JogXPos => ("jog.x_pos", n_!("Jog X+"), MC, &["6"]),
+            Command::JogXNeg => ("jog.x_neg", n_!("Jog X-"), MC, &["4"]),
+            Command::JogYPos => ("jog.y_pos", n_!("Jog Y+"), MC, &["8"]),
+            Command::JogYNeg => ("jog.y_neg", n_!("Jog Y-"), MC, &["2"]),
+            Command::JogZPos => ("jog.z_pos", n_!("Jog Z+"), MC, &["9"]),
+            Command::JogZNeg => ("jog.z_neg", n_!("Jog Z-"), MC, &["3"]),
             Command::ZoomFit => ("view.zoom_fit", n_!("Zoom to Fit"), VIS, &["F"]),
             Command::ZoomIn => ("view.zoom_in", n_!("Zoom In"), VIS, &["+"]),
             Command::ZoomOut => ("view.zoom_out", n_!("Zoom Out"), VIS, &["-"]),

@@ -255,6 +255,8 @@ pub struct PaneContext<'a> {
     machine: Option<&'a Machine>,
     /// The Designer's stock and tool for the program it last generated.
     stock_seed: Option<StockSeed>,
+    /// The key that ran the jog command being routed, when a key ran it.
+    jog_key: Option<egui::Key>,
 }
 
 impl<'a> PaneContext<'a> {
@@ -269,6 +271,7 @@ impl<'a> PaneContext<'a> {
             commands,
             machine: None,
             stock_seed: None,
+            jog_key: None,
         }
     }
 
@@ -294,6 +297,21 @@ impl<'a> PaneContext<'a> {
     pub fn with_stock_seed(mut self, seed: Option<StockSeed>) -> Self {
         self.stock_seed = seed;
         self
+    }
+
+    /// The same context for a jog command run by `key` (a key press, not a button or menu):
+    /// in continuous mode the jog lasts while the key is held.
+    ///
+    /// # Arguments
+    /// * `key` - The key that ran the command.
+    pub fn with_jog_key(mut self, key: Option<egui::Key>) -> Self {
+        self.jog_key = key;
+        self
+    }
+
+    /// The key that ran the jog command being routed, if a key ran it.
+    pub fn jog_key(&self) -> Option<egui::Key> {
+        self.jog_key
     }
 
     /// The Designer's stock and tool for the program it last generated, when the app

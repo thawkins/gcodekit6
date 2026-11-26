@@ -71,7 +71,7 @@ Status values:
 | Jog feed rate | 10-machine-control | Ported | `app/test_machine_controller::jog_writes_jog_command` |
 | Jog blocked in Alarm and while a job runs | 10-machine-control | Ported | `test_machine_jog::jog_refused_in_home_and_alarm`, `test_machine_jog::hold_cancelled_on_stream_start` |
 | Jog limited to machine travel (soft limits) | 10-machine-control, 85-safety | Ported | `test_machine_jog::hold_clamped_to_remaining_travel`, `test_machine_jog::hold_refused_at_limit` |
-| Keyboard jog | 10-machine-control, 90-shortcuts | Gap | GTK jogs from the numeric keypad (8/2/4/6/9/3; the docs' W/A/S/D was never bound). egui has no default jog keys by design (craft-keymap cannot tell keypad from top-row digits) |
+| Keyboard jog | 10-machine-control, 90-shortcuts | Ported | `test_machine_keyboard_jog::keypad_keys_jog_one_step_each`, `test_machine_keyboard_jog::keys_never_jog_while_a_text_field_has_focus`, `test_machine_keyboard_jog::continuous_key_hold_cancels_once_on_release`, `test_machine_keyboard_jog::continuous_key_hold_cancelled_when_a_text_field_takes_focus` and 4 more, `test_commands::every_gtk_accelerator_bound` (GTK's 8/2/4/6/9/3 in the Machine Control scope; egui, like GTK's `to_unicode`, also takes the top-row digits; the docs' W/A/S/D was never bound. A key press jogs one step, without GTK's auto-repeat) |
 | Home all | 03-quick-start, 10-machine-control | Ported | `test_console_pane::console_echoes_home_from_machine_control` |
 | Home a single axis | 10-machine-control | Not applicable | Not in the GTK source |
 | Unlock ($X) | 10-machine-control | Manual check needed | Button and `Cmd+U` command exist; no test clicks Unlock |
@@ -258,17 +258,13 @@ Ranked by user impact. Sizes are rough estimates for one developer who knows the
 | Rank | Gap | User impact | Rough size |
 | --- | --- | --- | --- |
 | 1 | Editor Replace / Replace All | Medium | 0.5-1 day |
-| 2 | Quick Z-touch and edge probe in Machine Control | Medium: the Probe Routines page covers it with more clicks | 1 day (routines exist) |
-| 3 | Keyboard jog | Medium: deliberate safety choice; needs a decision on keypad keys | 0.5 day plus a decision |
 | 4 | Visualizer 2D mode, display toggles, grid spacing, machine bounds, fit to device | Medium | 2-3 days |
-| 5 | DRO rotary axes A/B/C (and their Zero buttons) | Medium for 4-6 axis machines, none otherwise | 0.5 day |
 | 6 | Designer mirror, align, cut/copy/paste, boolean ops, Ctrl+G | Medium | 2-3 days (designer commands exist in `gcodekit5-designer`) |
 | 7 | Visualizer run preview (play/pause/speed) | Low | 1-2 days |
 | 8 | Import STL | Low: behind a Settings switch in GTK | 1 day |
 | 9 | Status bar elapsed/remaining time, feed/spindle readout | Low | 0.5 day |
-| 10 | Exact override percentage field | Low | 0.5 day |
 | 11 | Preferences Controller page and shortcut editor | Low | 1-2 days |
-| 12 | Persistent console history, Clear editor, machine limits/buffer readout, designer device work area, gallery icons | Low | 1-2 days together |
+| 12 | Persistent console history, designer device work area, gallery icons | Low | 1-2 days together |
 
 Manual checks still to run before GTK is deleted (no automated evidence): TCP and
 WebSocket connections, auto-reconnect, non-GRBL firmwares and the grblHAL simulator, Windows

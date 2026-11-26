@@ -114,6 +114,8 @@ mod test_icons;
 mod test_machine_control_layout;
 #[path = "test_machine_jog.rs"]
 mod test_machine_jog;
+#[path = "test_machine_keyboard_jog.rs"]
+mod test_machine_keyboard_jog;
 #[path = "test_machine_limits_buffer.rs"]
 mod test_machine_limits_buffer;
 #[path = "test_machine_override_target.rs"]

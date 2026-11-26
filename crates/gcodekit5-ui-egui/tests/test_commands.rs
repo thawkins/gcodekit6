@@ -77,6 +77,44 @@ const GTK_ACCELERATORS: &[(&str, &str, Command, Where)] = &[
     ),
     // Help
     ("F1", "F1", Command::OpenHelp, Where::App),
+    // Jog: machine_control/mod.rs's numeric keypad keys (`key.to_unicode()`, so the top-row
+    // digits jogged too; egui reports both as the digit), in Machine Control only.
+    (
+        "KP_6",
+        "6",
+        Command::JogXPos,
+        Where::Panel("MachineControl"),
+    ),
+    (
+        "KP_4",
+        "4",
+        Command::JogXNeg,
+        Where::Panel("MachineControl"),
+    ),
+    (
+        "KP_8",
+        "8",
+        Command::JogYPos,
+        Where::Panel("MachineControl"),
+    ),
+    (
+        "KP_2",
+        "2",
+        Command::JogYNeg,
+        Where::Panel("MachineControl"),
+    ),
+    (
+        "KP_9",
+        "9",
+        Command::JogZPos,
+        Where::Panel("MachineControl"),
+    ),
+    (
+        "KP_3",
+        "3",
+        Command::JogZNeg,
+        Where::Panel("MachineControl"),
+    ),
 ];
 
 /// Safety chords with no GTK accelerator: feed hold and soft reset each get a modifier chord
@@ -88,20 +126,9 @@ const SAFETY_CHORDS: &[(&str, Command)] = &[
     ("Cmd+Shift+K", Command::SoftReset),
 ];
 
-/// Documented safety deviations: GTK chords (or GTK key handling) that get NO default binding
-/// here, with the reason. Each command must have no default chord at all.
-const UNBOUND_FOR_SAFETY: &[(&str, Command)] = &[
-    // JOG_* "Right"/"Left"/"Up"/"Down"/"Page_Up"/"Page_Down" are unused accelerators.rs
-    // constants; arrows move between widgets. GTK jogs from the numeric keypad in
-    // machine_control/mod.rs (8 Y+, 2 Y-, 4 X-, 6 X+, 9 Z+, 3 Z-), but craft_keymap folds
-    // keypad digits into the top-row digits, which must not jog, so jog has no default keys.
-    ("Right / KP_6", Command::JogXPos),
-    ("Left / KP_4", Command::JogXNeg),
-    ("Up / KP_8", Command::JogYPos),
-    ("Down / KP_2", Command::JogYNeg),
-    ("Page_Up / KP_9", Command::JogZPos),
-    ("Page_Down / KP_3", Command::JogZNeg),
-];
+/// Documented safety deviation: keys that run nothing, anywhere. GTK's JOG_* "Right"/"Left"/"Up"/"Down"/"Page_Up"/"Page_Down" were unused accelerators.rs
+/// constants; arrows move between widgets, so they jog nothing, anywhere.
+const UNBOUND_FOR_SAFETY: &[&str] = &["Right", "Left", "Up", "Down", "PageUp", "PageDown"];
 
 #[test]
 fn test_every_gtk_accelerator_bound() {
@@ -109,12 +136,15 @@ fn test_every_gtk_accelerator_bound() {
     // also need the pane to report keyboard focus (M2) before they fire from the keyboard,
     // and Cut/Copy/Paste reach egui as clipboard events rather than through the dispatcher.
     let keymap = commands::keymap();
-    for (gtk, command) in UNBOUND_FOR_SAFETY {
-        assert_eq!(
-            keymap.default_bindings(&command.command_ref()),
-            Vec::new(),
-            "GTK {gtk}: {command:?} must have no default key"
-        );
+    for text in UNBOUND_FOR_SAFETY {
+        let chord = Chord::parse(text).expect("chord");
+        for active in [Active::NONE, Active::panel(commands::MACHINE_CONTROL_SCOPE)] {
+            assert_eq!(
+                keymap.lookup(&chord, false, &active),
+                Lookup::None,
+                "{text} must run nothing"
+            );
+        }
     }
     for (gtk, text, command, place) in GTK_ACCELERATORS {
         let chord = Chord::parse(text).expect("canonical chord");

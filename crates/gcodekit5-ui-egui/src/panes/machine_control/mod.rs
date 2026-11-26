@@ -474,16 +474,83 @@ impl MachineControlPane {
         self.with_controller(|c| c.jog(axis, distance, feed));
     }
 
+    /// Runs a jog command: one step, or, when a key ran it in continuous mode, a hold that
+    /// lasts while the key is down (as a held jog button), under the same guards.
+    fn jog_command(&mut self, ctx: &PaneContext, command: Command, axis: Axis, sign: f32) {
+        let Some(key) = ctx.jog_key().filter(|_| self.jog.continuous()) else {
+            self.jog_step(ctx, axis, sign);
+            return;
+        };
+        let machine = ctx.machine();
+        let status = machine.map(Machine::status);
+        let allowed = status.is_some_and(|s| s.connected && !s.streaming)
+            && machine.is_some_and(Machine::jog_allowed);
+        if !allowed {
+            self.notice = Some(
+                ctx.tr
+                    .tr("Jog refused: the machine is not idle.")
+                    .into_owned(),
+            );
+            return;
+        }
+        let Some(status) = status else {
+            return;
+        };
+        match self.jog.key_hold(command, key, status) {
+            jog::KeyHold::Started(action) => {
+                self.notice = None;
+                self.jog_action(action, ctx.tr);
+            }
+            jog::KeyHold::Busy => {}
+            jog::KeyHold::Refused(msgid) => self.notice = Some(ctx.tr.tr(msgid).into_owned()),
+        }
+    }
+
+    /// Sends what a jog action asks for.
+    fn jog_action(&mut self, action: jog::Action, tr: &Translator) {
+        match action {
+            jog::Action::Move {
+                axis,
+                distance_mm,
+                feed_mm_min,
+            } => self.with_controller(|c| c.jog(axis, distance_mm, feed_mm_min)),
+            jog::Action::Cancel => {
+                self.with_controller(|c| c.realtime(RealtimeCommand::JogCancel));
+            }
+            jog::Action::Refused(msgid) => self.notice = Some(tr.tr(msgid).into_owned()),
+        }
+    }
+
+    /// Ends a keyboard hold whose key was released, or that something else ends: the machine
+    /// no longer allows jogging, a widget took the keyboard (a text field focused, a
+    /// dropdown open) or the pointer was pressed (focus moving elsewhere). A page switch and
+    /// window focus loss end it through [`Pane::cancel_hold`].
+    fn follow_key_hold(&mut self, ui: &egui::Ui, machine: Option<&Machine>) {
+        let Some(key) = self.jog.held_key() else {
+            return;
+        };
+        let (key_down, pressed) = ui.input(|i| (i.key_down(key), i.pointer.any_pressed()));
+        let widget_has_keys =
+            ui.ctx().memory(|m| m.focused().is_some()) || egui::Popup::is_any_open(ui.ctx());
+        let allowed = machine
+            .is_some_and(|m| m.status().connected && !m.status().streaming && m.jog_allowed());
+        let may_continue = allowed && !widget_has_keys && !pressed;
+        if self.jog.follow_key_hold(key_down, may_continue) {
+            tracing::debug!(?key, key_down, may_continue, "keyboard jog ended");
+            self.with_controller(|c| c.realtime(RealtimeCommand::JogCancel));
+        }
+    }
+
     /// Runs a machine command; returns false for the commands that are not the pane's.
     fn run(&mut self, command: Command, ctx: &PaneContext) -> bool {
         let tr = ctx.tr;
         match command {
-            Command::JogXPos => self.jog_step(ctx, Axis::X, 1.0),
-            Command::JogXNeg => self.jog_step(ctx, Axis::X, -1.0),
-            Command::JogYPos => self.jog_step(ctx, Axis::Y, 1.0),
-            Command::JogYNeg => self.jog_step(ctx, Axis::Y, -1.0),
-            Command::JogZPos => self.jog_step(ctx, Axis::Z, 1.0),
-            Command::JogZNeg => self.jog_step(ctx, Axis::Z, -1.0),
+            Command::JogXPos => self.jog_command(ctx, command, Axis::X, 1.0),
+            Command::JogXNeg => self.jog_command(ctx, command, Axis::X, -1.0),
+            Command::JogYPos => self.jog_command(ctx, command, Axis::Y, 1.0),
+            Command::JogYNeg => self.jog_command(ctx, command, Axis::Y, -1.0),
+            Command::JogZPos => self.jog_command(ctx, command, Axis::Z, 1.0),
+            Command::JogZNeg => self.jog_command(ctx, command, Axis::Z, -1.0),
             Command::Connect => self.connect(tr),
             Command::Disconnect => {
                 // Disconnect writes jog cancel itself when a jog is outstanding.
@@ -834,17 +901,7 @@ impl MachineControlPane {
             if !matches!(action, jog::Action::Refused(_)) {
                 self.notice = None;
             }
-            match action {
-                jog::Action::Move {
-                    axis,
-                    distance_mm,
-                    feed_mm_min,
-                } => self.with_controller(|c| c.jog(axis, distance_mm, feed_mm_min)),
-                jog::Action::Cancel => {
-                    self.with_controller(|c| c.realtime(RealtimeCommand::JogCancel));
-                }
-                jog::Action::Refused(msgid) => self.notice = Some(tr.tr(msgid).into_owned()),
-            }
+            self.jog_action(action, tr);
         }
     }
 }
@@ -938,6 +995,7 @@ impl Pane for MachineControlPane {
         if let Some(msgid) = self.pending_refusal.take() {
             self.notice = Some(tr.tr(msgid).into_owned());
         }
+        self.follow_key_hold(ui, ctx.machine());
         let default_status = MachineStatus::default();
         let machine = ctx.machine();
         let status = machine.map_or(&default_status, |m| m.status());

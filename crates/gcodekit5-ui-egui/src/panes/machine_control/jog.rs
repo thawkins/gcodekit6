@@ -19,8 +19,13 @@
 //! was pressed on the button stays down, the pointer stays on the button and the button
 //! stays enabled. Anything else ends it with 0x85, and the pane and the app end it on
 //! focus loss, a hidden pane, disconnect, stream start, soft reset and exit
-//! ([`JogPanel::take_hold`], [`JogPanel::forget_hold`]). Keyboard jog keys are unbound by
-//! design (see [`crate::commands`]).
+//! ([`JogPanel::take_hold`], [`JogPanel::forget_hold`]).
+//!
+//! The keyboard jogs too (GTK's keypad keys, see [`crate::commands`]): a key press jogs one
+//! step, or in continuous mode starts the same hold as a button ([`JogPanel::key_hold`]),
+//! which lasts while that key stays down ([`JogPanel::follow_key_hold`]); the pane also ends
+//! it when a widget takes the keyboard or the pointer is pressed, and the app ends it on
+//! focus loss and on a page switch, as for a button hold.
 //!
 //! Dependencies: `egui`, `gcodekit5-app` (jog step presets, axes, invert, translations),
 //! `gcodekit5-core` (units).
@@ -174,8 +179,35 @@ pub(super) struct JogPanel {
     units: MeasurementSystem,
     feed_units: FeedRateUnits,
     continuous: bool,
-    /// The button held in continuous mode.
-    held: Option<Command>,
+    /// The hold in continuous mode.
+    held: Option<Hold>,
+}
+
+/// A continuous jog in progress.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct Hold {
+    /// The jog command (which button, or which key's command).
+    command: Command,
+    /// The key held, for a hold a key started; `None` for a button hold.
+    key: Option<egui::Key>,
+}
+
+/// What a key press in continuous mode did.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub(super) enum KeyHold {
+    /// The hold started with this move.
+    Started(Action),
+    /// A hold is already in progress (a key repeat, or a button held): nothing to do.
+    Busy,
+    /// Refused; the msgid says why.
+    Refused(&'static str),
+}
+
+/// The pad button of a jog command.
+fn button_of(command: Command) -> Option<JogButton> {
+    [Y_POS, Y_NEG, X_POS, X_NEG, Z_POS, Z_NEG]
+        .into_iter()
+        .find(|b| b.command == command)
 }
 
 impl Default for JogPanel {
@@ -232,6 +264,67 @@ impl JogPanel {
     /// Whether a hold is in progress.
     pub(super) fn is_holding(&self) -> bool {
         self.held.is_some()
+    }
+
+    /// Whether continuous (hold-to-jog) mode is on.
+    pub(super) fn continuous(&self) -> bool {
+        self.continuous
+    }
+
+    /// The key a keyboard hold lasts while, if one is in progress.
+    pub(super) fn held_key(&self) -> Option<egui::Key> {
+        self.held.and_then(|h| h.key)
+    }
+
+    /// Starts a continuous jog for `command`, run by `key`, lasting while the key is down.
+    ///
+    /// # Arguments
+    /// * `command` - The jog command the key ran.
+    /// * `key` - The key held.
+    /// * `status` - The machine status (the travel left).
+    pub(super) fn key_hold(
+        &mut self,
+        command: Command,
+        key: egui::Key,
+        status: &MachineStatus,
+    ) -> KeyHold {
+        if self.held.is_some() {
+            return KeyHold::Busy;
+        }
+        let Some(button) = button_of(command) else {
+            return KeyHold::Busy;
+        };
+        match self.hold_distance(button, status) {
+            Ok(distance_mm) => {
+                self.held = Some(Hold {
+                    command,
+                    key: Some(key),
+                });
+                KeyHold::Started(Action::Move {
+                    axis: button.axis,
+                    distance_mm,
+                    feed_mm_min: self.feed_mm_min,
+                })
+            }
+            Err(msgid) => KeyHold::Refused(msgid),
+        }
+    }
+
+    /// Ends a keyboard hold unless it may go on: its key is still down and `may_continue`
+    /// (the machine still allows jogging, no widget took the keyboard, no pointer press).
+    ///
+    /// # Arguments
+    /// * `key_down` - Whether the hold's key is down this frame.
+    /// * `may_continue` - Whether nothing else ends the hold.
+    ///
+    /// # Returns
+    /// Whether the hold ended (the caller sends 0x85).
+    pub(super) fn follow_key_hold(&mut self, key_down: bool, may_continue: bool) -> bool {
+        if self.held_key().is_some() && !(key_down && may_continue) {
+            self.held = None;
+            return true;
+        }
+        false
     }
 
     /// Ends the hold in progress; returns whether there was one (the caller sends 0x85).
@@ -304,7 +397,11 @@ impl JogPanel {
             )
         });
         let on_button = |p: Option<egui::Pos2>| p.is_some_and(|p| response.rect.contains(p));
-        if self.held == Some(button.command) {
+        let pointer_hold = Some(Hold {
+            command: button.command,
+            key: None,
+        });
+        if self.held == pointer_hold {
             if !(enabled && down && on_button(pos)) {
                 self.held = None;
                 actions.push(Action::Cancel);
@@ -317,7 +414,7 @@ impl JogPanel {
         {
             match self.hold_distance(button, status) {
                 Ok(distance_mm) => {
-                    self.held = Some(button.command);
+                    self.held = pointer_hold;
                     actions.push(Action::Move {
                         axis: button.axis,
                         distance_mm,

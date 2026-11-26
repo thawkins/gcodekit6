@@ -14,9 +14,10 @@
 - **Set % overrides in the egui Machine Control pane**: GTK's target fields for the feed and spindle overrides (10-200 %) move the override to the exact percentage, one realtime step at a time, each sent only after the controller's `Ov:` report confirmed the last (`gcodekit5_app::override_target`); a step not confirmed within 2 s ends it with a notice. The override readout now keeps the last `Ov:` values between reports
 - **Clear editor in egui**: a Clear editor button at the end of the editor's find row asks "Clear the editor?" when the editor holds G-code, as GTK did, and is disabled and refused while a job runs (also at Yes, if a job started meanwhile)
 - **Quick probes in the egui Machine Control pane**: GTK's Probe Z (20 mm down) and Edge X-/X+/Y-/Y+ (10 mm) buttons, at 100 mm/min, run through the Probe Routines generator and run of the CAM page, with its guards, stop-on-error stream, backstop (now driven for any pane through `Pane::wake_in`) and G90 restore after a failed probe; the result is shown under the buttons and no work offset is written
+- **Keyboard jog in egui**: GTK's numeric keypad keys (8/2 Y+/Y-, 4/6 X-/X+, 9/3 Z+/Z-) jog in the Machine Control scope, so only after a press in the pane and never while a text field or dropdown has the keyboard. In Continuous mode a held key jogs like a held button and sends one jog cancel on release, on a pointer press, when a widget takes the keyboard, on a page switch and when the window loses focus. egui reports the keypad digits as the top-row digits, so those jog too, as in GTK
 
 ### Known gaps
-- Not yet ported from GTK: editor replace, quick probe buttons, keyboard jog, rotary axes in the DRO, and the visualizer and designer items listed in `docs/reports/egui-parity.md`
+- Not yet ported from GTK: editor replace, and the visualizer and designer items listed in `docs/reports/egui-parity.md`
 
 ## [Unreleased] - 2026-11-26 (egui + craft-libs migration, milestone M5: managers and help)
 

@@ -347,6 +347,9 @@ pub struct GcodeKitApp {
     design: DesignFlow,
     /// The egui frame whose machine events were last polled.
     machine_polled: Option<u64>,
+    /// The key that ran each jog command of this frame's key presses (see
+    /// [`PaneContext::with_jog_key`]).
+    jog_keys: Vec<(Command, egui::Key)>,
     /// The `movable` flag last set on the macOS window (`title_bar::sync_movable`).
     #[cfg(target_os = "macos")]
     movable: Option<bool>,
@@ -483,6 +486,7 @@ impl GcodeKitApp {
             editor_prompt: None,
             design: DesignFlow::default(),
             machine_polled: None,
+            jog_keys: Vec::new(),
             #[cfg(target_os = "macos")]
             movable: None,
         }
@@ -759,10 +763,18 @@ impl GcodeKitApp {
             ..Active::NONE
         };
         let hits = ctx.input_mut(|input| self.dispatcher.dispatch(input, &self.keymap, &active));
-        self.queue.extend(
-            hits.iter()
-                .filter_map(|hit| Command::from_ref(&hit.command)),
-        );
+        // The key of each jog a key ran, so a continuous jog can last while it is held.
+        self.jog_keys.clear();
+        for command in hits.iter().filter_map(|hit| {
+            let command = Command::from_ref(&hit.command)?;
+            if command.is_jog() {
+                self.jog_keys
+                    .push((command, hit.trigger.chord.key.to_egui()));
+            }
+            Some(command)
+        }) {
+            self.queue.push(command);
+        }
     }
 
     /// The keymap scope of the pane that has the keyboard: the pane the user last pressed the
@@ -836,8 +848,14 @@ impl GcodeKitApp {
     /// Visualizer the view commands.
     fn route_pane_command(&mut self, cmd: Command) {
         let mut requested = Vec::new();
+        let key = self
+            .jog_keys
+            .iter()
+            .position(|(command, _)| *command == cmd)
+            .map(|i| self.jog_keys.remove(i).1);
         let mut ctx = PaneContext::new(&self.state.translator, &mut requested)
-            .with_machine(&self.state.machine);
+            .with_machine(&self.state.machine)
+            .with_jog_key(key);
         if !self.workspace.route(cmd, &mut ctx) {
             tracing::warn!(?cmd, "no pane runs this command");
         }
