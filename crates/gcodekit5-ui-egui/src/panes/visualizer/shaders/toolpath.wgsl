@@ -1,8 +1,9 @@
 // Toolpath lines (port of the GTK `shaders.rs` line shader): each vertex carries its
 // program line, and lines the machine has acknowledged (`line < progress`) are drawn in
 // `done_color`. The tag's top bit marks travel; travel or cuts the sidebar hides (`show`
-// bit 1 travel, bit 2 cuts) are moved outside the clip volume, so they draw nothing. Colours arrive in sRGB and leave premultiplied, converted to linear when the
-// target is an sRGB format.
+// bit 1 travel, bit 2 cuts) are moved outside the clip volume, so they draw nothing.
+// Colours arrive in sRGB and leave premultiplied, converted to linear when the target is an
+// sRGB format.
 
 struct Uniforms {
     view_proj: mat4x4<f32>,
