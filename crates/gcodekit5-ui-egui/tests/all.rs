@@ -112,6 +112,8 @@ mod test_machine_jog;
 mod test_machine_pane;
 #[path = "test_machine_probe_report.rs"]
 mod test_machine_probe_report;
+#[path = "test_machine_work_zero.rs"]
+mod test_machine_work_zero;
 #[path = "test_machine_worker_messages.rs"]
 mod test_machine_worker_messages;
 #[path = "test_materials_manager.rs"]

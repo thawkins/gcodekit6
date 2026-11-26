@@ -4581,3 +4581,9 @@ msgstr "guardado"
 
 msgid "The device profile has unsaved changes. Save them before continuing?"
 msgstr "O perfil do dispositivo tem alterações não guardadas. Guardá-las antes de continuar?"
+
+msgid "Go to Work Zero refused: the machine is not idle."
+msgstr "Ir para o zero de trabalho recusado: a máquina não está inativa."
+
+msgid "Waiting for the controller to report the active work coordinate system."
+msgstr "A aguardar que o controlador indique o sistema de coordenadas de trabalho ativo."

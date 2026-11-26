@@ -235,6 +235,9 @@ pub enum ConfirmRequest {
     Restart,
     /// A job is running while the user quits: stop it and quit (Yes) or keep running (No).
     StopJob,
+    /// Zero All Axes: set the current X/Y/Z as 0 of the active work coordinate system (Yes)
+    /// or not (No).
+    ZeroAllAxes,
 }
 
 impl ConfirmRequest {
@@ -269,6 +272,10 @@ impl ConfirmRequest {
             Self::StopJob => (
                 n_!("Stop job and quit?"),
                 n_!("A job is running. Quitting stops it and closes the machine connection."),
+            ),
+            Self::ZeroAllAxes => (
+                n_!("Zero all work axes?"),
+                n_!("This sets the active work coordinate system so the current X/Y/Z becomes 0."),
             ),
         }
     }
@@ -480,7 +487,9 @@ impl Dialogs {
                 ),
             ),
             ConfirmRequest::Restart => (MessageLevel::Info, MessageButtons::YesNo),
-            ConfirmRequest::StopJob => (MessageLevel::Warning, MessageButtons::YesNo),
+            ConfirmRequest::StopJob | ConfirmRequest::ZeroAllAxes => {
+                (MessageLevel::Warning, MessageButtons::YesNo)
+            }
         };
         let message = Message {
             level,
@@ -624,6 +633,7 @@ pub fn msgids() -> Vec<&'static str> {
         ConfirmRequest::UnsavedDevice,
         ConfirmRequest::Restart,
         ConfirmRequest::StopJob,
+        ConfirmRequest::ZeroAllAxes,
     ]
     .into_iter()
     .flat_map(|request| {

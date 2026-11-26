@@ -602,7 +602,7 @@ impl GcodeKitApp {
             }
             (ConfirmRequest::UnsavedDevice, choice) => self.device_quit_answer(choice.as_unsaved()),
             // The quit flow never asks this; forget the quit rather than act on it.
-            (ConfirmRequest::Restart, _) => self.cancel_quit(),
+            (ConfirmRequest::Restart | ConfirmRequest::ZeroAllAxes, _) => self.cancel_quit(),
         }
     }
 
@@ -688,6 +688,9 @@ impl GcodeKitApp {
         let mut panes =
             PaneContext::new(&self.state.translator, &mut queue).with_machine(&self.state.machine);
         self.workspace.show(ui, &mut panes);
+        for request in self.workspace.take_confirms() {
+            self.dialogs.confirm(request);
+        }
         for command in queue.drain(..) {
             self.dispatch(command);
         }
@@ -1034,6 +1037,17 @@ impl GcodeKitApp {
                 // next quit asks again.
                 tracing::warn!(?request, %reason, "quit prompt unavailable; quit cancelled");
                 self.cancel_quit();
+            }
+            DialogAnswer::Confirm {
+                request: ConfirmRequest::ZeroAllAxes,
+                choice,
+            } => {
+                let mut queue = Vec::new();
+                let mut panes = PaneContext::new(&self.state.translator, &mut queue)
+                    .with_machine(&self.state.machine);
+                self.workspace
+                    .confirmed(ConfirmRequest::ZeroAllAxes, *choice, &mut panes);
+                self.queue.extend(queue);
             }
             DialogAnswer::Unavailable { reason, .. } => {
                 tracing::warn!(%reason, "dialog unavailable");

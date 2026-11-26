@@ -4593,3 +4593,9 @@ msgstr "enregistré"
 
 msgid "The device profile has unsaved changes. Save them before continuing?"
 msgstr "Le profil de l'appareil contient des modifications non enregistrées. Les enregistrer avant de continuer ?"
+
+msgid "Go to Work Zero refused: the machine is not idle."
+msgstr "Aller au zéro pièce refusé : la machine n'est pas au repos."
+
+msgid "Waiting for the controller to report the active work coordinate system."
+msgstr "En attente du système de coordonnées pièce actif signalé par le contrôleur."

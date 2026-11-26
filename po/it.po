@@ -4589,3 +4589,9 @@ msgstr "memorizzato"
 
 msgid "The device profile has unsaved changes. Save them before continuing?"
 msgstr "Il profilo del dispositivo ha modifiche non salvate. Salvarle prima di continuare?"
+
+msgid "Go to Work Zero refused: the machine is not idle."
+msgstr "Vai allo zero pezzo rifiutato: la macchina non è inattiva."
+
+msgid "Waiting for the controller to report the active work coordinate system."
+msgstr "In attesa che il controller segnali il sistema di coordinate di lavoro attivo."

@@ -4510,3 +4510,9 @@ msgstr ""
 
 msgid "The device profile has unsaved changes. Save them before continuing?"
 msgstr ""
+
+msgid "Go to Work Zero refused: the machine is not idle."
+msgstr ""
+
+msgid "Waiting for the controller to report the active work coordinate system."
+msgstr ""

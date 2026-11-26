@@ -6,7 +6,9 @@
 //!
 //! Panes ask for commands through [`PaneContext::request`]; the app runs them after drawing.
 //! A command that belongs to a pane (the machine commands belong to Machine Control) is handed
-//! to it through [`Workspace::route`].
+//! to it through [`Workspace::route`]. A pane that needs a confirmation queues it
+//! ([`Pane::take_confirm`]); the app asks it and hands the answer back
+//! ([`Workspace::confirmed`]).
 //!
 //! The workspace also tracks which pane the user last pressed the pointer in
 //! ([`Workspace::focused_pane`]), so the app can tell the keymap which pane has the keyboard,
@@ -24,6 +26,7 @@ use gcodekit5_settings::config::Config;
 use serde::{Deserialize, Serialize};
 
 use crate::commands::{Command, MACHINE_CONTROL_SCOPE, VISUALIZER_SCOPE};
+use crate::dialogs::{ConfirmChoice, ConfirmRequest};
 use crate::machine::Machine;
 
 /// Identifies one pane of the main window.
@@ -189,6 +192,30 @@ pub trait Pane {
     /// * `tr` - Translator for the current UI language.
     fn machine_events(&mut self, events: &[MachineEvent], tr: &Translator) {
         let _ = (events, tr);
+    }
+
+    /// Takes the confirmation the pane wants the app to ask for, if any.
+    fn take_confirm(&mut self) -> Option<ConfirmRequest> {
+        None
+    }
+
+    /// Acts on the answer to a confirmation the pane asked for.
+    ///
+    /// # Arguments
+    /// * `request` - The question.
+    /// * `choice` - The answer.
+    /// * `ctx` - Shared state the pane may use.
+    ///
+    /// # Returns
+    /// Whether the question was the pane's.
+    fn confirmed(
+        &mut self,
+        request: ConfirmRequest,
+        choice: ConfirmChoice,
+        ctx: &mut PaneContext,
+    ) -> bool {
+        let _ = (request, choice, ctx);
+        false
     }
 }
 
@@ -392,6 +419,35 @@ impl Workspace {
         for pane in &mut self.panes {
             pane.machine_events(events, tr);
         }
+    }
+
+    /// Takes the confirmations the panes want asked ([`Pane::take_confirm`]).
+    pub fn take_confirms(&mut self) -> Vec<ConfirmRequest> {
+        self.panes
+            .iter_mut()
+            .filter_map(|pane| pane.take_confirm())
+            .collect()
+    }
+
+    /// Hands the answer to a pane's confirmation to the pane that asked
+    /// ([`Pane::confirmed`]).
+    ///
+    /// # Arguments
+    /// * `request` - The question.
+    /// * `choice` - The answer.
+    /// * `ctx` - Shared state passed to the panes.
+    ///
+    /// # Returns
+    /// Whether a pane took it.
+    pub fn confirmed(
+        &mut self,
+        request: ConfirmRequest,
+        choice: ConfirmChoice,
+        ctx: &mut PaneContext,
+    ) -> bool {
+        self.panes
+            .iter_mut()
+            .any(|pane| pane.confirmed(request, choice, ctx))
     }
 
     /// Applies a layout change (move, activate, float...) with the workspace's permissions.

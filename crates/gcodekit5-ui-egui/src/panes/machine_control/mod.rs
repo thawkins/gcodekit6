@@ -1,10 +1,16 @@
 //! The Machine Control pane: connection, emergency stop, homing, the position readout (DRO),
-//! job control with stream progress, jogging, feed/rapid/spindle overrides and a one-line
-//! command entry.
+//! work zero (per-axis Zero, the G54-G59 selector, Zero All Axes, Go to Work Zero), job
+//! control with stream progress, jogging, feed/rapid/spindle overrides and a one-line command
+//! entry.
+//!
+//! Every work zero control is disabled while disconnected and refused, with the reason shown,
+//! while a job runs ([`Machine::job_running`], which also covers a probe stream's halt). Go to
+//! Work Zero moves the machine, so it also needs the jog rule's fresh report, in `Idle`.
+//! Zero All Axes is confirmed in a dialog the app shows ([`Pane::take_confirm`]).
 //!
 //! The pane acts on the shared [`MachineController`] directly; every controller call returns
 //! without I/O, so the lock is held for one call at a time and never across a frame. What it
-//! shows comes from the app's [`Machine`](crate::machine::Machine) (this frame's events and the
+//! shows comes from the app's [`Machine`] (this frame's events and the
 //! derived status) through [`PaneContext::machine`], so the pane never polls the controller.
 //!
 //! The machine commands of the catalog ([`Command::Connect`], [`Command::FeedHold`],
@@ -22,6 +28,7 @@ mod dro;
 mod jog;
 mod overrides;
 mod stream;
+mod wcs;
 
 use std::sync::{Arc, Mutex};
 
@@ -30,6 +37,7 @@ use gcodekit5_app::i18n::Translator;
 use gcodekit5_app::machine::{
     Axis, MachineController, MachineError, MachineEvent, RealtimeCommand,
 };
+use gcodekit5_app::work_zero::{Wcs, go_to_work_zero_command, zero_axes_command};
 use gcodekit5_core::units::{FeedRateUnits, MeasurementSystem};
 use gcodekit5_settings::ConnectionSettings;
 use gcodekit5_settings::config::Config;
@@ -37,7 +45,8 @@ use gcodekit5_settings::config::Config;
 pub(crate) use dro::format_length;
 
 use crate::commands::Command;
-use crate::machine::{MachineStatus, lock};
+use crate::dialogs::{ConfirmChoice, ConfirmRequest};
+use crate::machine::{Machine, MachineStatus, lock};
 use crate::workspace::{Pane, PaneContext, PaneId};
 
 /// The msgids the pane shows, for the translation check.
@@ -49,6 +58,7 @@ pub fn msgids() -> Vec<&'static str> {
         overrides::MSGIDS,
         stream::MSGIDS,
         direct_sender::MSGIDS,
+        wcs::MSGIDS,
         MSGIDS,
     ]
     .concat()
@@ -69,7 +79,17 @@ const MSGIDS: &[&str] = &[
     n_!("Home machine ($H)"),
     n_!("Unlock"),
     n_!("Unlock from ALARM ($X)"),
+    COMMAND_DURING_JOB,
+    WCS_CHANGE_DURING_JOB,
+    GO_TO_ZERO_NOT_IDLE,
 ];
+
+/// A work zero command refused while a job runs.
+const COMMAND_DURING_JOB: &str = n_!("Command ignored: a job is running.");
+/// A work coordinate system selection refused while a job runs.
+const WCS_CHANGE_DURING_JOB: &str = n_!("Work coordinate change ignored: a job is running.");
+/// Go to Work Zero refused without a fresh `Idle` report.
+const GO_TO_ZERO_NOT_IDLE: &str = n_!("Go to Work Zero refused: the machine is not idle.");
 
 /// The Machine Control pane.
 pub struct MachineControlPane {
@@ -77,6 +97,9 @@ pub struct MachineControlPane {
     connection: connection::ConnectionForm,
     jog: jog::JogPanel,
     direct: direct_sender::DirectSender,
+    wcs: wcs::WcsPanel,
+    /// A confirmation the app is to ask for (Zero All Axes).
+    confirm: Option<ConfirmRequest>,
     /// The measurement system lengths are shown in.
     units: MeasurementSystem,
     /// The units feeds are shown in.
@@ -113,6 +136,8 @@ impl MachineControlPane {
             connection: connection::ConnectionForm::new(ConnectionSettings::default()),
             jog: jog::JogPanel::default(),
             direct: direct_sender::DirectSender::default(),
+            wcs: wcs::WcsPanel::default(),
+            confirm: None,
             units: MeasurementSystem::Metric,
             feed_units: FeedRateUnits::MmPerMin,
             notice: None,
@@ -167,6 +192,76 @@ impl MachineControlPane {
             Ok(()) => self.notice = None,
             Err(error) => self.notice = Some(error.to_string()),
         }
+    }
+
+    /// Refuses with `msgid` as the notice while a job runs; returns whether it refused.
+    fn refuse_during_job(
+        &mut self,
+        machine: Option<&Machine>,
+        tr: &Translator,
+        msgid: &str,
+    ) -> bool {
+        let running = machine.is_some_and(Machine::job_running);
+        if running {
+            tracing::info!(reason = msgid, "work zero command refused");
+            self.notice = Some(tr.tr(msgid).into_owned());
+        }
+        running
+    }
+
+    /// Makes the current position 0 on `axes` in the active work coordinate system
+    /// (`G10 L20 P<n> X0 ...`), unless a job runs or the active system is not known.
+    fn zero_axes(&mut self, machine: Option<&Machine>, tr: &Translator, axes: &[Axis]) {
+        if self.refuse_during_job(machine, tr, COMMAND_DURING_JOB) {
+            return;
+        }
+        let Some(wcs) = machine.and_then(|m| self.wcs.active(m.status())) else {
+            self.notice = Some(tr.tr(wcs::WAITING_FOR_WCS).into_owned());
+            return;
+        };
+        self.send_line(&zero_axes_command(wcs, axes));
+    }
+
+    /// Asks the app to confirm Zero All Axes, unless it would be refused now.
+    fn ask_zero_all(&mut self, machine: Option<&Machine>, tr: &Translator) {
+        if self.refuse_during_job(machine, tr, COMMAND_DURING_JOB) {
+            return;
+        }
+        if machine.and_then(|m| self.wcs.active(m.status())).is_none() {
+            self.notice = Some(tr.tr(wcs::WAITING_FOR_WCS).into_owned());
+            return;
+        }
+        self.notice = None;
+        self.confirm = Some(ConfirmRequest::ZeroAllAxes);
+    }
+
+    /// Rapids to work zero, only with a fresh `Idle` report (the jog rule) and no job.
+    fn go_to_work_zero(&mut self, machine: Option<&Machine>, tr: &Translator, include_z: bool) {
+        if self.refuse_during_job(machine, tr, COMMAND_DURING_JOB) {
+            return;
+        }
+        let idle = machine.is_some_and(|m| {
+            m.jog_allowed()
+                && m.status()
+                    .report
+                    .as_ref()
+                    .and_then(|r| r.machine_state.as_deref())
+                    .is_some_and(|state| state.starts_with("Idle"))
+        });
+        if !idle {
+            self.notice = Some(tr.tr(GO_TO_ZERO_NOT_IDLE).into_owned());
+            return;
+        }
+        self.send_line(go_to_work_zero_command(include_z));
+    }
+
+    /// Selects a work coordinate system (`G55`), unless a job runs; the status follows the
+    /// line once it is sent, and `$G` confirms it.
+    fn select_wcs(&mut self, machine: Option<&Machine>, tr: &Translator, wcs: Wcs) {
+        if self.refuse_during_job(machine, tr, WCS_CHANGE_DURING_JOB) {
+            return;
+        }
+        self.send_line(wcs.code());
     }
 
     /// The same pane connecting with `settings`.
@@ -410,7 +505,23 @@ impl Pane for MachineControlPane {
                 ui.separator();
                 self.show_safety(ui, tr, status);
                 ui.separator();
-                dro::show(ui, tr, status, self.units, self.feed_units);
+                // Asks `$G` when the active system may have changed; zeroing waits for it.
+                if let Some(machine) = machine {
+                    self.wcs.watch_stream(machine);
+                    self.wcs.drive(machine);
+                }
+                let active_wcs = self.wcs.active(status);
+                let zero_enabled = status.connected && active_wcs.is_some();
+                let waiting = tr.tr(wcs::WAITING_FOR_WCS);
+                let zero = dro::ZeroButtons {
+                    tr,
+                    enabled: zero_enabled,
+                    disabled_reason: (status.connected && active_wcs.is_none())
+                        .then_some(waiting.as_ref()),
+                };
+                if let Some(axis) = dro::show(ui, tr, status, self.units, self.feed_units, &zero) {
+                    self.zero_axes(machine, tr, &[axis]);
+                }
                 ui.separator();
                 match stream::show(ui, tr, status, has_program) {
                     Some(stream::Action::Start) => ctx.request(Command::StreamStart),
@@ -446,6 +557,16 @@ impl Pane for MachineControlPane {
                     lock(&controller).realtime(command);
                 }
                 ui.separator();
+                // Below the long-standing sections, so their places in the pane stay put.
+                match self.wcs.show(ui, tr, status, zero_enabled) {
+                    Some(wcs::Action::Select(wcs)) => self.select_wcs(machine, tr, wcs),
+                    Some(wcs::Action::ZeroAll) => self.ask_zero_all(machine, tr),
+                    Some(wcs::Action::GoToZero { include_z }) => {
+                        self.go_to_work_zero(machine, tr, include_z);
+                    }
+                    None => {}
+                }
+                ui.separator();
                 if let Some(line) = self.direct.show(ui, tr, status) {
                     self.send_line(&line);
                 }
@@ -462,5 +583,29 @@ impl Pane for MachineControlPane {
 
     fn configure(&mut self, config: &Config) {
         MachineControlPane::configure(self, config);
+    }
+
+    fn machine_events(&mut self, events: &[MachineEvent], _tr: &Translator) {
+        self.wcs.follow(events);
+    }
+
+    fn take_confirm(&mut self) -> Option<ConfirmRequest> {
+        self.confirm.take()
+    }
+
+    fn confirmed(
+        &mut self,
+        request: ConfirmRequest,
+        choice: ConfirmChoice,
+        ctx: &mut PaneContext,
+    ) -> bool {
+        if request != ConfirmRequest::ZeroAllAxes {
+            return false;
+        }
+        if choice == ConfirmChoice::Yes {
+            // Checked again: the job or the active system may have changed meanwhile.
+            self.zero_axes(ctx.machine(), ctx.tr, &[Axis::X, Axis::Y, Axis::Z]);
+        }
+        true
     }
 }
