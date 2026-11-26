@@ -807,19 +807,19 @@ impl GcodeKitApp {
     }
 
     /// Runs the frame's key presses through the keymap, before any widget reads them. While a
-    /// menu of the in-window bar is open, or the bar has the keyboard, the keys stay with it.
+    /// menu of the in-window bar is open, or the bar has the keyboard, the keys stay with it,
+    /// except the E-STOP (soft reset) and feed hold keys, which always run.
     fn dispatch_keys(&mut self, ctx: &egui::Context) {
         craft_menu::bar::leave_for_shortcut(ctx);
-        if craft_menu::bar::is_open(ctx) || craft_menu::bar::is_focused(ctx) {
-            return;
-        }
+        let menu_up = craft_menu::bar::is_open(ctx) || craft_menu::bar::is_focused(ctx);
         let active = Active {
             typing: ctx.text_edit_focused(),
             panel: self.keyboard_panel(ctx),
             ..Active::NONE
         };
-        // While Preferences records a key, only the E-STOP and feed hold keys run; every
-        // other press is left for the window to record. A command that moves the machine
+        // While Preferences records a key, or a menu of the bar is up, only the E-STOP and
+        // feed hold keys run; every other press is left for the window to record or for the
+        // menu. A command that moves the machine
         // never runs while a text field has the keyboard, whatever its key (an F-key or a
         // Ctrl chord would otherwise fire while typing); the press stays with the field.
         let recording = self.settings_window.is_recording();
@@ -830,7 +830,7 @@ impl GcodeKitApp {
                 .dispatch_filtered(input, &self.keymap, &active, |hit| {
                     let command = Command::from_ref(&hit.command);
                     let safety = command.is_some_and(|c| crate::shortcuts::LOCKED.contains(&c));
-                    (!recording || safety) && command.is_none_or(|c| c.may_run(typing))
+                    (!(recording || menu_up) || safety) && command.is_none_or(|c| c.may_run(typing))
                 });
             (hits, input.modifiers)
         });

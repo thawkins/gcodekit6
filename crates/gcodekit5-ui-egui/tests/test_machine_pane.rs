@@ -292,6 +292,69 @@ fn test_safety_chords_work_in_text_field() {
     );
 }
 
+/// Presses the feed hold chord, then the E-STOP (soft reset) chord, and checks each runs and
+/// reaches the controller.
+fn safety_chords_run(harness: &mut Harness<'_, GcodeKitApp>, shared: &LoopbackShared, at: &str) {
+    let cmd_shift = egui::Modifiers::COMMAND | egui::Modifiers::SHIFT;
+    for (key, command, realtime) in [
+        (egui::Key::H, Command::FeedHold, RealtimeCommand::FeedHold),
+        (egui::Key::K, Command::SoftReset, RealtimeCommand::SoftReset),
+    ] {
+        harness.key_press_modifiers(cmd_shift, key);
+        harness.step();
+        assert_eq!(
+            harness.state().last_dispatched(),
+            Some(command),
+            "{command:?} with {at}"
+        );
+        assert!(
+            wait_until(|| wrote_realtime(shared, realtime)),
+            "{command:?} not written with {at}: {:?}",
+            shared.log()
+        );
+    }
+}
+
+/// The E-STOP and feed hold keys run while a menu of the in-window bar is open (opened by a
+/// click), which otherwise keeps the keys for itself.
+#[test]
+fn test_safety_chords_work_while_a_menu_is_open() {
+    let (mut harness, shared) = pane_app(Duration::from_millis(1), true);
+    harness
+        .get_by_role_and_label(Role::MenuItem, "Machine")
+        .click();
+    harness.run();
+    assert!(
+        craft_menu::bar::is_open(&harness.ctx),
+        "the Machine menu is not open"
+    );
+    safety_chords_run(&mut harness, &shared, "a menu open");
+}
+
+/// The same while the bar has the keyboard (F10, no menu open yet).
+#[test]
+fn test_safety_chords_work_while_the_menu_bar_has_the_keyboard() {
+    let (mut harness, shared) = pane_app(Duration::from_millis(1), true);
+    harness.key_press(egui::Key::F10);
+    harness.step();
+    harness.step();
+    assert!(
+        craft_menu::bar::is_focused(&harness.ctx),
+        "the bar does not have the keyboard"
+    );
+    safety_chords_run(&mut harness, &shared, "the bar focused");
+}
+
+/// The same while a window (Preferences) is open over the page.
+#[test]
+fn test_safety_chords_work_while_a_window_is_open() {
+    let (mut harness, shared) = pane_app(Duration::from_millis(1), true);
+    harness.state_mut().dispatch(Command::OpenSettings);
+    harness.run();
+    let _ = harness.get_by_label("Measurement System");
+    safety_chords_run(&mut harness, &shared, "Preferences open");
+}
+
 /// Bare Escape runs nothing anywhere, also with the pane holding the keyboard.
 #[test]
 fn test_escape_is_unbound() {

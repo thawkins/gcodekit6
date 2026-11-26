@@ -76,7 +76,7 @@ Status values:
 | Home all | 03-quick-start, 10-machine-control | Ported | `test_console_pane::console_echoes_home_from_machine_control` |
 | Home a single axis | 10-machine-control | Not applicable | Not in the GTK source |
 | Unlock ($X) | 10-machine-control | Manual check needed | Button and `Cmd+U` command exist; no test clicks Unlock |
-| E-Stop (soft reset), also with Machine Control hidden | 10-machine-control, 85-safety | Ported | `test_status_bar::status_bar_estop_stops_stream_without_machine_control`, `test_console_pane::console_echoes_soft_reset_label` |
+| E-Stop (soft reset), also with Machine Control hidden | 10-machine-control, 85-safety | Ported | `test_status_bar::status_bar_estop_stops_stream_without_machine_control`, `test_console_pane::console_echoes_soft_reset_label`, `test_machine_pane::safety_chords_work_in_text_field`, `test_machine_pane::safety_chords_work_while_a_menu_is_open`, `test_machine_pane::safety_chords_work_while_the_menu_bar_has_the_keyboard`, `test_machine_pane::safety_chords_work_while_a_window_is_open` (the E-STOP and feed hold keys run whatever has the keyboard: a text field, an open menu of the in-window bar, a window) |
 | Escape as E-Stop | 10-machine-control, 90-shortcuts | Not applicable | GTK never bound Escape; egui keeps it unbound for safety (`test_machine_pane::escape_is_unbound`); soft reset is `Cmd+Shift+K` (`test_commands::safety_chords_bound_everywhere`) |
 | Quick Z-touch and edge probe from Machine Control | PROBING (Quick Probe) | Ported | `test_machine_quick_probe::quick_probe_z_streams_gtk_values_and_shows_the_result`, `test_machine_quick_probe::quick_probe_edges_use_gtk_distance_and_direction`, `test_machine_quick_probe::quick_probe_refused_unless_idle`, `test_machine_quick_probe::quick_probe_disabled_offline_and_during_a_job` (Probe Routines generator and run with GTK's 20 mm / 10 mm at 100 mm/min; the generator adds a 1 mm lift or clearance move after the touch) |
 | Machine limits and buffer readout | *(GTK)* | Ported | `test_machine_limits_buffer::machine_limits_follow_grbl_travel`, `test_machine_limits_buffer::rotary_limit_shown_once_axis_reported`, `test_machine_limits_buffer::buffer_shown_from_status_report` |
@@ -241,7 +241,7 @@ Status values:
 
 | Feature | Source doc | egui status | Evidence |
 | --- | --- | --- | --- |
-| Feed hold | 85-safety-diagnostics | Ported | `test_commands::safety_chords_bound_everywhere` |
+| Feed hold | 85-safety-diagnostics | Ported | `test_commands::safety_chords_bound_everywhere`, `test_machine_pane::safety_chords_work_while_a_menu_is_open` (see E-Stop) |
 | E-Stop state machine, motion interlock | 85-safety-diagnostics | Not applicable | Not in the GTK source |
 | Communication, buffer and performance diagnostics panels | 85-safety-diagnostics | Not applicable | Not in the GTK source |
 | Help browser with topics, links, images | 87-help-system | Ported | `test_help::help_opens_topic_by_id_and_renders_headings_and_images`, `test_help::help_internal_link_navigates_and_back_forward_return` |
