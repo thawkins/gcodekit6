@@ -27,6 +27,8 @@ mod test_device_profiles_model;
 mod test_files_atomic;
 #[path = "test_firmware_settings_model.rs"]
 mod test_firmware_settings_model;
+#[path = "test_grbl_stream.rs"]
+mod test_grbl_stream;
 #[path = "test_i18n.rs"]
 mod test_i18n;
 #[path = "test_job_preferences.rs"]
@@ -53,6 +55,8 @@ mod test_report_units;
 mod test_tool_material_library;
 #[path = "test_tools_manager_backend.rs"]
 mod test_tools_manager_backend;
+#[path = "test_translation_catalogs.rs"]
+mod test_translation_catalogs;
 #[path = "test_unsaved_changes_choice.rs"]
 mod test_unsaved_changes_choice;
 #[path = "test_work_zero.rs"]

@@ -2,7 +2,7 @@
 //! translates through a variable, and every language must translate every
 //! template string (PR #98 review).
 
-use gcodekit5_ui::ui::gtk::config_settings::SETTING_CATEGORIES;
+use gcodekit5_app::firmware_settings::SETTING_CATEGORIES;
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 
