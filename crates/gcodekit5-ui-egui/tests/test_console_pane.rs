@@ -384,7 +384,8 @@ fn test_console_program_end_lines_and_a_later_manual_m2() {
         &[
             progress.clone(),
             MachineEvent::StreamFinished { lines: 1 },
-            MachineEvent::Sent("0x21 (Feed Hold)".to_string()),
+            MachineEvent::Sent("! (Feed hold)".to_string()),
+            MachineEvent::Sent("~ (Cycle start)".to_string()),
             received("[MSG:Pgm End]"),
         ],
         &tr,

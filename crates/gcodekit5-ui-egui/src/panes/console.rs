@@ -34,7 +34,7 @@ use std::sync::{Arc, Mutex};
 use gcodekit5_app::command_history::CommandHistory;
 use gcodekit5_app::console::{ConsolePanel, MessageLevel};
 use gcodekit5_app::i18n::Translator;
-use gcodekit5_app::machine::{MachineController, MachineEvent};
+use gcodekit5_app::machine::{MachineController, MachineEvent, realtime_label};
 
 use crate::icons::{Icon, icon_only_button};
 use crate::machine::{MachineStatus, lock, protocol_mismatch_text, worker_message};
@@ -187,8 +187,8 @@ impl ConsolePane {
                 ),
                 MachineEvent::Sent(line) => {
                     // A manual line after the job ends it: its program end is not the job's.
-                    // Realtime bytes (`0x..`, a feed hold or resume) leave the job running.
-                    if !self.streaming && !line.starts_with("0x") {
+                    // Realtime bytes (a feed hold, a resume, `0x18`) leave the job running.
+                    if !self.streaming && !is_realtime_echo(line) {
                         self.job_started = None;
                     }
                     self.log.add_command(line);
@@ -419,4 +419,10 @@ impl Pane for ConsolePane {
     fn machine_events(&mut self, events: &[MachineEvent], tr: &Translator) {
         self.apply(events, tr);
     }
+}
+
+/// Whether `line` is the echo of a real-time byte (`! (Feed hold)`, `0x18 (Reset)`, see
+/// [`realtime_label`]) rather than a command line.
+fn is_realtime_echo(line: &str) -> bool {
+    (0..=u8::MAX).any(|byte| realtime_label(byte) == Some(line))
 }
