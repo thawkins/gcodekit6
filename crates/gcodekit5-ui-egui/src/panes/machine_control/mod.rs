@@ -51,6 +51,7 @@ use gcodekit5_app::override_target::{OverrideTarget, TargetStep};
 use gcodekit5_app::work_zero::{
     Wcs, go_to_work_zero_command, reports_grbl_parser_state, zero_axes_command, zero_rotary_command,
 };
+use gcodekit5_communication::firmware::ControllerProtocol;
 use gcodekit5_core::units::{FeedRateUnits, MeasurementSystem};
 use gcodekit5_settings::ConnectionSettings;
 use gcodekit5_settings::config::Config;
@@ -61,7 +62,7 @@ pub(crate) use jog::feed_to_display;
 use crate::commands::Command;
 use crate::dialogs::{ConfirmChoice, ConfirmRequest};
 use crate::icons::Icon;
-use crate::machine::{Machine, MachineStatus, lock};
+use crate::machine::{Machine, MachineStatus, lock, protocol_mismatch_text};
 use crate::panes::cam_tools::probe_routines::run::{self as probe_run, Outcome, ProbeRun};
 use crate::workspace::{Pane, PaneContext, PaneId};
 
@@ -92,6 +93,8 @@ pub fn msgids() -> Vec<&'static str> {
 const MSGIDS: &[&str] = &[
     n_!("E-STOP"),
     n_!("Emergency stop (soft reset, {shortcut})"),
+    ESTOP_REPETIER,
+    OVERRIDES_NOT_ON_REPETIER,
     n_!("Home"),
     n_!("Home machine ($H)"),
     n_!("Unlock"),
@@ -107,6 +110,13 @@ const MSGIDS: &[&str] = &[
     OVERRIDE_NOT_CONFIRMED,
     CALIBRATION_NOT_A_NUMBER,
 ];
+
+/// The emergency stop's tooltip on a Repetier connection, which has no soft reset.
+const ESTOP_REPETIER: &str = n_!("Emergency stop (M112, {shortcut})");
+
+/// Why the overrides are disabled on a Repetier connection.
+const OVERRIDES_NOT_ON_REPETIER: &str =
+    n_!("Overrides need GRBL's real-time commands; Repetier firmware has none.");
 
 /// Unlock from the menu or its key refused outside ALARM.
 const UNLOCK_NOT_IN_ALARM: &str = n_!("Unlock ignored: the machine is not in ALARM.");
@@ -172,6 +182,9 @@ pub struct MachineControlPane {
     /// The emergency stop picture (`images/eStop2.png`): `None` until first drawn, then the
     /// texture, or `None` inside when it could not be decoded (the button shows its text).
     estop_image: Option<Option<egui::TextureHandle>>,
+    /// The active device profile's protocol, which a connect speaks
+    /// ([`MachineController::connect_with`]).
+    protocol: ControllerProtocol,
 }
 
 /// Share of the pane's width the sidebar (connection, state, work coordinates, job) takes.
@@ -239,6 +252,7 @@ impl MachineControlPane {
             probe: None,
             probe_text: None,
             estop_image: None,
+            protocol: ControllerProtocol::Unknown,
         }
     }
 
@@ -463,7 +477,8 @@ impl MachineControlPane {
     /// Starts connecting with the form's settings; a refusal is shown in the pane.
     fn connect(&mut self, tr: &Translator) {
         let settings = self.connection.settings().clone();
-        match self.with_controller(|c| c.connect(&settings)) {
+        let protocol = self.protocol;
+        match self.with_controller(|c| c.connect_with(&settings, protocol)) {
             Ok(()) => {
                 self.notice = None;
                 self.connection.set_connecting(true);
@@ -743,7 +758,16 @@ impl MachineControlPane {
 
     /// Clears the connecting state once the controller reported how the connect went (a
     /// failed connect reports its error, then `Disconnected`).
-    fn follow_events(&mut self, events: &[MachineEvent]) {
+    fn follow_events(&mut self, events: &[MachineEvent], tr: &Translator) {
+        for event in events {
+            if let MachineEvent::ProtocolMismatch {
+                configured,
+                detected,
+            } = event
+            {
+                self.notice = Some(protocol_mismatch_text(*configured, *detected, tr));
+            }
+        }
         if events
             .iter()
             .any(|e| matches!(e, MachineEvent::Connected | MachineEvent::Disconnected))
@@ -896,10 +920,16 @@ impl MachineControlPane {
         // it is never pushed past the column's edge or below the fold.
         let estop_on_top = stacked || room < jog::PAD_ROW_WIDTH + ESTOP_SIZE.x;
         let texture = self.estop_texture(ui.ctx());
+        // A Repetier connection has no real-time commands: no overrides, no jog cancel (so no
+        // continuous jog), no probing, and the emergency stop is `M112`.
+        let repetier = status.connected && self.with_controller(|c| c.is_repetier());
         let estop_label = tr.tr("E-STOP");
-        let estop_hint = tr
-            .tr("Emergency stop (soft reset, {shortcut})")
-            .replace("{shortcut}", SOFT_RESET_CHORD);
+        let estop_msgid = if repetier {
+            ESTOP_REPETIER
+        } else {
+            "Emergency stop (soft reset, {shortcut})"
+        };
+        let estop_hint = tr.tr(estop_msgid).replace("{shortcut}", SOFT_RESET_CHORD);
         let mut estop = false;
         if estop_on_top {
             estop = estop_button(ui, &estop_label, texture.as_ref(), status.connected)
@@ -908,7 +938,15 @@ impl MachineControlPane {
             ui.add_space(SECTION_GAP);
         }
         self.targets.busy = self.override_target.is_some();
-        match overrides::show(ui, tr, status, stacked, &mut self.targets) {
+        let overrides = ui
+            .add_enabled_ui(!repetier, |ui| {
+                overrides::show(ui, tr, status, stacked, &mut self.targets)
+            })
+            .inner;
+        if repetier {
+            ui.weak(tr.tr(OVERRIDES_NOT_ON_REPETIER));
+        }
+        match overrides {
             Some(overrides::Action::Realtime(command)) => {
                 self.with_controller(|c| c.realtime(command));
             }
@@ -931,9 +969,12 @@ impl MachineControlPane {
         let wcs = &mut self.wcs;
         // Quick probes: GTK's guards (connected, no job, one probe at a time); the run
         // checks the rest (Idle, fresh report, probe input) when it starts.
-        let probe_enabled =
-            status.connected && self.probe.is_none() && !machine.is_some_and(Machine::job_running);
-        let probe_text = self.probe_text.as_deref();
+        let probe_enabled = status.connected
+            && !repetier
+            && self.probe.is_none()
+            && !machine.is_some_and(Machine::job_running);
+        let probe_refusal = repetier.then(|| tr.tr(probe_run::PROBE_NOT_ON_REPETIER));
+        let probe_text = probe_refusal.as_deref().or(self.probe_text.as_deref());
         self.jog.begin_frame();
         // Rotary jog buttons in the readout rows: the pad's guards (read after this frame's
         // Home/Unlock buttons) and rules.
@@ -1176,7 +1217,7 @@ impl Pane for MachineControlPane {
         // Here, not in `ui`: the pane is hidden on every page but Machine Control, and the
         // connection state, the work zero query and a quick probe must follow the machine
         // meanwhile.
-        self.follow_events(events);
+        self.follow_events(events, tr);
         self.wcs.follow(events);
         self.follow_probe(events, tr);
     }
@@ -1186,6 +1227,11 @@ impl Pane for MachineControlPane {
     }
 
     fn frame(&mut self, machine: &Machine) {
+        // Every frame, drawn or not: a keyboard jog may run while the pane is hidden.
+        let repetier = machine.status().connected && self.with_controller(|c| c.is_repetier());
+        if self.jog.set_continuous_allowed(!repetier) {
+            self.with_controller(|c| c.realtime(RealtimeCommand::JogCancel));
+        }
         if self.jog.expire_key_hold() {
             tracing::warn!("keyboard jog not confirmed in time; cancelled");
             self.with_controller(|c| c.realtime(RealtimeCommand::JogCancel));
@@ -1198,6 +1244,9 @@ impl Pane for MachineControlPane {
 
     fn set_controller(&mut self, controller: Option<&gcodekit5_devicedb::ControllerType>) {
         self.wcs.set_grbl(reports_grbl_parser_state(controller));
+        self.protocol = controller.map_or(ControllerProtocol::Unknown, |c| {
+            ControllerProtocol::from_name(c.as_str())
+        });
     }
 
     fn take_confirm(&mut self) -> Option<ConfirmRequest> {

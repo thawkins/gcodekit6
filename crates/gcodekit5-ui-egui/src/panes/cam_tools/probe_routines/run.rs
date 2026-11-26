@@ -52,6 +52,9 @@ pub const BACKSTOP_DELAY: Duration = HALT_MAX_WAIT.saturating_add(Duration::from
 pub const UNCONFIRMED_BACKSTOP_DELAY: Duration = Duration::from_secs(2);
 
 const NOT_CONNECTED: &str = n_!("The machine is not connected.");
+/// A probe refused on a Repetier connection: Repetier acknowledges a refused line with `ok`,
+/// so a probe run could not stop on its error (GTK probed GRBL only).
+pub const PROBE_NOT_ON_REPETIER: &str = n_!("Probing is not available on Repetier firmware.");
 const RUN_IN_PROGRESS: &str = n_!("A probe run is still in progress.");
 const JOB_RUNNING: &str = n_!("A job is running.");
 const MUST_BE_IDLE: &str = n_!("The machine must be Idle");
@@ -78,6 +81,7 @@ const REPORTS_RECEIVED: &str = n_!("probe report(s) received.");
 pub fn msgids() -> Vec<&'static str> {
     vec![
         NOT_CONNECTED,
+        PROBE_NOT_ON_REPETIER,
         RUN_IN_PROGRESS,
         JOB_RUNNING,
         MUST_BE_IDLE,
@@ -123,6 +127,9 @@ pub fn not_ready(machine: Option<&Machine>, running: bool, tr: &Translator) -> O
     let Some(machine) = machine.filter(|m| m.status().connected) else {
         return Some(tr.tr(NOT_CONNECTED).into_owned());
     };
+    if lock(machine.controller()).is_repetier() {
+        return Some(tr.tr(PROBE_NOT_ON_REPETIER).into_owned());
+    }
     if running {
         return Some(tr.tr(RUN_IN_PROGRESS).into_owned());
     }

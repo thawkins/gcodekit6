@@ -4645,3 +4645,15 @@ msgstr ""
 
 msgid "resend request could not be honoured"
 msgstr ""
+
+msgid "Emergency stop (M112, {shortcut})"
+msgstr ""
+
+msgid "Overrides need GRBL's real-time commands; Repetier firmware has none."
+msgstr ""
+
+msgid "Continuous jog needs GRBL's jog cancel; Repetier firmware has none."
+msgstr ""
+
+msgid "Probing is not available on Repetier firmware."
+msgstr ""

@@ -4724,3 +4724,15 @@ msgstr "omitido: sin equivalente en Repetier"
 
 msgid "resend request could not be honoured"
 msgstr "no se pudo atender la solicitud de reenvío"
+
+msgid "Emergency stop (M112, {shortcut})"
+msgstr "Parada de emergencia (M112, {shortcut})"
+
+msgid "Overrides need GRBL's real-time commands; Repetier firmware has none."
+msgstr "Los ajustes requieren los comandos en tiempo real de GRBL; el firmware Repetier no los tiene."
+
+msgid "Continuous jog needs GRBL's jog cancel; Repetier firmware has none."
+msgstr "El desplazamiento continuo requiere la cancelación de jog de GRBL; el firmware Repetier no la tiene."
+
+msgid "Probing is not available on Repetier firmware."
+msgstr "El sondeo no está disponible con el firmware Repetier."

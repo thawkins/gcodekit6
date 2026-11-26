@@ -132,6 +132,8 @@ mod test_machine_pane;
 mod test_machine_probe_report;
 #[path = "test_machine_quick_probe.rs"]
 mod test_machine_quick_probe;
+#[path = "test_machine_repetier_pane.rs"]
+mod test_machine_repetier_pane;
 #[path = "test_machine_rotary_jog.rs"]
 mod test_machine_rotary_jog;
 #[path = "test_machine_work_zero.rs"]

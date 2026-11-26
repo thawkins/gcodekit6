@@ -4728,3 +4728,15 @@ msgstr "ignoré : aucun équivalent Repetier"
 
 msgid "resend request could not be honoured"
 msgstr "la demande de renvoi n'a pas pu être satisfaite"
+
+msgid "Emergency stop (M112, {shortcut})"
+msgstr "Arrêt d'urgence (M112, {shortcut})"
+
+msgid "Overrides need GRBL's real-time commands; Repetier firmware has none."
+msgstr "Les ajustements nécessitent les commandes temps réel de GRBL ; le micrologiciel Repetier n'en a pas."
+
+msgid "Continuous jog needs GRBL's jog cancel; Repetier firmware has none."
+msgstr "Le jog continu nécessite l'annulation de jog de GRBL ; le micrologiciel Repetier n'en a pas."
+
+msgid "Probing is not available on Repetier firmware."
+msgstr "Le palpage n'est pas disponible avec le micrologiciel Repetier."

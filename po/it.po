@@ -4724,3 +4724,15 @@ msgstr "saltato: nessun equivalente Repetier"
 
 msgid "resend request could not be honoured"
 msgstr "impossibile soddisfare la richiesta di reinvio"
+
+msgid "Emergency stop (M112, {shortcut})"
+msgstr "Arresto di emergenza (M112, {shortcut})"
+
+msgid "Overrides need GRBL's real-time commands; Repetier firmware has none."
+msgstr "Gli override richiedono i comandi in tempo reale di GRBL; il firmware Repetier non li ha."
+
+msgid "Continuous jog needs GRBL's jog cancel; Repetier firmware has none."
+msgstr "Il jog continuo richiede l'annullamento jog di GRBL; il firmware Repetier non lo ha."
+
+msgid "Probing is not available on Repetier firmware."
+msgstr "La tastatura non è disponibile con il firmware Repetier."

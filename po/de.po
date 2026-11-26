@@ -4721,3 +4721,15 @@ msgstr "übersprungen: keine Repetier-Entsprechung"
 
 msgid "resend request could not be honoured"
 msgstr "Wiederholungsanforderung konnte nicht erfüllt werden"
+
+msgid "Emergency stop (M112, {shortcut})"
+msgstr "Not-Aus (M112, {shortcut})"
+
+msgid "Overrides need GRBL's real-time commands; Repetier firmware has none."
+msgstr "Overrides benötigen die Echtzeitbefehle von GRBL; die Repetier-Firmware hat keine."
+
+msgid "Continuous jog needs GRBL's jog cancel; Repetier firmware has none."
+msgstr "Kontinuierliches Verfahren benötigt den Jog-Abbruch von GRBL; die Repetier-Firmware hat keinen."
+
+msgid "Probing is not available on Repetier firmware."
+msgstr "Antasten ist mit der Repetier-Firmware nicht verfügbar."

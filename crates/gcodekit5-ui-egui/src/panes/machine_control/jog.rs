@@ -50,11 +50,16 @@ pub(super) const MSGIDS: &[&str] = &[
     n_!("Step"),
     n_!("Jog Feed:"),
     n_!("Continuous"),
+    CONTINUOUS_NOT_ON_REPETIER,
     n_!("Jog refused: the machine position is unknown."),
     n_!("Jog refused: no travel left in that direction."),
     n_!("Jog refused: the machine is not idle."),
     n_!("Jog"),
 ];
+
+/// Why continuous jog is off on a Repetier connection.
+const CONTINUOUS_NOT_ON_REPETIER: &str =
+    n_!("Continuous jog needs GRBL's jog cancel; Repetier firmware has none.");
 
 /// Default step, feed and travel, as `MachineSettings` defaults them.
 const DEFAULT_STEP_MM: f32 = 1.0;
@@ -192,6 +197,9 @@ pub(super) struct JogPanel {
     units: MeasurementSystem,
     feed_units: FeedRateUnits,
     continuous: bool,
+    /// Whether the connection can end a hold (GRBL's jog cancel); continuous mode is off
+    /// while it cannot, see [`JogPanel::set_continuous_allowed`].
+    continuous_allowed: bool,
     /// The hold in continuous mode.
     held: Option<Hold>,
     /// The rotary jog step in degrees (Preferences > Machine > rotary jog increment).
@@ -250,6 +258,7 @@ impl JogPanel {
             units: MeasurementSystem::Metric,
             feed_units: FeedRateUnits::MmPerMin,
             continuous: false,
+            continuous_allowed: true,
             held: None,
             rotary_step_deg: 1.0,
             rotary_limit_deg: [360.0; 3],
@@ -334,7 +343,15 @@ impl JogPanel {
 
     /// Whether continuous (hold-to-jog) mode is on.
     pub(super) fn continuous(&self) -> bool {
-        self.continuous
+        self.continuous && self.continuous_allowed
+    }
+
+    /// Allows continuous mode, or turns it off (keeping the user's choice for later) on a
+    /// connection that cannot cancel a jog (Repetier). Returns whether a hold was in
+    /// progress, which the caller then cancels.
+    pub(super) fn set_continuous_allowed(&mut self, allowed: bool) -> bool {
+        self.continuous_allowed = allowed;
+        !allowed && self.take_hold()
     }
 
     /// The key a keyboard hold lasts while, if one is in progress.
@@ -495,7 +512,7 @@ impl JogPanel {
         actions: &mut Vec<Action>,
         hold: impl FnOnce(&Self) -> Result<f32, &'static str>,
     ) {
-        if !self.continuous {
+        if !self.continuous() {
             if response.clicked() {
                 actions.push(Action::Move {
                     axis,
@@ -667,10 +684,19 @@ impl JogPanel {
             ui.add_space(8.0);
             self.show_feed(ui, tr);
             ui.add_space(8.0);
-            let was_continuous = self.continuous;
-            crate::theme::checkbox(ui, &mut self.continuous, tr.tr("Continuous"));
-            if was_continuous && !self.continuous && self.take_hold() {
-                actions.push(Action::Cancel);
+            if self.continuous_allowed {
+                let was_continuous = self.continuous;
+                crate::theme::checkbox(ui, &mut self.continuous, tr.tr("Continuous"));
+                if was_continuous && !self.continuous && self.take_hold() {
+                    actions.push(Action::Cancel);
+                }
+            } else {
+                let mut off = false;
+                ui.add_enabled_ui(false, |ui| {
+                    crate::theme::checkbox(ui, &mut off, tr.tr("Continuous"))
+                })
+                .inner
+                .on_disabled_hover_text(tr.tr(CONTINUOUS_NOT_ON_REPETIER));
             }
         });
         ui.add_space(6.0);
