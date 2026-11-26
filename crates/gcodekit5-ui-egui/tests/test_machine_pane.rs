@@ -583,3 +583,30 @@ fn test_unlock_only_in_alarm_and_sends_dollar_x() {
         shared.log()
     );
 }
+
+/// GTK's override limit marker: " MAX" at 200 %, " MIN" at the feed's 10 % and the
+/// spindle's 50 %, none in between and none on the rapid override.
+#[test]
+fn test_override_readout_marks_the_limits() {
+    let (mut harness, shared) = pane_app(Duration::from_millis(1), true);
+    report_state(
+        &mut harness,
+        &shared,
+        "<Idle|MPos:0.000,0.000,0.000|FS:0,0|Ov:200,25,50>",
+        "Idle",
+    );
+    harness.run();
+    let _ = harness.get_by_label("200% MAX");
+    let _ = harness.get_by_label("50% MIN");
+    let _ = harness.get_by_label("25%");
+    report_state(
+        &mut harness,
+        &shared,
+        "<Run|MPos:0.000,0.000,0.000|FS:0,0|Ov:10,100,120>",
+        "Run",
+    );
+    harness.run();
+    let _ = harness.get_by_label("10% MIN");
+    let _ = harness.get_by_label("120%");
+    assert!(harness.query_by_label_contains("MAX").is_none());
+}

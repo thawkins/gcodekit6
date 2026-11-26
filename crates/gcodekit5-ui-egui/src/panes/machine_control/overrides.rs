@@ -186,12 +186,46 @@ fn row(
     clicked
 }
 
-/// The override percentage last reported, as text.
-fn percent(status: &MachineStatus, pick: impl Fn(u16, u16, u16) -> u16) -> String {
-    status.overrides.map_or_else(
-        || "-".to_string(),
-        |o| format!("{}%", pick(o.feed, o.rapid, o.spindle)),
-    )
+/// The override percentage last reported, as text, and whether it is at a limit.
+///
+/// GTK marks an override at its limit with " MAX" (200 % and over) or " MIN" (the feed at
+/// 10 % and under, the spindle at 50 % and under) in the error colour; `limits` gives those
+/// bounds, `None` for the rapid override, which has none.
+///
+/// # Arguments
+/// * `status` - The machine status with the last `Ov:` values.
+/// * `pick` - Picks the override from (feed, rapid, spindle).
+/// * `limits` - The (MIN, MAX) bounds in percent, if the override has them.
+fn percent(
+    status: &MachineStatus,
+    pick: impl Fn(u16, u16, u16) -> u16,
+    limits: Option<(u16, u16)>,
+) -> (String, bool) {
+    let Some(o) = status.overrides else {
+        return ("-".to_string(), false);
+    };
+    let value = pick(o.feed, o.rapid, o.spindle);
+    let marker = match limits {
+        Some((_, max)) if value >= max => " MAX",
+        Some((min, _)) if value <= min => " MIN",
+        _ => "",
+    };
+    (format!("{value}%{marker}"), !marker.is_empty())
+}
+
+/// GTK's feed override limits for the MIN/MAX marker, in percent.
+const FEED_LIMITS: (u16, u16) = (10, 200);
+/// GTK's spindle override limits for the MIN/MAX marker, in percent.
+const SPINDLE_LIMITS: (u16, u16) = (50, 200);
+
+/// The percentage text, in the error colour at a limit (GTK's `error` style).
+fn value_text(ui: &egui::Ui, (text, limit): (String, bool)) -> egui::RichText {
+    let text = egui::RichText::new(text);
+    if limit {
+        text.color(ui.visuals().error_fg_color)
+    } else {
+        text
+    }
 }
 
 /// Draws one Set % field and its button; returns the target when Set was clicked.
@@ -304,19 +338,19 @@ pub(super) fn show(
     let rows = [
         (
             tr.tr("Feed:"),
-            percent(status, |f, _, _| f),
+            percent(status, |f, _, _| f, Some(FEED_LIMITS)),
             named(&FEED),
             Some(OverrideKind::Feed),
         ),
         (
             tr.tr("Spindle:"),
-            percent(status, |_, _, s| s),
+            percent(status, |_, _, s| s, Some(SPINDLE_LIMITS)),
             named(&SPINDLE),
             Some(OverrideKind::Spindle),
         ),
         (
             rapid.clone(),
-            percent(status, |_, r, _| r),
+            percent(status, |_, r, _| r, None),
             rapid_buttons,
             None,
         ),
@@ -326,7 +360,7 @@ pub(super) fn show(
         for (label, value, buttons, kind) in rows {
             ui.horizontal(|ui| {
                 ui.weak(label);
-                ui.label(value);
+                ui.label(value_text(ui, value));
                 if let Some(kind) = kind {
                     ui.add_space(8.0);
                     target = target.or(kind_target(ui, tr, kind, enabled, targets));
@@ -341,7 +375,8 @@ pub(super) fn show(
             .show(ui, |ui| {
                 for (label, value, buttons, _) in rows {
                     ui.weak(label);
-                    ui.add_sized([56.0, BUTTON_SIZE.y], egui::Label::new(value));
+                    let value = value_text(ui, value);
+                    ui.add_sized([72.0, BUTTON_SIZE.y], egui::Label::new(value));
                     clicked = clicked.or(row(ui, enabled, buttons));
                     ui.end_row();
                 }

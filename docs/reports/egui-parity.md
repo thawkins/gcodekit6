@@ -108,6 +108,7 @@ Status values:
 | Feed override +/-1 %, +/-10 %, reset | 12-overrides | Ported | `test_machine_pane::feed_override_plus_10` |
 | Spindle override +/-1 %, +/-10 %, reset | 12-overrides | Ported | `test_machine_pane::test_spindle_and_rapid_override_buttons` (each button, and Stop spindle, writes its realtime byte) |
 | Rapid override presets | 12-overrides | Ported | `test_machine_pane::test_spindle_and_rapid_override_buttons` (25 %, 50 %, 100 %) |
+| Override limit marker (MAX / MIN in the error colour) | *(GTK)* | Ported | `test_machine_pane::test_override_readout_marks_the_limits` (GTK's `status_report.rs` thresholds: feed 10 / 200 %, spindle 50 / 200 %; the colour is not in the accessibility tree, so the test checks the text. The readout keeps the percentage only, without GTK's adjusted value: see Visual) |
 | Set an exact override percentage | *(GTK)* | Ported | `test_machine_override_target::feed_set_percent_steps_with_confirmation`, `test_machine_override_target::spindle_set_percent_sends_spindle_bytes`, `app/test_override_target::next_step_waits_for_the_report_then_fails_after_timeout` (feed and spindle, as GTK; one step per `Ov:` confirmation) |
 
 ## Console
@@ -241,6 +242,8 @@ The two rules differ on purpose; both are pinned by tests
 | Spoilboard Grid | 50-camtools | Ported | `test_cam_spoilboard_grid::cam_grid_generate_matches_gtk_defaults` |
 | Gerber converter | 50-camtools | Ported | `test_cam_gerber::cam_gerber_generate_matches_gtk` |
 | Speeds and Feeds | 50-camtools | Ported | `test_cam_speeds_feeds::cam_speeds_feeds_matches_gtk_defaults` |
+| Speeds and Feeds material picker category filter (All / Metals / Wood / Plastics / Composites) | *(GTK)* | Not applicable | GTK's dropdown (`speeds_feeds_page.rs:1107-1114`) is built but never read: no handler filters the list by it (nor by its search entry), so it never filtered anything. egui's picker search does filter (`panes/cam_tools/speeds_feeds/page.rs` `picker_rows`) and each row names its category |
+| Speeds and Feeds "Warnings / No warnings" group | *(GTK)* | Not applicable | GTK's group (`speeds_feeds_page.rs:404-414`) is static: it always says "No warnings" and is never updated, so it tells the user nothing; a dead widget is not ported |
 | Presets: save, load, GTK files | 50-camtools | Ported | `test_cam_presets::cam_preset_loads_the_gtk_files`, `test_cam_presets::cam_preset_save_and_load_through_the_dialogs` |
 | Send to editor, preview | 50-camtools | Ported | `test_cam_tools::send_to_editor_replaces_the_program_and_forgets_the_file`, `test_cam_tools::preview_brings_the_visualizer_to_the_front` |
 | Help button per tool | 50-camtools | Ported | `test_help::help_console_and_cam_pages_open_their_topic` |
