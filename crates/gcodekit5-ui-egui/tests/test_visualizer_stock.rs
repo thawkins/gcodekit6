@@ -627,8 +627,8 @@ fn test_designer_generate_seeds_the_stock() -> TestResult {
     crate::test_designer_files_app::frames(&mut h, 3);
     let seed = h.state().state().stock_seed.ok_or("no seed")?;
     assert_eq!(
-        (seed.width, seed.height, seed.thickness, seed.tool_diameter),
-        (80.0, 60.0, 6.0, 2.0)
+        (seed.stock, seed.tool_diameter),
+        (Some([80.0, 60.0, 6.0]), 2.0)
     );
     let gcode = h.state().editor().borrow().buffer().text().to_string();
 
@@ -698,6 +698,58 @@ fn test_designer_generate_seeds_the_stock() -> TestResult {
     assert!(
         !over_corner.is_empty() && over_corner.iter().all(|z| *z == 6.0),
         "the travel from the origin did not cut: {over_corner:?}"
+    );
+    Ok(())
+}
+
+#[test]
+fn test_designer_without_stock_keeps_the_stock() -> TestResult {
+    // GTK's sync_stock_from_designer leaves the fields alone when the Designer has no stock;
+    // only the tool comes with the program.
+    let (mut h, _script) =
+        crate::test_designer_files_app::app(crate::test_designer_files_app::default_state());
+    cnc_design(&mut h);
+    h.state().designer().borrow_mut().state_mut().stock_material = None;
+    h.state()
+        .designer()
+        .borrow_mut()
+        .request_to_editor(gcodekit5_ui_egui::panes::designer::ToEditor::Generate);
+    crate::test_designer_files_app::frames(&mut h, 3);
+    let seed = h.state().state().stock_seed.ok_or("no seed")?;
+    assert_eq!((seed.stock, seed.tool_diameter), (None, 2.0));
+
+    // The user's stock, edited before the Designer's program arrives.
+    let tr = Translator::new("en");
+    let mut pane = VisualizerPane::new();
+    pane.configure(&config(true));
+    let edited = StockSetup {
+        width: 120.0,
+        height: 90.0,
+        thickness: 12.0,
+        ..StockSetup::default()
+    };
+    pane.set_stock_setup(edited, &egui::Context::default());
+    let mut harness = Harness::builder()
+        .with_size(egui::vec2(730.0, 600.0))
+        .build_ui_state(
+            move |ui, pane: &mut VisualizerPane| {
+                let mut requested = Vec::new();
+                let mut ctx = PaneContext::new(&tr, &mut requested).with_stock_seed(Some(seed));
+                pane.ui(ui, &mut ctx);
+            },
+            pane,
+        );
+    harness.run();
+    let setup = harness.state().stock_setup();
+    assert_eq!(
+        (
+            setup.width,
+            setup.height,
+            setup.thickness,
+            setup.tool_diameter
+        ),
+        (120.0, 90.0, 12.0, 2.0),
+        "the user's stock is kept; the tool follows the Designer"
     );
     Ok(())
 }

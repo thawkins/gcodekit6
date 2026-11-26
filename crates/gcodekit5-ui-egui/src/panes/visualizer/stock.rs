@@ -84,27 +84,27 @@ impl Default for StockSetup {
 pub struct StockSeed {
     /// Changes with every generated program, so each is applied once.
     pub serial: u64,
-    /// Stock size in X (mm).
-    pub width: f32,
-    /// Stock size in Y (mm).
-    pub height: f32,
-    /// Stock size in Z (mm).
-    pub thickness: f32,
+    /// The Designer's stock size in X, Y and Z (mm), or `None` when it has no stock: the
+    /// visualizer's stock is then kept, as GTK's `sync_stock_from_designer` did.
+    pub stock: Option<[f32; 3]>,
     /// The Designer's tool diameter (mm).
     pub tool_diameter: f32,
 }
 
 impl StockSeed {
-    /// `setup` with the seed's stock size and tool; the zero references are kept (a
-    /// Designer program records its Stock Z0 in its header).
+    /// `setup` with the seed's stock size (when the Designer has a stock) and tool; the zero
+    /// references are kept (a Designer program records its Stock Z0 in its header).
     ///
     /// # Arguments
     /// * `setup` - The current stock and tool.
     pub fn apply(&self, setup: StockSetup) -> StockSetup {
+        let [width, height, thickness] =
+            self.stock
+                .unwrap_or([setup.width, setup.height, setup.thickness]);
         StockSetup {
-            width: self.width,
-            height: self.height,
-            thickness: self.thickness,
+            width,
+            height,
+            thickness,
             tool_diameter: self.tool_diameter,
             ..setup
         }

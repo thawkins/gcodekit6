@@ -37,7 +37,7 @@ use crate::commands::Command;
 use crate::dialogs::{Asked, ConfirmRequest, DialogAnswer, FilePurpose};
 use crate::panes::cam_tools::CamDelivery;
 use crate::panes::designer::ToEditor;
-use crate::panes::visualizer::{StockSeed, StockSetup};
+use crate::panes::visualizer::StockSeed;
 use crate::workspace::PaneId;
 
 /// A request to replace the editor's program, and who made it.
@@ -99,23 +99,19 @@ const HANDOFF_BEHIND_OPEN: &str =
 pub(super) const OPEN_BEHIND_HANDOFF: &str =
     n_!("Answer the question about the editor's unsaved changes before opening a file.");
 
-/// The Designer's stock (GTK's 200 x 200 x 10 mm when it has none) and tool, for the
-/// visualizer's stock removal simulation.
+/// The Designer's stock, if it has one, and tool, for the visualizer's stock removal
+/// simulation.
 ///
 /// # Arguments
 /// * `state` - The Designer's state.
 /// * `serial` - Tags this program's seed.
 fn stock_seed(state: &DesignerState, serial: u64) -> StockSeed {
-    let default = StockSetup::default();
-    let (width, height, thickness) = state.stock_material.as_ref().map_or(
-        (default.width, default.height, default.thickness),
-        |stock| (stock.width, stock.height, stock.thickness),
-    );
     StockSeed {
         serial,
-        width,
-        height,
-        thickness,
+        stock: state
+            .stock_material
+            .as_ref()
+            .map(|stock| [stock.width, stock.height, stock.thickness]),
         tool_diameter: state.tool_settings.tool_diameter as f32,
     }
 }
