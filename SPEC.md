@@ -1,8 +1,8 @@
 # GCodeKit5 - Specification Document
 
-**Version**: 1.2.0-beta.2
+**Version**: 2.0.0-alpha.1
 **Last Updated**: 2026-11-27
-**Status**: Beta Release
+**Status**: Alpha Release
 
 ### Unreleased (2026-11-27) - egui + craft-libs Front End
 - ✅ **UI toolkit**

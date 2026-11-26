@@ -623,11 +623,17 @@ You may choose either license for your use of this software.
 
 ## Project Status
 
-  - **Current Version**: 1.2.0-beta.2a
+  - **Current Version**: 2.0.0-alpha.1
   - **Status**: Active Development
-  - **Stability**: Beta
+  - **Stability**: Alpha
 
 ## Updates
+
+### Recent Updates (2.0.0-alpha.1) - UI rewritten on egui + craft-libs (2026-11-27)
+- The GTK4 front end is replaced by egui + craft-libs. GTK4, libadwaita and GtkSourceView are no longer needed to build, run or package GCodeKit5.
+- Every GTK feature is ported or recorded in `docs/reports/egui-parity.md`; settings, machine profiles and libraries carry over.
+- CI and the release builds (`.deb`, `.rpm`, Flatpak, AppImage, `.dmg`, `.msi`, portable zip) no longer install or bundle GTK.
+- Alpha: not yet tested on real hardware or on Windows and macOS builds.
 
 ### Recent Updates (1.2.0-beta.2a) Fixed an issue with moving multiple objects using grips and Fix Dead Keys on Wayland (2026-10-25)
   - When modifying the grips of a set of objects, they would lose their position. This issue has been fixed.
