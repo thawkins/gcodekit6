@@ -1,7 +1,7 @@
 //! Saving files safely: write a temporary file beside the target, flush it to disk, then
 //! rename it over the target, so a crash, a power loss or a full disk never leaves a
-//! half-written file. Shared by both front ends (the egui editor, designer and CAM presets,
-//! the tool and material library back ends, and the device profiles file), re-exported as
+//! half-written file. Used by the egui editor, designer and CAM presets, the tool and
+//! material library back ends, and the device profiles file, and re-exported as
 //! `gcodekit5_app::files`.
 //!
 //! Dependencies: `std`, `tracing` (a temporary file left behind is logged).

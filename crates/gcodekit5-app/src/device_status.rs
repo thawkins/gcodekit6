@@ -1,4 +1,3 @@
-//! gcodekit5-ui/src/device_status.rs
 //! Global device status shared across the application
 
 use gcodekit5_communication::firmware::grbl::status_parser::{
@@ -35,7 +34,8 @@ pub struct GrblDeviceStatus {
     /// Device name (e.g., "CNC 3018 Pro")
     pub device_name: Option<String>,
 
-    /// Last known GRBL settings (from `$$`), keyed by `$n` (u16 to support grblHAL extended settings up to $680)
+    /// Last known GRBL settings (from `$$`), keyed by `$n` (u16 to support grblHAL extended
+    /// settings up to $680)
     pub grbl_settings: HashMap<u16, String>,
 
     /// Last commanded feed rate (F value)

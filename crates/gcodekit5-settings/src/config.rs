@@ -224,8 +224,7 @@ pub struct UiSettings {
     /// The user's changes to the default keyboard shortcuts (egui front end's
     /// Preferences > Shortcuts): each entry replaces one command's default keys.
     /// Saved as an array, which the store replaces whole, so an entry removed
-    /// (a command reset to its defaults) stays removed. The GTK build keeps it
-    /// unchanged.
+    /// (a command reset to its defaults) stays removed.
     #[serde(default)]
     pub keyboard_shortcuts: Vec<ShortcutOverride>,
 }

@@ -3,7 +3,7 @@
 //! The console's command history: the commands typed in the console entry, newest last,
 //! with Up/Down navigation. It is kept across sessions in [`HISTORY_FILE`] (JSON) in the
 //! settings folder, written through the shared atomic writer, and bounded to
-//! [`MAX_HISTORY`] commands. Both front ends use this model and file.
+//! [`MAX_HISTORY`] commands. The file is the GTK front end's, so its history carries over.
 //!
 //! Dependencies: `serde`/`serde_json` (file format), `gcodekit5-core` (atomic write),
 //! `dirs` (the settings folder).
