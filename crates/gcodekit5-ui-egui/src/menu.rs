@@ -75,9 +75,9 @@ fn menu(tr: &Translator, title: &str, role: MenuRole, rows: &[Option<Command>]) 
 /// The app's menus, labelled through `tr`, before any platform layout and without shortcuts
 /// (`craft_menu::apply_keymap` adds them): GTK's File, Edit, Machine and Help. The commands
 /// left out have a home elsewhere: jogging and the visualizer's view commands are buttons on
-/// their pages (Reset View is its `Cmd+0` key), and the manager windows of earlier builds are
-/// page tabs ([`crate::workspace::Page::for_command`]). About, Preferences and Quit are
-/// tagged so each layout puts them where the platform expects.
+/// their pages (Reset View also keeps its `Cmd+0` key), and the manager windows of earlier
+/// builds are page tabs ([`crate::workspace::Page::for_command`]). About, Preferences and
+/// Quit are tagged so each layout puts them where the platform expects.
 ///
 /// # Arguments
 /// * `tr` - Translator for the labels.
