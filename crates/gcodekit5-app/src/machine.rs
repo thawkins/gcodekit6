@@ -68,6 +68,10 @@ const MAX_QUERY_TAGS: usize = 3;
 const QUERY_REPLY_TIMEOUT: Duration = Duration::from_secs(2);
 /// The most unanswered `?`s the worker remembers; see [`WorkerState::unanswered_queries`].
 const MAX_UNANSWERED_QUERIES: usize = 256;
+/// How many times in a row the worker replays the same line on a Repetier `Resend:` before it
+/// stops the stream: a line the firmware keeps refusing (one longer than its buffer, a noisy
+/// link) would otherwise be replayed for ever.
+const MAX_REPETIER_RESENDS: u32 = 5;
 /// How long an idle worker waits for a command before reading the transport again.
 const IDLE_WAIT: Duration = Duration::from_millis(2);
 
@@ -1036,6 +1040,8 @@ struct RepetierLink {
     acks_due: usize,
     /// Whether the command in flight is one of `internal`'s (not a program or manual line).
     internal_in_flight: bool,
+    /// The line of the last `Resend:` and how many times in a row it was asked for.
+    resend_streak: (u32, u32),
     /// Lines the worker sends itself: the protocol's start-up commands (`M110`, `M115`) at
     /// connect and after the controller restarts.
     internal: VecDeque<&'static str>,
@@ -1048,6 +1054,7 @@ impl RepetierLink {
             processor: RepetierProcessor::new(),
             acks_due: 0,
             internal_in_flight: false,
+            resend_streak: (0, 0),
             internal: protocol_profile(ControllerProtocol::Repetier.as_str())
                 .init_commands
                 .iter()
@@ -2079,16 +2086,32 @@ impl WorkerState {
         let Some(link) = self.repetier.as_mut() else {
             return Ok(());
         };
-        match link.processor.resend_lines(from) {
+        let streak = if link.resend_streak.0 == from {
+            link.resend_streak.1 + 1
+        } else {
+            1
+        };
+        link.resend_streak = (from, streak);
+        let lines = if streak > MAX_REPETIER_RESENDS {
+            tracing::warn!(from, streak, "Repetier keeps asking for the same line");
+            None
+        } else {
+            link.processor.resend_lines(from)
+        };
+        match lines {
             Some(lines) if lines.is_empty() => Ok(()),
             Some(lines) => {
-                link.acks_due = lines.len();
+                // Repetier answers a resend request with `ok` as well, after `Resend:`: one
+                // acknowledgement more than the lines replayed, so the next line waits for the
+                // replayed one's own `ok`. A firmware that sends none recovers with its idle
+                // `wait`.
+                link.acks_due = lines.len() + 1;
                 link.processor.mark_buffer_full();
                 tracing::info!(from, count = lines.len(), "Repetier resend");
                 self.write(lines.concat().as_bytes())
             }
             None => {
-                tracing::warn!(from, "Repetier resend of an unknown line");
+                tracing::warn!(from, "Repetier resend not honoured");
                 self.sink.emit(MachineEvent::Error(format!(
                     "{}: N{from}",
                     worker_text::RESEND_FAILED

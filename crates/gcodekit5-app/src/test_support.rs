@@ -12,7 +12,7 @@
 //! each no sooner than [`LoopbackShared::reply_delay`] after its `?` (a slow link).
 //!
 //! It stands in for a Repetier controller too: each numbered line gets its `ok`, and
-//! [`LoopbackShared::resend_once`] answers one line with `Resend:N` instead.
+//! [`LoopbackShared::resend_once`] answers one line with `Resend:N` and `ok` instead.
 
 use std::collections::VecDeque;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
@@ -65,7 +65,8 @@ pub struct LoopbackShared {
     /// can tell what was written before the close.
     pub closed_at: Mutex<Option<usize>>,
     /// A Repetier line number: the first line written as `N<n> ...` is answered with
-    /// `Resend:<n>` instead of `ok` (a checksum error on the controller), then cleared.
+    /// `Resend:<n>` and `ok`, as Repetier firmware answers a checksum error, instead of the
+    /// line's own `ok`; then cleared.
     pub resend_once: Mutex<Option<u32>>,
 }
 
@@ -167,7 +168,7 @@ impl LoopbackShared {
             .lock()
             .expect("loopback log mutex poisoned")
             .push(Wrote::Line(line.to_string()));
-        self.inject(&format!("Resend:{n}\n"));
+        self.inject(&format!("Resend:{n}\nok\n"));
         true
     }
 

@@ -183,6 +183,13 @@ fn repetier_resend_replays_the_requested_line() {
         .is_some(),
         "stream did not finish after the resend: {seen:?}"
     );
+    // Every line was answered before the stream counted as finished: the `ok` after
+    // `Resend:` did not stand in for the replayed line's own.
+    assert_eq!(
+        shared.outstanding.load(std::sync::atomic::Ordering::SeqCst),
+        0,
+        "the stream finished with a line unanswered"
+    );
     let lines: Vec<String> = shared
         .log()
         .iter()
@@ -437,4 +444,39 @@ fn matching_identity_keeps_the_connection() {
             .iter()
             .any(|e| matches!(e, MachineEvent::ProtocolMismatch { .. }))
     );
+}
+
+#[test]
+fn repetier_endless_resend_stops_the_stream() {
+    let shared = Arc::new(LoopbackShared::default());
+    let mut controller = connect_repetier(&shared);
+    shared
+        .hold_acks
+        .store(true, std::sync::atomic::Ordering::SeqCst);
+    controller.start_stream(program(3)).expect("start");
+    assert!(wait_until(|| shared.lines_written() >= 3));
+    // The firmware keeps asking for N3 (its own `ok` held back).
+    for _ in 0..8 {
+        shared.inject("Resend:3\n");
+    }
+    let mut seen = Vec::new();
+    assert!(
+        wait_for(&mut controller, &mut seen, |e| matches!(
+            e,
+            MachineEvent::StreamStopped { .. }
+        ))
+        .is_some(),
+        "an endless resend did not stop the stream: {seen:?}"
+    );
+    assert!(
+        seen.iter().any(
+            |e| matches!(e, MachineEvent::Error(m) if m.starts_with(worker_text::RESEND_FAILED))
+        )
+    );
+    let replays = shared
+        .log()
+        .iter()
+        .filter(|w| matches!(w, Wrote::Line(l) if l.starts_with("N3 ")))
+        .count();
+    assert_eq!(replays, 6, "N3 written once and replayed 5 times");
 }
