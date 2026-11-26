@@ -3,10 +3,12 @@
 Date: 2026-11-26. Branch `claude/egui-m6`, base `6841d84`. Signed off by gap-closure Task G7
 (base `c8d4fe3`): every row is Ported, Not applicable or Manual check needed with its reason,
 except the two Gap rows the G7 sweep found (Repetier streaming and E-STOP; connection refused
-on a firmware/profile mismatch), which gap-closure Task G8 then ported.
+on a firmware/profile mismatch), which gap-closure Task G8 then ported. The GTK front end was
+then deleted (`26740e3`); its source is at `6841d84`. The Manual checks below are still
+pending before release.
 
-Counts (table rows above Gaps, recounted by G8): 144 Ported, 23 Not applicable, 13 Manual
-check needed, 0 Gap; 180 rows.
+Counts (table rows above Gaps, recounted after the M6 final fixes): 145 Ported, 23 Not
+applicable, 13 Manual check needed, 0 Gap; 181 rows.
 
 G7 sweep: every user-visible string of `crates/gcodekit5-ui/src/ui/gtk/` and `gtk_app.rs`
 (`t!(...)`, 1066 strings) was looked up in the egui and app sources, and each one missing was
@@ -125,6 +127,7 @@ Status values:
 | Bounded buffer | 15-console | Ported | `test_console_pane::console_buffer_is_bounded` |
 | Auto-scroll | 15-console | Manual check needed | egui scroll area sticks to the bottom; no test |
 | Clear | 15-console | Ported | `test_console_pane::test_console_clear_empties_the_log` |
+| Copy last error | *(GTK)* | Ported | `test_console_pane::test_console_last_error_is_newest_error_or_alarm`, `test_console_pane::test_console_header_buttons_in_app` (GTK's console header button: copies the newest error or alarm line) |
 
 ## Streaming
 
@@ -306,7 +309,8 @@ a firmware/profile mismatch) were ported by gap-closure Task G8.
 ## Manual checks
 
 Things only a person with the hardware or the operating system can check. None has been run
-for this report. Run them before GTK is deleted.
+for this report, and the GTK front end has since been deleted (`26740e3`); they are still
+pending and must be run before release.
 
 Connection and firmware:
 
