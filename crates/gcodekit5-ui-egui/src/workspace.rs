@@ -256,7 +256,17 @@ pub struct PaneContext<'a> {
     /// The Designer's stock and tool for the program it last generated.
     stock_seed: Option<StockSeed>,
     /// The key that ran the jog command being routed, when a key ran it.
-    jog_key: Option<egui::Key>,
+    jog_key: Option<JogKey>,
+}
+
+/// The key press that ran a jog command: the key, and the modifiers held when it was
+/// pressed (a change of them ends a keyboard hold, see `panes::machine_control`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct JogKey {
+    /// The key pressed, as egui reported it.
+    pub key: egui::Key,
+    /// The modifiers held at the press.
+    pub modifiers: egui::Modifiers,
 }
 
 impl<'a> PaneContext<'a> {
@@ -304,13 +314,13 @@ impl<'a> PaneContext<'a> {
     ///
     /// # Arguments
     /// * `key` - The key that ran the command.
-    pub fn with_jog_key(mut self, key: Option<egui::Key>) -> Self {
+    pub fn with_jog_key(mut self, key: Option<JogKey>) -> Self {
         self.jog_key = key;
         self
     }
 
     /// The key that ran the jog command being routed, if a key ran it.
-    pub fn jog_key(&self) -> Option<egui::Key> {
+    pub fn jog_key(&self) -> Option<JogKey> {
         self.jog_key
     }
 

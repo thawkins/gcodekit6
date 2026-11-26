@@ -36,9 +36,12 @@ use gcodekit5_app::machine::Axis;
 use gcodekit5_app::machine::grbl_stream::jog_step_choices;
 use gcodekit5_core::units::{FeedRateUnits, MeasurementSystem};
 
+use std::time::{Duration, Instant};
+
 use crate::commands::Command;
 use crate::icons::Icon;
 use crate::machine::MachineStatus;
+use crate::workspace::JogKey;
 
 /// The msgids this section shows (the button labels are the jog commands' labels).
 pub(super) const MSGIDS: &[&str] = &[
@@ -54,6 +57,11 @@ pub(super) const MSGIDS: &[&str] = &[
 const DEFAULT_STEP_MM: f32 = 1.0;
 const DEFAULT_FEED_MM_MIN: f32 = 1000.0;
 const DEFAULT_TRAVEL_MM: [f32; 3] = [200.0, 200.0, 100.0];
+/// How long a keyboard hold lasts without a frame confirming its key is still down.
+pub(super) const KEY_HOLD_DEAD_MAN: Duration = Duration::from_millis(250);
+/// How often a frame is asked for while a keyboard hold lasts, well inside
+/// [`KEY_HOLD_DEAD_MAN`].
+pub(super) const KEY_HOLD_FRAME: Duration = Duration::from_millis(50);
 /// Millimetres per inch.
 const MM_PER_INCH: f32 = 25.4;
 
@@ -189,7 +197,9 @@ struct Hold {
     /// The jog command (which button, or which key's command).
     command: Command,
     /// The key held, for a hold a key started; `None` for a button hold.
-    key: Option<egui::Key>,
+    key: Option<JogKey>,
+    /// When a frame last confirmed a keyboard hold (its key still down, nothing ending it).
+    confirmed: Instant,
 }
 
 /// What a key press in continuous mode did.
@@ -272,7 +282,7 @@ impl JogPanel {
     }
 
     /// The key a keyboard hold lasts while, if one is in progress.
-    pub(super) fn held_key(&self) -> Option<egui::Key> {
+    pub(super) fn held_key(&self) -> Option<JogKey> {
         self.held.and_then(|h| h.key)
     }
 
@@ -285,7 +295,7 @@ impl JogPanel {
     pub(super) fn key_hold(
         &mut self,
         command: Command,
-        key: egui::Key,
+        key: JogKey,
         status: &MachineStatus,
     ) -> KeyHold {
         if self.held.is_some() {
@@ -299,6 +309,7 @@ impl JogPanel {
                 self.held = Some(Hold {
                     command,
                     key: Some(key),
+                    confirmed: Instant::now(),
                 });
                 KeyHold::Started(Action::Move {
                     axis: button.axis,
@@ -320,11 +331,30 @@ impl JogPanel {
     /// # Returns
     /// Whether the hold ended (the caller sends 0x85).
     pub(super) fn follow_key_hold(&mut self, key_down: bool, may_continue: bool) -> bool {
-        if self.held_key().is_some() && !(key_down && may_continue) {
-            self.held = None;
-            return true;
+        let Some(hold) = self.held.as_mut().filter(|h| h.key.is_some()) else {
+            return false;
+        };
+        if key_down && may_continue {
+            hold.confirmed = Instant::now();
+            return false;
         }
-        false
+        self.held = None;
+        true
+    }
+
+    /// The dead man's switch of a keyboard hold: ends it when no frame has confirmed it for
+    /// [`KEY_HOLD_DEAD_MAN`] (frames stopped, or the pane stopped following it).
+    ///
+    /// # Returns
+    /// Whether the hold ended (the caller sends 0x85).
+    pub(super) fn expire_key_hold(&mut self) -> bool {
+        let expired = self
+            .held
+            .is_some_and(|h| h.key.is_some() && h.confirmed.elapsed() > KEY_HOLD_DEAD_MAN);
+        if expired {
+            self.held = None;
+        }
+        expired
     }
 
     /// Ends the hold in progress; returns whether there was one (the caller sends 0x85).
@@ -397,11 +427,10 @@ impl JogPanel {
             )
         });
         let on_button = |p: Option<egui::Pos2>| p.is_some_and(|p| response.rect.contains(p));
-        let pointer_hold = Some(Hold {
-            command: button.command,
-            key: None,
-        });
-        if self.held == pointer_hold {
+        let pointer_hold = |held: Option<Hold>| {
+            held.is_some_and(|h| h.key.is_none() && h.command == button.command)
+        };
+        if pointer_hold(self.held) {
             if !(enabled && down && on_button(pos)) {
                 self.held = None;
                 actions.push(Action::Cancel);
@@ -414,7 +443,11 @@ impl JogPanel {
         {
             match self.hold_distance(button, status) {
                 Ok(distance_mm) => {
-                    self.held = pointer_hold;
+                    self.held = Some(Hold {
+                        command: button.command,
+                        key: None,
+                        confirmed: Instant::now(),
+                    });
                     actions.push(Action::Move {
                         axis: button.axis,
                         distance_mm,

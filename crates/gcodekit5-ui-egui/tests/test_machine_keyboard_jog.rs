@@ -247,3 +247,62 @@ fn test_continuous_key_repeat_sends_no_second_jog() {
     assert_eq!(settled_jogs(&shared).len(), 1, "{:?}", shared.log());
     assert_eq!(settled_cancels(&shared), 0);
 }
+
+/// Review Focus 1, a lost key-up: with NumLock on, Shift turns a held keypad 8 into
+/// ArrowUp, so its release arrives as ArrowUp and egui keeps 8 down. The modifier change
+/// ends the hold.
+#[test]
+fn test_continuous_key_hold_cancelled_when_shift_changes_the_key() {
+    let (mut harness, shared) = keyboard_app(true);
+    hold(&mut harness, &shared, egui::Key::Num8);
+    // Shift pressed while 8 is held: the hold ends at once.
+    harness.event(egui::Event::ModifiersChanged(egui::Modifiers::SHIFT));
+    harness.step();
+    assert!(wait_until(|| cancels(&shared) == 1), "{:?}", shared.log());
+    // The release then arrives as ArrowUp; egui keeps 8 down, but nothing more is sent.
+    harness.event(egui::Event::Key {
+        key: egui::Key::ArrowUp,
+        physical_key: Some(egui::Key::Num8),
+        pressed: false,
+        repeat: false,
+        modifiers: egui::Modifiers::SHIFT,
+    });
+    harness.event(egui::Event::ModifiersChanged(egui::Modifiers::NONE));
+    for _ in 0..3 {
+        harness.step();
+    }
+    assert_eq!(settled_cancels(&shared), 1);
+    assert_eq!(jogs(&shared).len(), 1);
+}
+
+/// A release reported as another key, with no modifier change (a NumLock change between
+/// press and release): any other key event ends the hold, though egui keeps 8 down.
+#[test]
+fn test_continuous_key_hold_cancelled_by_another_key_event() {
+    let (mut harness, shared) = keyboard_app(true);
+    hold(&mut harness, &shared, egui::Key::Num8);
+    harness.event(egui::Event::Key {
+        key: egui::Key::ArrowUp,
+        physical_key: Some(egui::Key::Num8),
+        pressed: false,
+        repeat: false,
+        modifiers: egui::Modifiers::NONE,
+    });
+    harness.step();
+    assert!(wait_until(|| cancels(&shared) == 1), "{:?}", shared.log());
+}
+
+/// The dead man's switch: a hold no frame confirmed for longer than 250 ms (the app stalled)
+/// is cancelled on the next frame, though the key is still down.
+#[test]
+fn test_continuous_key_hold_cancelled_when_frames_stop() {
+    let (mut harness, shared) = keyboard_app(true);
+    hold(&mut harness, &shared, egui::Key::Num6);
+    std::thread::sleep(Duration::from_millis(300));
+    harness.step();
+    assert!(wait_until(|| cancels(&shared) == 1), "{:?}", shared.log());
+    assert!(
+        harness.state().state().machine.status().connected,
+        "still connected"
+    );
+}

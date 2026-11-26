@@ -80,7 +80,7 @@ use crate::windows::{
     AboutWindow, DeviceInfoPanel, DeviceManagerWindow, FirmwareSettingsWindow, HelpWindow,
     MaterialsManagerWindow, SettingsOutcome, SettingsWindow, ToolsManagerWindow, help,
 };
-use crate::workspace::{Page, PaneContext, PaneId, Workspace};
+use crate::workspace::{JogKey, Page, PaneContext, PaneId, Workspace};
 use designer_files::{DesignFlow, DesignNext, EditorNext, OPEN_BEHIND_HANDOFF};
 use gcodekit5_app::materials_manager_backend::MATERIALS_FILE;
 use gcodekit5_app::tools_manager_backend::TOOLS_FILE;
@@ -349,7 +349,7 @@ pub struct GcodeKitApp {
     machine_polled: Option<u64>,
     /// The key that ran each jog command of this frame's key presses (see
     /// [`PaneContext::with_jog_key`]).
-    jog_keys: Vec<(Command, egui::Key)>,
+    jog_keys: Vec<(Command, JogKey)>,
     /// The `movable` flag last set on the macOS window (`title_bar::sync_movable`).
     #[cfg(target_os = "macos")]
     movable: Option<bool>,
@@ -762,14 +762,17 @@ impl GcodeKitApp {
             panel: self.keyboard_panel(ctx),
             ..Active::NONE
         };
-        let hits = ctx.input_mut(|input| self.dispatcher.dispatch(input, &self.keymap, &active));
+        let (hits, modifiers) = ctx.input_mut(|input| {
+            let hits = self.dispatcher.dispatch(input, &self.keymap, &active);
+            (hits, input.modifiers)
+        });
         // The key of each jog a key ran, so a continuous jog can last while it is held.
         self.jog_keys.clear();
         for command in hits.iter().filter_map(|hit| {
             let command = Command::from_ref(&hit.command)?;
             if command.is_jog() {
-                self.jog_keys
-                    .push((command, hit.trigger.chord.key.to_egui()));
+                let key = hit.trigger.chord.key.to_egui();
+                self.jog_keys.push((command, JogKey { key, modifiers }));
             }
             Some(command)
         }) {

@@ -522,23 +522,41 @@ impl MachineControlPane {
         }
     }
 
-    /// Ends a keyboard hold whose key was released, or that something else ends: the machine
-    /// no longer allows jogging, a widget took the keyboard (a text field focused, a
-    /// dropdown open) or the pointer was pressed (focus moving elsewhere). A page switch and
-    /// window focus loss end it through [`Pane::cancel_hold`].
+    /// Ends a keyboard hold unless this frame confirms it: its key is still down, no key
+    /// event arrived (any press or release but the held key's own repeat: a release reported
+    /// as another key, Shift turning keypad 8 into ArrowUp, a NumLock change), the modifiers
+    /// are the ones held at the press, the machine still allows jogging, no widget took the
+    /// keyboard (a text field focused, a dropdown open) and the pointer was not pressed
+    /// (focus moving elsewhere). A page switch and window focus loss end it through
+    /// [`Pane::cancel_hold`], and [`Pane::frame`] ends one no frame confirmed for
+    /// [`jog::KEY_HOLD_DEAD_MAN`]. While it lasts a frame is asked for every
+    /// [`jog::KEY_HOLD_FRAME`].
     fn follow_key_hold(&mut self, ui: &egui::Ui, machine: Option<&Machine>) {
-        let Some(key) = self.jog.held_key() else {
+        let Some(held) = self.jog.held_key() else {
             return;
         };
-        let (key_down, pressed) = ui.input(|i| (i.key_down(key), i.pointer.any_pressed()));
+        let (key_down, pressed, modifiers, key_event) = ui.input(|i| {
+            let key_event = i.raw.events.iter().any(|e| {
+                matches!(e, egui::Event::Key { key, repeat, .. } if !(*repeat && *key == held.key))
+            });
+            (
+                i.key_down(held.key),
+                i.pointer.any_pressed(),
+                i.modifiers,
+                key_event,
+            )
+        });
         let widget_has_keys =
             ui.ctx().memory(|m| m.focused().is_some()) || egui::Popup::is_any_open(ui.ctx());
         let allowed = machine
             .is_some_and(|m| m.status().connected && !m.status().streaming && m.jog_allowed());
-        let may_continue = allowed && !widget_has_keys && !pressed;
+        let may_continue =
+            allowed && !widget_has_keys && !pressed && !key_event && modifiers == held.modifiers;
         if self.jog.follow_key_hold(key_down, may_continue) {
-            tracing::debug!(?key, key_down, may_continue, "keyboard jog ended");
+            tracing::debug!(?held, key_down, may_continue, "keyboard jog ended");
             self.with_controller(|c| c.realtime(RealtimeCommand::JogCancel));
+        } else {
+            ui.ctx().request_repaint_after(jog::KEY_HOLD_FRAME);
         }
     }
 
@@ -1074,6 +1092,10 @@ impl Pane for MachineControlPane {
     }
 
     fn frame(&mut self, machine: &Machine) {
+        if self.jog.expire_key_hold() {
+            tracing::warn!("keyboard jog not confirmed in time; cancelled");
+            self.with_controller(|c| c.realtime(RealtimeCommand::JogCancel));
+        }
         // Asks `$G` when the active system may have changed; zeroing waits for it.
         self.wcs.watch_stream(machine);
         self.wcs.drive(machine);
