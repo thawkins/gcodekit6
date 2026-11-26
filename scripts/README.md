@@ -105,6 +105,19 @@ python scripts/generate_test_stl.py
 
 ---
 
+### `release_notes.py`
+
+Builds the GitHub release notes for one version from `CHANGELOG.md`. The release workflow runs it on every tag push and uses the result as the release body.
+
+The notes are every `## [<version>] - ...` section of `CHANGELOG.md` (a version can have several), plus older versions that never had a published release. They end with a downloads table and a link to the full `CHANGELOG.md` at the tag.
+
+**Usage:**
+```bash
+python3 scripts/release_notes.py 2.0.0-alpha.2 --out target/temp/notes.md --repo thawkins/gcodekit6
+```
+
+A tag push fails at this step when `CHANGELOG.md` has no section for its version, so before tagging, give the release its own `## [<version>] - <date>` heading.
+
 ## Windows Build Quick Reference
 
 ### First Time Setup
