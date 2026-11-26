@@ -16,7 +16,10 @@
 //! a settings folder (see [`ConsolePane::with_history_file`]), at most
 //! [`gcodekit5_app::command_history::MAX_HISTORY`] commands. The header
 //! has GTK's icon buttons: Clear console, Copy last error (see [`ConsolePane::last_error`])
-//! and Help.
+//! and Help. As GTK, the end of a job is logged: "Job Completed" when every line is
+//! acknowledged, "Job stopped:" with the lines done when it ends early, and "Work completed
+//! in: m:ss" (from the job's start) when the controller reports the program's end
+//! (`[MSG:Program End]`, from M2 or M30).
 //!
 //! Ported from the GTK `ui/gtk/device_console.rs` view. Not ported: the `ok` pairing of the
 //! GTK listener (acknowledgements are not events here).
@@ -53,7 +56,26 @@ pub fn msgids() -> Vec<&'static str> {
         n_!("Device connected"),
         n_!("Device disconnected"),
         n_!("Error"),
+        JOB_COMPLETED,
+        JOB_STOPPED,
+        WORK_COMPLETED,
     ]
+}
+
+/// GTK's log line when every line of a job is acknowledged.
+const JOB_COMPLETED: &str = n_!("Job Completed");
+/// GTK's log prefix when a job ends early; the lines done follow.
+const JOB_STOPPED: &str = n_!("Job stopped:");
+/// GTK's log prefix when the controller reports the program's end; `m:ss` follows.
+const WORK_COMPLETED: &str = n_!("\u{2705} Work completed in:");
+
+/// `elapsed` as GTK's `m:ss`.
+///
+/// # Arguments
+/// * `elapsed` - The time since the job started.
+pub fn work_time(elapsed: std::time::Duration) -> String {
+    let secs = elapsed.as_secs();
+    format!("{}:{:02}", secs / 60, secs % 60)
 }
 
 /// The Console pane.
@@ -68,6 +90,10 @@ pub struct ConsolePane {
     history_file: Option<PathBuf>,
     /// The controller's refusal of the last line typed, shown until the next one.
     notice: Option<String>,
+    /// Whether a job streams, so its first progress event marks its start.
+    streaming: bool,
+    /// When the last job started, until the controller reports the program's end.
+    job_started: Option<std::time::Instant>,
 }
 
 impl std::fmt::Debug for ConsolePane {
@@ -111,6 +137,8 @@ impl ConsolePane {
             history: CommandHistory::new(),
             history_file: None,
             notice: None,
+            streaming: false,
+            job_started: None,
         }
     }
 
@@ -156,11 +184,35 @@ impl ConsolePane {
                     if !line.is_empty() && !is_status_report(line) {
                         self.log.add_message(received_level(line), line);
                     }
+                    if line.contains("Program End")
+                        && let Some(started) = self.job_started.take()
+                    {
+                        self.log.add_message(
+                            MessageLevel::Success,
+                            format!("{} {}", tr.tr(WORK_COMPLETED), work_time(started.elapsed())),
+                        );
+                    }
                 }
-                MachineEvent::StatusReport(_)
-                | MachineEvent::StreamProgress { .. }
-                | MachineEvent::StreamFinished { .. }
-                | MachineEvent::StreamStopped { .. } => {}
+                MachineEvent::StreamProgress { .. } => {
+                    if !self.streaming {
+                        self.streaming = true;
+                        self.job_started = Some(std::time::Instant::now());
+                    }
+                }
+                MachineEvent::StreamFinished { .. } => {
+                    self.streaming = false;
+                    self.log
+                        .add_message(MessageLevel::Success, tr.tr(JOB_COMPLETED));
+                }
+                MachineEvent::StreamStopped { acked, total } => {
+                    self.streaming = false;
+                    self.job_started = None;
+                    self.log.add_message(
+                        MessageLevel::Warning,
+                        format!("{} {acked} / {total}", tr.tr(JOB_STOPPED)),
+                    );
+                }
+                MachineEvent::StatusReport(_) => {}
             }
         }
     }

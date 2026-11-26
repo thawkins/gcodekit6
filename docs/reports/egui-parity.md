@@ -102,6 +102,7 @@ Status values:
 | Per-level filter buttons, timestamps | 15-console | Not applicable | Not in the GTK source |
 | Command history (Up/Down) | 15-console | Ported | `app/test_command_history::navigate_up`, `app/test_command_history::navigate_down` |
 | Command history kept across sessions | *(GTK)* | Ported | `test_console_pane::test_console_history_kept_across_sessions`, `app/test_command_history::test_history_file_round_trip`, `app/test_command_history::test_history_file_missing_damaged_or_long` (GTK's `command_history.json` in the legacy settings folder, 250 commands, written atomically) |
+| Job end logged (Job Completed, Job stopped, Work completed in m:ss) | *(GTK)* | Ported | `test_console_pane::test_console_logs_the_end_of_a_job` (GTK's lines; "Job stopped:" gives the lines done where GTK gave the reason, which the console logs on its own line) |
 | Bounded buffer | 15-console | Ported | `test_console_pane::console_buffer_is_bounded` |
 | Auto-scroll | 15-console | Manual check needed | egui scroll area sticks to the bottom; no test |
 | Clear | 15-console | Manual check needed | Button exists; no test |

@@ -292,3 +292,51 @@ fn test_console_history_kept_across_sessions() {
     let entry = harness.get_by_role_and_label(egui::accesskit::Role::TextInput, ENTRY);
     assert_eq!(entry.value().as_deref(), Some("G0 X7"));
 }
+
+/// GTK's job-end lines: "Job Completed" when every line is acknowledged, then "Work
+/// completed in: m:ss" when the controller reports the program's end; "Job stopped:" with
+/// the lines done when a job ends early.
+#[test]
+fn test_console_logs_the_end_of_a_job() {
+    let (mut pane, tr) = console();
+    let progress = MachineEvent::StreamProgress {
+        sent: 1,
+        acked: 0,
+        total: 2,
+    };
+    pane.apply(
+        &[
+            progress.clone(),
+            MachineEvent::StreamFinished { lines: 2 },
+            received("[MSG:Program End]"),
+        ],
+        &tr,
+    );
+    assert_eq!(
+        pane.lines(),
+        vec![
+            "Job Completed".to_string(),
+            "[MSG:Program End]".to_string(),
+            "\u{2705} Work completed in: 0:00".to_string(),
+        ]
+    );
+    pane.apply(
+        &[
+            progress,
+            MachineEvent::StreamStopped { acked: 1, total: 2 },
+            received("[MSG:Program End]"),
+        ],
+        &tr,
+    );
+    let lines = pane.lines();
+    assert_eq!(lines[3], "Job stopped: 1 / 2");
+    assert_eq!(
+        lines.len(),
+        5,
+        "no work time after a stopped job: {lines:?}"
+    );
+    assert_eq!(
+        gcodekit5_ui_egui::panes::console::work_time(std::time::Duration::from_secs(125)),
+        "2:05"
+    );
+}
