@@ -15,6 +15,7 @@
 //! `gcodekit5-communication` (status report types).
 
 use std::sync::{Arc, Mutex, PoisonError};
+use std::time::Instant;
 
 use gcodekit5_app::i18n::Translator;
 use gcodekit5_app::machine::grbl_stream::{
@@ -56,6 +57,9 @@ pub struct MachineStatus {
     pub streaming: bool,
     /// The latest stream progress, kept after the stream ends.
     pub progress: Option<Progress>,
+    /// When the running stream started (its first progress report); `None` when no stream
+    /// runs. The status bar's elapsed and remaining times count from it.
+    pub stream_started: Option<Instant>,
     /// How the last stream ended, if one did.
     pub stream_end: Option<StreamEnd>,
     /// The latest status report.
@@ -241,6 +245,7 @@ impl MachineStatus {
                     }
                     self.connected = false;
                     self.streaming = false;
+                    self.stream_started = None;
                     self.report = None;
                     self.wco = None;
                     self.overrides = None;
@@ -288,6 +293,7 @@ impl MachineStatus {
                 MachineEvent::StreamProgress { sent, acked, total } => {
                     if !self.streaming {
                         self.stream_end = None;
+                        self.stream_started = Some(Instant::now());
                     }
                     self.streaming = true;
                     self.progress = Some(Progress {
@@ -298,6 +304,7 @@ impl MachineStatus {
                 }
                 MachineEvent::StreamFinished { lines } => {
                     self.streaming = false;
+                    self.stream_started = None;
                     self.stream_end = Some(StreamEnd::Finished);
                     self.progress = Some(Progress {
                         sent: *lines,
@@ -307,6 +314,7 @@ impl MachineStatus {
                 }
                 MachineEvent::StreamStopped { acked, total } => {
                     self.streaming = false;
+                    self.stream_started = None;
                     self.stream_end = Some(StreamEnd::Stopped);
                     let sent = self.progress.map_or(*acked, |p| p.sent.max(*acked));
                     self.progress = Some(Progress {

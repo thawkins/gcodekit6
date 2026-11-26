@@ -7,18 +7,21 @@
 //! the user's measurement system (two decimals for mm, three for inches, through
 //! `format_length` as the DRO does).
 //!
-//! Ported from the GTK `ui/gtk/status_bar.rs`. Not ported: the feed/spindle readout,
-//! elapsed/remaining time and the timed notices; the connected port is not known to the
+//! Ported from the GTK `ui/gtk/status_bar.rs`; the remaining time is estimated as GTK's
+//! `update_progress` does, from the average time per acknowledged line. Not ported: the
+//! feed/spindle readout and the timed notices; the connected port is not known to the
 //! status.
 //!
 //! Dependencies: `egui`, `gcodekit5-app` (translations), `gcodekit5-core` (units),
 //! `gcodekit5-devicedb` (the active profile).
 
+use std::time::Duration;
+
 use gcodekit5_app::i18n::Translator;
 use gcodekit5_core::units::{MeasurementSystem, get_unit_label};
 use gcodekit5_devicedb::DeviceProfile;
 
-use crate::machine::{MachineStatus, Xyz};
+use crate::machine::{MachineStatus, Progress, Xyz};
 use crate::panes::machine_control::format_length;
 
 /// The msgids the bar shows, for the translation check.
@@ -28,6 +31,8 @@ pub const MSGIDS: &[&str] = &[
     n_!("eStop"),
     n_!("No device selected"),
     n_!("Emergency stop (soft reset, {shortcut})"),
+    n_!("Elapsed:"),
+    n_!("Remaining:"),
 ];
 
 /// What the status bar shows, as text.
@@ -44,6 +49,8 @@ pub struct Summary {
     /// The job's progress as a fraction in `0.0..=1.0` and its label (`25.0%`), from the
     /// acknowledged lines; `None` when no job ran.
     pub progress: Option<(f32, String)>,
+    /// While a job streams: `Elapsed: HH:MM:SS` and `Remaining: HH:MM:SS`, translated.
+    pub times: Option<(String, String)>,
     /// The last error the controller or transport reported.
     pub error: Option<String>,
 }
@@ -61,6 +68,39 @@ pub fn position_text(xyz: Xyz, units: MeasurementSystem) -> String {
         format_length(xyz[2], units),
         get_unit_label(units)
     )
+}
+
+/// A job time as GTK's status bar shows it: `HH:MM:SS`, seconds truncated.
+///
+/// # Arguments
+/// * `time` - The duration to show.
+pub fn format_time(time: Duration) -> String {
+    let secs = time.as_secs();
+    format!(
+        "{:02}:{:02}:{:02}",
+        secs / 3600,
+        (secs % 3600) / 60,
+        secs % 60
+    )
+}
+
+/// The job's elapsed and estimated remaining time, formatted by [`format_time`].
+///
+/// The estimate is GTK's: the average time per acknowledged line so far, times the lines
+/// not yet acknowledged; zero until a line has been acknowledged.
+///
+/// # Arguments
+/// * `progress` - The stream's progress.
+/// * `elapsed` - The time since the stream started.
+pub fn job_times(progress: Progress, elapsed: Duration) -> (String, String) {
+    let remaining = match u32::try_from(progress.acked) {
+        Ok(acked) if acked > 0 && !elapsed.is_zero() => {
+            let left = progress.total.saturating_sub(progress.acked) as f64;
+            Duration::from_secs_f64(elapsed.as_secs_f64() / f64::from(acked) * left)
+        }
+        Ok(_) | Err(_) => Duration::ZERO,
+    };
+    (format_time(elapsed), format_time(remaining))
 }
 
 /// What the bar shows for `status`.
@@ -92,6 +132,17 @@ pub fn summary(status: &MachineStatus, units: MeasurementSystem, tr: &Translator
             .filter(|_| status.connected)
             .map(|xyz| position_text(xyz, units)),
         progress,
+        times: status
+            .progress
+            .zip(status.stream_started)
+            .filter(|_| status.streaming)
+            .map(|(progress, started)| {
+                let (elapsed, remaining) = job_times(progress, started.elapsed());
+                (
+                    format!("{} {elapsed}", tr.tr("Elapsed:")),
+                    format!("{} {remaining}", tr.tr("Remaining:")),
+                )
+            }),
         error: status
             .last_error
             .as_deref()
@@ -174,6 +225,12 @@ pub fn show(
                         .desired_width(120.0)
                         .text(label),
                 );
+            }
+            if let Some((elapsed, remaining)) = &summary.times {
+                ui.label(remaining);
+                ui.label(elapsed);
+                // The elapsed time counts up between status reports too.
+                ui.ctx().request_repaint_after(Duration::from_secs(1));
             }
             if let Some(error) = &summary.error {
                 ui.add(

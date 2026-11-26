@@ -8,7 +8,7 @@ use gcodekit5_app::i18n::Translator;
 use gcodekit5_communication::firmware::grbl::status_parser::FullStatus;
 use gcodekit5_core::units::MeasurementSystem;
 use gcodekit5_ui_egui::machine::{MachineStatus, Progress};
-use gcodekit5_ui_egui::status_bar::{device_text, position_text, summary};
+use gcodekit5_ui_egui::status_bar::{device_text, format_time, job_times, position_text, summary};
 
 use gcodekit5_app::test_support::Wrote;
 use gcodekit5_ui_egui::GcodeKitApp;
@@ -155,4 +155,84 @@ fn test_status_bar_shows_estop_and_device() {
     hide_machine_control(&mut harness);
     assert!(harness.query_by_label("eStop").is_some());
     assert!(harness.query_by_label("No device selected").is_some());
+}
+
+/// GTK's `HH:MM:SS` job time format.
+#[test]
+fn test_status_bar_time_format() {
+    assert_eq!(format_time(Duration::ZERO), "00:00:00");
+    assert_eq!(format_time(Duration::from_secs_f64(65.9)), "00:01:05");
+    assert_eq!(
+        format_time(Duration::from_secs(3 * 3600 + 7 * 60 + 9)),
+        "03:07:09"
+    );
+}
+
+/// Remaining time is the average time per acknowledged line times the lines left, as GTK
+/// estimates it; nothing acknowledged yet gives zero.
+#[test]
+fn test_status_bar_job_times_estimate() {
+    let progress = Progress {
+        sent: 40,
+        acked: 25,
+        total: 100,
+    };
+    let elapsed = Duration::from_secs(50);
+    assert_eq!(
+        job_times(progress, elapsed),
+        ("00:00:50".to_string(), "00:02:30".to_string())
+    );
+    let none_acked = Progress {
+        sent: 5,
+        acked: 0,
+        total: 100,
+    };
+    assert_eq!(
+        job_times(none_acked, elapsed),
+        ("00:00:50".to_string(), "00:00:00".to_string())
+    );
+}
+
+/// The times show while streaming, labelled as GTK labels them, and not after the job.
+#[test]
+fn test_status_bar_summary_times_while_streaming() {
+    let tr = Translator::new("en");
+    let mut status = MachineStatus {
+        connected: true,
+        streaming: true,
+        progress: Some(Progress {
+            sent: 10,
+            acked: 10,
+            total: 20,
+        }),
+        stream_started: std::time::Instant::now().checked_sub(Duration::from_secs(10)),
+        ..MachineStatus::default()
+    };
+    let s = summary(&status, MeasurementSystem::Metric, &tr);
+    let (elapsed, remaining) = s.times.expect("times while streaming");
+    assert!(elapsed.starts_with("Elapsed: 00:00:1"), "{elapsed}");
+    assert!(remaining.starts_with("Remaining: 00:00:"), "{remaining}");
+    status.streaming = false;
+    assert_eq!(summary(&status, MeasurementSystem::Metric, &tr).times, None);
+}
+
+/// Starting a stream records its start time; ending it clears it.
+#[test]
+fn test_status_bar_stream_start_time_follows_stream() {
+    use gcodekit5_app::machine::MachineEvent;
+    let mut status = MachineStatus::default();
+    status.apply(&[MachineEvent::StreamProgress {
+        sent: 1,
+        acked: 0,
+        total: 3,
+    }]);
+    let started = status.stream_started.expect("started");
+    status.apply(&[MachineEvent::StreamProgress {
+        sent: 2,
+        acked: 1,
+        total: 3,
+    }]);
+    assert_eq!(status.stream_started, Some(started));
+    status.apply(&[MachineEvent::StreamFinished { lines: 3 }]);
+    assert_eq!(status.stream_started, None);
 }
