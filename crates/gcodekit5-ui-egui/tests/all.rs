@@ -136,6 +136,8 @@ mod test_machine_worker_messages;
 mod test_manager_pages_layout;
 #[path = "test_materials_manager.rs"]
 mod test_materials_manager;
+#[path = "test_panel_visibility.rs"]
+mod test_panel_visibility;
 #[path = "test_quit.rs"]
 mod test_quit;
 #[path = "test_settings_window.rs"]

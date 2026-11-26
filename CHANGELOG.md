@@ -27,6 +27,7 @@
 - **Run preview in the egui Visualizer**: GTK's bar at the bottom left of the view (Play, Pause, Stop, Speed: Slow, Normal, Fast, Turbo) moves a cyan preview marker along the toolpath, 1/2/5/20 points every 33 ms over points about 3 mm apart, following arcs; File > Run (`Cmd+R`, F5) shows the Visualizer and starts it, or says why it cannot (no G-code, no motion). It only animates the view: nothing is sent to the machine
 - **Visualizer right-click menu in egui**: GTK's menu on the view: Fit to Content, Reset View (GTK's Fit to Viewport), Fit to Device Working Area, Copy cursor coordinates (the work-plane point under the pointer, copied as GTK did: `X 12.345  Y 6.789`) and Toggle Grid / Machine Bounds / Rapid Moves / Cutting Moves (now translated)
 - **S-value statistics in the egui Visualizer inspector**: GTK's Min S, Max S and Avg S rows under Bounds X/Y, over every move and arc that carries a spindle/laser power, with one decimal, or N/A when none does
+- **Hide kept between runs in egui**: the Visualizer sidebar's Hide / Show Sidebar is saved in the settings' `panel_visibility` under GTK's `visualizer_sidebar` key and restored at start, and so is the Designer inspector's Hide / Unhide (`designer_properties`, which GTK did not keep)
 
 ### Fixed
 - **Stock removal mesh memory**: the face list a stock mesh is built from stops as soon as it holds more faces than the mesh budget can take, so a stock near the vertex budget no longer holds a transient face list of up to about 1 GB before falling back to a coarser mesh (both front ends)

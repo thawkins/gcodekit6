@@ -19,6 +19,9 @@
 //! Toolpath and Guides toggles ([`Display`]: rapids, cuts, the tool marker, the grid and its
 //! spacing, the machine bounds) and Inspector.
 //!
+//! Whether the sidebar is hidden is kept between runs in the settings' `panel_visibility`
+//! under GTK's `visualizer_sidebar` key ([`Pane::panel_visibility`]).
+//!
 //! Right-click on the view opens GTK's menu ([`menu`]): the fits, Copy cursor coordinates
 //! (the work-plane point under the pointer) and the Toggle switches of the sidebar's toggles.
 //!
@@ -83,6 +86,8 @@ pub use toolpath::ToolpathMesh;
 use crate::commands::Command;
 use crate::workspace::{Pane, PaneContext, PaneId};
 
+/// The settings' `panel_visibility` key of the sidebar (GTK's), kept between runs.
+pub const SIDEBAR_KEY: &str = "visualizer_sidebar";
 /// Millimetres the Zoom In / Zoom Out buttons and commands move the eye (GTK's step).
 pub const ZOOM_STEP: f32 = 10.0;
 /// How long a stock field must stay unchanged before the simulation restarts with it.
@@ -884,7 +889,17 @@ impl Pane for VisualizerPane {
         self.work_area = profile.map(work_area_of);
     }
 
+    fn panel_visibility(&self) -> Option<(&'static str, bool)> {
+        Some((SIDEBAR_KEY, !self.sidebar_hidden))
+    }
+
     fn configure(&mut self, config: &Config) {
+        self.sidebar_hidden = !config
+            .ui
+            .panel_visibility
+            .get(SIDEBAR_KEY)
+            .copied()
+            .unwrap_or(true);
         self.units = config.ui.measurement_system;
         self.stock_enabled = config.ui.enable_stock_removal_3d;
         if !self.stock_enabled && self.show_stock {

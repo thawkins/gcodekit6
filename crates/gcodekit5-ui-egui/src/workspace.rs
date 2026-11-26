@@ -416,6 +416,12 @@ pub trait Pane {
         let _ = controller;
     }
 
+    /// The pane's hideable panel and whether it is shown, as a `panel_visibility` key of
+    /// the settings, for a pane whose Hide is kept between runs.
+    fn panel_visibility(&self) -> Option<(&'static str, bool)> {
+        None
+    }
+
     /// Takes the active device profile (at start and when it changes), for a pane that uses
     /// its work area.
     ///
@@ -542,6 +548,9 @@ impl Default for Workspace {
     }
 }
 
+/// The settings' `panel_visibility` key of the Designer page's inspector column.
+pub const INSPECTOR_KEY: &str = "designer_properties";
+
 /// Height of the page tab row in points.
 const TAB_HEIGHT: f32 = 26.0;
 
@@ -666,9 +675,23 @@ impl Workspace {
     /// # Arguments
     /// * `config` - The current settings.
     pub fn configure(&mut self, config: &Config) {
+        self.inspector_hidden = !config
+            .ui
+            .panel_visibility
+            .get(INSPECTOR_KEY)
+            .copied()
+            .unwrap_or(true);
         for pane in &mut self.panes {
             pane.configure(config);
         }
+    }
+
+    /// The hideable panels and whether each is shown, as the settings' `panel_visibility`
+    /// keeps them: the Designer inspector's and the panes' ([`Pane::panel_visibility`]).
+    pub fn panel_visibility(&self) -> Vec<(&'static str, bool)> {
+        std::iter::once((INSPECTOR_KEY, !self.inspector_hidden))
+            .chain(self.panes.iter().filter_map(|pane| pane.panel_visibility()))
+            .collect()
     }
 
     /// Hands machine `events` to every pane ([`Pane::machine_events`]).

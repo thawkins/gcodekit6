@@ -370,6 +370,9 @@ pub struct GcodeKitApp {
     /// The key that ran each jog command of this frame's key presses (see
     /// [`PaneContext::with_jog_key`]).
     jog_keys: Vec<(Command, JogKey)>,
+    /// The hideable panels' visibility last saved (or found at start), so a change is saved
+    /// once (GTK's `panel_visibility`).
+    panel_visibility: Vec<(&'static str, bool)>,
     /// The `movable` flag last set on the macOS window (`title_bar::sync_movable`).
     #[cfg(target_os = "macos")]
     movable: Option<bool>,
@@ -466,6 +469,7 @@ impl GcodeKitApp {
         workspace.set_pane(Box::new(SharedCamTools::new(Rc::clone(&cam_tools))));
         workspace.configure(state.config());
         workspace.set_device(device_manager.active_profile().as_ref());
+        let panel_visibility = workspace.panel_visibility();
         {
             // Wake the event loop whenever the machine reports something.
             let wake_ctx = Arc::clone(&wake_ctx);
@@ -507,6 +511,7 @@ impl GcodeKitApp {
             design: DesignFlow::default(),
             machine_polled: None,
             jog_keys: Vec::new(),
+            panel_visibility,
             #[cfg(target_os = "macos")]
             movable: None,
         }
@@ -741,6 +746,7 @@ impl GcodeKitApp {
             .with_machine(&self.state.machine)
             .with_stock_seed(self.state.stock_seed);
         self.workspace.show(ui, &mut panes);
+        self.store_panel_visibility();
         if self.workspace.page().panes().is_empty() {
             egui::CentralPanel::default().show(ui, |ui| self.show_manager_page(ui));
         }
@@ -1417,6 +1423,27 @@ impl GcodeKitApp {
             | Page::MachineControl
             | Page::CamTools
             | Page::DeviceConfig => {}
+        }
+    }
+
+    /// Saves the hideable panels' visibility (the Visualizer sidebar, the Designer inspector)
+    /// in the settings when a Hide or Show changed it, so it is kept between runs as GTK kept
+    /// the sidebar's (a failed write is not retried until it changes again).
+    fn store_panel_visibility(&mut self) {
+        let now = self.workspace.panel_visibility();
+        if now == self.panel_visibility {
+            return;
+        }
+        let mut config = self.state.settings.config().clone();
+        for (key, shown) in &now {
+            config
+                .ui
+                .panel_visibility
+                .insert((*key).to_string(), *shown);
+        }
+        self.panel_visibility = now;
+        if let Err(error) = self.state.settings.apply(config) {
+            tracing::debug!(%error, "panel visibility not kept");
         }
     }
 

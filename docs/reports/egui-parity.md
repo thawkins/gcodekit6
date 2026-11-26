@@ -155,6 +155,7 @@ Status values:
 | Run preview (play/pause/speed) | *(GTK)* | Ported | `test_visualizer_preview::preview_steps_by_speed_per_tick`, `test_visualizer_preview::preview_bar_buttons_drive_the_preview`, `test_visualizer_preview::preview_plays_in_frames_and_asks_nothing`, `test_visualizer_preview::file_run_in_the_app_shows_the_visualizer_and_sends_nothing`, `test_visualizer_preview::preview_marker_drawn_unless_hidden`, `test_visualizer_preview::preview_path_spacing_as_gtk` (File > Run starts it, as in GTK) |
 | Copy cursor coordinates (right-click menu) | *(GTK)* | Ported | `test_visualizer_menu::copy_cursor_coordinates_copies_the_clicked_point`, `test_visualizer_menu::cursor_on_plane_inverts_the_projection`, `test_visualizer_menu::coordinates_text_is_gtk_format`, `test_visualizer_menu::menu_toggles_and_fits` (GTK's menu: fits, copy, Toggle Grid/Machine Bounds/Rapid Moves/Cutting Moves) |
 | Intensity statistics | *(GTK)* | Ported | `test_visualizer_intensity::intensity_statistics_as_gtk`, `test_visualizer_intensity::inspector_shows_the_s_statistics` |
+| Sidebar Hide kept between runs (and the Designer inspector's) | *(GTK)* | Ported | `test_panel_visibility::visualizer_sidebar_hide_is_kept_between_runs`, `test_panel_visibility::designer_inspector_hide_is_kept_between_runs`, `test_panel_visibility::visualizer_pane_follows_the_setting` (GTK's `visualizer_sidebar` key; GTK did not keep the inspector's, egui keeps it under `designer_properties`) |
 
 ## Designer
 
