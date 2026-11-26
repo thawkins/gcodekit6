@@ -192,6 +192,46 @@ fn test_feed_override_plus_10() {
     );
 }
 
+/// Every spindle and rapid override button writes its realtime byte.
+#[test]
+fn test_spindle_and_rapid_override_buttons() {
+    let (mut harness, shared) = pane_app(Duration::from_millis(1), true);
+    for (label, command) in [
+        (
+            "Decrease spindle speed by 10%",
+            RealtimeCommand::SpindleOverrideMinus10,
+        ),
+        (
+            "Decrease spindle speed by 1%",
+            RealtimeCommand::SpindleOverrideMinus1,
+        ),
+        (
+            "Reset spindle speed to 100%",
+            RealtimeCommand::SpindleOverrideReset,
+        ),
+        ("Stop spindle", RealtimeCommand::SpindleStop),
+        (
+            "Increase spindle speed by 1%",
+            RealtimeCommand::SpindleOverridePlus1,
+        ),
+        (
+            "Increase spindle speed by 10%",
+            RealtimeCommand::SpindleOverridePlus10,
+        ),
+        ("Rapid: 25%", RealtimeCommand::RapidOverride25),
+        ("Rapid: 50%", RealtimeCommand::RapidOverride50),
+        ("Rapid: 100%", RealtimeCommand::RapidOverride100),
+    ] {
+        harness.get_by_label(label).click();
+        harness.step();
+        assert!(
+            wait_until(|| wrote_realtime(&shared, command)),
+            "{label} not written: {:?}",
+            shared.log()
+        );
+    }
+}
+
 /// Review Focus 1: with the Preferences window open over the workspace, the stream keeps
 /// reporting progress and the pane keeps showing it.
 #[test]

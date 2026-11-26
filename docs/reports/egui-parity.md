@@ -88,8 +88,8 @@ Status values:
 | Feature | Source doc | egui status | Evidence |
 | --- | --- | --- | --- |
 | Feed override +/-1 %, +/-10 %, reset | 12-overrides | Ported | `test_machine_pane::feed_override_plus_10` |
-| Spindle override +/-1 %, +/-10 %, reset | 12-overrides | Manual check needed | Same button row as feed; no spindle-specific test |
-| Rapid override presets | 12-overrides | Manual check needed | Buttons exist (`overrides.rs` `RAPID`); no test |
+| Spindle override +/-1 %, +/-10 %, reset | 12-overrides | Ported | `test_machine_pane::test_spindle_and_rapid_override_buttons` (each button, and Stop spindle, writes its realtime byte) |
+| Rapid override presets | 12-overrides | Ported | `test_machine_pane::test_spindle_and_rapid_override_buttons` (25 %, 50 %, 100 %) |
 | Set an exact override percentage | *(GTK)* | Ported | `test_machine_override_target::feed_set_percent_steps_with_confirmation`, `test_machine_override_target::spindle_set_percent_sends_spindle_bytes`, `app/test_override_target::next_step_waits_for_the_report_then_fails_after_timeout` (feed and spindle, as GTK; one step per `Ov:` confirmation) |
 
 ## Console
@@ -105,7 +105,7 @@ Status values:
 | Job end logged (Job Completed, Job stopped, Work completed in m:ss) | *(GTK)* | Ported | `test_console_pane::test_console_logs_the_end_of_a_job` (GTK's lines; "Job stopped:" gives the lines done where GTK gave the reason, which the console logs on its own line) |
 | Bounded buffer | 15-console | Ported | `test_console_pane::console_buffer_is_bounded` |
 | Auto-scroll | 15-console | Manual check needed | egui scroll area sticks to the bottom; no test |
-| Clear | 15-console | Manual check needed | Button exists; no test |
+| Clear | 15-console | Ported | `test_console_pane::test_console_clear_empties_the_log` |
 
 ## Streaming
 

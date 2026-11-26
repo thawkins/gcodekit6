@@ -340,3 +340,28 @@ fn test_console_logs_the_end_of_a_job() {
         "2:05"
     );
 }
+
+/// Clear console empties the log: its "Error: ALARM:1" line goes (Machine Control may still
+/// show the alarm itself).
+#[test]
+fn test_console_clear_empties_the_log() {
+    let (mut harness, shared) = pane_app(Duration::from_millis(1), true);
+    shared.inject("ALARM:1\n");
+    let deadline = std::time::Instant::now() + crate::machine_support::EVENTUALLY;
+    while harness.query_by_label("Error: ALARM:1").is_none() && std::time::Instant::now() < deadline
+    {
+        harness.step();
+        std::thread::sleep(Duration::from_millis(2));
+    }
+    assert!(
+        harness.query_by_label("Error: ALARM:1").is_some(),
+        "never logged"
+    );
+    harness.get_by_label("Clear console").click();
+    harness.step();
+    harness.step();
+    assert!(
+        harness.query_by_label("Error: ALARM:1").is_none(),
+        "log cleared"
+    );
+}
