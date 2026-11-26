@@ -572,6 +572,8 @@ impl MachineController {
         self.jogs_requested = 0;
         self.jogs_answered = Arc::new(AtomicU64::new(0));
         self.halted = Arc::new(AtomicBool::new(false));
+        // The last connection's program is not this one's: the WCS watch reads it.
+        self.streamed = None;
         let state = WorkerState::new(
             (self.factory)(),
             cmd_rx,

@@ -1086,3 +1086,25 @@ fn test_soft_reset_drops_lines_queued_before_it() {
         .collect();
     assert!(after.is_empty(), "written after the reset: {after:?}");
 }
+
+/// A reconnect starts without the last connection's program: the WCS watch must not judge
+/// a program that ran on the earlier connection.
+#[test]
+fn test_reconnect_forgets_the_streamed_program() {
+    let shared = Arc::new(LoopbackShared::default());
+    let mut controller = loopback_controller(&shared, Duration::from_millis(1));
+    connect(&mut controller);
+    controller.start_stream(program(3)).expect("start_stream");
+    assert!(
+        wait_for(&mut controller, |e| matches!(
+            e,
+            MachineEvent::StreamFinished { .. }
+        ))
+        .is_some()
+    );
+    assert!(controller.streamed_program().is_some());
+    controller.disconnect();
+    assert!(wait_for(&mut controller, |e| *e == MachineEvent::Disconnected).is_some());
+    connect(&mut controller);
+    assert!(controller.streamed_program().is_none());
+}
