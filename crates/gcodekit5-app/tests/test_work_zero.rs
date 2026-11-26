@@ -2,8 +2,8 @@
 
 use gcodekit5_app::machine::Axis;
 use gcodekit5_app::work_zero::{
-    PARSER_STATE_QUERY, Wcs, go_to_work_zero_command, parser_state_wcs, wcs_in_line,
-    zero_axes_command,
+    PARSER_STATE_QUERY, Wcs, WcsWord, go_to_work_zero_command, parser_state_wcs,
+    reports_grbl_parser_state, wcs_in_line, zero_axes_command,
 };
 
 #[test]
@@ -40,29 +40,70 @@ fn test_parser_state_query_is_dollar_g() {
 fn test_parser_state_wcs_reads_grbl_gc_reply() {
     assert_eq!(
         parser_state_wcs("[GC:G0 G54 G17 G21 G90 G94 M5 M9 T0 F0 S0]"),
-        Some(Wcs::G54)
+        Some(WcsWord::Known(Wcs::G54))
     );
     assert_eq!(
         parser_state_wcs("[GC:G1 G57 G17 G20 G91 G94 M3 M8 T1 F500 S1000]\r"),
-        Some(Wcs::G57)
+        Some(WcsWord::Known(Wcs::G57))
     );
-    assert_eq!(parser_state_wcs("[GC:G0 G17 G21]"), None);
     assert_eq!(parser_state_wcs("[MSG:G55]"), None);
     assert_eq!(parser_state_wcs("ok"), None);
 }
 
 #[test]
+fn test_parser_state_outside_g54_g59_is_other() {
+    // grblHAL with nine systems.
+    assert_eq!(
+        parser_state_wcs("[GC:G0 G59.1 G17 G21 G90 G94 M5 M9 T0 F0 S0]"),
+        Some(WcsWord::Other)
+    );
+    assert_eq!(parser_state_wcs("[GC:G0 G17 G21]"), Some(WcsWord::Other));
+}
+
+#[test]
 fn test_wcs_in_line_finds_g5x_words() {
-    assert_eq!(wcs_in_line("G55"), Some(Wcs::G55));
-    assert_eq!(wcs_in_line("g56"), Some(Wcs::G56));
-    assert_eq!(wcs_in_line("G0G59X0"), Some(Wcs::G59));
-    assert_eq!(wcs_in_line("G90 G58 G0 X1"), Some(Wcs::G58));
-    assert_eq!(wcs_in_line("G055"), Some(Wcs::G55));
+    let known = |w| Some(WcsWord::Known(w));
+    assert_eq!(wcs_in_line("G55"), known(Wcs::G55));
+    assert_eq!(wcs_in_line("g56"), known(Wcs::G56));
+    assert_eq!(wcs_in_line("G0G59X0"), known(Wcs::G59));
+    assert_eq!(wcs_in_line("G90 G58 G0 X1"), known(Wcs::G58));
+    assert_eq!(wcs_in_line("G055"), known(Wcs::G55));
+    assert_eq!(wcs_in_line("G55.0"), known(Wcs::G55));
     // Not a WCS selection.
     assert_eq!(wcs_in_line("G10 L20 P2 X0"), None);
     assert_eq!(wcs_in_line("G0 X54"), None);
-    assert_eq!(wcs_in_line("G54.1"), None);
     assert_eq!(wcs_in_line("G1 X0 (G55)"), None);
     assert_eq!(wcs_in_line("G1 X0 ; G55"), None);
     assert_eq!(wcs_in_line("$G"), None);
+}
+
+#[test]
+fn test_wcs_in_line_outside_g54_g59_is_other() {
+    assert_eq!(wcs_in_line("G59.2"), Some(WcsWord::Other));
+    assert_eq!(wcs_in_line("G54.1 P7"), Some(WcsWord::Other));
+    // The last selection wins.
+    assert_eq!(wcs_in_line("G59.1 G55"), Some(WcsWord::Known(Wcs::G55)));
+    assert_eq!(wcs_in_line("G55 G59.3"), Some(WcsWord::Other));
+}
+
+#[test]
+fn test_only_grbl_family_is_asked_for_parser_state() {
+    use gcodekit5_devicedb::ControllerType;
+    assert!(reports_grbl_parser_state(None));
+    for grbl in [
+        ControllerType::Grbl,
+        ControllerType::GrblHal,
+        ControllerType::FluidNC,
+    ] {
+        assert!(reports_grbl_parser_state(Some(&grbl)), "{grbl:?}");
+    }
+    for other in [
+        ControllerType::TinyG,
+        ControllerType::G2Core,
+        ControllerType::Smoothieware,
+        ControllerType::Marlin,
+        ControllerType::Repetier,
+    ] {
+        assert!(!reports_grbl_parser_state(Some(&other)), "{other:?}");
+    }
 }

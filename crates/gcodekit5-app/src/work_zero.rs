@@ -5,12 +5,35 @@
 //! Plain functions without I/O, shared by the front ends; ported from the GTK
 //! `machine_control` view, which built these lines inline.
 //!
-//! Dependencies: none beyond [`crate::machine::Axis`].
+//! Dependencies: `gcodekit5-devicedb` (controller type), [`crate::machine::Axis`].
+
+use gcodekit5_devicedb::ControllerType;
 
 use crate::machine::Axis;
 
 /// The line that asks GRBL for its G-code parser state; it answers `[GC:...]`, then `ok`.
 pub const PARSER_STATE_QUERY: &str = "$G";
+
+/// Whether a controller of the device profile's `controller` type answers `$G` with a GRBL
+/// `[GC:...]` parser state (Grbl, grblHAL, FluidNC). Without a profile GRBL is assumed, the
+/// app's default controller.
+///
+/// # Arguments
+/// * `controller` - The active device profile's controller type, if a profile is active.
+pub fn reports_grbl_parser_state(controller: Option<&ControllerType>) -> bool {
+    match controller {
+        None | Some(ControllerType::Grbl | ControllerType::GrblHal | ControllerType::FluidNC) => {
+            true
+        }
+        Some(
+            ControllerType::TinyG
+            | ControllerType::G2Core
+            | ControllerType::Smoothieware
+            | ControllerType::Marlin
+            | ControllerType::Repetier,
+        ) => false,
+    }
+}
 
 /// A work coordinate system.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
@@ -94,22 +117,35 @@ pub fn go_to_work_zero_command(include_z: bool) -> &'static str {
     }
 }
 
+/// A work coordinate system a line selects or a controller reports.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum WcsWord {
+    /// One of G54-G59.
+    Known(Wcs),
+    /// A system outside G54-G59 (`G59.1`, `G54.1 P7`, ...), or a parser state that names
+    /// none: a `G10 L20 P<n>` built for G54-G59 would act on another system than the active
+    /// one.
+    Other,
+}
+
 /// The active system of a GRBL parser-state reply (`[GC:G0 G54 G17 ...]`), if the line is
-/// one and names a system.
+/// one: [`WcsWord::Other`] when it names a system outside G54-G59 (grblHAL's `G59.1`) or
+/// none.
 ///
 /// # Arguments
 /// * `line` - One line received from the controller.
-pub fn parser_state_wcs(line: &str) -> Option<Wcs> {
+pub fn parser_state_wcs(line: &str) -> Option<WcsWord> {
     let inner = line.trim().strip_prefix("[GC:")?.strip_suffix(']')?;
-    wcs_in_line(inner)
+    Some(wcs_in_line(inner).unwrap_or(WcsWord::Other))
 }
 
-/// The last system a G-code line selects (`G55`, `G0G59X0`), if any. Comments (`(...)`,
-/// `; ...`) and `$` lines select none; `G54.1` is not a system selection.
+/// The last system a G-code line selects (`G55`, `G0G59X0`), if any: [`WcsWord::Other`] for
+/// a `G54.x`-`G59.x` word (`G59.1`, `G54.1`). Comments (`(...)`, `; ...`) and `$` lines
+/// select none.
 ///
 /// # Arguments
 /// * `line` - A G-code line, as sent to the controller.
-pub fn wcs_in_line(line: &str) -> Option<Wcs> {
+pub fn wcs_in_line(line: &str) -> Option<WcsWord> {
     if line.trim_start().starts_with('$') {
         return None;
     }
@@ -135,12 +171,23 @@ pub fn wcs_in_line(line: &str) -> Option<Wcs> {
                         break;
                     }
                 }
-                if let Some(wcs) = number.parse::<u32>().ok().and_then(Wcs::from_number) {
-                    found = Some(wcs);
+                if let Some(word) = wcs_word(&number) {
+                    found = Some(word);
                 }
             }
             _ => {}
         }
     }
     found
+}
+
+/// The system a `G` word's number (`55`, `055`, `59.1`) selects, if it is in 54-59.
+fn wcs_word(number: &str) -> Option<WcsWord> {
+    let (whole, fraction) = number.split_once('.').unwrap_or((number, ""));
+    let wcs = Wcs::from_number(whole.parse::<u32>().ok()?)?;
+    if fraction.trim_end_matches('0').is_empty() {
+        Some(WcsWord::Known(wcs))
+    } else {
+        Some(WcsWord::Other)
+    }
 }
