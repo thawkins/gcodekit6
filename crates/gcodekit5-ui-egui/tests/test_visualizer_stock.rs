@@ -753,3 +753,24 @@ fn test_designer_without_stock_keeps_the_stock() -> TestResult {
     );
     Ok(())
 }
+
+/// GTK's tooltip on "Show Stock Removal" states the simulation's resolution.
+#[test]
+fn test_show_stock_removal_tooltip_states_the_resolution() -> TestResult {
+    let tr = gcodekit5_app::i18n::Translator::new("en");
+    let text = gcodekit5_ui_egui::panes::visualizer::sidebar::resolution_tooltip(&tr);
+    assert_eq!(
+        text,
+        "The simulation has a resolution of 0.19mm. Cuts smaller than 0.20mm will not be \
+         visually displayed, but the G-code will execute correctly."
+    );
+    let mut harness = pane_harness(VisualizerPane::new());
+    harness.state_mut().configure(&config(true));
+    harness.run();
+    harness.get_by_label("Show Stock Removal").hover();
+    for _ in 0..30 {
+        harness.step();
+    }
+    assert!(harness.query_by_label(&text).is_some(), "tooltip shown");
+    Ok(())
+}

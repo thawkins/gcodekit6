@@ -66,6 +66,9 @@ pub fn msgids() -> Vec<&'static str> {
         n_!("to"),
         n_!("Simulation"),
         n_!("Show Stock Removal"),
+        n_!("The simulation has a resolution of "),
+        n_!("mm. Cuts smaller than "),
+        n_!("mm will not be visually displayed, but the G-code will execute correctly."),
         n_!("Stock"),
         n_!("Width"),
         n_!("Height"),
@@ -206,13 +209,30 @@ fn choice_row<T: PartialEq + Copy>(
     });
 }
 
+/// GTK's tooltip on "Show Stock Removal": the simulation's resolution and the smallest cut
+/// it shows, in mm with two decimals.
+///
+/// # Arguments
+/// * `tr` - Translator for the current UI language.
+pub fn resolution_tooltip(tr: &Translator) -> String {
+    let resolution = super::stock::RESOLUTION;
+    format!(
+        "{}{resolution:.2}{}{:.2}{}",
+        tr.tr("The simulation has a resolution of "),
+        tr.tr("mm. Cuts smaller than "),
+        resolution + 0.01,
+        tr.tr("mm will not be visually displayed, but the G-code will execute correctly."),
+    )
+}
+
 /// The Simulation section.
 fn simulation(ui: &mut egui::Ui, sim: Simulation<'_>, tr: &Translator) {
     egui::CollapsingHeader::new(tr.tr("Simulation"))
         .id_salt("visualizer-simulation")
         .default_open(true)
         .show(ui, |ui| {
-            crate::theme::checkbox(ui, sim.show, tr.tr("Show Stock Removal"));
+            crate::theme::checkbox(ui, sim.show, tr.tr("Show Stock Removal"))
+                .on_hover_text(resolution_tooltip(tr));
             if !*sim.show {
                 return;
             }
