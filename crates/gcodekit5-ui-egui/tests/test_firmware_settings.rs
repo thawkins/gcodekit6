@@ -578,6 +578,12 @@ fn test_firmware_settings_mismatched_read_back_is_reported() {
     );
     let notice = h.state().firmware_settings().notice().unwrap_or_default();
     assert!(!notice.contains("Setting written"), "{notice:?}");
+    // The setting did change, to the stored value: not "Setting not changed".
+    assert!(
+        notice.starts_with("Setting stored with another value: $110=5000"),
+        "{notice:?}"
+    );
+    assert!(!notice.contains("Setting not changed"), "{notice:?}");
 }
 
 /// A value GRBL would refuse (negative) or truncate (a byte mask over 255, a fraction) is

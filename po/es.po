@@ -1156,6 +1156,9 @@ msgstr "no conectado"
 msgid "Setting not changed"
 msgstr "Ajuste no modificado"
 
+msgid "Setting stored with another value"
+msgstr "Ajuste guardado con otro valor"
+
 msgid "Export Settings"
 msgstr "Exportar ajustes"
 

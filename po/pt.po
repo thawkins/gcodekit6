@@ -1150,6 +1150,9 @@ msgstr "não ligado"
 msgid "Setting not changed"
 msgstr "Definição não alterada"
 
+msgid "Setting stored with another value"
+msgstr "Definição guardada com outro valor"
+
 msgid "Export Settings"
 msgstr "Exportar definições"
 

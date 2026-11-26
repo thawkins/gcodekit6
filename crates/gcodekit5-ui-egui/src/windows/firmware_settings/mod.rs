@@ -323,11 +323,18 @@ impl FirmwareSettingsWindow {
                 None => crate::machine::worker_message(&reply, tr),
             },
             WriteOutcome::NoReply => tr.tr(n_!("no reply from the controller")).into_owned(),
-            WriteOutcome::Mismatch(stored) => setting_write::mismatch_text(&line, &stored, tr),
+            WriteOutcome::Mismatch(stored) => {
+                // The setting did change, to the stored value.
+                let reason = setting_write::mismatch_text(&line, &stored, tr);
+                let title = tr.tr(n_!("Setting stored with another value"));
+                self.say(format!("{title}: {line}: {reason}"), true);
+                return;
+            }
         };
         self.refuse_write(&line, &failure, tr);
     }
 
+    /// Reports a write the controller did not take (or that was never sent).
     fn refuse_write(&mut self, line: &str, reason: &str, tr: &Translator) {
         let title = tr.tr(n_!("Setting not changed"));
         self.say(format!("{title}: {line}: {reason}"), true);
@@ -490,6 +497,7 @@ pub fn msgids() -> Vec<&'static str> {
         n_!("the controller replied"),
         n_!("no reply from the controller"),
         n_!("Setting not changed"),
+        n_!("Setting stored with another value"),
         n_!("Please connect the machine before retrieving parameters."),
         n_!("Cannot retrieve settings:"),
         n_!("Error sending M205:"),

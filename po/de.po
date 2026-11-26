@@ -1149,6 +1149,9 @@ msgstr "nicht verbunden"
 msgid "Setting not changed"
 msgstr "Einstellung nicht geändert"
 
+msgid "Setting stored with another value"
+msgstr "Einstellung mit anderem Wert gespeichert"
+
 msgid "Export Settings"
 msgstr "Einstellungen exportieren"
 

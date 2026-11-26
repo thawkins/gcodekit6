@@ -1119,6 +1119,9 @@ msgstr ""
 msgid "Setting not changed"
 msgstr ""
 
+msgid "Setting stored with another value"
+msgstr ""
+
 msgid "Export Settings"
 msgstr ""
 
