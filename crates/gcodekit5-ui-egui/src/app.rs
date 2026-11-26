@@ -128,6 +128,18 @@ pub struct DirtyState {
     pub designer: bool,
 }
 
+/// The msgids of the app's own startup notices, for the translation check.
+pub fn msgids() -> Vec<&'static str> {
+    vec![SETTINGS_PROBLEM_TITLE, SETTINGS_PROBLEM_TEXT]
+}
+
+/// GTK's title of the warning shown when the settings could not be loaded.
+const SETTINGS_PROBLEM_TITLE: &str = n_!("Settings could not be loaded");
+
+/// GTK's text of that warning, above the file and the problem.
+const SETTINGS_PROBLEM_TEXT: &str =
+    n_!("Default settings are in use. The settings file will be backed up before it is replaced.");
+
 /// State held by the egui front end.
 #[derive(Debug)]
 pub struct AppState {
@@ -169,6 +181,10 @@ pub struct AppState {
     /// The Designer's stock and tool for the program it last generated, which the
     /// visualizer's stock removal simulation takes (GTK's `sync_stock_from_designer`).
     pub stock_seed: Option<crate::panes::visualizer::StockSeed>,
+    /// What went wrong loading the settings (the file and the problem), shown once at start
+    /// as GTK's "Settings could not be loaded" warning; set with
+    /// [`AppState::with_settings_problem`] before the app is built from the state.
+    pub settings_problem: Option<String>,
 }
 
 impl AppState {
@@ -198,7 +214,18 @@ impl AppState {
             materials_file,
             history_file,
             stock_seed: None,
+            settings_problem: None,
         }
+    }
+
+    /// The same state with `problem`, the description of what went wrong loading the
+    /// settings, to show at start.
+    ///
+    /// # Arguments
+    /// * `problem` - The problem, or `None` when the settings loaded cleanly.
+    pub fn with_settings_problem(mut self, problem: Option<String>) -> Self {
+        self.settings_problem = problem;
+        self
     }
 
     /// The same state keeping its custom tools in `file` (a test folder, for example).
@@ -259,18 +286,24 @@ impl AppState {
 
     /// The saved settings, or defaults that are never saved when there is no settings
     /// folder.
-    pub fn load_settings() -> SettingsManager {
+    ///
+    /// # Returns
+    /// The settings, and what went wrong loading them (the settings file and the problem),
+    /// for the warning at start.
+    pub fn load_settings() -> (SettingsManager, Option<String>) {
         match SettingsManager::config_dirs() {
             Ok(dirs) => {
+                let file = dirs.config.join("config.toml");
                 let (settings, problem) = SettingsManager::open(dirs);
-                if let Some(problem) = problem {
+                if let Some(problem) = &problem {
                     tracing::warn!(%problem, "settings loaded with problems");
                 }
-                settings
+                let problem = problem.map(|p| format!("{}\n\n{p}", file.display()));
+                (settings, problem)
             }
             Err(error) => {
                 tracing::warn!(%error, "no settings folder; using defaults");
-                SettingsManager::detached(Config::default())
+                (SettingsManager::detached(Config::default()), None)
             }
         }
     }
@@ -344,6 +377,8 @@ pub struct GcodeKitApp {
     help_window: HelpWindow,
     /// Saved shortcuts put back to their defaults at start, until the user closes the notice.
     shortcut_notice: Option<String>,
+    /// GTK's "Settings could not be loaded" warning, shown at start until OK.
+    settings_notice: Option<String>,
     /// The Device Config page's firmware settings.
     firmware_settings: FirmwareSettingsWindow,
     /// The Device Info panel (the left column of the Device Config page).
@@ -436,6 +471,12 @@ impl GcodeKitApp {
     pub fn from_state(state: AppState) -> Self {
         let (keymap, dropped) = crate::shortcuts::keymap_from(&state.config().ui);
         let shortcut_notice = crate::shortcuts::reset_notice(&state.translator, &dropped);
+        let settings_notice = state.settings_problem.as_ref().map(|details| {
+            format!(
+                "{}\n\n{details}",
+                state.translator.tr(SETTINGS_PROBLEM_TEXT)
+            )
+        });
         let menus = Menus::new(&state.translator, &keymap);
         let wake_ctx: Arc<OnceLock<egui::Context>> = Arc::new(OnceLock::new());
         let wake = {
@@ -509,6 +550,7 @@ impl GcodeKitApp {
             about_window,
             help_window: HelpWindow::default(),
             shortcut_notice,
+            settings_notice,
             firmware_settings: FirmwareSettingsWindow::default(),
             device_info: DeviceInfoPanel::default(),
             device_manager,
@@ -1193,6 +1235,7 @@ impl GcodeKitApp {
         }
         self.about_window.show(ctx, &self.state.translator);
         self.show_shortcut_notice(ctx);
+        self.show_settings_notice(ctx);
         self.show_machine_windows(ctx);
         self.show_library_windows();
         if let Some(topic) = help::take_request(ctx) {
@@ -1220,6 +1263,28 @@ impl GcodeKitApp {
             });
         if close {
             self.shortcut_notice = None;
+        }
+    }
+
+    /// GTK's warning that the settings could not be loaded and defaults are in use, until OK.
+    fn show_settings_notice(&mut self, ctx: &egui::Context) {
+        let Some(message) = &self.settings_notice else {
+            return;
+        };
+        let tr = &self.state.translator;
+        let mut close = false;
+        egui::Window::new(tr.tr(SETTINGS_PROBLEM_TITLE))
+            .id(egui::Id::unique("gcodekit5-settings-notice"))
+            .collapsible(false)
+            .resizable(false)
+            .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
+            .show(ctx, |ui| {
+                ui.set_max_width(480.0);
+                ui.label(message.as_str());
+                close = ui.button(tr.tr(n_!("OK"))).clicked();
+            });
+        if close {
+            self.settings_notice = None;
         }
     }
 

@@ -72,3 +72,37 @@ fn test_main_window_opens_maximized() {
     assert_eq!(viewport.maximized, Some(true));
     assert_eq!(viewport.inner_size, Some(egui::vec2(1280.0, 800.0)));
 }
+
+/// GTK's warning when the settings could not be loaded: shown at start with the file and the
+/// problem, until OK; none when they loaded cleanly.
+#[test]
+fn test_settings_problem_is_shown_at_start_until_ok() {
+    let clean = GcodeKitApp::from_state(AppState::new(
+        SettingsManager::detached(Config::default()),
+        native_decision(),
+    ));
+    let mut h = crate::machine_support::app_harness(clean);
+    h.run();
+    assert!(h.query_by_label("Settings could not be loaded").is_none());
+    let state = AppState::new(
+        SettingsManager::detached(Config::default()),
+        native_decision(),
+    )
+    .with_settings_problem(Some(
+        "/x/config.toml\n\nconfig.toml was damaged".to_string(),
+    ));
+    let mut h = crate::machine_support::app_harness(GcodeKitApp::from_state(state));
+    h.run();
+    let _ = h.get_by_label("Settings could not be loaded");
+    assert!(
+        h.query_by_label_contains("config.toml was damaged")
+            .is_some()
+    );
+    assert!(
+        h.query_by_label_contains("Default settings are in use.")
+            .is_some()
+    );
+    h.get_by_label("OK").click();
+    h.run();
+    assert!(h.query_by_label("Settings could not be loaded").is_none());
+}

@@ -51,14 +51,14 @@ pub struct LaunchOptions {
 /// `Ok(())` on a clean exit, or an error if the native window cannot start.
 pub fn run(options: LaunchOptions) -> anyhow::Result<()> {
     let LaunchOptions { files } = options;
-    let settings = AppState::load_settings();
+    let (settings, settings_problem) = AppState::load_settings();
     gcodekit5_app::i18n::set_language(&settings.config().ui.language);
     let decision = craft_window::policy::decide_for(
         craft_window::Prefix::new("GCODEKIT5"),
         craft_window::policy::Backend::from_env(),
         frame::title_bar_pref(&settings.config().ui),
     );
-    let state = AppState::new(settings, decision);
+    let state = AppState::new(settings, decision).with_settings_problem(settings_problem);
     // Keep eframe's default `depth_buffer: 0` and `multisampling: 0`: the visualizer's wgpu
     // pipelines (`panes::visualizer::install`) draw inside egui's pass and are built for no
     // depth attachment and one sample per pixel.

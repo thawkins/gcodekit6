@@ -31,6 +31,7 @@ Status values:
 | Translations (UI language, restart on change) | SPEC 6.3 | Ported | `test_translations::every_ui_msgid_is_translated`, `test_settings_window::language_change_requests_restart` |
 | HiDPI (1x, 1.5x, 2x hit testing) | SPEC 6.3 | Ported | `test_hidpi::*` (8 tests) |
 | App-drawn window frame / system title bar option | *(GTK)* | Ported | `test_frame::*`, `test_settings_window::title_bar_row_follows_decision` |
+| Warning when the settings could not be loaded | *(GTK)* | Ported | `test_smoke::test_settings_problem_is_shown_at_start_until_ok` (GTK's title and text, with the settings file and the problem) |
 | About dialog | SPEC 5.3.5 | Ported | `test_commands::settings_and_about_open_windows` |
 | Open a G-code file named on the command line | 03-quick-start | Ported | `test_editor::launch_files_open_in_editor` |
 | Drag-and-drop a file onto the window | 03-quick-start | Not applicable | No drop handler in the GTK source either |

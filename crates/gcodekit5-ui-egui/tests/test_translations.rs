@@ -327,6 +327,7 @@ fn msgids() -> Vec<&'static str> {
         .chain(designer::msgids())
         .chain(cam_tools::msgids())
         .chain(gcodekit5_ui_egui::app::designer_files::msgids())
+        .chain(gcodekit5_ui_egui::app::msgids())
         .chain(status_bar::MSGIDS.iter().copied())
         .chain(gcodekit5_ui_egui::machine::worker_msgids())
         .collect()
