@@ -4712,3 +4712,6 @@ msgstr "Estos atajos guardados incumplían una regla y vuelven a usar sus teclas
 
 msgid "Duplicate"
 msgstr "Duplicar"
+
+msgid "Unlock ignored: the machine is not in ALARM."
+msgstr "Desbloqueo ignorado: la máquina no está en ALARMA."

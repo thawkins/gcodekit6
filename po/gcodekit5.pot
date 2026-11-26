@@ -4633,3 +4633,6 @@ msgstr ""
 
 msgid "Toggle Cutting Moves"
 msgstr ""
+
+msgid "Unlock ignored: the machine is not in ALARM."
+msgstr ""

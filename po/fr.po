@@ -4716,3 +4716,6 @@ msgstr "Ces raccourcis enregistrés enfreignaient une règle et reprennent leurs
 
 msgid "Duplicate"
 msgstr "Dupliquer"
+
+msgid "Unlock ignored: the machine is not in ALARM."
+msgstr "Déverrouillage ignoré : la machine n’est pas en ALARME."

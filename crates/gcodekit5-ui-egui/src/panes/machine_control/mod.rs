@@ -98,6 +98,7 @@ const MSGIDS: &[&str] = &[
     n_!("Unlock from ALARM ($X)"),
     n_!("Connect to enable controls."),
     ALARM_UNLOCK,
+    UNLOCK_NOT_IN_ALARM,
     COMMAND_DURING_JOB,
     WCS_CHANGE_DURING_JOB,
     GO_TO_ZERO_NOT_IDLE,
@@ -106,6 +107,9 @@ const MSGIDS: &[&str] = &[
     OVERRIDE_NOT_CONFIRMED,
     CALIBRATION_NOT_A_NUMBER,
 ];
+
+/// Unlock from the menu or its key refused outside ALARM.
+const UNLOCK_NOT_IN_ALARM: &str = n_!("Unlock ignored: the machine is not in ALARM.");
 
 /// GTK's hint while the machine is in ALARM.
 const ALARM_UNLOCK: &str = n_!("ALARM: Unlock required.");
@@ -615,7 +619,14 @@ impl MachineControlPane {
             // Soft reset through `stop`: 0x18, and the queued lines are dropped with it.
             Command::StreamStop | Command::SoftReset => self.emergency_stop(),
             Command::Home => self.send_line("$H"),
-            Command::Unlock => self.send_line("$X"),
+            // GTK enabled Unlock only in ALARM; the menu item and its key follow the button.
+            Command::Unlock => {
+                if ctx.machine().is_some_and(|m| in_alarm(m.status())) {
+                    self.send_line("$X");
+                } else {
+                    self.refuse(tr, UNLOCK_NOT_IN_ALARM);
+                }
+            }
             Command::FileNew
             | Command::FileNew3d
             | Command::FileOpen

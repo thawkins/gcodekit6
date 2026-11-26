@@ -4712,3 +4712,6 @@ msgstr "Queste scorciatoie salvate violavano una regola e tornano ai tasti prede
 
 msgid "Duplicate"
 msgstr "Duplica"
+
+msgid "Unlock ignored: the machine is not in ALARM."
+msgstr "Sblocco ignorato: la macchina non è in ALLARME."

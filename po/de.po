@@ -4709,3 +4709,6 @@ msgstr "Diese gespeicherten Tastenkürzel verstießen gegen eine Regel und verwe
 
 msgid "Duplicate"
 msgstr "Duplizieren"
+
+msgid "Unlock ignored: the machine is not in ALARM."
+msgstr "Entsperren ignoriert: Die Maschine ist nicht im ALARM."

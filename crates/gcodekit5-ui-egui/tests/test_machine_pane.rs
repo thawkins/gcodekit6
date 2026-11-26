@@ -610,3 +610,69 @@ fn test_override_readout_marks_the_limits() {
     let _ = harness.get_by_label("120%");
     assert!(harness.query_by_label_contains("MAX").is_none());
 }
+
+/// While a menu of the in-window bar is open, only the E-STOP and feed hold keys run: a
+/// Ctrl chord (File > Open) and a jog digit in an armed Machine Control stay with the menu.
+#[test]
+fn test_other_keys_do_not_run_while_a_menu_is_open() {
+    let (mut harness, shared) = pane_app(Duration::from_millis(1), true);
+    report_state(
+        &mut harness,
+        &shared,
+        "<Idle|MPos:0.000,0.000,0.000|FS:0,0>",
+        "Idle",
+    );
+    harness.get_by_label("Machine State").click();
+    harness.step();
+    harness.step();
+    harness
+        .get_by_role_and_label(Role::MenuItem, "Machine")
+        .click();
+    harness.run();
+    assert!(craft_menu::bar::is_open(&harness.ctx));
+    let before = harness.state().last_dispatched();
+    harness.key_press_modifiers(egui::Modifiers::COMMAND, egui::Key::O);
+    harness.step();
+    harness.key_press(egui::Key::Num6);
+    harness.step();
+    harness.step();
+    assert_eq!(harness.state().last_dispatched(), before);
+    std::thread::sleep(Duration::from_millis(30));
+    assert!(
+        !shared
+            .log()
+            .iter()
+            .any(|w| matches!(w, Wrote::Line(l) if l.starts_with("$J="))),
+        "{:?}",
+        shared.log()
+    );
+}
+
+/// Machine > Unlock and Cmd+U follow the button: refused outside ALARM with a notice, `$X`
+/// in ALARM.
+#[test]
+fn test_unlock_command_only_in_alarm() {
+    let (mut harness, shared) = pane_app(Duration::from_millis(1), true);
+    report_state(
+        &mut harness,
+        &shared,
+        "<Idle|MPos:0.000,0.000,0.000|FS:0,0>",
+        "Idle",
+    );
+    harness.state_mut().dispatch(Command::Unlock);
+    harness.run();
+    let _ = harness.get_by_label("Unlock ignored: the machine is not in ALARM.");
+    std::thread::sleep(Duration::from_millis(30));
+    assert!(!shared.log().contains(&Wrote::Line("$X".to_string())));
+    report_state(
+        &mut harness,
+        &shared,
+        "<Alarm|MPos:0.000,0.000,0.000|FS:0,0>",
+        "Alarm",
+    );
+    harness.state_mut().dispatch(Command::Unlock);
+    harness.run();
+    assert!(wait_until(|| shared
+        .log()
+        .contains(&Wrote::Line("$X".to_string()))));
+}
