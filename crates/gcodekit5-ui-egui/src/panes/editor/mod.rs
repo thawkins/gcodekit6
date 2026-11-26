@@ -44,6 +44,7 @@ use gcodekit5_app::machine::MachineEvent;
 pub use buffer::EditorBuffer;
 use highlight::HighlightStyle;
 
+use crate::icons::{Icon, icon_only_button};
 use crate::workspace::{Pane, PaneContext, PaneId};
 
 /// Files with more lines than this open read-only in the virtualised view.
@@ -302,13 +303,17 @@ impl EditorPane {
         )
     }
 
-    /// The find row: query, previous and next, match count.
+    /// The find row: query, previous and next (chevron icon buttons named "Previous Match"
+    /// and "Next Match"), match count. The query takes the room the rest leaves, so the row
+    /// fits a narrow editor column.
     fn show_find(&mut self, ui: &mut egui::Ui, tr: &Translator) {
         ui.horizontal(|ui| {
             let hint = tr.tr("Search...");
+            // Two icon buttons and the match count.
+            let rest = 2.0 * 36.0 + 110.0;
             let edit = egui::TextEdit::singleline(&mut self.find_query)
                 .hint_text(hint.as_ref())
-                .desired_width(200.0);
+                .desired_width((ui.available_width() - rest).clamp(80.0, 200.0));
             let response = ui.add(edit);
             response.widget_info(|| {
                 let mut info = egui::WidgetInfo::text_edit(
@@ -324,10 +329,10 @@ impl EditorPane {
                 self.find_match = None;
             }
             let enter = response.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter));
-            if ui.button(tr.tr("Previous Match")).clicked() {
+            if icon_only_button(ui, Icon::JogUp, &tr.tr("Previous Match")).clicked() {
                 self.find_previous();
             }
-            if ui.button(tr.tr("Next Match")).clicked() || enter {
+            if icon_only_button(ui, Icon::JogDown, &tr.tr("Next Match")).clicked() || enter {
                 self.find_next();
             }
             if enter {

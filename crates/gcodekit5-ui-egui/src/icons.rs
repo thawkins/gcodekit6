@@ -136,8 +136,11 @@ impl Icon {
             .tint(Color32::WHITE)
     }
 
-    /// The icon tinted with the theme's text colour for `ui`.
+    /// The icon tinted with the theme's text colour for `ui`. Installs the SVG loader on
+    /// `ui`'s context if it is missing (one lookup), so a pane drawn outside the app, as in
+    /// a test harness, still shows its icons.
     pub fn themed(self, ui: &Ui) -> Image<'static> {
+        install(ui.ctx());
         self.image().tint(tint(ui))
     }
 }
