@@ -37,8 +37,8 @@ only while Machine Control, the Visualizer or the Designer has the keyboard) and
 2. Click **Change**, then press the new key combination (Escape cancels)
 3. Click **Apply**: the new key works at once and shows in the menus
 
-**Clear** removes a command's keys, **Reset** gives one command its default keys back, and
-**Reset All** every command. **Cancel** drops the changes.
+**Clear** removes a command's keys, **Reset** gives one command its default keys back (unless
+another command now uses one of them; the reason is shown), and **Reset All** every command. **Cancel** drops the changes.
 
 A key is refused, with the reason shown above the list, when:
 

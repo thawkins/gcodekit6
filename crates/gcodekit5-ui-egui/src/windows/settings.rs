@@ -750,9 +750,10 @@ fn shortcut_row(
         .add_enabled(!locked && changed, egui::Button::new(tr.tr(n_!("Reset"))))
         .clicked()
     {
-        shortcuts::reset(&mut draft.keymap, command);
         draft.recording = None;
-        draft.shortcut_notice = None;
+        draft.shortcut_notice = shortcuts::reset(&mut draft.keymap, command)
+            .err()
+            .map(|(trigger, refusal)| refusal.message(tr, &trigger.display(platform)));
     }
     ui.end_row();
 }

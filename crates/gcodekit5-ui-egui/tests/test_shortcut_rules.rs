@@ -208,7 +208,7 @@ fn test_set_key_replaces_and_reset_restores() {
     assert_eq!(shortcuts::clear(&mut keymap, Command::FileOpen), Ok(()));
     assert!(texts(&keymap, Command::FileOpen).is_empty());
 
-    shortcuts::reset(&mut keymap, Command::Redo);
+    assert_eq!(shortcuts::reset(&mut keymap, Command::Redo), Ok(()));
     assert_eq!(texts(&keymap, Command::Redo), ["Cmd+Y", "Cmd+Shift+Z"]);
     assert!(
         texts(&keymap, Command::FileOpen).is_empty(),
@@ -327,4 +327,25 @@ fn test_refusals_name_the_key_and_the_command_in_the_ui_language() {
         shortcuts::check(&keymap, Command::JogXPos, &binding),
         Err(Refusal::WrongScope)
     );
+}
+
+/// A command's default key given to another command meanwhile: Reset is refused, so the two
+/// never share it (the reviewer's example: Jog X+ moved to Q, View Top given 6).
+#[test]
+fn test_reset_refused_when_a_default_key_is_now_taken() {
+    let mut keymap = commands::keymap();
+    assert_eq!(set(&mut keymap, Command::JogXPos, "Q"), Ok(()));
+    assert_eq!(set(&mut keymap, Command::ViewTop, "6"), Ok(()));
+    assert_eq!(
+        shortcuts::reset(&mut keymap, Command::JogXPos),
+        Err((trigger("6"), Refusal::Taken(Command::ViewTop)))
+    );
+    assert_eq!(texts(&keymap, Command::JogXPos), ["Q"]);
+    assert_eq!(keymap.conflicts(), Vec::new());
+    // Once View Top is reset, Jog X+ can be.
+    assert_eq!(shortcuts::reset(&mut keymap, Command::ViewTop), Ok(()));
+    assert_eq!(shortcuts::reset(&mut keymap, Command::JogXPos), Ok(()));
+    assert_eq!(texts(&keymap, Command::JogXPos), ["6"]);
+    // Locked commands reset to what they already have.
+    assert_eq!(shortcuts::reset(&mut keymap, Command::SoftReset), Ok(()));
 }

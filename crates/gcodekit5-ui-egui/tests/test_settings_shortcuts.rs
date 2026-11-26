@@ -355,3 +355,33 @@ fn test_saved_shortcuts_breaking_a_rule_load_as_defaults() {
         keymap.default_bindings(&Command::JogXPos.command_ref())
     );
 }
+
+/// Reset on a command whose default key another command took meanwhile says why and
+/// changes nothing.
+#[test]
+fn test_reset_refused_when_the_default_key_is_taken() {
+    let mut h = harness(scratch("test_reset_refused_when_taken"));
+    filter(&mut h, "Jog X+");
+    click(&mut h, "Change");
+    press(&mut h, Modifiers::NONE, Key::Q);
+    let field = h.get_by_label("Filter:");
+    field.click();
+    h.key_press_modifiers(Modifiers::COMMAND, Key::A);
+    field.type_text("Top");
+    h.run();
+    // View Top comes before Align Top.
+    h.get_all_by_label("Change")
+        .next()
+        .expect("Top row")
+        .click();
+    h.run();
+    press(&mut h, Modifiers::NONE, Key::Num6);
+    let field = h.get_by_label("Filter:");
+    field.click();
+    h.key_press_modifiers(Modifiers::COMMAND, Key::A);
+    field.type_text("Jog X+");
+    h.run();
+    click(&mut h, "Reset");
+    let _ = h.get_by_label("6 is already used by Stop Streaming");
+    let _ = h.get_by_label("Q");
+}

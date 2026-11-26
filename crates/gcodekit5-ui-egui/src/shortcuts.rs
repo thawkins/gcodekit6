@@ -273,9 +273,20 @@ pub fn clear(keymap: &mut Keymap, command: Command) -> Result<(), Refusal> {
     Ok(())
 }
 
-/// Gives `command` its default keys back.
-pub fn reset(keymap: &mut Keymap, command: Command) {
-    keymap.reset(&command.command_ref());
+/// Gives `command` its default keys back, when the rules allow them now: another command
+/// may have been given one of them meanwhile.
+///
+/// # Errors
+/// The first default key the rules refuse, and why; the keymap is unchanged then.
+pub fn reset(keymap: &mut Keymap, command: Command) -> Result<(), (Trigger, Refusal)> {
+    let command_ref = command.command_ref();
+    if !LOCKED.contains(&command) {
+        for binding in keymap.default_bindings(&command_ref) {
+            check(keymap, command, &binding).map_err(|refusal| (binding.trigger, refusal))?;
+        }
+    }
+    keymap.reset(&command_ref);
+    Ok(())
 }
 
 /// Gives every command its default keys back.
@@ -306,7 +317,7 @@ pub fn sanitized(overrides: Overrides) -> (Keymap, Vec<Command>) {
         .filter(|c| changed(&keymap, *c))
         .collect();
     for command in &dropped {
-        reset(&mut keymap, *command);
+        keymap.reset(&command.command_ref());
     }
     // Each pass resets at least one changed command, so this ends. A command put back may
     // collide with another change, which the next pass catches.
@@ -329,7 +340,7 @@ pub fn sanitized(overrides: Overrides) -> (Keymap, Vec<Command>) {
                 command = command.id(),
                 "saved shortcut breaks a rule; default used"
             );
-            reset(&mut keymap, command);
+            keymap.reset(&command.command_ref());
             dropped.push(command);
         }
     }
