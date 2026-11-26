@@ -10,8 +10,8 @@
 //! `max_buffer_size` is not uploaded ([`toolpath_fits`]) and the pane says so. Its `paint`
 //! draws, in order: the grid (when shown), the origin axes, the machine bounds (when shown),
 //! the toolpath (its travel and
-//! its cuts each when shown, GTK's Show Rapid Moves and Show Cutting Moves), and the tool
-//! marker.
+//! its cuts each when shown, GTK's Show Rapid Moves and Show Cutting Moves), the tool
+//! marker and the run preview's marker.
 //!
 //! The shaders are WGSL ports of the GTK `ui/gtk/shaders.rs` line and stock removal shaders.
 //! The callback draws inside egui's render pass, which has no depth buffer, so later draws
@@ -58,6 +58,8 @@ const BOUNDS_VERTICES: usize = 24;
 const AXIS_LENGTH: f32 = 100.0;
 /// Tool marker colour: red at 40% opacity, as GTK draws it.
 const MARKER_COLOR: [u8; 4] = [255, 0, 0, 102];
+/// Run preview marker colour: GTK's cyan (0, 0.85, 1) at 55% opacity.
+pub const PREVIEW_MARKER_COLOR: [u8; 4] = [0, 217, 255, 140];
 /// Tool marker cone height and radius in mm, and its number of sides.
 const MARKER_HEIGHT: f32 = 10.0;
 const MARKER_RADIUS: f32 = 1.5;
@@ -125,6 +127,8 @@ struct GpuResources {
     axes_count: u32,
     /// The tool marker, rewritten when the tool moves.
     marker: wgpu::Buffer,
+    /// The run preview marker, rewritten as it moves.
+    preview_marker: wgpu::Buffer,
     /// The machine bounds box, rewritten each frame it is shown.
     bounds: wgpu::Buffer,
     /// The uploaded toolpath: its generation, buffer and vertex count.
@@ -234,8 +238,8 @@ fn scene_buffer(device: &wgpu::Device, vertices: &[SceneVertex]) -> wgpu::Buffer
     })
 }
 
-/// The tool marker: a cone with its tip at `tip` and its base 10 mm above.
-fn marker_vertices(tip: Vec3) -> Vec<SceneVertex> {
+/// A tool marker: a cone with its tip at `tip` and its base 10 mm above, in `color`.
+fn marker_vertices(tip: Vec3, color: [u8; 4]) -> Vec<SceneVertex> {
     let base = tip + Vec3::Z * MARKER_HEIGHT;
     let rim = |i: usize| {
         let a = i as f32 / MARKER_SIDES as f32 * std::f32::consts::TAU;
@@ -243,7 +247,7 @@ fn marker_vertices(tip: Vec3) -> Vec<SceneVertex> {
     };
     let vertex = |p: Vec3| SceneVertex {
         pos: p.to_array(),
-        color: MARKER_COLOR,
+        color,
     };
     (0..MARKER_SIDES)
         .flat_map(|i| {
@@ -488,6 +492,12 @@ pub fn install(render_state: &egui_wgpu::RenderState) {
             usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
             mapped_at_creation: false,
         }),
+        preview_marker: device.create_buffer(&wgpu::BufferDescriptor {
+            label: Some("gcodekit5_visualizer_preview_marker"),
+            size: (MARKER_VERTICES * std::mem::size_of::<SceneVertex>()) as u64,
+            usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+            mapped_at_creation: false,
+        }),
         bounds: device.create_buffer(&wgpu::BufferDescriptor {
             label: Some("gcodekit5_visualizer_bounds"),
             size: (BOUNDS_VERTICES * std::mem::size_of::<SceneVertex>()) as u64,
@@ -605,6 +615,8 @@ pub struct VisualizerCallback {
     pub mesh: Option<UploadedMesh>,
     /// Where to draw the tool marker (work coordinates, mm).
     pub tool: Option<Vec3>,
+    /// Where to draw the run preview marker (mm).
+    pub preview: Option<Vec3>,
     /// The camera's view matrix, to light the stock in view space.
     pub view: Mat4,
     /// The stock removal mesh, when the simulation is shown and finished.
@@ -847,7 +859,12 @@ impl egui_wgpu::CallbackTrait for VisualizerCallback {
             queue.write_buffer(&gpu.bounds, 0, bytemuck::cast_slice(&vertices));
         }
         if let Some(tip) = self.tool {
-            queue.write_buffer(&gpu.marker, 0, bytemuck::cast_slice(&marker_vertices(tip)));
+            let vertices = marker_vertices(tip, MARKER_COLOR);
+            queue.write_buffer(&gpu.marker, 0, bytemuck::cast_slice(&vertices));
+        }
+        if let Some(tip) = self.preview {
+            let vertices = marker_vertices(tip, PREVIEW_MARKER_COLOR);
+            queue.write_buffer(&gpu.preview_marker, 0, bytemuck::cast_slice(&vertices));
         }
         gpu.upload_stock(device, self.stock.as_ref());
         let size = size_px(self.rect, screen, device.limits().max_texture_dimension_2d);
@@ -891,6 +908,11 @@ impl egui_wgpu::CallbackTrait for VisualizerCallback {
         if self.tool.is_some() {
             pass.set_pipeline(&gpu.marker_pipeline);
             pass.set_vertex_buffer(0, gpu.marker.slice(..));
+            pass.draw(0..MARKER_VERTICES as u32, 0..1);
+        }
+        if self.preview.is_some() {
+            pass.set_pipeline(&gpu.marker_pipeline);
+            pass.set_vertex_buffer(0, gpu.preview_marker.slice(..));
             pass.draw(0..MARKER_VERTICES as u32, 0..1);
         }
     }

@@ -105,6 +105,10 @@ pub struct Overlay<'a> {
     pub bounds: Option<&'a Aabb>,
     /// The tool's work position, when the machine reports one.
     pub tool: Option<Xyz>,
+    /// The lowest the bottom-left panel may reach (the top of the run preview bar).
+    pub bottom: f32,
+    /// A warning (msgids of its title and text) to show in the middle of the view.
+    pub notice: Option<(&'a str, &'a str)>,
 }
 
 /// Draws the OSD over the view `rect`.
@@ -128,6 +132,8 @@ pub fn show(
         failed,
         bounds,
         tool,
+        bottom,
+        notice,
     } = overlay;
     let margin = 10.0;
     let mut rows = bounds.map_or_else(Vec::new, |b| bounds_lines(b, units, tr));
@@ -135,13 +141,17 @@ pub fn show(
         rows.push(position_line(xyz, units, tr));
     }
     if !rows.is_empty() {
-        let corner = rect.left_bottom() + egui::vec2(margin, -margin);
+        let corner = egui::pos2(rect.left() + margin, bottom.min(rect.bottom()) - margin);
         panel(ui, corner, egui::Align2::LEFT_BOTTOM, &rows);
     }
     if too_large {
         let note = [tr
             .tr("Toolpath too large to display on this GPU.")
             .into_owned()];
+        panel(ui, rect.center(), egui::Align2::CENTER_CENTER, &note);
+    }
+    if let Some((title, text)) = notice {
+        let note = [tr.tr(title).into_owned(), tr.tr(text).into_owned()];
         panel(ui, rect.center(), egui::Align2::CENTER_CENTER, &note);
     }
     if failed {

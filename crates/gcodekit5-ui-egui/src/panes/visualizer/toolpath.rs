@@ -11,6 +11,9 @@
 //! are travel (grey), powered feed moves and arcs are cuts coloured by spindle/laser power,
 //! and arcs are split into segments of at most 5 degrees.
 //!
+//! The same pass builds the run preview's path ([`super::preview::PathBuilder`]), so the
+//! preview needs no second parse.
+//!
 //! Dependencies: `glam`, `bytemuck`, `gcodekit5-visualizer` (parser, arc maths).
 
 use gcodekit5_visualizer::gcode::arc;
@@ -18,6 +21,7 @@ use gcodekit5_visualizer::{GCodeCommand, Point3D, Visualizer};
 use glam::Vec3;
 
 use super::camera::Aabb;
+use super::preview::PathBuilder;
 
 /// The dwell (seconds) of the marker placed after each program line.
 pub const MARKER_DWELL: f32 = 12345.678;
@@ -64,6 +68,8 @@ pub struct ToolpathMesh {
     pub bounds: Option<Aabb>,
     /// The bounds of the cutting moves (GTK's inspector bounds), else `None`.
     pub cut_bounds: Option<Aabb>,
+    /// The run preview's path.
+    pub preview: Vec<Vec3>,
 }
 
 /// The program text with a marker dwell after every line.
@@ -92,6 +98,7 @@ fn grow(bounds: &mut Option<Aabb>, p: Vec3) {
 struct Builder {
     mesh: ToolpathMesh,
     line: u32,
+    path: PathBuilder,
 }
 
 impl Builder {
@@ -132,6 +139,7 @@ impl Builder {
         ) else {
             // Zero radius: a straight move.
             self.segment(v(from), v(to), color, cut);
+            self.path.line(v(from), v(to), 2);
             return;
         };
         let segments = sweep.segment_count(std::f64::consts::PI / 36.0, 4, 128);
@@ -145,6 +153,7 @@ impl Builder {
                 Vec3::new(x as f32, y as f32, from.z + (to.z - from.z) * t as f32)
             };
             self.segment(prev, next, color, cut);
+            self.path.line(prev, next, 1);
             prev = next;
         }
     }
@@ -168,13 +177,16 @@ pub fn build(lines: &[String]) -> ToolpathMesh {
     let mut builder = Builder {
         mesh: ToolpathMesh::default(),
         line: 0,
+        path: PathBuilder::default(),
     };
     let v = |p: &Point3D| Vec3::new(p.x, p.y, p.z);
     for command in vis.commands() {
         match command {
-            GCodeCommand::Dwell { duration, .. } => {
+            GCodeCommand::Dwell { duration, pos } => {
                 if (duration - MARKER_DWELL).abs() < 1e-3 {
                     builder.line = builder.line.saturating_add(1);
+                } else {
+                    builder.path.dwell(v(pos), *duration);
                 }
             }
             GCodeCommand::Move {
@@ -182,10 +194,15 @@ pub fn build(lines: &[String]) -> ToolpathMesh {
                 to,
                 rapid,
                 intensity,
-            } => match (*rapid, intensity) {
-                (false, Some(s)) => builder.segment(v(from), v(to), cut_color(&vis, *s), true),
-                (false, None) | (true, _) => builder.segment(v(from), v(to), TRAVEL_COLOR, false),
-            },
+            } => {
+                builder.path.line(v(from), v(to), 2);
+                match (*rapid, intensity) {
+                    (false, Some(s)) => builder.segment(v(from), v(to), cut_color(&vis, *s), true),
+                    (false, None) | (true, _) => {
+                        builder.segment(v(from), v(to), TRAVEL_COLOR, false)
+                    }
+                }
+            }
             GCodeCommand::Arc {
                 from,
                 to,
@@ -199,5 +216,7 @@ pub fn build(lines: &[String]) -> ToolpathMesh {
             }
         }
     }
-    builder.mesh
+    let mut mesh = builder.mesh;
+    mesh.preview = builder.path.finish();
+    mesh
 }

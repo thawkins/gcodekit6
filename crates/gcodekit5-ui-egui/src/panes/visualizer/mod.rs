@@ -19,6 +19,11 @@
 //! Toolpath and Guides toggles ([`Display`]: rapids, cuts, the tool marker, the grid and its
 //! spacing, the machine bounds) and Inspector.
 //!
+//! The run preview bar ([`preview`]) at the bottom left plays the toolpath with a preview
+//! marker of its own (GTK's cyan), at GTK's four speeds; File > Run (`Cmd+R`, F5) shows the
+//! page and starts it from the beginning, as in GTK. It only animates the view: the pane
+//! never asks the machine for anything while it plays. A new program stops it.
+//!
 //! The machine bounds and Fit to Device Working Area use the active device profile's X, Y
 //! and Z limits ([`work_area_of`], handed in through [`Pane::set_device`]); with no profile,
 //! Fit to Device fits GTK's default 250 x 250 mm area and no bounds are drawn.
@@ -32,7 +37,7 @@
 //! in the sidebar hold until the next one.
 //!
 //! Ported from the GTK `ui/gtk/visualizer/mod.rs`, `renderer_3d.rs`, `shaders.rs` and
-//! `nav_cube.rs`. Not ported: run preview, scrollbars, the zoom/centre/cursor
+//! `nav_cube.rs`. Not ported: scrollbars, the zoom/centre/cursor
 //! status line and intensity statistics.
 //!
 //! [`Machine::program`]: crate::machine::Machine::program
@@ -45,6 +50,7 @@ pub mod camera;
 pub mod nav_cube;
 pub mod osd;
 pub mod pipeline;
+pub mod preview;
 pub mod sidebar;
 pub mod stock;
 pub mod toolpath;
@@ -65,6 +71,7 @@ use gcodekit5_visualizer::visualizer::StockZeroReference;
 pub use nav_cube::NavAction;
 pub use pipeline::install;
 use pipeline::{Upload, UploadedMesh, VisualizerCallback};
+pub use preview::{PreviewSpeed, PreviewState, RunPreview};
 pub use sidebar::Display;
 pub use stock::{StockSeed, StockSetup, StockSimulation};
 pub use toolpath::ToolpathMesh;
@@ -112,6 +119,7 @@ pub fn msgids() -> Vec<&'static str> {
     nav_cube::msgids()
         .into_iter()
         .chain(osd::msgids())
+        .chain(preview::msgids())
         .chain(sidebar::msgids())
         .chain(stock::msgids())
         .collect()
@@ -153,6 +161,14 @@ pub struct VisualizerPane {
     view_2d: bool,
     /// The active device profile's work area, if a profile is active.
     work_area: Option<Aabb>,
+    /// The run preview.
+    preview: RunPreview,
+    /// File > Run waits for the program's build to start the preview.
+    preview_on_build: bool,
+    /// When the run preview last moved on, while it plays.
+    preview_clock: Option<std::time::Instant>,
+    /// Why File > Run started no preview: GTK's warning title and text.
+    preview_notice: Option<(&'static str, &'static str)>,
     /// The `enable_stock_removal_3d` setting.
     stock_enabled: bool,
     /// Whether "Show Stock Removal" is checked.
@@ -196,6 +212,10 @@ impl VisualizerPane {
             display: Display::default(),
             view_2d: false,
             work_area: None,
+            preview: RunPreview::default(),
+            preview_on_build: false,
+            preview_clock: None,
+            preview_notice: None,
             stock_enabled: false,
             show_stock: false,
             stock_setup: StockSetup::default(),
@@ -374,6 +394,42 @@ impl VisualizerPane {
         self.display
     }
 
+    /// The run preview.
+    pub fn preview(&self) -> &RunPreview {
+        &self.preview
+    }
+
+    /// The run preview, to drive it.
+    pub fn preview_mut(&mut self) -> &mut RunPreview {
+        &mut self.preview
+    }
+
+    /// Why File > Run started no preview (GTK's warning title and text), until the next
+    /// program or Run.
+    pub fn preview_notice(&self) -> Option<(&'static str, &'static str)> {
+        self.preview_notice
+    }
+
+    /// File > Run: starts the run preview from the beginning, once the program's toolpath is
+    /// built (GTK's `run_preview_from_gcode`). With no program or no motion, says why
+    /// instead.
+    pub fn run_preview(&mut self) {
+        self.preview_notice = None;
+        if self.program.is_none() {
+            self.preview_notice = Some((
+                n_!("No G-code to run"),
+                n_!("Generate or open G-code before using Run."),
+            ));
+        } else if self.building {
+            self.preview_on_build = true;
+        } else if !self.preview.restart() {
+            self.preview_notice = Some((
+                n_!("No motion commands found"),
+                n_!("The loaded G-code has no G0/G1/G2/G3 movement to preview."),
+            ));
+        }
+    }
+
     /// Whether the 2D view mode is on.
     pub fn is_2d(&self) -> bool {
         self.view_2d
@@ -430,6 +486,10 @@ impl VisualizerPane {
         self.generation = self.generation.wrapping_add(1);
         self.progress = 0;
         self.program = program.clone();
+        // A new program ends the preview of the old one (GTK's `apply_gcode`).
+        self.preview.stop();
+        self.preview_on_build = false;
+        self.preview_notice = None;
         // A program that records its stock Z0 sets it; otherwise the user's choice holds.
         self.stock_setup.zero = program
             .as_deref()
@@ -460,6 +520,7 @@ impl VisualizerPane {
         self.bounds = None;
         self.cut_bounds = None;
         self.refit_pending = false;
+        self.preview.set_points(Vec::new());
     }
 
     /// Takes the finished build, if any.
@@ -488,7 +549,12 @@ impl VisualizerPane {
             vertices,
             bounds,
             cut_bounds,
+            preview,
         } = mesh;
+        self.preview.set_points(preview);
+        if std::mem::take(&mut self.preview_on_build) {
+            self.run_preview();
+        }
         // The fit depends on the view's aspect, which this frame sets after the build is
         // polled, so a build that lands on the first frame is fitted in `ui`, not here.
         self.refit_pending = refit && bounds.is_some();
@@ -531,6 +597,21 @@ impl VisualizerPane {
             NavAction::Fit => self.fit(),
             NavAction::FitDevice => self.fit_device(),
         }
+    }
+
+    /// Moves the run preview on by the time since the last frame while it plays, and wakes
+    /// the next frame in time for its next step.
+    fn play_preview(&mut self, repaint: &egui::Context) {
+        if self.preview.state() != PreviewState::Playing {
+            self.preview_clock = None;
+            return;
+        }
+        let now = std::time::Instant::now();
+        if let Some(last) = self.preview_clock {
+            self.preview.advance(now.saturating_duration_since(last));
+        }
+        self.preview_clock = Some(now);
+        repaint.request_repaint_after(preview::TICK);
     }
 
     /// Orbits, pans and zooms with the mouse over `response`.
@@ -661,6 +742,7 @@ impl Pane for VisualizerPane {
         } else {
             egui::Theme::Light
         };
+        self.play_preview(ui.ctx());
         let marker = tool.filter(|_| self.display.marker);
         let callback = VisualizerCallback {
             view_proj: self.camera.view_proj(rect.width() / rect.height().max(1.0)),
@@ -668,6 +750,7 @@ impl Pane for VisualizerPane {
             done_color: srgb_floats(crate::theme::palette(mode).accent),
             mesh: self.mesh.clone(),
             tool: marker.map(Vec3::from_array),
+            preview: self.preview.position().filter(|_| self.display.marker),
             view: self.camera.view_matrix(),
             stock: self.stock.mesh().filter(|_| self.show_stock).cloned(),
             rect,
@@ -685,6 +768,7 @@ impl Pane for VisualizerPane {
         if self.sidebar_hidden && sidebar::show_button(ui, rect, ctx.tr) {
             self.sidebar_hidden = false;
         }
+        let bar = preview::show_bar(ui, rect, &mut self.preview, ctx.tr);
         let loaded = self.program.is_some();
         let too_large = self.mesh.as_ref().is_some_and(|m| m.upload.too_large());
         osd::show(
@@ -696,6 +780,8 @@ impl Pane for VisualizerPane {
                 failed: self.build_failed,
                 bounds: bounds.as_ref(),
                 tool,
+                bottom: bar.top(),
+                notice: self.preview_notice,
             },
             self.units,
             ctx.tr,
@@ -704,6 +790,10 @@ impl Pane for VisualizerPane {
 
     fn command(&mut self, command: Command, _ctx: &mut PaneContext) -> bool {
         let action = match command {
+            Command::FileRun => {
+                self.run_preview();
+                return true;
+            }
             Command::ZoomFit => NavAction::Fit,
             Command::ZoomIn => NavAction::ZoomIn,
             Command::ZoomOut => NavAction::ZoomOut,
@@ -723,7 +813,6 @@ impl Pane for VisualizerPane {
             | Command::FileImportImage
             | Command::FileExportGcode
             | Command::FileExportSvg
-            | Command::FileRun
             | Command::Quit
             | Command::Undo
             | Command::Redo

@@ -160,6 +160,8 @@ mod test_visualizer_bounds;
 mod test_visualizer_display;
 #[path = "test_visualizer_page_layout.rs"]
 mod test_visualizer_page_layout;
+#[path = "test_visualizer_preview.rs"]
+mod test_visualizer_preview;
 #[path = "test_visualizer_stock.rs"]
 mod test_visualizer_stock;
 #[path = "test_workspace.rs"]

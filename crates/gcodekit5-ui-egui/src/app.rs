@@ -988,7 +988,16 @@ impl GcodeKitApp {
             | Command::FileImportImage
             | Command::FileExportGcode
             | Command::FileExportSvg => {}
-            Command::FileRun => tracing::debug!(?cmd, "document command not available yet"),
+            // GTK's Run: the Visualizer's run preview of the program, which sends nothing.
+            Command::FileRun => {
+                self.show_page(Page::Visualizer);
+                let mut requested = Vec::new();
+                let mut ctx = PaneContext::new(&self.state.translator, &mut requested)
+                    .with_machine(&self.state.machine);
+                self.workspace
+                    .route_to(PaneId::Visualizer, Command::FileRun, &mut ctx);
+                self.queue.extend(requested);
+            }
             Command::Undo | Command::Redo => {
                 if !self.route_to_active_designer(cmd) {
                     tracing::debug!(?cmd, "no document to undo in");
