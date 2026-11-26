@@ -740,6 +740,10 @@ impl GcodeKitApp {
         let mut queue = std::mem::take(&mut self.queue);
         let mut from_menu = self.menus.take_native(&ctx, gate);
         self.show_frame_and_menu(ui, gate, &mut from_menu);
+        // A key equivalent of the macOS menu arrives as a menu choice, and the in-window bar
+        // can be driven from the keyboard (Alt+M, H) while a text field keeps it: both pass
+        // the same check as a key.
+        from_menu.retain(|command| command.may_run(gate.text_editing));
         for command in from_menu {
             if !self.edit_text_from_menu(command) {
                 queue.push(command);
@@ -826,8 +830,7 @@ impl GcodeKitApp {
                 .dispatch_filtered(input, &self.keymap, &active, |hit| {
                     let command = Command::from_ref(&hit.command);
                     let safety = command.is_some_and(|c| crate::shortcuts::LOCKED.contains(&c));
-                    let motion = command.is_some_and(Command::starts_motion);
-                    (!recording || safety) && !(typing && motion)
+                    (!recording || safety) && command.is_none_or(|c| c.may_run(typing))
                 });
             (hits, input.modifiers)
         });

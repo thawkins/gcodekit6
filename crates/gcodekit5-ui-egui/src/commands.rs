@@ -416,6 +416,17 @@ impl Command {
             )
     }
 
+    /// Whether the command may run now, by any route it can arrive by: a key, the macOS menu
+    /// (its key equivalents included) or the in-window menu bar (its keyboard navigation
+    /// included). A command that moves the machine never runs while a text field has the
+    /// keyboard: the key was meant for the text.
+    ///
+    /// # Arguments
+    /// * `text_field_has_keyboard` - Whether a text field has the keyboard this frame.
+    pub fn may_run(self, text_field_has_keyboard: bool) -> bool {
+        !(text_field_has_keyboard && self.starts_motion())
+    }
+
     /// The command's catalog entry for craft-keymap.
     fn bindable(self) -> Bindable {
         let spec = self.spec();
