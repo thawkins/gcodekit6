@@ -4,7 +4,7 @@
 //! [`summary`] turns the app's [`MachineStatus`] into the strings the bar shows, so they can
 //! be tested without a window; [`show`] draws them. The position is the machine position in
 //! the user's measurement system (two decimals for mm, three for inches, through
-//! [`format_length`] as the DRO does).
+//! `format_length` as the DRO does).
 //!
 //! Ported from the GTK `ui/gtk/status_bar.rs`. Not ported: the E-stop button (Machine
 //! Control has it), the device name, feed/spindle readout, elapsed/remaining time and the

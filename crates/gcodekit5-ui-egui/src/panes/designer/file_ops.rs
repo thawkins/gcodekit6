@@ -10,7 +10,7 @@
 //!   non-positive step down becomes 0.1 mm and the ids continue after the loaded shapes;
 //!   a stored zoom that is not usable fits the view instead.
 //! - Save writes through the model's serialization to a temporary file beside the target,
-//!   then renames it ([`crate::files`]): a read-only target is refused and a failed save
+//!   then renames it (`crate::files`): a read-only target is refused and a failed save
 //!   leaves the design modified.
 //! - Import adds the shapes of an SVG or DXF file as one undo step, applies a
 //!   DXF entity's elevation and thickness, switches to CNC mode when any shape has depth,

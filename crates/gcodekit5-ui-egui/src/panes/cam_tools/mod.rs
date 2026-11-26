@@ -11,9 +11,9 @@
 //! [`requests`]. Load and Save read and write a page's input as a JSON preset in GTK's file
 //! format.
 //!
-//! The Laser Image Engraver engraves on a worker thread ([`bitmap_pane`]); the Probe Tools
+//! The Laser Image Engraver engraves on a worker thread (`bitmap_pane`); the Probe Tools
 //! page runs its routines on the machine ([`probe_routines::run`], fed the machine events
-//! through [`Pane::machine_events`]).
+//! through [`Pane::machine_events`](crate::workspace::Pane::machine_events)).
 //!
 //! Dependencies: `egui`, `gcodekit5-camtools` (generators), `gcodekit5-app` (translations),
 //! `gcodekit5-settings` (units).

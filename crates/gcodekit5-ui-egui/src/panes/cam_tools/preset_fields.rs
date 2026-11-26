@@ -36,7 +36,7 @@ pub fn preset_len(
 /// * `text` - The field's text.
 ///
 /// # Errors
-/// The field and [`NOT_A_NUMBER`] when the text is not a number.
+/// The field and [`NOT_A_NUMBER`](super::common::NOT_A_NUMBER) when the text is not a number.
 pub fn preset_number(field: &'static str, text: &str) -> Result<f64, FieldError> {
     parse_number(text).map_err(|message| FieldError::field(field, message))
 }
