@@ -4,7 +4,7 @@
 FROM fedora:40
 
 LABEL maintainer="GCodeKit5 Development Team"
-LABEL description="Development environment for GCodeKit5 - Rust + GTK4"
+LABEL description="Development environment for GCodeKit5 - Rust + egui"
 
 # Install system dependencies
 RUN dnf update -y && dnf install -y \
@@ -16,14 +16,16 @@ RUN dnf update -y && dnf install -y \
     pkg-config \
     # Rust dependencies
     curl \
-    # GTK4 and related libraries
-    gtk4-devel \
-    libadwaita-devel \
-    glib2-devel \
-    cairo-devel \
-    pango-devel \
-    gdk-pixbuf2-devel \
-    graphene-devel \
+    # egui front end (winit, wgpu) and serial port (udev)
+    systemd-devel \
+    libxkbcommon-devel \
+    wayland-devel \
+    libX11-devel \
+    libXcursor-devel \
+    libXrandr-devel \
+    libXi-devel \
+    vulkan-loader \
+    mesa-vulkan-drivers \
     # Additional dependencies
     openssl-devel \
     sqlite-devel \
