@@ -93,6 +93,8 @@ pub struct VisualizerPane {
     bounds: Option<Aabb>,
     /// Bounds of its cutting moves.
     cut_bounds: Option<Aabb>,
+    /// A newly loaded toolpath is to be fitted once this frame's view size is known.
+    refit_pending: bool,
     worker: BuildWorker,
     /// A build for `generation` was requested and has not arrived.
     building: bool,
@@ -138,6 +140,7 @@ impl VisualizerPane {
             mesh: None,
             bounds: None,
             cut_bounds: None,
+            refit_pending: false,
             worker: BuildWorker::new(),
             building: false,
             build_failed: false,
@@ -368,6 +371,7 @@ impl VisualizerPane {
         self.mesh = None;
         self.bounds = None;
         self.cut_bounds = None;
+        self.refit_pending = false;
     }
 
     /// Takes the finished build, if any.
@@ -397,10 +401,9 @@ impl VisualizerPane {
             bounds,
             cut_bounds,
         } = mesh;
-        if refit && let Some(bounds) = bounds {
-            self.camera.view(StdView::IsoSe);
-            self.camera.fit(bounds);
-        }
+        // The fit depends on the view's aspect, which this frame sets after the build is
+        // polled, so a build that lands on the first frame is fitted in `ui`, not here.
+        self.refit_pending = refit && bounds.is_some();
         self.bounds = bounds;
         self.cut_bounds = cut_bounds;
         self.mesh = Some(UploadedMesh {
@@ -528,6 +531,12 @@ impl Pane for VisualizerPane {
         let response = ui.allocate_rect(rect, egui::Sense::click_and_drag());
         self.camera
             .set_aspect(rect.width() / rect.height().max(1.0));
+        if std::mem::take(&mut self.refit_pending)
+            && let Some(bounds) = self.bounds
+        {
+            self.camera.view(StdView::IsoSe);
+            self.camera.fit(bounds);
+        }
         self.handle_input(ui, &response);
 
         let dark = ui.visuals().dark_mode;

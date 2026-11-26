@@ -406,6 +406,28 @@ fn test_snapshot_stock_groove_top() -> TestResult {
     Ok(())
 }
 
+/// The fit uses the aspect of the laid-out view, even when the build lands on the frame after
+/// the Simulation section widened the sidebar (which the snapshots depend on being fitted the
+/// same way).
+#[test]
+fn test_fit_uses_the_laid_out_aspect() -> TestResult {
+    let mut harness = gpu_harness(VisualizerPane::new());
+    shown(&mut harness, groove_stock());
+    load(&mut harness, GROOVE);
+    // Let the build finish before the next frame, so that frame is the one that applies it.
+    std::thread::sleep(Duration::from_millis(400));
+    settle(&mut harness)?;
+    let pane = harness.state();
+    let bounds = pane.bounds().ok_or("toolpath bounds")?;
+    let rect = pane.view_rect();
+    let mut expected = visualizer::Camera::default();
+    expected.view(StdView::IsoSe);
+    expected.set_aspect(rect.width() / rect.height());
+    expected.fit(bounds);
+    assert_eq!(pane.camera().distance(), expected.distance());
+    Ok(())
+}
+
 /// Two grooves 2 mm deep in the 60 x 40 mm stock: along X at Y20 (X10 to X30), and along Y
 /// at X45 (Y5 to Y35).
 const SLOTS: &str = "G21\nG90\nG0 Z5\nG0 X10 Y20\nM3 S1000\nG1 Z-2 F100\nG1 X30 F300\n\
