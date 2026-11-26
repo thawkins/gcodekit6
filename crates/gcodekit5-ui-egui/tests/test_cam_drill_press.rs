@@ -50,7 +50,18 @@ pub fn open_tool_tall(tool: CamTool) -> Harness<'static, GcodeKitApp> {
 /// below the fold), then lets the app handle the request.
 pub fn click(h: &mut Harness<'static, GcodeKitApp>, label: &str) {
     h.get_by_label(label).scroll_to_me();
-    frames(h, 2);
+    // The scroll lands some frames later: wait until the button has stayed put for three.
+    let mut rect = h.get_by_label(label).rect();
+    let mut still = 0;
+    for _ in 0..20 {
+        frames(h, 1);
+        let now = h.get_by_label(label).rect();
+        still = if now == rect { still + 1 } else { 0 };
+        rect = now;
+        if still == 3 {
+            break;
+        }
+    }
     h.get_by_label(label).click();
     frames(h, 3);
 }

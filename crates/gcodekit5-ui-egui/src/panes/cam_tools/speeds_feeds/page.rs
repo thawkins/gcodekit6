@@ -363,7 +363,7 @@ fn inputs(
     let mut action = CamAction::None;
     ui.add_space(8.0);
     ui.horizontal(|ui| {
-        let calculate = egui::Button::new(tr.tr("Calculate"));
+        let calculate = crate::theme::primary_button(tr.tr("Calculate"));
         if ui.add_enabled(errors.is_empty(), calculate).clicked() {
             action = CamAction::Generate;
         }

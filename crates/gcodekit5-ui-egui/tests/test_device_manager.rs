@@ -23,7 +23,7 @@ use crate::machine_support::{
 
 /// A profiles file as the GTK build's `DeviceManager::save` writes it: two profiles, the
 /// second active, the first with a stored `$$` dump.
-const GTK_DEVICES: &str = r#"{
+pub(crate) const GTK_DEVICES: &str = r#"{
   "active_id": "b-laser",
   "profiles": [
     {

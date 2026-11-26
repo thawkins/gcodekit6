@@ -231,7 +231,11 @@ pub fn show(
         {
             action = CamAction::ApplyWcs;
         }
-        if view.streaming && ui.button(tr.tr(STOP)).clicked() {
+        if view.streaming
+            && ui
+                .add(crate::theme::destructive_button(ui, tr.tr(STOP)))
+                .clicked()
+        {
             action = CamAction::StopProbe;
         }
         if let Some(reason) = &view.not_ready {

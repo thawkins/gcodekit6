@@ -320,7 +320,9 @@ pub fn show(ui: &mut egui::Ui, params: &mut JigsawParams, tr: &Translator) -> Ca
         field_row(ui, tr, JITTER, &mut params.jitter, "", &errors);
         field_row(ui, tr, SEED, &mut params.seed, "", &errors);
         ui.label("");
-        if ui.button(tr.tr(n_!("Randomize"))).clicked() {
+        if crate::icons::icon_button(ui, crate::icons::Icon::Shuffle, &tr.tr(n_!("Randomize")))
+            .clicked()
+        {
             params.randomize_seed();
         }
         ui.end_row();

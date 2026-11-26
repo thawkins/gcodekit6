@@ -10,6 +10,7 @@ pub mod device_info;
 pub mod device_manager;
 pub mod firmware_settings;
 pub mod help;
+pub(crate) mod manager_ui;
 pub mod materials_manager;
 pub mod setting_write;
 pub mod settings;

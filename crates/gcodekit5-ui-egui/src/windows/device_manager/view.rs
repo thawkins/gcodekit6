@@ -14,8 +14,11 @@ use gcodekit5_core::units::get_unit_label;
 use gcodekit5_settings::config::Config;
 
 use super::{DeviceManagerWindow, Edit, Tab};
+use crate::icons::Icon;
 use crate::machine::Machine;
-use crate::windows::help::{HelpTopic, help_row};
+use crate::theme;
+use crate::windows::help::HelpTopic;
+use crate::windows::manager_ui::{self, SIDEBAR_WIDTH, icon_text_button};
 
 /// What the action bar asked for this frame.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -37,56 +40,55 @@ impl DeviceManagerWindow {
     /// * `tr` - Translates the labels.
     pub fn show(&mut self, ui: &mut egui::Ui, machine: &Machine, config: &Config, tr: &Translator) {
         let (units, feed_units) = (config.ui.measurement_system, config.ui.feed_rate_units);
-        help_row(ui, HelpTopic::DeviceManager, tr);
+        // GTK: the device list sidebar | the edit form.
         ui.horizontal_top(|ui| {
-            let size = egui::vec2(250.0, ui.available_height());
+            let size = egui::vec2(SIDEBAR_WIDTH, ui.available_height());
             ui.allocate_ui_with_layout(size, egui::Layout::top_down(egui::Align::Min), |ui| {
-                ui.strong(tr.tr(n_!("Devices")));
+                manager_ui::sidebar_header(
+                    ui,
+                    &tr.tr(n_!("Devices")),
+                    HelpTopic::DeviceManager,
+                    tr,
+                );
                 ui.add(
                     egui::TextEdit::singleline(&mut self.search)
                         .hint_text(tr.tr(n_!("Search devices...")))
                         .desired_width(f32::INFINITY),
                 );
-                if ui
-                    .add_enabled(
-                        self.store.is_some(),
-                        egui::Button::new(tr.tr(n_!("Add Device"))),
-                    )
-                    .clicked()
-                {
-                    self.add(units, feed_units, tr);
-                }
-                ui.separator();
+                ui.add_space(4.0);
+                // Add Device sits under the list, as in GTK.
+                let add_height = ui.spacing().interact_size.y + 12.0;
                 egui::ScrollArea::vertical()
                     .id_salt("gcodekit5-device-manager-list")
                     .auto_shrink([false, false])
+                    .max_height((ui.available_height() - add_height).max(80.0))
                     .show(ui, |ui| self.list(ui, units, feed_units, tr));
+                ui.add_space(6.0);
+                let add = theme::primary_icon_button(Icon::Add.image(), tr.tr(n_!("Add Device")))
+                    .min_size(egui::vec2(ui.available_width(), 0.0));
+                if ui.add_enabled(self.store.is_some(), add).clicked() {
+                    self.add(units, feed_units, tr);
+                }
             });
             ui.separator();
+            ui.add_space(12.0);
             ui.vertical(|ui| self.details(ui, machine, tr));
         });
     }
 
     /// The notice, the delete question, the action bar and the form.
     fn details(&mut self, ui: &mut egui::Ui, machine: &Machine, tr: &Translator) {
-        match &self.notice {
-            Some((text, true)) => {
-                ui.colored_label(ui.visuals().error_fg_color, text);
-            }
-            Some((text, false)) => {
-                ui.label(text);
-            }
-            None => {}
-        }
+        manager_ui::notice(ui, self.notice.as_ref());
         self.confirm(ui, tr);
         if self.edit.is_none() {
-            ui.centered_and_justified(|ui| {
-                ui.weak(tr.tr(n_!("Please select or create a device entry to edit")));
-            });
+            manager_ui::placeholder(
+                ui,
+                &tr.tr(n_!("Please select or create a device entry to edit")),
+            );
             return;
         }
         let action = self.action_bar(ui, machine, tr);
-        ui.separator();
+        ui.add_space(8.0);
         if let Some(edit) = self.edit.as_mut() {
             form(ui, edit, tr);
         }
@@ -113,23 +115,32 @@ impl DeviceManagerWindow {
         let active = self.active_id();
         let selected = self.edit.as_ref().map(|e| e.id.clone());
         let mut clicked = None;
-        for profile in self.profiles().iter().filter(|p| self.listed(p)) {
-            let is_selected = selected.as_deref() == Some(profile.id.as_str());
-            if ui.selectable_label(is_selected, &profile.name).clicked() {
-                clicked = Some(profile.id.clone());
-            }
-            ui.horizontal(|ui| {
-                ui.weak(format!(
-                    "{} - {}",
-                    tr.tr(device_type_label(&profile.device_type)),
-                    profile.controller_type
-                ));
-                if active.as_deref() == Some(profile.id.as_str()) {
-                    ui.colored_label(ui.visuals().selection.bg_fill, tr.tr(n_!("Active")));
+        manager_ui::boxed_list(ui, |ui| {
+            let profiles = self.profiles();
+            for (index, profile) in profiles.iter().filter(|p| self.listed(p)).enumerate() {
+                let is_selected = selected.as_deref() == Some(profile.id.as_str());
+                let row = manager_ui::list_row(ui, index == 0, is_selected, &profile.name, |ui| {
+                    ui.horizontal(|ui| {
+                        ui.weak(format!(
+                            "{} - {}",
+                            tr.tr(device_type_label(&profile.device_type)),
+                            profile.controller_type
+                        ));
+                        if active.as_deref() == Some(profile.id.as_str()) {
+                            ui.with_layout(
+                                egui::Layout::right_to_left(egui::Align::Center),
+                                |ui| {
+                                    theme::badge(ui, &tr.tr(n_!("Active")));
+                                },
+                            );
+                        }
+                    });
+                });
+                if row.clicked() {
+                    clicked = Some(profile.id.clone());
                 }
-            });
-            ui.add_space(4.0);
-        }
+            }
+        });
         if let Some(id) = clicked {
             self.select(&id, units, feed_units);
         }
@@ -143,19 +154,12 @@ impl DeviceManagerWindow {
         let question =
             tr.tr(n_!("Delete '{}'? This cannot be undone."))
                 .replacen("{}", &confirm.name, 1);
-        let mut answer = None;
-        ui.group(|ui| {
-            ui.strong(tr.tr(n_!("Delete device?")));
-            ui.label(question);
-            ui.horizontal(|ui| {
-                if ui.button(tr.tr(n_!("Yes"))).clicked() {
-                    answer = Some(true);
-                }
-                if ui.button(tr.tr(n_!("No"))).clicked() {
-                    answer = Some(false);
-                }
-            });
-        });
+        let choices = [
+            tr.tr(n_!("Yes")).into_owned(),
+            tr.tr(n_!("No")).into_owned(),
+        ];
+        let answer = manager_ui::question(ui, &tr.tr(n_!("Delete device?")), &question, &choices)
+            .map(|index| index == 0);
         match answer {
             Some(true) => self.delete(tr),
             Some(false) => self.confirm_delete = None,
@@ -170,29 +174,39 @@ impl DeviceManagerWindow {
             .is_some_and(|e| self.active_id().as_deref() == Some(e.id.as_str()));
         let asking = self.confirm_delete.is_some();
         let mut action = None;
+        // GTK's action bar: Save (suggested), Cancel, Delete (destructive), Sync, and Set
+        // Active at the right end.
         ui.horizontal(|ui| {
             ui.add_enabled_ui(!asking, |ui| {
-                if ui.button(tr.tr(n_!("Save"))).clicked() {
+                let save = theme::primary_icon_button(Icon::Save.image(), tr.tr(n_!("Save")));
+                if ui.add(save).clicked() {
                     action = Some(Action::Save);
                 }
-                if ui.button(tr.tr(n_!("Cancel"))).clicked() {
+                if ui
+                    .add(icon_text_button(ui, Icon::Close, tr.tr(n_!("Cancel"))))
+                    .clicked()
+                {
                     action = Some(Action::Cancel);
                 }
-                if ui.button(tr.tr(n_!("Delete"))).clicked() {
+                let delete =
+                    theme::destructive_icon_button(ui, Icon::Trash.image(), tr.tr(n_!("Delete")));
+                if ui.add(delete).clicked() {
                     action = Some(Action::Delete);
                 }
                 let sync = ui
                     .add_enabled(
                         machine.status().connected,
-                        egui::Button::new(tr.tr(n_!("Sync from Device"))),
+                        icon_text_button(ui, Icon::Refresh, tr.tr(n_!("Sync from Device"))),
                     )
                     .on_hover_text(tr.tr(n_!("Update device information from connected device")));
                 if sync.clicked() {
                     action = Some(Action::Sync);
                 }
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    let set_active =
-                        ui.add_enabled(!is_active, egui::Button::new(tr.tr(n_!("Set Active"))));
+                    let set_active = ui.add_enabled(
+                        !is_active,
+                        icon_text_button(ui, Icon::Ok, tr.tr(n_!("Set Active"))),
+                    );
                     if set_active.clicked() {
                         action = Some(Action::SetActive);
                     }
@@ -218,12 +232,12 @@ fn unit_field(ui: &mut egui::Ui, label: &str, text: &mut String, unit: &str) {
 
 /// The tab switcher and the open tab.
 fn form(ui: &mut egui::Ui, edit: &mut Edit, tr: &Translator) {
-    ui.horizontal(|ui| {
-        for tab in Tab::ALL {
-            ui.selectable_value(&mut edit.tab, tab, tr.tr(tab.msgid()));
-        }
-    });
-    ui.separator();
+    let tabs: Vec<_> = Tab::ALL
+        .iter()
+        .map(|tab| (*tab, tr.tr(tab.msgid()).into_owned()))
+        .collect();
+    manager_ui::tab_switcher(ui, &mut edit.tab, &tabs);
+    ui.add_space(8.0);
     let unit = get_unit_label(edit.units);
     let feed_unit = edit.feed_units.to_string();
     let f = &mut edit.form;
@@ -231,9 +245,9 @@ fn form(ui: &mut egui::Ui, edit: &mut Edit, tr: &Translator) {
         .id_salt("gcodekit5-device-manager-form")
         .auto_shrink([false, false])
         .show(ui, |ui| match edit.tab {
-            Tab::General => general(ui, f, tr),
-            Tab::Connection => connection(ui, f, tr),
-            Tab::Dimensions => dimensions(ui, f, unit, tr),
+            Tab::General => manager_ui::form_group(ui, None, |ui| general(ui, f, tr)),
+            Tab::Connection => manager_ui::form_group(ui, None, |ui| connection(ui, f, tr)),
+            Tab::Dimensions => manager_ui::form_group(ui, None, |ui| dimensions(ui, f, unit, tr)),
             Tab::Capabilities => capabilities(ui, f, &feed_unit, tr),
         });
 }
@@ -241,6 +255,7 @@ fn form(ui: &mut egui::Ui, edit: &mut Edit, tr: &Translator) {
 fn general(ui: &mut egui::Ui, f: &mut ProfileForm, tr: &Translator) {
     egui::Grid::new("gcodekit5-device-general")
         .num_columns(2)
+        .spacing([12.0, 8.0])
         .show(ui, |ui| {
             field(ui, &tr.tr(n_!("Name:")), &mut f.name, true);
             ui.end_row();
@@ -276,6 +291,7 @@ fn connection(ui: &mut egui::Ui, f: &mut ProfileForm, tr: &Translator) {
     let serial = f.is_serial();
     egui::Grid::new("gcodekit5-device-connection")
         .num_columns(2)
+        .spacing([12.0, 8.0])
         .show(ui, |ui| {
             let label = ui.label(tr.tr(n_!("Connection Type:")));
             egui::ComboBox::from_id_salt("gcodekit5-device-connection-type")
@@ -316,6 +332,7 @@ fn connection(ui: &mut egui::Ui, f: &mut ProfileForm, tr: &Translator) {
 fn dimensions(ui: &mut egui::Ui, f: &mut ProfileForm, unit: &str, tr: &Translator) {
     egui::Grid::new("gcodekit5-device-dimensions")
         .num_columns(7)
+        .spacing([12.0, 8.0])
         .show(ui, |ui| {
             let axes = [
                 (n_!("X Axis:"), &mut f.x_min, &mut f.x_max),
@@ -334,59 +351,62 @@ fn dimensions(ui: &mut egui::Ui, f: &mut ProfileForm, unit: &str, tr: &Translato
 }
 
 fn capabilities(ui: &mut egui::Ui, f: &mut ProfileForm, feed_unit: &str, tr: &Translator) {
-    ui.strong(tr.tr(n_!("Limits")));
-    egui::Grid::new("gcodekit5-device-limits")
-        .num_columns(3)
-        .show(ui, |ui| {
-            unit_field(
-                ui,
-                &tr.tr(n_!("Max Feed Rate:")),
-                &mut f.max_feed_rate,
-                feed_unit,
-            );
-            ui.end_row();
-            field(ui, &tr.tr(n_!("Max S-Value:")), &mut f.max_s_value, true);
-            ui.end_row();
-        });
-    ui.separator();
-    ui.strong(tr.tr(n_!("Capabilities")));
-    egui::Grid::new("gcodekit5-device-capabilities")
-        .num_columns(2)
-        .show(ui, |ui| {
-            field(ui, &tr.tr(n_!("No of Axes:")), &mut f.num_axes, true);
-            ui.end_row();
-            crate::theme::checkbox(ui, &mut f.has_spindle, tr.tr(n_!("Has Spindle")));
-            ui.end_row();
-            let spindle = f.has_spindle;
-            field(
-                ui,
-                &tr.tr(n_!("Spindle Power (W):")),
-                &mut f.spindle_watts,
-                spindle,
-            );
-            ui.end_row();
-            field(
-                ui,
-                &tr.tr(n_!("Max Spindle Speed (RPM):")),
-                &mut f.max_spindle_speed_rpm,
-                spindle,
-            );
-            ui.end_row();
-            crate::theme::checkbox(ui, &mut f.has_laser, tr.tr(n_!("Has Laser")));
-            ui.end_row();
-            let laser = f.has_laser;
-            field(
-                ui,
-                &tr.tr(n_!("Laser Power (W):")),
-                &mut f.laser_watts,
-                laser,
-            );
-            ui.end_row();
-        });
-    crate::theme::checkbox(ui, &mut f.has_coolant, tr.tr(n_!("Has Coolant")));
-    crate::theme::checkbox(
-        ui,
-        &mut f.pen_mode,
-        tr.tr(n_!("Pen Mode (Repetier: M3/M5 become pen down/up Z moves)")),
-    );
+    manager_ui::form_group(ui, Some(&tr.tr(n_!("Limits"))), |ui| {
+        egui::Grid::new("gcodekit5-device-limits")
+            .num_columns(3)
+            .spacing([12.0, 8.0])
+            .show(ui, |ui| {
+                unit_field(
+                    ui,
+                    &tr.tr(n_!("Max Feed Rate:")),
+                    &mut f.max_feed_rate,
+                    feed_unit,
+                );
+                ui.end_row();
+                field(ui, &tr.tr(n_!("Max S-Value:")), &mut f.max_s_value, true);
+                ui.end_row();
+            });
+    });
+    manager_ui::form_group(ui, Some(&tr.tr(n_!("Capabilities"))), |ui| {
+        egui::Grid::new("gcodekit5-device-capabilities")
+            .num_columns(2)
+            .spacing([12.0, 8.0])
+            .show(ui, |ui| {
+                field(ui, &tr.tr(n_!("No of Axes:")), &mut f.num_axes, true);
+                ui.end_row();
+                crate::theme::checkbox(ui, &mut f.has_spindle, tr.tr(n_!("Has Spindle")));
+                ui.end_row();
+                let spindle = f.has_spindle;
+                field(
+                    ui,
+                    &tr.tr(n_!("Spindle Power (W):")),
+                    &mut f.spindle_watts,
+                    spindle,
+                );
+                ui.end_row();
+                field(
+                    ui,
+                    &tr.tr(n_!("Max Spindle Speed (RPM):")),
+                    &mut f.max_spindle_speed_rpm,
+                    spindle,
+                );
+                ui.end_row();
+                crate::theme::checkbox(ui, &mut f.has_laser, tr.tr(n_!("Has Laser")));
+                ui.end_row();
+                let laser = f.has_laser;
+                field(
+                    ui,
+                    &tr.tr(n_!("Laser Power (W):")),
+                    &mut f.laser_watts,
+                    laser,
+                );
+                ui.end_row();
+            });
+        crate::theme::checkbox(ui, &mut f.has_coolant, tr.tr(n_!("Has Coolant")));
+        crate::theme::checkbox(
+            ui,
+            &mut f.pen_mode,
+            tr.tr(n_!("Pen Mode (Repetier: M3/M5 become pen down/up Z moves)")),
+        );
+    });
 }

@@ -309,6 +309,55 @@ pub fn section_heading(ui: &mut egui::Ui, text: &str) -> egui::Response {
     response
 }
 
+/// Adwaita's title sizes in points: `title-1` (page titles such as "CAM Tools"), `title-2`
+/// (a CAM tool's title), `title-3` (a placeholder) and `title-4` (a list row's name).
+pub const TITLE_1: f32 = 22.0;
+/// See [`TITLE_1`].
+pub const TITLE_2: f32 = 18.0;
+/// See [`TITLE_1`].
+pub const TITLE_3: f32 = 16.0;
+/// See [`TITLE_1`].
+pub const TITLE_4: f32 = 15.0;
+
+/// A bold-looking title of `size` points (Adwaita's `title-1` to `title-4` labels), drawn
+/// like [`section_heading`]. The label is a normal accessible label.
+///
+/// # Arguments
+/// * `ui` - Where to put the title.
+/// * `text` - The title text, already translated.
+/// * `size` - The font size in points, such as [`TITLE_1`].
+pub fn title(ui: &mut egui::Ui, text: &str, size: f32) -> egui::Response {
+    let font = FontId::proportional(size);
+    let color = ui.visuals().strong_text_color();
+    let response = ui.label(RichText::new(text).font(font.clone()).color(color));
+    let galley = ui.painter().layout_no_wrap(text.to_owned(), font, color);
+    let pos = response.rect.min + egui::vec2(0.7, 0.0);
+    ui.painter().galley(pos, galley, color);
+    response
+}
+
+/// A small green badge with bold white text, like GTK's `active-badge` ("Active",
+/// "Connected"). The text is a normal accessible label.
+///
+/// # Arguments
+/// * `ui` - Where to put the badge.
+/// * `text` - The badge text, already translated.
+pub fn badge(ui: &mut egui::Ui, text: &str) -> egui::Response {
+    egui::Frame::new()
+        .fill(ACTIVE_BADGE)
+        .corner_radius(CornerRadius::same(4))
+        .inner_margin(Margin::symmetric(4, 1))
+        .show(ui, |ui| {
+            ui.label(
+                RichText::new(text)
+                    .color(Color32::WHITE)
+                    .strong()
+                    .size(11.0),
+            )
+        })
+        .inner
+}
+
 /// A rounded, bordered card for a group of related controls, like the Designer inspector's
 /// "Size" and "Machine Type" groups.
 ///

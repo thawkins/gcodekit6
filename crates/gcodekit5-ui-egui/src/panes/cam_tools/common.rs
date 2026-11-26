@@ -11,6 +11,8 @@
 use gcodekit5_app::i18n::Translator;
 use gcodekit5_core::units::{self, MeasurementSystem};
 
+use crate::icons::{Icon, icon_button};
+
 /// What a page asks the pane to do after drawing.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum CamAction {
@@ -335,15 +337,16 @@ pub fn any(_v: f64) -> Option<&'static str> {
     None
 }
 
-/// A section heading.
+/// A section heading: the bold title of the framed group under it (GTK's
+/// `PreferencesGroup` title).
 ///
 /// # Arguments
 /// * `ui` - The page's `Ui`.
 /// * `tr` - Translator for the current UI language.
 /// * `title` - The heading's msgid.
 pub fn heading(ui: &mut egui::Ui, tr: &Translator, title: &str) {
-    ui.add_space(6.0);
-    ui.strong(tr.tr(title));
+    ui.add_space(8.0);
+    crate::theme::section_heading(ui, &tr.tr(title));
 }
 
 /// One labelled text field of a two-column grid, with its unit after it and the first
@@ -431,17 +434,25 @@ pub fn check_row(ui: &mut egui::Ui, tr: &Translator, label: &'static str, value:
     ui.end_row();
 }
 
-/// A two-column grid of fields.
+/// Narrowest a framed group of fields gets, so the groups of a page line up.
+const GROUP_WIDTH: f32 = 460.0;
+
+/// A two-column grid of fields in a framed group (GTK's `PreferencesGroup` card).
 ///
 /// # Arguments
 /// * `ui` - The page's `Ui`.
 /// * `id` - The grid's id salt.
 /// * `rows` - Draws the rows.
 pub fn grid(ui: &mut egui::Ui, id: &str, rows: impl FnOnce(&mut egui::Ui)) {
-    egui::Grid::new(id)
-        .num_columns(2)
-        .spacing([12.0, 6.0])
-        .show(ui, rows);
+    let frame = crate::theme::group_frame(ui).inner_margin(egui::Margin::symmetric(10, 6));
+    frame.show(ui, |ui| {
+        ui.set_min_width(GROUP_WIDTH.min(ui.available_width()));
+        egui::Grid::new(id)
+            .num_columns(2)
+            .spacing([12.0, 6.0])
+            .min_col_width(160.0)
+            .show(ui, rows);
+    });
 }
 
 /// The problems with the whole page, in the error colour.
@@ -499,20 +510,23 @@ pub fn action_row(
     let mut action = CamAction::None;
     ui.add_space(8.0);
     ui.horizontal_wrapped(|ui| {
-        for (msgid, what) in buttons {
-            if ui
-                .add_enabled(valid, egui::Button::new(tr.tr(msgid)))
-                .clicked()
-            {
+        for (index, (msgid, what)) in buttons.iter().enumerate() {
+            // The first action is the page's main one (GTK's suggested-action Generate).
+            let button = if index == 0 {
+                crate::theme::primary_button(tr.tr(msgid))
+            } else {
+                egui::Button::new(tr.tr(msgid))
+            };
+            if ui.add_enabled(valid, button).clicked() {
                 action = *what;
             }
         }
         ui.separator();
-        for (msgid, what) in [
-            (n_!("Load"), CamAction::LoadPreset),
-            (n_!("Save"), CamAction::SavePreset),
+        for (icon, msgid, what) in [
+            (Icon::Open, n_!("Load"), CamAction::LoadPreset),
+            (Icon::Save, n_!("Save"), CamAction::SavePreset),
         ] {
-            if ui.button(tr.tr(msgid)).clicked() {
+            if icon_button(ui, icon, &tr.tr(msgid)).clicked() {
                 action = what;
             }
         }

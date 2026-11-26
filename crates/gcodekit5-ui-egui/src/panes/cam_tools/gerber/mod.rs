@@ -368,7 +368,9 @@ pub fn show(ui: &mut egui::Ui, params: &mut GerberParams, tr: &Translator) -> Ca
     heading(ui, tr, n_!("Gerber Project"));
     ui.horizontal_wrapped(|ui| {
         ui.label(tr.tr(n_!("Select Directory")));
-        if ui.button(tr.tr(n_!("Browse..."))).clicked() {
+        if crate::icons::icon_button(ui, crate::icons::Icon::Open, &tr.tr(n_!("Browse...")))
+            .clicked()
+        {
             action = CamAction::ChooseFolder;
         }
         match &params.directory {

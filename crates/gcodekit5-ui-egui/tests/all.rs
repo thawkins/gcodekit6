@@ -122,6 +122,8 @@ mod test_machine_probe_report;
 mod test_machine_work_zero;
 #[path = "test_machine_worker_messages.rs"]
 mod test_machine_worker_messages;
+#[path = "test_manager_pages_layout.rs"]
+mod test_manager_pages_layout;
 #[path = "test_materials_manager.rs"]
 mod test_materials_manager;
 #[path = "test_quit.rs"]

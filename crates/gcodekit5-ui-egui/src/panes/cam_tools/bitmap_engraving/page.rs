@@ -101,7 +101,7 @@ pub fn show(
         );
         ui.add(egui::Label::new(shown).truncate())
             .labelled_by(name.id);
-        if ui.button(tr.tr("Browse...")).clicked() {
+        if crate::icons::icon_button(ui, crate::icons::Icon::Open, &tr.tr("Browse...")).clicked() {
             action = CamAction::ChooseImage;
         }
     });

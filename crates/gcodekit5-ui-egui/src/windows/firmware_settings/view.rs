@@ -14,8 +14,33 @@ use gcodekit5_app::i18n::Translator;
 use gcodekit5_devicedb::ControllerType;
 
 use super::{Edit, FileRequest, FirmwareSettingsWindow};
+use crate::icons::Icon;
 use crate::machine::Machine;
 use crate::windows::help::{self, HelpTopic};
+use crate::windows::manager_ui::{self, icon_text_button};
+
+/// GTK's column widths of the settings list: ID, Name, Value, Unit and Category; the
+/// Description takes the rest.
+const COLUMNS: [f32; 5] = [50.0, 200.0, 100.0, 80.0, 150.0];
+/// Height of a row of the settings list.
+const ROW_HEIGHT: f32 = 30.0;
+/// Room left of the first column, inside the list's frame.
+const LIST_MARGIN: f32 = 10.0;
+
+/// One cell of the settings list (or its header): `width` points wide, its contents
+/// vertically centred and cut off at its right edge.
+fn cell(ui: &mut egui::Ui, width: f32, add: impl FnOnce(&mut egui::Ui)) {
+    let size = egui::vec2(width, ui.spacing().interact_size.y);
+    ui.allocate_ui_with_layout(
+        size,
+        egui::Layout::left_to_right(egui::Align::Center),
+        |ui| {
+            ui.set_width(width - ui.spacing().item_spacing.x);
+            ui.set_clip_rect(ui.max_rect().intersect(ui.clip_rect()));
+            add(ui);
+        },
+    );
+}
 
 impl FirmwareSettingsWindow {
     /// Keeps the settings' reads and writes going. The app calls this once every frame,
@@ -73,9 +98,13 @@ impl FirmwareSettingsWindow {
         tr: &Translator,
     ) {
         let busy = self.retrieval.is_some() || self.write.is_some();
+        // GTK's toolbar: Retrieve, Save, Load, and the help button at the right end.
         ui.horizontal(|ui| {
             let retrieve = ui
-                .add_enabled(!busy, egui::Button::new(tr.tr(n_!("Retrieve"))))
+                .add_enabled(
+                    !busy,
+                    icon_text_button(ui, Icon::Refresh, tr.tr(n_!("Retrieve"))),
+                )
                 .on_hover_text(tr.tr(n_!("Retrieve Settings from Device ($$)")));
             if retrieve.clicked() {
                 self.retrieve(machine, identity, profile_repetier, tr);
@@ -83,26 +112,30 @@ impl FirmwareSettingsWindow {
             let save = ui
                 .add_enabled(
                     self.table.count() > 0,
-                    egui::Button::new(tr.tr(n_!("Save"))),
+                    icon_text_button(ui, Icon::Save, tr.tr(n_!("Save"))),
                 )
                 .on_hover_text(tr.tr(n_!("Save Settings to File")));
             if save.clicked() {
                 self.file_request = Some(FileRequest::Save);
             }
             let load = ui
-                .button(tr.tr(n_!("Load")))
+                .add(icon_text_button(ui, Icon::Open, tr.tr(n_!("Load"))))
                 .on_hover_text(tr.tr(n_!("Load Settings from File")));
             if load.clicked() {
                 self.file_request = Some(FileRequest::Load);
             }
-            help::help_button(ui, HelpTopic::DeviceConfig, tr);
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                help::help_button(ui, HelpTopic::DeviceConfig, tr);
+            });
         });
+        ui.add_space(6.0);
         ui.horizontal(|ui| {
             let label = ui.label(tr.tr(n_!("Filter:")));
+            let category_width = 260.0;
             ui.add(
                 egui::TextEdit::singleline(&mut self.search)
                     .hint_text(tr.tr(n_!("Search settings...")))
-                    .desired_width(240.0),
+                    .desired_width((ui.available_width() - category_width).max(200.0)),
             )
             .labelled_by(label.id);
             let label = ui.label(tr.tr(n_!("Category:")));
@@ -116,18 +149,40 @@ impl FirmwareSettingsWindow {
                 .response
                 .labelled_by(label.id);
         });
+        ui.add_space(6.0);
         let rows = self.visible_rows();
+        // The list's header row, then the boxed list; GTK's status line sits under it.
+        let status_height = ui.spacing().interact_size.y + 8.0;
+        ui.horizontal(|ui| {
+            ui.add_space(LIST_MARGIN);
+            for (heading, width) in [
+                n_!("ID"),
+                n_!("Name"),
+                n_!("Value"),
+                n_!("Unit"),
+                n_!("Category"),
+            ]
+            .into_iter()
+            .zip(COLUMNS)
+            {
+                cell(ui, width, |ui| {
+                    crate::theme::section_heading(ui, &tr.tr(heading));
+                });
+            }
+            crate::theme::section_heading(ui, &tr.tr(n_!("Description")));
+        });
+        ui.add_space(4.0);
+        let list_height = (ui.available_height() - status_height).max(60.0);
+        manager_ui::boxed_list(ui, |ui| {
+            egui::ScrollArea::both()
+                .auto_shrink([false, false])
+                .max_height(list_height)
+                .show(ui, |ui| self.list(ui, &rows, tr));
+        });
+        ui.add_space(4.0);
         ui.horizontal(|ui| {
             let not_connected = tr.tr(n_!("Not connected"));
-            match &self.notice {
-                Some((text, true)) => {
-                    ui.colored_label(ui.visuals().error_fg_color, text);
-                }
-                Some((text, false)) => {
-                    ui.label(text);
-                }
-                None => {}
-            }
+            manager_ui::notice(ui, self.notice.as_ref());
             let shown = self.notice.as_ref().map(|(text, _)| text.as_str());
             if !machine.status().connected && shown != Some(&*not_connected) {
                 ui.weak(not_connected);
@@ -142,29 +197,19 @@ impl FirmwareSettingsWindow {
                 ui.weak(count);
             });
         });
-        ui.separator();
-        egui::ScrollArea::both()
-            .auto_shrink([false, false])
-            .show(ui, |ui| self.list(ui, &rows, tr));
     }
 
     fn list(&mut self, ui: &mut egui::Ui, rows: &[ConfigSettingRow], tr: &Translator) {
-        egui::Grid::new("gcodekit5-firmware-settings-list")
-            .striped(true)
-            .num_columns(6)
-            .show(ui, |ui| {
-                for heading in [
-                    n_!("ID"),
-                    n_!("Name"),
-                    n_!("Value"),
-                    n_!("Unit"),
-                    n_!("Category"),
-                    n_!("Description"),
-                ] {
-                    ui.strong(tr.tr(heading));
-                }
-                ui.end_row();
-                for row in rows {
+        ui.spacing_mut().item_spacing.y = 0.0;
+        for (index, row) in rows.iter().enumerate() {
+            let top = ui.cursor().top();
+            let background = ui.painter().add(egui::Shape::Noop);
+            ui.horizontal(|ui| {
+                ui.set_min_height(ROW_HEIGHT);
+                ui.add_space(LIST_MARGIN);
+                // GTK's row colours: the name in the accent colour, the value green, the
+                // rest dim.
+                cell(ui, COLUMNS[0], |ui| {
                     if row.read_only || !self.reported.contains(&row.number) {
                         ui.weak(row.id());
                     } else if ui.selectable_label(false, row.id()).clicked() {
@@ -173,16 +218,40 @@ impl FirmwareSettingsWindow {
                             value: row.value.clone(),
                         });
                     }
-                    ui.label(&row.name);
-                    ui.label(&row.value);
-                    ui.weak(&row.unit);
-                    ui.weak(tr.tr(&row.category));
+                });
+                cell(ui, COLUMNS[1], |ui| {
                     ui.add(
-                        egui::Label::new(egui::RichText::new(&row.description).weak()).truncate(),
+                        egui::Label::new(
+                            egui::RichText::new(&row.name).color(crate::theme::ACCENT_BLUE),
+                        )
+                        .truncate(),
                     );
-                    ui.end_row();
-                }
+                });
+                cell(ui, COLUMNS[2], |ui| {
+                    ui.add(
+                        egui::Label::new(
+                            egui::RichText::new(&row.value).color(crate::theme::ACTIVE_BADGE),
+                        )
+                        .truncate(),
+                    );
+                });
+                cell(ui, COLUMNS[3], |ui| {
+                    ui.add(egui::Label::new(egui::RichText::new(&row.unit).weak()).truncate());
+                });
+                cell(ui, COLUMNS[4], |ui| {
+                    let category = tr.tr(&row.category);
+                    ui.add(egui::Label::new(egui::RichText::new(category).weak()).truncate());
+                });
+                ui.add(egui::Label::new(egui::RichText::new(&row.description).weak()).truncate());
             });
+            if index % 2 == 1 {
+                let rect =
+                    egui::Rect::from_x_y_ranges(ui.max_rect().x_range(), top..=ui.cursor().top());
+                let fill = ui.visuals().faint_bg_color;
+                ui.painter()
+                    .set(background, egui::Shape::rect_filled(rect, 0.0, fill));
+            }
+        }
     }
 
     /// Draws the editor of the clicked row while it is open.
@@ -234,7 +303,7 @@ impl FirmwareSettingsWindow {
                 ui.horizontal(|ui| {
                     cancel = ui.button(tr.tr(n_!("Cancel"))).clicked();
                     apply = ui
-                        .add_enabled(can_apply, egui::Button::new(tr.tr(n_!("Apply"))))
+                        .add_enabled(can_apply, crate::theme::primary_button(tr.tr(n_!("Apply"))))
                         .clicked();
                 });
             });

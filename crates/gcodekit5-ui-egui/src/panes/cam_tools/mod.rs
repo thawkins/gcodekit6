@@ -541,13 +541,18 @@ impl CamToolsPane {
         tr: &Translator,
         machine: Option<&Machine>,
     ) {
+        // GTK's header: the go-previous button, the title, and the help button on the right.
         ui.horizontal(|ui| {
-            if ui.button(tr.tr("Back")).clicked() {
+            if crate::icons::icon_only_button(ui, crate::icons::Icon::JogLeft, &tr.tr("Back"))
+                .clicked()
+            {
                 self.open = None;
             }
-            ui.heading(tr.tr(tool.title_msgid()));
+            crate::theme::title(ui, &tr.tr(tool.title_msgid()), crate::theme::TITLE_2);
             if let Some(topic) = tool.help_topic() {
-                help::help_button(ui, topic, tr);
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    help::help_button(ui, topic, tr);
+                });
             }
         });
         ui.separator();
@@ -563,7 +568,8 @@ impl CamToolsPane {
                 if let Some(gcode) = self.output() {
                     let mut text = gcode;
                     ui.add_space(8.0);
-                    let name = ui.strong(tr.tr("Generated G-Code"));
+                    ui.add_space(4.0);
+                    let name = crate::theme::section_heading(ui, &tr.tr("Generated G-Code"));
                     ui.add(
                         egui::TextEdit::multiline(&mut text)
                             .id_salt("cam-generated")
