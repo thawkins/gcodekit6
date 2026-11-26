@@ -9,7 +9,10 @@
 //! machine has acknowledged are drawn in the accent colour. The tool marker follows the work
 //! position the machine reports.
 //!
-//! Mouse, as in GTK: left drag orbits, Shift + left drag pans, the wheel zooms. The nav cube
+//! Mouse, as in GTK: left drag orbits, Shift + left drag pans, the wheel zooms. GTK's 2D
+//! view mode ([`VisualizerPane::set_2d`]) locks the camera to the orthographic top view: left
+//! drag pans, the nav cube's view grid and zoom row are hidden, and only the Top view is
+//! taken from the View commands; a program loaded in 2D is fitted from the top. The nav cube
 //! ([`nav_cube`]) and the View commands switch to standard views, zoom and fit; the OSD
 //! ([`osd`]) shows the bounds and the tool position. The left sidebar ([`sidebar`]) has
 //! GTK's toolbar (Fit to Content, Reset View, Fit to Device Working Area, Hide), its
@@ -29,7 +32,7 @@
 //! in the sidebar hold until the next one.
 //!
 //! Ported from the GTK `ui/gtk/visualizer/mod.rs`, `renderer_3d.rs`, `shaders.rs` and
-//! `nav_cube.rs`. Not ported: the 2D mode, run preview, scrollbars, the zoom/centre/cursor
+//! `nav_cube.rs`. Not ported: run preview, scrollbars, the zoom/centre/cursor
 //! status line and intensity statistics.
 //!
 //! [`Machine::program`]: crate::machine::Machine::program
@@ -146,6 +149,8 @@ pub struct VisualizerPane {
     sidebar_hidden: bool,
     /// The sidebar's Toolpath and Guides toggles.
     display: Display,
+    /// GTK's 2D view mode: the camera stays in the top view.
+    view_2d: bool,
     /// The active device profile's work area, if a profile is active.
     work_area: Option<Aabb>,
     /// The `enable_stock_removal_3d` setting.
@@ -189,6 +194,7 @@ impl VisualizerPane {
             view_rect: egui::Rect::NOTHING,
             sidebar_hidden: false,
             display: Display::default(),
+            view_2d: false,
             work_area: None,
             stock_enabled: false,
             show_stock: false,
@@ -368,6 +374,22 @@ impl VisualizerPane {
         self.display
     }
 
+    /// Whether the 2D view mode is on.
+    pub fn is_2d(&self) -> bool {
+        self.view_2d
+    }
+
+    /// Switches to the 2D view mode (the top view, locked) or back to the 3D view (the
+    /// isometric view), as GTK's 2D / 3D pair does.
+    ///
+    /// # Arguments
+    /// * `on` - `true` for 2D, `false` for 3D.
+    pub fn set_2d(&mut self, on: bool) {
+        self.view_2d = on;
+        self.camera
+            .view(if on { StdView::Top } else { StdView::IsoSe });
+    }
+
     /// The active device profile's work area, if a profile is active.
     pub fn work_area(&self) -> Option<Aabb> {
         self.work_area
@@ -486,9 +508,12 @@ impl VisualizerPane {
         }
     }
 
-    /// Resets the camera, then fits the toolpath (Reset View).
+    /// Resets the camera (to the top view in 2D), then fits the toolpath (Reset View).
     fn reset_view(&mut self) {
         self.camera.reset();
+        if self.view_2d {
+            self.camera.view(StdView::Top);
+        }
         self.fit();
     }
 
@@ -498,6 +523,8 @@ impl VisualizerPane {
     /// * `action` - What the user clicked.
     pub fn apply(&mut self, action: NavAction) {
         match action {
+            // 2D stays in the top view.
+            NavAction::View(view) if self.view_2d && view != StdView::Top => {}
             NavAction::View(view) => self.camera.view(view),
             NavAction::ZoomIn => self.camera.zoom(ZOOM_STEP),
             NavAction::ZoomOut => self.camera.zoom(-ZOOM_STEP),
@@ -510,7 +537,7 @@ impl VisualizerPane {
     fn handle_input(&mut self, ui: &egui::Ui, response: &egui::Response) {
         if response.dragged_by(egui::PointerButton::Primary) {
             let delta = response.drag_delta();
-            if ui.input(|i| i.modifiers.shift) {
+            if self.view_2d || ui.input(|i| i.modifiers.shift) {
                 self.camera.pan(delta.x, delta.y);
             } else {
                 self.camera.orbit(delta.x, delta.y);
@@ -564,6 +591,7 @@ impl Pane for VisualizerPane {
             let progress = self.stock.progress();
             let enabled = self.stock_enabled;
             let display = &mut self.display;
+            let view_2d = self.view_2d;
             let clicked = egui::Panel::left("gcodekit5-visualizer-sidebar")
                 .resizable(true)
                 .default_size(sidebar::WIDTH)
@@ -580,7 +608,15 @@ impl Pane for VisualizerPane {
                                 progress,
                                 notice,
                             });
-                            sidebar::show(ui, bounds.as_ref(), display, units, simulation, ctx.tr)
+                            sidebar::show(
+                                ui,
+                                bounds.as_ref(),
+                                view_2d,
+                                display,
+                                units,
+                                simulation,
+                                ctx.tr,
+                            )
                         })
                         .inner
                 })
@@ -591,6 +627,7 @@ impl Pane for VisualizerPane {
                 Some(sidebar::SidebarAction::Fit) => self.fit(),
                 Some(sidebar::SidebarAction::ResetView) => self.reset_view(),
                 Some(sidebar::SidebarAction::FitDevice) => self.fit_device(),
+                Some(sidebar::SidebarAction::ViewMode(on)) => self.set_2d(on),
                 Some(sidebar::SidebarAction::Hide) => self.sidebar_hidden = true,
                 None => {}
             }
@@ -603,7 +640,11 @@ impl Pane for VisualizerPane {
         if std::mem::take(&mut self.refit_pending)
             && let Some(bounds) = self.bounds
         {
-            self.camera.view(StdView::IsoSe);
+            self.camera.view(if self.view_2d {
+                StdView::Top
+            } else {
+                StdView::IsoSe
+            });
             self.camera.fit(bounds);
         }
         self.handle_input(ui, &response);
@@ -638,7 +679,7 @@ impl Pane for VisualizerPane {
         ui.painter()
             .add(egui_wgpu::Callback::new_paint_callback(rect, callback));
 
-        if let Some(action) = nav_cube::show(ui, rect, ctx.tr) {
+        if let Some(action) = nav_cube::show(ui, rect, !self.view_2d, ctx.tr) {
             self.apply(action);
         }
         if self.sidebar_hidden && sidebar::show_button(ui, rect, ctx.tr) {

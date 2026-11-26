@@ -1,5 +1,6 @@
 //! The visualizer's left sidebar, laid out as the GTK one: a toolbar (Fit to Content,
-//! Reset View, Fit to Device Working Area and Hide) above collapsible sections: Toolpath
+//! Reset View, Fit to Device Working Area and Hide), GTK's 2D / 3D view mode pair, and
+//! collapsible sections: Toolpath
 //! (Show Rapid Moves, Show Cutting Moves, Show Laser/Spindle), Guides (Show Grid, Grid
 //! spacing, Show Machine Bounds), Simulation and the
 //! Inspector with the program's bounds. The toggles are [`Display`], which the pane hands to
@@ -7,8 +8,7 @@
 //!
 //! Ported from the GTK `ui/gtk/visualizer/mod.rs` sidebar. GTK's Fit to Viewport button
 //! (`view-restore`) is Reset View here, which `Cmd+0` also runs. Left out, because the
-//! egui visualizer lacks the features: the 2D/3D switch and the inspector's S-value
-//! statistics.
+//! egui visualizer lacks the feature: the inspector's S-value statistics.
 //!
 //! The Simulation section ("Show Stock Removal", and the stock, tool and zero references
 //! while it is checked) is shown only while the `enable_stock_removal_3d` setting is on, as
@@ -46,6 +46,10 @@ pub fn msgids() -> Vec<&'static str> {
         n_!("Show Grid"),
         n_!("Grid spacing"),
         n_!("Show Machine Bounds"),
+        n_!("2D"),
+        n_!("Top-down 2D view"),
+        n_!("3D"),
+        n_!("Rotatable 3D view"),
         n_!("Fit to Device Working Area"),
         n_!("Reset View"),
         n_!("Hide"),
@@ -267,6 +271,8 @@ pub enum SidebarAction {
     ResetView,
     /// Fit the active device's work area into the view.
     FitDevice,
+    /// Switch to the 2D view (`true`) or the 3D view (`false`).
+    ViewMode(bool),
     /// Hide the sidebar.
     Hide,
 }
@@ -287,6 +293,7 @@ fn range(min: f32, max: f32, units: MeasurementSystem, tr: &Translator) -> Strin
 /// # Arguments
 /// * `ui` - The sidebar panel's `Ui`.
 /// * `bounds` - The program's bounds, once built.
+/// * `view_2d` - Whether the 2D view mode is on.
 /// * `display_state` - The Toolpath and Guides toggles, edited in place.
 /// * `units` - The measurement system to show.
 /// * `simulation` - The Simulation section's state, or `None` to leave the section out (the
@@ -298,6 +305,7 @@ fn range(min: f32, max: f32, units: MeasurementSystem, tr: &Translator) -> Strin
 pub fn show(
     ui: &mut egui::Ui,
     bounds: Option<&Aabb>,
+    view_2d: bool,
     display_state: &mut Display,
     units: MeasurementSystem,
     simulation: Option<Simulation<'_>>,
@@ -318,6 +326,21 @@ pub fn show(
         }
         if named_icon_button(ui, Icon::Hide, &tr.tr("Hide"), &tr.tr("Hide Sidebar")) {
             action = Some(SidebarAction::Hide);
+        }
+    });
+    ui.horizontal(|ui| {
+        let modes = [
+            (true, "2D", "Top-down 2D view"),
+            (false, "3D", "Rotatable 3D view"),
+        ];
+        for (mode, label, tooltip) in modes {
+            let on = view_2d == mode;
+            let clicked = crate::theme::checked_scope(ui, on, |ui| ui.radio(on, tr.tr(label)))
+                .on_hover_text(tr.tr(tooltip))
+                .clicked();
+            if clicked && !on {
+                action = Some(SidebarAction::ViewMode(mode));
+            }
         }
     });
     ui.add_space(4.0);

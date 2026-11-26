@@ -17,7 +17,18 @@ const LANGUAGES: [&str; 5] = ["de", "es", "fr", "it", "pt"];
 
 /// Translations that are spelled like the English msgid; the Translator cannot tell them
 /// from a missing entry, so the po file is checked for them instead.
-const IDENTICAL: [(&str, &str); 241] = [
+const IDENTICAL: [(&str, &str); 251] = [
+    // Visualizer 2D / 3D view mode.
+    ("de", "2D"),
+    ("es", "2D"),
+    ("fr", "2D"),
+    ("it", "2D"),
+    ("pt", "2D"),
+    ("de", "3D"),
+    ("es", "3D"),
+    ("fr", "3D"),
+    ("it", "3D"),
+    ("pt", "3D"),
     // Visualizer Simulation section.
     ("de", "Simulation"),
     ("fr", "Simulation"),

@@ -139,23 +139,26 @@ fn cell(origin: egui::Pos2, row: usize, col: usize) -> egui::Rect {
 /// # Arguments
 /// * `ui` - The visualizer's `Ui`.
 /// * `rect` - The view's rectangle.
+/// * `cube` - Whether to draw the view grid and the zoom row; GTK hides them in the 2D view
+///   mode, leaving the floating column in place.
 /// * `tr` - Translator for the current UI language.
 ///
 /// # Returns
 /// The action of the button clicked this frame, if any.
-pub fn show(ui: &mut egui::Ui, rect: egui::Rect, tr: &Translator) -> Option<NavAction> {
+pub fn show(ui: &mut egui::Ui, rect: egui::Rect, cube: bool, tr: &Translator) -> Option<NavAction> {
     ui.scope_builder(egui::UiBuilder::new().max_rect(rect), |ui| {
         // Small padding, so no label or icon makes its button outgrow the 30-point cell.
         ui.spacing_mut().button_padding = egui::vec2(2.0, 2.0);
-        show_buttons(ui, rect, tr)
+        let width = 3.0 * BUTTON + 2.0 * GAP;
+        let origin = egui::pos2(rect.right() - MARGIN - width, rect.top() + MARGIN);
+        let views = cube.then(|| show_cube(ui, origin, tr)).flatten();
+        show_column(ui, origin, tr).or(views)
     })
     .inner
 }
 
-/// Draws the nav cube's buttons; see [`show`].
-fn show_buttons(ui: &mut egui::Ui, rect: egui::Rect, tr: &Translator) -> Option<NavAction> {
-    let width = 3.0 * BUTTON + 2.0 * GAP;
-    let origin = egui::pos2(rect.right() - MARGIN - width, rect.top() + MARGIN);
+/// Draws the view grid and the zoom row with its top-left corner at `origin`.
+fn show_cube(ui: &mut egui::Ui, origin: egui::Pos2, tr: &Translator) -> Option<NavAction> {
     let mut action = None;
     for (row, views) in VIEWS.into_iter().enumerate() {
         for (col, (label, msgid, view)) in views.into_iter().enumerate() {
@@ -179,6 +182,13 @@ fn show_buttons(ui: &mut egui::Ui, rect: egui::Rect, tr: &Translator) -> Option<
             action = Some(act);
         }
     }
+    action
+}
+
+/// Draws the floating column (Top View, Fit to Device Working Area, Mouse Controls) under
+/// the right column of the nav cube placed at `origin`.
+fn show_column(ui: &mut egui::Ui, origin: egui::Pos2, tr: &Translator) -> Option<NavAction> {
+    let mut action = None;
     let column = origin + egui::vec2(0.0, COLUMN_GAP);
     let top = tr.tr("Top View");
     let top_rect = cell(column, 4, 2);
