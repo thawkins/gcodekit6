@@ -102,6 +102,8 @@ fn test_fixed_machine_errors_are_translated() {
         MachineError::NotConnected,
         MachineError::AlreadyConnected,
         MachineError::StreamInProgress,
+        MachineError::EmptyLine,
+        MachineError::Halted,
     ] {
         let english = error.to_string();
         let shown = gcodekit5_ui_egui::machine::worker_message(&english, &tr);

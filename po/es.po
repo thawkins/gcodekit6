@@ -4754,3 +4754,6 @@ msgstr "el controlador está en parada de emergencia (M112): reinícielo o vuelv
 
 msgid "Select the active work coordinate system: the program may have changed it."
 msgstr "Seleccione el sistema de coordenadas de trabajo activo: el programa puede haberlo cambiado."
+
+msgid "the command line is empty"
+msgstr "la línea de comando está vacía"

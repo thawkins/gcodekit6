@@ -4675,3 +4675,6 @@ msgstr ""
 
 msgid "Select the active work coordinate system: the program may have changed it."
 msgstr ""
+
+msgid "the command line is empty"
+msgstr ""

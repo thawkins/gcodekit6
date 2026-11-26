@@ -4751,3 +4751,6 @@ msgstr "der Controller ist im Not-Aus (M112): zurücksetzen oder neu verbinden"
 
 msgid "Select the active work coordinate system: the program may have changed it."
 msgstr "Wählen Sie das aktive Werkstückkoordinatensystem: Das Programm hat es möglicherweise geändert."
+
+msgid "the command line is empty"
+msgstr "die Befehlszeile ist leer"

@@ -123,11 +123,13 @@ pub mod worker_text {
     /// by the line number.
     pub const RESEND_FAILED: &str =
         "resend request could not be honoured; reconnect to the controller";
+    /// [`MachineError::EmptyLine`](super::MachineError::EmptyLine).
+    pub const EMPTY_LINE: &str = "the command line is empty";
     /// [`MachineError::Halted`](super::MachineError::Halted): after a Repetier `M112`.
     pub const HALTED: &str = "the controller is emergency-stopped (M112): reset it or reconnect";
 
     /// Every text above, for a front end's translation table.
-    pub const ALL: [&str; 19] = [
+    pub const ALL: [&str; 20] = [
         CONNECT_FAILED,
         WRITE_FAILED,
         READ_FAILED,
@@ -146,6 +148,7 @@ pub mod worker_text {
         NOT_ON_REPETIER,
         NO_REPETIER_EQUIVALENT,
         RESEND_FAILED,
+        EMPTY_LINE,
         HALTED,
     ];
 }
@@ -169,7 +172,7 @@ pub enum MachineError {
     #[error("cannot start the machine worker: {0}")]
     WorkerStart(String),
     /// A command line was empty.
-    #[error("the command line is empty")]
+    #[error("{}", worker_text::EMPTY_LINE)]
     EmptyLine,
     /// A command line held a byte outside printable ASCII (a line break, a control byte, a
     /// non-ASCII character); GRBL acts on some of them as real-time commands.
