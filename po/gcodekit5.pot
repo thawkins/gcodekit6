@@ -4621,3 +4621,15 @@ msgstr ""
 
 msgid "Duplicate"
 msgstr ""
+
+msgid "Toggle Grid"
+msgstr ""
+
+msgid "Toggle Machine Bounds"
+msgstr ""
+
+msgid "Toggle Rapid Moves"
+msgstr ""
+
+msgid "Toggle Cutting Moves"
+msgstr ""
