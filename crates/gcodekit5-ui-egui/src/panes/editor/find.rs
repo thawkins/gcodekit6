@@ -1,6 +1,6 @@
 //! Find in the editor's text: the next or previous match of a query, wrapping around, the
-//! number of matches, and the text with every match replaced. Matching ignores ASCII case (G-code is ASCII; `x10` finds `X10`),
-//! as the GTK editor's search did by default.
+//! number of matches, and the text with every match replaced. Matching ignores ASCII case
+//! (G-code is ASCII; `x10` finds `X10`), as the GTK editor's search did by default.
 //!
 //! Ranges are byte ranges into the text. ASCII case folding keeps every byte where it is, so
 //! a match in the folded text is the same range in the original.
