@@ -4703,3 +4703,9 @@ msgstr "{key} funciona en el lugar equivocado"
 
 msgid "Outside Machine Control a command that moves the machine needs Ctrl, Alt or a function key"
 msgstr "Fuera del Control de máquina, un comando que mueve la máquina necesita Ctrl, Alt o una tecla de función"
+
+msgid "Too many shortcuts are changed"
+msgstr "Hay demasiados atajos cambiados"
+
+msgid "These saved shortcuts broke a shortcut rule and use their default keys again: {commands}"
+msgstr "Estos atajos guardados incumplían una regla y vuelven a usar sus teclas predeterminadas: {commands}"

@@ -354,6 +354,33 @@ fn test_saved_shortcuts_breaking_a_rule_load_as_defaults() {
         keymap.bindings(&Command::JogXPos.command_ref()),
         keymap.default_bindings(&Command::JogXPos.command_ref())
     );
+
+    // The user is told which ones, until OK.
+    let mut h = crate::machine_support::app_harness(app);
+    h.run();
+    let notice = "These saved shortcuts broke a shortcut rule and use their default keys \
+                  again: Reset, Jog X+, About";
+    let _ = h.get_by_label(notice);
+    click(&mut h, "OK");
+    assert!(h.query_by_label(notice).is_none());
+}
+
+/// Saved shortcuts that keep every rule start with no notice.
+#[test]
+fn test_valid_saved_shortcuts_start_without_a_notice() {
+    use gcodekit5_settings::config::{Config, ShortcutOverride};
+    let mut config = Config::default();
+    config.ui.keyboard_shortcuts = vec![ShortcutOverride {
+        command: "file.open".to_string(),
+        keys: vec!["Cmd+Shift+O".to_string()],
+    }];
+    let app = GcodeKitApp::from_state(AppState::new(
+        SettingsManager::detached(config),
+        crate::test_smoke::native_decision(),
+    ));
+    let mut h = crate::machine_support::app_harness(app);
+    h.run();
+    assert!(h.query_by_label_contains("saved shortcuts broke").is_none());
 }
 
 /// Reset on a command whose default key another command took meanwhile says why and

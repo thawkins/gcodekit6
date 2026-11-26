@@ -58,7 +58,8 @@ A command that moves the machine never runs from its key while a text field has 
 whatever the key; File > Run only previews the program and is not one of them.
 
 Shortcuts are saved with the other settings. A saved shortcut that breaks one of these rules
-(for example after editing the settings file by hand) is replaced by the command's default.
+(for example after editing the settings file by hand) is replaced by the command's default, and
+a notice at start names the commands.
 
 See [Keyboard Shortcuts Reference](90-shortcuts.md) for the full default list.
 

@@ -4612,3 +4612,9 @@ msgstr ""
 
 msgid "Outside Machine Control a command that moves the machine needs Ctrl, Alt or a function key"
 msgstr ""
+
+msgid "Too many shortcuts are changed"
+msgstr ""
+
+msgid "These saved shortcuts broke a shortcut rule and use their default keys again: {commands}"
+msgstr ""

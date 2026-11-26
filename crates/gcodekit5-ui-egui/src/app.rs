@@ -342,6 +342,8 @@ pub struct GcodeKitApp {
     about_window: AboutWindow,
     /// The help browser.
     help_window: HelpWindow,
+    /// Saved shortcuts put back to their defaults at start, until the user closes the notice.
+    shortcut_notice: Option<String>,
     /// The Device Config page's firmware settings.
     firmware_settings: FirmwareSettingsWindow,
     /// The Device Info panel (the left column of the Device Config page).
@@ -432,7 +434,8 @@ impl GcodeKitApp {
     /// # Arguments
     /// * `state` - The front end's state.
     pub fn from_state(state: AppState) -> Self {
-        let keymap = crate::shortcuts::keymap_from(&state.config().ui);
+        let (keymap, dropped) = crate::shortcuts::keymap_from(&state.config().ui);
+        let shortcut_notice = crate::shortcuts::reset_notice(&state.translator, &dropped);
         let menus = Menus::new(&state.translator, &keymap);
         let wake_ctx: Arc<OnceLock<egui::Context>> = Arc::new(OnceLock::new());
         let wake = {
@@ -505,6 +508,7 @@ impl GcodeKitApp {
             settings_window,
             about_window,
             help_window: HelpWindow::default(),
+            shortcut_notice,
             firmware_settings: FirmwareSettingsWindow::default(),
             device_info: DeviceInfoPanel::default(),
             device_manager,
@@ -1183,12 +1187,35 @@ impl GcodeKitApp {
             | SettingsOutcome::Failed(_) => {}
         }
         self.about_window.show(ctx, &self.state.translator);
+        self.show_shortcut_notice(ctx);
         self.show_machine_windows(ctx);
         self.show_library_windows();
         if let Some(topic) = help::take_request(ctx) {
             self.help_window.open(topic);
         }
         self.help_window.show(ctx, &self.state.translator);
+    }
+
+    /// Tells the user which saved shortcuts were put back to their defaults at start, until OK.
+    fn show_shortcut_notice(&mut self, ctx: &egui::Context) {
+        let Some(message) = &self.shortcut_notice else {
+            return;
+        };
+        let tr = &self.state.translator;
+        let mut close = false;
+        egui::Window::new(tr.tr(n_!("Shortcuts")))
+            .id(egui::Id::unique("gcodekit5-shortcut-notice"))
+            .collapsible(false)
+            .resizable(false)
+            .anchor(egui::Align2::CENTER_CENTER, egui::Vec2::ZERO)
+            .show(ctx, |ui| {
+                ui.set_max_width(420.0);
+                ui.label(message.as_str());
+                close = ui.button(tr.tr(n_!("OK"))).clicked();
+            });
+        if close {
+            self.shortcut_notice = None;
+        }
     }
 
     /// Acts on a dialog's answer; every answer is also kept in

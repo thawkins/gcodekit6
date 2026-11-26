@@ -69,6 +69,8 @@ pub enum Refusal {
     DoublePress,
     /// A scope other than the command's own.
     WrongScope,
+    /// The saved changes are at craft-keymap's cap on changed commands.
+    TooManyChanges,
 }
 
 impl Refusal {
@@ -104,6 +106,7 @@ impl Refusal {
             Self::Reserved => (n_!("{key} is reserved by the system"), None),
             Self::DoublePress => (n_!("Double presses are not supported"), None),
             Self::WrongScope => (n_!("{key} works in the wrong place"), None),
+            Self::TooManyChanges => (n_!("Too many shortcuts are changed"), None),
         };
         let text = tr.tr(msgid).replace("{key}", key);
         match command {
@@ -294,7 +297,7 @@ fn store(keymap: &mut Keymap, command: Command, list: Vec<Binding>) -> Result<()
         .map_err(|error| {
             // `check` already refused every holder and reserved key; this is the overrides cap.
             tracing::warn!(%error, command = command.id(), "shortcut not set");
-            Refusal::Reserved
+            Refusal::TooManyChanges
         })
 }
 
@@ -404,14 +407,39 @@ pub fn saved(keymap: &Keymap) -> Vec<ShortcutOverride> {
 ///
 /// # Arguments
 /// * `ui` - The UI settings holding the saved shortcuts.
-pub fn keymap_from(ui: &UiSettings) -> Keymap {
+///
+/// # Returns
+/// The keymap, and the commands put back to their defaults (for [`reset_notice`]).
+pub fn keymap_from(ui: &UiSettings) -> (Keymap, Vec<Command>) {
     let mut overrides = Overrides::new();
     for entry in &ui.keyboard_shortcuts {
         if !overrides.insert(entry.command.clone(), entry.keys.clone()) {
             tracing::warn!(command = %entry.command, "saved shortcut too long; ignored");
         }
     }
-    sanitized(overrides).0
+    sanitized(overrides)
+}
+
+/// What the app tells the user when saved shortcuts were put back to their defaults at start:
+/// `None` when none were.
+///
+/// # Arguments
+/// * `tr` - Translates the message and the command names.
+/// * `dropped` - The commands put back to their defaults.
+pub fn reset_notice(tr: &Translator, dropped: &[Command]) -> Option<String> {
+    if dropped.is_empty() {
+        return None;
+    }
+    let names: Vec<String> = dropped
+        .iter()
+        .map(|c| tr.tr(c.label_msgid()).into_owned())
+        .collect();
+    Some(
+        tr.tr(n_!(
+            "These saved shortcuts broke a shortcut rule and use their default keys again: {commands}"
+        ))
+        .replace("{commands}", &names.join(", ")),
+    )
 }
 
 /// The English msgids of the refusal messages, for the translation test.
@@ -433,5 +461,10 @@ pub fn msgids() -> Vec<&'static str> {
         n_!("{key} is reserved by the system"),
         n_!("Double presses are not supported"),
         n_!("{key} works in the wrong place"),
+        n_!("Too many shortcuts are changed"),
+        n_!(
+            "These saved shortcuts broke a shortcut rule and use their default keys again: {commands}"
+        ),
+        n_!("OK"),
     ]
 }

@@ -17,7 +17,7 @@ const LANGUAGES: [&str; 5] = ["de", "es", "fr", "it", "pt"];
 
 /// Translations that are spelled like the English msgid; the Translator cannot tell them
 /// from a missing entry, so the po file is checked for them instead.
-const IDENTICAL: [(&str, &str); 261] = [
+const IDENTICAL: [(&str, &str); 265] = [
     // Designer context menu: GTK's short boolean labels.
     ("es", "Inter"),
     ("fr", "Union"),
@@ -297,6 +297,11 @@ const IDENTICAL: [(&str, &str); 261] = [
     // Machine Control: the Buffer readout.
     ("it", "Buffer:"),
     ("pt", "Buffer:"),
+    // The startup notice about reset shortcuts: its OK button.
+    ("de", "OK"),
+    ("fr", "OK"),
+    ("it", "OK"),
+    ("pt", "OK"),
 ];
 
 fn msgids() -> Vec<&'static str> {

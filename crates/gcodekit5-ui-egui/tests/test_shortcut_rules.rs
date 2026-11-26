@@ -316,6 +316,10 @@ fn test_refusals_name_the_key_and_the_command_in_the_ui_language() {
         Refusal::SafetyKey(Command::SoftReset).message(&tr, "Ctrl+Shift+K"),
         "Ctrl+Shift+K is kept for Reset"
     );
+    assert_eq!(
+        Refusal::TooManyChanges.message(&tr, "F9"),
+        "Too many shortcuts are changed"
+    );
     let de = Translator::new("de");
     let german = Refusal::Taken(Command::FileSave).message(&de, "Strg+S");
     assert!(german.contains("Strg+S"), "{german}");
