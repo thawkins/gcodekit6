@@ -144,3 +144,35 @@ fn test_set_percent_disabled_while_disconnected() {
     assert!(!set_enabled(&harness, 0));
     assert!(!set_enabled(&harness, 1));
 }
+
+/// E-STOP (a soft reset) ends a Set % target: GRBL resets the overrides to 100 %, and the
+/// target must not drive them back toward its goal.
+#[test]
+fn test_set_percent_dropped_by_a_reset() {
+    let (mut harness, shared) = connected_with_ov();
+    set_target(&mut harness, 0, 130.0);
+    click_set(&mut harness, 0);
+    assert!(
+        wait_until(|| count(&shared, RealtimeCommand::FeedOverridePlus10) == 1),
+        "{:?}",
+        shared.log()
+    );
+    harness.get_by_label("E-STOP").click();
+    harness.step();
+    assert!(
+        wait_until(|| shared.log().contains(&Wrote::Realtime(0x18))),
+        "{:?}",
+        shared.log()
+    );
+    harness.step();
+    // The step is reported after the reset: the target must not go on.
+    report_ov(&mut harness, &shared, 110, 100);
+    for _ in 0..5 {
+        harness.step();
+    }
+    assert_eq!(count(&shared, RealtimeCommand::FeedOverridePlus10), 1);
+    assert!(
+        set_enabled(&harness, 0),
+        "Set still waiting after the reset"
+    );
+}

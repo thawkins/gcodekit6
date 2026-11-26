@@ -43,8 +43,9 @@ use std::time::Instant;
 
 use gcodekit5_app::device_status::{jog_direction, set_jog_inverted};
 use gcodekit5_app::i18n::Translator;
+use gcodekit5_app::machine::grbl_stream::{GrblResponseLine, classify_response};
 use gcodekit5_app::machine::{
-    Axis, MachineController, MachineError, MachineEvent, RealtimeCommand,
+    Axis, MachineController, MachineError, MachineEvent, RealtimeCommand, realtime_label,
 };
 use gcodekit5_app::override_target::{OverrideTarget, TargetStep};
 use gcodekit5_app::work_zero::{
@@ -715,6 +716,26 @@ impl MachineControlPane {
         }
         if events.contains(&MachineEvent::Disconnected) {
             self.jog.forget_hold();
+        }
+        // A reset (E-STOP, Stop, or the controller's own) puts the overrides back to 100 %:
+        // a Set % target must not then drive them toward its goal again.
+        let reset = realtime_label(RealtimeCommand::SoftReset.byte());
+        let was_reset = events.iter().any(|e| match e {
+            MachineEvent::Sent(line) => Some(line.as_str()) == reset,
+            MachineEvent::Received(line) => {
+                matches!(classify_response(line), GrblResponseLine::Reset(_))
+            }
+            MachineEvent::Connected
+            | MachineEvent::Disconnected
+            | MachineEvent::StatusReport(_)
+            | MachineEvent::StreamProgress { .. }
+            | MachineEvent::StreamHalted { .. }
+            | MachineEvent::StreamFinished { .. }
+            | MachineEvent::StreamStopped { .. }
+            | MachineEvent::Error(_) => false,
+        });
+        if was_reset && self.override_target.take().is_some() {
+            tracing::info!("Set % target dropped: the controller was reset");
         }
     }
 
