@@ -145,7 +145,8 @@ impl DesignerPane {
         self.forget_view_state();
         let zoom = self.state.canvas.zoom();
         if !(zoom.is_finite() && zoom > 0.0001) && self.state.canvas.shape_count() > 0 {
-            editing::zoom_fit(&mut self.state);
+            let area = self.work_area();
+            editing::zoom_fit(&mut self.state, area);
         }
         self.notice = Some(format!("{} {}", tr.tr("Loaded:"), path.display()));
         true
@@ -316,7 +317,8 @@ impl DesignerPane {
                 tr.tr("values in this DXF file were not numbers and were replaced by defaults, so some geometry may be wrong.")
             ));
         }
-        editing::zoom_fit(&mut self.state);
+        let area = self.work_area();
+        editing::zoom_fit(&mut self.state, area);
         messages
     }
 

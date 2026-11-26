@@ -94,6 +94,8 @@ mod test_designer_text_tool;
 mod test_designer_toolbox;
 #[path = "test_designer_toolpath.rs"]
 mod test_designer_toolpath;
+#[path = "test_designer_work_area.rs"]
+mod test_designer_work_area;
 #[path = "test_device_info.rs"]
 mod test_device_info;
 #[path = "test_device_manager.rs"]

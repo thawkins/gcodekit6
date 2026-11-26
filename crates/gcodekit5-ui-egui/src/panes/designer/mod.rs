@@ -13,9 +13,9 @@
 //! [`shape_gallery`]; the shape it arms is placed by the next canvas click. New, Open, Save
 //! and Import are [`file_ops`]; the shapes a CAM page generates are added by
 //! [`DesignerPane::add_generated_paths`]; G-code and SVG output (Export, the toolbox's
-//! Generate G-Code and Frame) are [`export`], the outcome shown as the pane's notice. Not
-//! ported here: scrollbars, the device's work area (the default 250 x 250 mm is shown), and
-//! the context menu's other entries.
+//! Generate G-Code and Frame) are [`export`], the outcome shown as the pane's notice. The
+//! canvas outlines the active device profile's work area ([`DesignerPane::work_area`]). Not
+//! ported here: scrollbars.
 //!
 //! Dependencies: `egui`, `gcodekit5-designer` (model), `gcodekit5-app` (translations),
 //! `gcodekit5-settings` (grid line widths, display units), `gcodekit5-core` (units).
@@ -39,6 +39,7 @@ use gcodekit5_core::units::MeasurementSystem;
 use gcodekit5_designer::DesignerState;
 use gcodekit5_designer::gcode_gen::MachineLimits;
 use gcodekit5_designer::model::{Point, Shape};
+use gcodekit5_devicedb::DeviceProfile;
 use gcodekit5_settings::config::Config;
 
 use canvas::array_dialog::{self, ArrayDialog};
@@ -95,8 +96,13 @@ pub struct DesignerPane {
     notice: Option<String>,
     /// G-code for the editor (Generate G-Code, Frame), until the app takes it.
     editor_gcode: Option<String>,
-    /// The machine's working area from the settings, for the out-of-limits check.
+    /// The machine's working area for the out-of-limits check: the device profile's, else
+    /// the Preferences limits ([`DesignerPane::machine_limits`]).
     limits: Option<MachineLimits>,
+    /// The Preferences limits, used while no device profile is active.
+    config_limits: Option<MachineLimits>,
+    /// The active device profile's X/Y area (mm), if any.
+    device: Option<editing::Bounds>,
     /// The toolbox asked for G-code for the editor; the app runs it.
     editor_request: Option<ToEditor>,
     /// Counts changes to the design ([`DesignerPane::revision`]).
@@ -141,6 +147,8 @@ impl DesignerPane {
             notice: None,
             editor_gcode: None,
             limits: None,
+            config_limits: None,
+            device: None,
             editor_request: None,
             revision: 0,
             cursor: (0.0, 0.0),
@@ -324,6 +332,31 @@ impl DesignerPane {
         }
     }
 
+    /// The work area outlined on the canvas and fitted by Fit to Device: the active device
+    /// profile's X/Y limits (GTK's `compute_device_bbox`), else GTK's 250 x 250 mm.
+    pub fn work_area(&self) -> editing::Bounds {
+        self.device.unwrap_or_else(editing::default_work_area)
+    }
+
+    /// The XY limits exported G-code is checked against: the active device profile's, else
+    /// Preferences > Machine's X/Y limits from 0 (GTK's `designer_machine_limits`), if set.
+    pub fn machine_limits(&self) -> Option<&MachineLimits> {
+        self.limits.as_ref()
+    }
+
+    /// Recomputes [`DesignerPane::machine_limits`] from the device and the settings.
+    fn update_limits(&mut self) {
+        self.limits = match self.device {
+            Some((x_min, y_min, x_max, y_max)) => Some(MachineLimits {
+                x_min,
+                x_max,
+                y_min,
+                y_max,
+            }),
+            None => self.config_limits.clone(),
+        };
+    }
+
     /// The canvas's view on the last frame: maps screen points to world millimetres.
     pub fn view(&self) -> CanvasView {
         self.view
@@ -407,7 +440,8 @@ impl DesignerPane {
             .canvas
             .set_canvas_size(f64::from(rect.width()), f64::from(rect.height()));
         if !self.fitted && rect.width() > 0.0 && rect.height() > 0.0 {
-            editing::fit_work_area(&mut self.state);
+            let area = self.work_area();
+            editing::fit_work_area(&mut self.state, area);
             self.fitted = true;
         }
         let view = CanvasView::new(rect, self.state.canvas.viewport());
@@ -447,6 +481,7 @@ impl DesignerPane {
             palette,
             self.widths,
             &self.preview,
+            self.work_area(),
         );
         self.toolpaths
             .paint(&painter, &self.view, &self.state, palette);
@@ -483,11 +518,12 @@ impl DesignerPane {
     /// # Arguments
     /// * `action` - The change.
     pub fn apply_view(&mut self, action: ViewAction) {
+        let area = self.work_area();
         match action {
             ViewAction::ZoomIn => self.state.zoom_in(),
             ViewAction::ZoomOut => self.state.zoom_out(),
-            ViewAction::FitContent => editing::zoom_fit(&mut self.state),
-            ViewAction::FitWorkArea => editing::fit_work_area(&mut self.state),
+            ViewAction::FitContent => editing::zoom_fit(&mut self.state, area),
+            ViewAction::FitWorkArea => editing::fit_work_area(&mut self.state, area),
             // GTK's reset: 100% with the origin at the canvas's bottom-left corner.
             ViewAction::FitViewport => {
                 self.state.canvas.set_zoom(1.0);
@@ -651,16 +687,31 @@ impl Pane for DesignerPane {
         true
     }
 
+    fn set_device(&mut self, profile: Option<&DeviceProfile>) {
+        self.device = profile.map(|p| {
+            let (x, y) = (&p.x_axis, &p.y_axis);
+            (
+                x.min.min(x.max),
+                y.min.min(y.max),
+                x.min.max(x.max),
+                y.min.max(y.max),
+            )
+        });
+        self.update_limits();
+    }
+
     fn configure(&mut self, config: &Config) {
         self.units = config.ui.measurement_system;
         // GTK's fallback when no device profile is active: the Preferences limits.
         let machine = &config.machine;
-        self.limits = (machine.x_limit > 0.0 && machine.y_limit > 0.0).then_some(MachineLimits {
-            x_min: 0.0,
-            x_max: machine.x_limit,
-            y_min: 0.0,
-            y_max: machine.y_limit,
-        });
+        self.config_limits =
+            (machine.x_limit > 0.0 && machine.y_limit > 0.0).then_some(MachineLimits {
+                x_min: 0.0,
+                x_max: machine.x_limit,
+                y_min: 0.0,
+                y_max: machine.y_limit,
+            });
+        self.update_limits();
         self.widths = LineWidths {
             grid_major: config.ui.grid_major_line_width as f32,
             grid_minor: config.ui.grid_minor_line_width as f32,

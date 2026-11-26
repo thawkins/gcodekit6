@@ -483,18 +483,19 @@ pub fn zoom_at(state: &mut DesignerState, view: &CanvasView, p: egui::Pos2, fact
     viewport.set_pan(pan_x, pan_y);
 }
 
-/// Fits every shape into the view (5% padding), or the default work area when there are
-/// none (GTK: the device's area, falling back to 250 x 250 mm).
+/// Fits every shape into the view (5% padding), or the work area when there are none (GTK:
+/// the device's area).
 ///
 /// # Arguments
 /// * `state` - The design.
-pub fn zoom_fit(state: &mut DesignerState) {
+/// * `area` - The work area: the device's, else [`default_work_area`].
+pub fn zoom_fit(state: &mut DesignerState, area: Bounds) {
     let bounds = state
         .canvas
         .shapes()
         .map(|o| o.get_total_bounds())
         .reduce(|a, b| (a.0.min(b.0), a.1.min(b.1), a.2.max(b.2), a.3.max(b.3)))
-        .unwrap_or(work_area());
+        .unwrap_or(area);
     state.canvas.fit_to_bounds(
         bounds.0,
         bounds.1,
@@ -504,19 +505,20 @@ pub fn zoom_fit(state: &mut DesignerState) {
     );
 }
 
-/// Fits the default work area into the view (GTK's start-up view without a device).
+/// Fits the work area into the view (GTK's Fit to Device and start-up view).
 ///
 /// # Arguments
 /// * `state` - The design.
-pub fn fit_work_area(state: &mut DesignerState) {
-    let (x0, y0, x1, y1) = work_area();
+/// * `area` - The work area: the device's, else [`default_work_area`].
+pub fn fit_work_area(state: &mut DesignerState, area: Bounds) {
+    let (x0, y0, x1, y1) = area;
     state
         .canvas
         .fit_to_bounds(x0, y0, x1, y1, core_constants::VIEW_PADDING);
 }
 
-/// The default work area: GTK's area without a device profile.
-pub fn work_area() -> Bounds {
+/// The default work area: GTK's area without a device profile, 250 x 250 mm.
+pub fn default_work_area() -> Bounds {
     (
         0.0,
         0.0,

@@ -54,7 +54,8 @@ impl DesignerPane {
                     ids: objects.iter().map(|o| o.id).collect(),
                     objects: objects.into_iter().map(Some).collect(),
                 }));
-            editing::zoom_fit(&mut self.state);
+            let area = self.work_area();
+            editing::zoom_fit(&mut self.state, area);
         }
         added
     }

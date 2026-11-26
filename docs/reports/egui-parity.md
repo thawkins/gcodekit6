@@ -189,7 +189,7 @@ Status values:
 | Undo / redo | 40-designer | Ported | `test_designer_editing::undo_redo_commands`, `test_designer_app::app_routes_undo_to_active_designer_and_tracks_dirty` |
 | Save / open design files | 40-designer | Ported | `test_designer_files::save_then_open_round_trips_the_design` |
 | Export G-code and SVG | 40-designer | Ported | `test_designer_files::export_gcode_writes_only_visible_shapes`, `test_designer_files::export_svg_writes_visible_shapes` |
-| Device work area on the canvas | *(GTK)* | Gap | egui shows the default 250 x 250 mm (designer module docs) |
+| Device work area on the canvas | *(GTK)* | Ported | `test_designer_work_area::test_work_area_follows_the_active_profile`, `test_designer_work_area::test_fit_to_device_fits_the_profiles_area`, `test_designer_work_area::test_export_limits_are_the_profiles_else_the_preferences` (the active profile's X/Y limits are outlined, fitted by Fit to Device and used for the export limits; 250 x 250 mm and the Preferences limits without a profile) |
 
 ## CAM tools
 
