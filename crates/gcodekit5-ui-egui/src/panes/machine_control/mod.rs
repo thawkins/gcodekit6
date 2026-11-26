@@ -1,7 +1,8 @@
-//! The Machine Control pane: connection, emergency stop, homing, the position readout (DRO),
-//! work zero (per-axis Zero, the G54-G59 selector, Zero All Axes, Go to Work Zero), job
-//! control with stream progress, jogging, feed/rapid/spindle overrides and a one-line command
-//! entry.
+//! The Machine Control pane: connection, emergency stop, homing, the position readout (DRO,
+//! with A/B/C in degrees when reported), machine limits and the buffer readout, work zero
+//! (per-axis Zero, the G54-G59 selector, Zero All Axes, Go to Work Zero), quick Z and edge
+//! probes, job control with stream progress, jogging (pad and keyboard), feed/rapid/spindle
+//! overrides with Set %, and a one-line command entry.
 //!
 //! Laid out as GTK's page: a sidebar (status strip, connection, machine state with homing,
 //! the G54-G59 selector, job control, the command entry and notices) and a centre column
