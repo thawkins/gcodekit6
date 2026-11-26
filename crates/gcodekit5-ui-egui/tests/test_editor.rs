@@ -788,3 +788,99 @@ fn test_notice_cleared_by_success() {
     pane.program_fed();
     assert_eq!(pane.notice(), None);
 }
+
+/// Answers every message dialog with Yes, or No when `yes` is false.
+fn answer_messages(app: &mut GcodeKitApp, yes: bool) {
+    app.dialogs_mut()
+        .set_override(Some(Box::new(move |_: &Request| {
+            Answer::Message(if yes {
+                craft_dialogs::MessageResult::Yes
+            } else {
+                craft_dialogs::MessageResult::No
+            })
+        })));
+}
+
+/// Clear editor asks first when the editor holds G-code: No keeps the text, Yes removes it
+/// (an edit, so the file is unsaved).
+#[test]
+fn test_clear_editor_asks_then_clears() {
+    let mut harness = app_harness();
+    harness
+        .state()
+        .editor()
+        .borrow_mut()
+        .buffer_mut()
+        .set_text("G1 X1\n".to_string());
+    harness.step();
+    harness.get_by_label("Clear editor").click();
+    harness.step();
+    assert_eq!(harness.state().dialogs().waiting(), 1, "no question asked");
+    answer_messages(harness.state_mut(), false);
+    app_frame(&mut harness);
+    app_frame(&mut harness);
+    assert_eq!(harness.state().editor().borrow().buffer().text(), "G1 X1\n");
+
+    harness.get_by_label("Clear editor").click();
+    harness.step();
+    answer_messages(harness.state_mut(), true);
+    app_frame(&mut harness);
+    app_frame(&mut harness);
+    let editor = harness.state().editor();
+    let editor = editor.borrow();
+    assert_eq!(editor.buffer().text(), "");
+    assert!(editor.buffer().is_dirty());
+}
+
+/// An empty editor is cleared without a question.
+#[test]
+fn test_clear_editor_without_text_asks_nothing() {
+    let mut harness = app_harness();
+    harness
+        .state()
+        .editor()
+        .borrow_mut()
+        .buffer_mut()
+        .set_text("  \n".to_string());
+    harness.step();
+    harness.get_by_label("Clear editor").click();
+    harness.step();
+    harness.step();
+    assert_eq!(harness.state().dialogs().waiting(), 0);
+    assert_eq!(harness.state().editor().borrow().buffer().text(), "");
+}
+
+/// While a job runs Clear editor is disabled and refused; a Yes given after a job started
+/// leaves the text as it is.
+#[test]
+fn test_clear_editor_refused_while_job_runs() {
+    let mut harness = crate::machine_support::app_harness(app_with_running_job("G1 X1\n"));
+    harness.step();
+    harness.step();
+    use egui_kittest::kittest::NodeT;
+    assert!(
+        harness
+            .get_by_label("Clear editor")
+            .accesskit_node()
+            .is_disabled(),
+        "Clear editor enabled during a job"
+    );
+    let tr = Translator::new("en");
+    harness.state().editor().borrow_mut().request_clear(&tr);
+    harness.step();
+    assert_eq!(harness.state().dialogs().waiting(), 0, "asked during a job");
+    assert_eq!(harness.state().editor().borrow().buffer().text(), "G1 X1\n");
+
+    // A question answered Yes after the job started does not clear either.
+    let mut requested = Vec::new();
+    let machine = &harness.state().state().machine;
+    let mut ctx = PaneContext::new(&tr, &mut requested).with_machine(machine);
+    let editor = harness.state().editor();
+    let took = editor.borrow_mut().confirmed(
+        gcodekit5_ui_egui::dialogs::ConfirmRequest::ClearEditor,
+        gcodekit5_ui_egui::dialogs::ConfirmChoice::Yes,
+        &mut ctx,
+    );
+    assert!(took);
+    assert_eq!(editor.borrow().buffer().text(), "G1 X1\n");
+}

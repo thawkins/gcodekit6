@@ -18,6 +18,11 @@
 //! for the File commands and hands the text to the machine as the program to stream
 //! ([`EditorPane::program_stale`], [`EditorPane::program_fed`]).
 //!
+//! Clear editor (GTK's button in the Machine Control editor header) sits at the end of the
+//! find row: it is disabled, and refused, while a job runs (the text is read-only then), and
+//! asks first when the editor holds any G-code, as GTK did; the question is asked again at
+//! Yes, which is refused if a job started meanwhile.
+//!
 //! Ported from the GTK `ui/gtk/editor.rs` (GtkSourceView). Not ported: replace and replace
 //! all, and the line-counter tooltip; the GTK find box's match index ("2 of 5") is shown as
 //! the match count only.
@@ -44,6 +49,7 @@ use gcodekit5_app::machine::MachineEvent;
 pub use buffer::EditorBuffer;
 use highlight::HighlightStyle;
 
+use crate::dialogs::{ConfirmChoice, ConfirmRequest};
 use crate::icons::{Icon, icon_only_button};
 use crate::workspace::{Pane, PaneContext, PaneId};
 
@@ -58,6 +64,9 @@ const SCROLL_TRIES: u8 = 2;
 
 /// Font size of the editor's text.
 const FONT_SIZE: f32 = 13.0;
+
+/// Shown while a job runs: the text cannot be changed.
+const READ_ONLY_DURING_JOB: &str = n_!("Read-only while a job is running.");
 
 /// The msgids the pane shows, for the translation check.
 pub fn msgids() -> Vec<&'static str> {
@@ -74,7 +83,8 @@ pub fn msgids() -> Vec<&'static str> {
         n_!("Stop the running job before opening a file."),
         n_!("Could not save file"),
         n_!("Cannot stream this program"),
-        n_!("Read-only while a job is running."),
+        READ_ONLY_DURING_JOB,
+        n_!("Clear editor"),
     ]
 }
 
@@ -119,6 +129,8 @@ pub struct EditorPane {
     last_cursor: Option<usize>,
     /// An error to show under the text until the next file operation.
     notice: Option<String>,
+    /// A confirmation the app is to ask for (Clear editor).
+    confirm: Option<ConfirmRequest>,
 }
 
 impl Default for EditorPane {
@@ -148,6 +160,7 @@ impl EditorPane {
             stream_map: Vec::new(),
             last_cursor: None,
             notice: None,
+            confirm: None,
         }
     }
 
@@ -283,6 +296,34 @@ impl EditorPane {
         self.notice = Some(notice);
     }
 
+    /// Clear editor: refused while a job runs; with only whitespace (or nothing) the text is
+    /// cleared at once, otherwise the app is asked to confirm first (as GTK did).
+    ///
+    /// # Arguments
+    /// * `tr` - Translator for the refusal.
+    pub fn request_clear(&mut self, tr: &Translator) {
+        if self.locked {
+            self.notice = Some(tr.tr(READ_ONLY_DURING_JOB).into_owned());
+            return;
+        }
+        if self.buffer.text().trim().is_empty() {
+            if !self.buffer.text().is_empty() {
+                self.clear();
+            }
+            return;
+        }
+        self.confirm = Some(ConfirmRequest::ClearEditor);
+    }
+
+    /// Removes all text: an edit, so the file is unsaved and the program is handed over again.
+    fn clear(&mut self) {
+        self.buffer.set_text(String::new());
+        self.find_match = None;
+        self.select_match = false;
+        self.last_edit = Some(Instant::now());
+        self.scroll_to = Some((0, SCROLL_TRIES));
+    }
+
     /// Follows the streaming job: the line in progress becomes the current line.
     fn follow_stream(&mut self, acked: usize, total: usize) {
         // Only while the streamed program is the one this editor handed over.
@@ -309,8 +350,8 @@ impl EditorPane {
     fn show_find(&mut self, ui: &mut egui::Ui, tr: &Translator) {
         ui.horizontal(|ui| {
             let hint = tr.tr("Search...");
-            // Two icon buttons and the match count.
-            let rest = 2.0 * 36.0 + 110.0;
+            // Three icon buttons and the match count.
+            let rest = 3.0 * 36.0 + 110.0;
             let edit = egui::TextEdit::singleline(&mut self.find_query)
                 .hint_text(hint.as_ref())
                 .desired_width((ui.available_width() - rest).clamp(80.0, 200.0));
@@ -350,6 +391,14 @@ impl EditorPane {
                 };
                 ui.label(format!("{} {count}", tr.tr("Matches:")));
             }
+            let clear = ui
+                .add_enabled_ui(!self.locked, |ui| {
+                    icon_only_button(ui, Icon::Clear, &tr.tr("Clear editor"))
+                })
+                .inner;
+            if clear.clicked() {
+                self.request_clear(tr);
+            }
         });
     }
 
@@ -372,7 +421,7 @@ impl EditorPane {
             ));
             if self.locked {
                 ui.separator();
-                ui.label(tr.tr("Read-only while a job is running."));
+                ui.label(tr.tr(READ_ONLY_DURING_JOB));
             }
             if self.is_large() {
                 ui.separator();
@@ -413,6 +462,30 @@ impl Pane for EditorPane {
             self.show_text_edit(ui, &style, row_height, &label);
         }
         self.settle_scroll();
+    }
+
+    fn take_confirm(&mut self) -> Option<ConfirmRequest> {
+        self.confirm.take()
+    }
+
+    fn confirmed(
+        &mut self,
+        request: ConfirmRequest,
+        choice: ConfirmChoice,
+        ctx: &mut PaneContext,
+    ) -> bool {
+        if request != ConfirmRequest::ClearEditor {
+            return false;
+        }
+        if choice == ConfirmChoice::Yes {
+            // Checked again: a job may have started while the question was open.
+            if ctx.machine().is_some_and(|m| m.job_running()) {
+                self.notice = Some(ctx.tr.tr(READ_ONLY_DURING_JOB).into_owned());
+            } else {
+                self.clear();
+            }
+        }
+        true
     }
 
     fn machine_events(&mut self, events: &[MachineEvent], _tr: &Translator) {
@@ -460,6 +533,28 @@ impl Pane for SharedEditor {
         match self.0.try_borrow_mut() {
             Ok(mut pane) => pane.machine_events(events, tr),
             Err(error) => tracing::warn!(%error, "editor busy; machine events dropped"),
+        }
+    }
+
+    fn take_confirm(&mut self) -> Option<ConfirmRequest> {
+        self.0
+            .try_borrow_mut()
+            .ok()
+            .and_then(|mut pane| pane.take_confirm())
+    }
+
+    fn confirmed(
+        &mut self,
+        request: ConfirmRequest,
+        choice: ConfirmChoice,
+        ctx: &mut PaneContext,
+    ) -> bool {
+        match self.0.try_borrow_mut() {
+            Ok(mut pane) => pane.confirmed(request, choice, ctx),
+            Err(error) => {
+                tracing::warn!(%error, "editor busy; confirmation dropped");
+                false
+            }
         }
     }
 }

@@ -611,7 +611,12 @@ impl GcodeKitApp {
             }
             (ConfirmRequest::UnsavedDevice, choice) => self.device_quit_answer(choice.as_unsaved()),
             // The quit flow never asks this; forget the quit rather than act on it.
-            (ConfirmRequest::Restart | ConfirmRequest::ZeroAllAxes(_), _) => self.cancel_quit(),
+            (
+                ConfirmRequest::Restart
+                | ConfirmRequest::ZeroAllAxes(_)
+                | ConfirmRequest::ClearEditor,
+                _,
+            ) => self.cancel_quit(),
         }
     }
 
@@ -1065,7 +1070,7 @@ impl GcodeKitApp {
                 self.cancel_quit();
             }
             DialogAnswer::Confirm {
-                request: request @ ConfirmRequest::ZeroAllAxes(_),
+                request: request @ (ConfirmRequest::ZeroAllAxes(_) | ConfirmRequest::ClearEditor),
                 choice,
             } => {
                 let mut queue = Vec::new();

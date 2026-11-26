@@ -133,7 +133,7 @@ Status values:
 | Executed-line tick marks | 20-gcode-editor | Not applicable | Not in the GTK source |
 | Undo / redo, clipboard, select all | 90-shortcuts | Manual check needed | Text field's own undo and clipboard; no test |
 | Read-only while a job runs | *(GTK)* | Ported | `test_editor::editor_read_only_while_job_runs` |
-| Clear editor | *(GTK)* | Gap | GTK Machine Control "Clear editor"; not in egui |
+| Clear editor | *(GTK)* | Ported | `test_editor::clear_editor_asks_then_clears`, `test_editor::clear_editor_without_text_asks_nothing`, `test_editor::clear_editor_refused_while_job_runs` (asks whenever the editor holds G-code, as GTK did) |
 
 ## Visualizer
 

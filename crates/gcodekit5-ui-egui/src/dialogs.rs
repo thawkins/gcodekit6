@@ -239,6 +239,8 @@ pub enum ConfirmRequest {
     /// Zero All Axes: set the current X/Y/Z as 0 of the work coordinate system it names,
     /// the active one when asked (Yes), or not (No).
     ZeroAllAxes(Wcs),
+    /// Clear editor: remove all G-code from the editor (Yes), or keep it (No).
+    ClearEditor,
 }
 
 impl ConfirmRequest {
@@ -273,6 +275,10 @@ impl ConfirmRequest {
             Self::StopJob => (
                 n_!("Stop job and quit?"),
                 n_!("A job is running. Quitting stops it and closes the machine connection."),
+            ),
+            Self::ClearEditor => (
+                n_!("Clear the editor?"),
+                n_!("All G-code in the editor will be removed."),
             ),
             Self::ZeroAllAxes(_) => (
                 n_!("Zero all work axes?"),
@@ -488,9 +494,9 @@ impl Dialogs {
                 ),
             ),
             ConfirmRequest::Restart => (MessageLevel::Info, MessageButtons::YesNo),
-            ConfirmRequest::StopJob | ConfirmRequest::ZeroAllAxes(_) => {
-                (MessageLevel::Warning, MessageButtons::YesNo)
-            }
+            ConfirmRequest::StopJob
+            | ConfirmRequest::ZeroAllAxes(_)
+            | ConfirmRequest::ClearEditor => (MessageLevel::Warning, MessageButtons::YesNo),
         };
         let message = Message {
             level,
@@ -503,7 +509,8 @@ impl Dialogs {
                 | ConfirmRequest::UnsavedMaterial
                 | ConfirmRequest::UnsavedDevice
                 | ConfirmRequest::Restart
-                | ConfirmRequest::StopJob => tr.tr(description).into_owned(),
+                | ConfirmRequest::StopJob
+                | ConfirmRequest::ClearEditor => tr.tr(description).into_owned(),
             },
             buttons,
         };
@@ -644,6 +651,7 @@ pub fn msgids() -> Vec<&'static str> {
         ConfirmRequest::Restart,
         ConfirmRequest::StopJob,
         ConfirmRequest::ZeroAllAxes(Wcs::G54),
+        ConfirmRequest::ClearEditor,
     ]
     .into_iter()
     .flat_map(|request| {
