@@ -599,3 +599,38 @@ fn repetier_resend_after_m112_writes_nothing() {
         shared.log()
     );
 }
+
+#[test]
+fn repetier_m112_in_any_form_is_the_emergency_stop() {
+    for typed in [
+        "N5 M112",
+        "N5 M112*23",
+        "M112 ; stop",
+        "M112 (panic)",
+        "m112",
+        "  M112   ",
+        "N12  m112  *7 ; now",
+    ] {
+        let shared = Arc::new(LoopbackShared::default());
+        let mut controller = connect_repetier(&shared);
+        controller.send_line(typed).expect("send");
+        assert!(
+            wait_until(|| controller.is_halted()),
+            "{typed:?} not taken as the emergency stop: {:?}",
+            shared.log()
+        );
+        assert!(
+            shared.log().contains(&Wrote::Line("M112".to_string())),
+            "{typed:?} not written as a bare M112: {:?}",
+            shared.log()
+        );
+    }
+    // Not an M112.
+    let shared = Arc::new(LoopbackShared::default());
+    let mut controller = connect_repetier(&shared);
+    for other in ["M1120", "M11", "G0 X112", "(M112)", "; M112"] {
+        controller.send_line(other).expect("send");
+    }
+    assert!(wait_until(|| controller.lines_answered()));
+    assert!(!controller.is_halted(), "{:?}", shared.log());
+}

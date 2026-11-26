@@ -1002,9 +1002,27 @@ fn repetier_translates(line: &str) -> bool {
     !upper.starts_with('$') || upper.starts_with("$H") || upper.starts_with("$J=")
 }
 
-/// Whether `line` is the emergency stop `M112` (and nothing else).
+/// Whether `line` is the emergency stop `M112`, as firmware reads it: whatever the case and
+/// spacing, with or without a line number (`N5`), checksum (`*23`) and comments (`; ...`,
+/// `(...)`).
 fn is_m112(line: &str) -> bool {
-    line.trim().eq_ignore_ascii_case("M112")
+    let code = line.split(';').next().unwrap_or_default();
+    let code = code.split('*').next().unwrap_or_default();
+    let mut text = String::with_capacity(code.len());
+    let mut depth = 0usize;
+    for c in code.chars() {
+        match c {
+            '(' => depth += 1,
+            ')' => depth = depth.saturating_sub(1),
+            c if depth == 0 && !c.is_whitespace() => text.push(c.to_ascii_uppercase()),
+            _ => {}
+        }
+    }
+    let text = match text.strip_prefix('N') {
+        Some(rest) => rest.trim_start_matches(|c: char| c.is_ascii_digit()),
+        None => text.as_str(),
+    };
+    text == "M112"
 }
 
 /// Maps the stored connection settings to transport parameters.
