@@ -33,7 +33,9 @@
 use gcodekit5_app::device_status::jog_direction;
 use gcodekit5_app::i18n::Translator;
 use gcodekit5_app::machine::Axis;
-use gcodekit5_app::machine::grbl_stream::{LINEAR_JOG_DECIMALS, jog_step_choices, jog_writes_zero};
+use gcodekit5_app::machine::grbl_stream::{
+    LINEAR_JOG_DECIMALS, ROTARY_JOG_DECIMALS, jog_step_choices, jog_value_text, jog_writes_zero,
+};
 use gcodekit5_core::units::{FeedRateUnits, MeasurementSystem};
 
 use std::time::{Duration, Instant};
@@ -299,6 +301,13 @@ impl JogPanel {
     /// is raised to it, so a click never asks for a zero-length move.
     pub(super) fn configure_rotary(&mut self, step_deg: f32, limits_deg: [f32; 3]) {
         if step_deg.is_finite() && step_deg > 0.0 {
+            if step_deg < MIN_ROTARY_STEP_DEG {
+                tracing::warn!(
+                    step_deg,
+                    used = MIN_ROTARY_STEP_DEG,
+                    "rotary jog step below what a jog line writes; raised"
+                );
+            }
             self.rotary_step_deg = step_deg.max(MIN_ROTARY_STEP_DEG);
         }
         for (limit, new) in self.rotary_limit_deg.iter_mut().zip(limits_deg) {
@@ -587,6 +596,10 @@ impl JogPanel {
                 },
             );
         }
+        // The step these buttons move, as used: a configured step too small for a jog line
+        // is raised to 0.001 degree, and shown so.
+        let step = jog_value_text(step, ROTARY_JOG_DECIMALS);
+        ui.weak(format!("{} {step}\u{b0}", tr.tr("Step")));
     }
 
     /// Draws the step chooser in the user's units.

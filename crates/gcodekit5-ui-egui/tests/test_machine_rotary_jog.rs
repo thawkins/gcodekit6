@@ -42,6 +42,7 @@ fn enabled(harness: &Harness<'_, GcodeKitApp>, label: &str) -> bool {
 fn test_rotary_jog_steps_by_the_rotary_increment() {
     let (mut harness, shared) = rotary_app(A_AND_B, "Idle");
     assert!(harness.query_by_label("Jog C+").is_none(), "C not reported");
+    assert_eq!(harness.query_all_by_label("Step 5.000\u{b0}").count(), 2);
     harness.get_by_label("Jog A+").click();
     harness.step();
     assert!(
@@ -137,6 +138,8 @@ fn test_rotary_hold_cancelled_when_the_axis_row_goes() {
 #[test]
 fn test_tiny_rotary_step_is_raised_not_sent_as_zero() {
     let (mut harness, shared) = rotary_app_with_step(0.0001, A_AND_B, "Idle");
+    // The step used is shown in each rotary row, not the configured 0.0001.
+    assert_eq!(harness.query_all_by_label("Step 0.001\u{b0}").count(), 2);
     harness.get_by_label("Jog A+").click();
     harness.step();
     assert!(
