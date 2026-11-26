@@ -261,9 +261,7 @@ Ranked by user impact. Sizes are rough estimates for one developer who knows the
 
 | Rank | Gap | User impact | Rough size |
 | --- | --- | --- | --- |
-| 4 | Visualizer 2D mode, display toggles, grid spacing, machine bounds, fit to device | Medium | 2-3 days |
 | 6 | Designer mirror, align, cut/copy/paste, boolean ops, Ctrl+G | Medium | 2-3 days (designer commands exist in `gcodekit5-designer`) |
-| 7 | Visualizer run preview (play/pause/speed) | Low | 1-2 days |
 | 8 | Import STL | Low: behind a Settings switch in GTK | 1 day |
 | 11 | Preferences Controller page and shortcut editor | Low | 1-2 days |
 | 12 | Designer device work area, gallery icons | Low | 1-2 days together |
