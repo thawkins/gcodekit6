@@ -559,6 +559,39 @@ fn test_firmware_settings_write_read_back_with_another_value_is_a_mismatch() {
     );
 }
 
+/// A read-back drops only an old GRBL's trailing `(comment)`: a text value with spaces is
+/// compared whole, so a value cut after its first word is a mismatch.
+#[test]
+fn test_firmware_settings_read_back_keeps_a_multi_word_value() {
+    use gcodekit5_app::i18n::Translator;
+    use gcodekit5_ui_egui::windows::setting_write::{PendingWrite, WriteOutcome};
+
+    let (mut state, _shared) = loopback_state(Duration::from_millis(1));
+    connect(&mut state);
+    let tr = Translator::new("en");
+    let read_back = |written: &str, stored: &str| {
+        let mut write = PendingWrite::send(&state.machine, written, true, &tr).expect("send");
+        write.observe(&MachineEvent::Sent(written.to_string()));
+        write.observe(&MachineEvent::Received(stored.to_string()))
+    };
+    assert_eq!(
+        read_back("$70=my shop cnc", "$70=my shop cnc"),
+        Some(WriteOutcome::Accepted)
+    );
+    assert_eq!(
+        read_back("$70=my shop cnc", "$70=my"),
+        Some(WriteOutcome::Mismatch("$70=my".to_string()))
+    );
+    assert_eq!(
+        read_back("$3=1", "$3=1 (dir invert mask)"),
+        Some(WriteOutcome::Accepted)
+    );
+    assert_eq!(
+        read_back("$3=257", "$3=1 (dir invert mask)"),
+        Some(WriteOutcome::Mismatch("$3=1".to_string()))
+    );
+}
+
 /// The Firmware Settings window reports a stored value that differs from the written one
 /// as a failure naming both, never as "Setting written".
 #[test]

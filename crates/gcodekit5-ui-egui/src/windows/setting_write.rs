@@ -199,14 +199,20 @@ impl PendingWrite {
     }
 }
 
-/// Splits a `$n=v` line into the setting number and the value (up to the first space, so
-/// an old GRBL's `$3=1 (dir port invert mask)` gives `1`).
+/// Splits a `$n=v` line into the setting number and the trimmed value, without an old
+/// GRBL's trailing comment (`$3=1 (dir port invert mask)` gives `1`); a text value with
+/// spaces (`$70=my shop cnc`) is kept whole.
 fn split_setting(line: &str) -> Option<(&str, &str)> {
     let (number, value) = line.strip_prefix('$')?.split_once('=')?;
     if number.is_empty() || !number.bytes().all(|b| b.is_ascii_digit()) {
         return None;
     }
-    Some((number, value.split_whitespace().next().unwrap_or("")))
+    let value = value.trim();
+    let value = match value.rfind('(') {
+        Some(open) if value.ends_with(')') => value[..open].trim_end(),
+        Some(_) | None => value,
+    };
+    Some((number, value))
 }
 
 /// Whether a read-back `stored` value is the `written` one. Numbers are compared to the
