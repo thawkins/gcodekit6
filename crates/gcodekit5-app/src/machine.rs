@@ -34,8 +34,9 @@ use gcodekit5_communication::{Communicator, ConnectionParams, SerialCommunicator
 use gcodekit5_settings::{ConnectionSettings, ConnectionType};
 
 use grbl_stream::{
-    CharCountWindow, GRBL_RX_BUFFER_BYTES, GrblResponseLine, MAX_LINE_LENGTH, ResponseLineSplitter,
-    classify_response, linear_jog_command, rotary_jog_line,
+    CharCountWindow, GRBL_RX_BUFFER_BYTES, GrblResponseLine, LINEAR_JOG_DECIMALS, MAX_LINE_LENGTH,
+    ROTARY_JOG_DECIMALS, ResponseLineSplitter, classify_response, jog_writes_zero,
+    linear_jog_command, rotary_jog_line,
 };
 
 /// How often the worker asks for a status report while it waits for a feed hold to complete.
@@ -639,9 +640,13 @@ impl MachineController {
 
     fn jog_sent_at(&mut self, axis: Axis, distance_mm: f32, feed_mm_min: f32, sent: Instant) {
         let rotary = matches!(axis, Axis::A | Axis::B | Axis::C);
-        // The written value: 2 decimals for mm, 3 for degrees; zero means no motion.
-        let scale = if rotary { 1000.0 } else { 100.0 };
-        let written_zero = (distance_mm * scale).round() == 0.0;
+        // Judged on the text the line writes: zero there means no motion.
+        let decimals = if rotary {
+            ROTARY_JOG_DECIMALS
+        } else {
+            LINEAR_JOG_DECIMALS
+        };
+        let written_zero = jog_writes_zero(distance_mm, decimals);
         if !distance_mm.is_finite()
             || written_zero
             || !(feed_mm_min.is_finite() && feed_mm_min > 0.0)

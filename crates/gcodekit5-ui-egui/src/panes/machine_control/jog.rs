@@ -33,7 +33,7 @@
 use gcodekit5_app::device_status::jog_direction;
 use gcodekit5_app::i18n::Translator;
 use gcodekit5_app::machine::Axis;
-use gcodekit5_app::machine::grbl_stream::jog_step_choices;
+use gcodekit5_app::machine::grbl_stream::{LINEAR_JOG_DECIMALS, jog_step_choices, jog_writes_zero};
 use gcodekit5_core::units::{FeedRateUnits, MeasurementSystem};
 
 use std::time::{Duration, Instant};
@@ -428,10 +428,12 @@ impl JogPanel {
             .ok_or(n_!("Jog refused: the machine position is unknown."))?;
         let direction = directed(button.axis, button.sign);
         let left = remaining_travel(mpos[button.index], travel, direction);
-        if left <= 0.0 {
+        let distance = direction * travel.min(left);
+        // Less travel left than a jog line can write (it would be sent as `X0.00`).
+        if left <= 0.0 || jog_writes_zero(distance, LINEAR_JOG_DECIMALS) {
             return Err(n_!("Jog refused: no travel left in that direction."));
         }
-        Ok(direction * travel.min(left))
+        Ok(distance)
     }
 
     /// Draws one jog button and adds what it asks for to `actions`.

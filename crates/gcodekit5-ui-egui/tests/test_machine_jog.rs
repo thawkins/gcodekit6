@@ -258,6 +258,37 @@ fn test_hold_refused_at_limit() {
     assert_eq!(settled_cancels(&shared), 0);
 }
 
+/// A hold clamped to less travel than a jog line can write (5 um left: it would be sent
+/// as `X0.00`) is refused like one at the limit, with no zero-length jog; with 0.01 mm left
+/// it moves exactly that.
+#[test]
+fn test_hold_refused_when_clamped_below_a_written_step() {
+    for (mpos, expected) in [
+        (-0.005_f32, None),
+        (-0.0049, None),
+        (-0.0051, Some("$J=G91 G21 X0.01 F1000")),
+    ] {
+        let (mut harness, shared) = hold_app(loopback_config(), Some([mpos, -100.0, -50.0]));
+        let at = press(&mut harness, "Jog X+");
+        harness.step();
+        match expected {
+            None => {
+                let _ = harness.get_by_label("Jog refused: no travel left in that direction.");
+                release(&mut harness, at);
+                assert!(
+                    crate::test_machine_keyboard_jog::settled_jogs(&harness, &shared).is_empty(),
+                    "{mpos}: {:?}",
+                    shared.log()
+                );
+            }
+            Some(line) => {
+                assert_eq!(wait_jogs(&shared, 1), [line], "{mpos}");
+                release(&mut harness, at);
+            }
+        }
+    }
+}
+
 /// I3: without a machine position the hold does not move and the pane says why.
 #[test]
 fn test_hold_refused_without_position() {

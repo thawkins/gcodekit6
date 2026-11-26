@@ -219,6 +219,53 @@ fn test_rotary_jog_has_three_decimals_and_zero_jogs_are_refused() {
     assert_eq!(jogs, 1, "{:?}", shared.log());
 }
 
+/// The zero-length guard judges the text the line writes: a distance that writes as
+/// `0.00` is refused, one that writes `0.01` is sent, and no written jog is ever zero.
+#[test]
+fn test_jog_guard_and_formatter_round_alike() {
+    use gcodekit5_app::machine::Axis;
+    use gcodekit5_app::machine::grbl_stream::{jog_value_text, jog_writes_zero};
+    for d in [0.005_f32, -0.005, 0.0049, 0.0051, 0.0005, 0.00049] {
+        let decimals = 2;
+        let text = jog_value_text(d, decimals);
+        assert_eq!(
+            jog_writes_zero(d, decimals),
+            text.parse::<f32>().map_or(true, |v| v == 0.0),
+            "{d}: {text}"
+        );
+    }
+    assert!(jog_writes_zero(0.0049, 2));
+    assert!(!jog_writes_zero(0.0051, 2));
+    assert!(jog_writes_zero(0.00049, 3));
+
+    let shared = Arc::new(LoopbackShared::default());
+    let mut controller = loopback_controller(&shared, Duration::from_millis(1));
+    connect(&mut controller);
+    for d in [0.005_f32, -0.005, 0.0049, 0.0051] {
+        controller.jog(Axis::X, d, 1000.0);
+    }
+    assert!(
+        wait_until(|| shared
+            .log()
+            .contains(&Wrote::Line("$J=G91 G21 X0.01 F1000".to_string()))),
+        "0.0051 not written: {:?}",
+        shared.log()
+    );
+    std::thread::sleep(Duration::from_millis(20));
+    for w in shared.log() {
+        if let Wrote::Line(line) = w
+            && let Some(rest) = line.strip_prefix("$J=G91 G21 X")
+        {
+            let value: f32 = rest
+                .split(' ')
+                .next()
+                .and_then(|v| v.parse().ok())
+                .expect("value");
+            assert!(value != 0.0, "zero-length jog written: {line}");
+        }
+    }
+}
+
 #[test]
 fn test_repaint_hook_called_on_event() {
     let shared = Arc::new(LoopbackShared::default());
