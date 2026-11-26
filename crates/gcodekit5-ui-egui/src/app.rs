@@ -811,15 +811,19 @@ impl GcodeKitApp {
             ..Active::NONE
         };
         // While Preferences records a key, only the E-STOP and feed hold keys run; every
-        // other press is left for the window to record.
+        // other press is left for the window to record. A command that moves the machine
+        // never runs while a text field has the keyboard, whatever its key (an F-key or a
+        // Ctrl chord would otherwise fire while typing); the press stays with the field.
         let recording = self.settings_window.is_recording();
+        let typing = active.typing;
         let (hits, modifiers) = ctx.input_mut(|input| {
             let hits = self
                 .dispatcher
                 .dispatch_filtered(input, &self.keymap, &active, |hit| {
-                    !recording
-                        || Command::from_ref(&hit.command)
-                            .is_some_and(|c| crate::shortcuts::LOCKED.contains(&c))
+                    let command = Command::from_ref(&hit.command);
+                    let safety = command.is_some_and(|c| crate::shortcuts::LOCKED.contains(&c));
+                    let motion = command.is_some_and(Command::starts_motion);
+                    (!recording || safety) && !(typing && motion)
                 });
             (hits, input.modifiers)
         });

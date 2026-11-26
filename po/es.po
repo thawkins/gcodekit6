@@ -4700,3 +4700,6 @@ msgstr "No se admiten pulsaciones dobles"
 
 msgid "{key} works in the wrong place"
 msgstr "{key} funciona en el lugar equivocado"
+
+msgid "Outside Machine Control a command that moves the machine needs Ctrl, Alt or a function key"
+msgstr "Fuera del Control de máquina, un comando que mueve la máquina necesita Ctrl, Alt o una tecla de función"

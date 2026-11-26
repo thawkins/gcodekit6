@@ -402,13 +402,17 @@ impl Command {
         )
     }
 
-    /// Whether the command can start machine motion: a jog, a run, a stream start, a cycle
-    /// start or homing. Its keys stay off the feed hold and soft reset keys.
+    /// Whether the command moves the machine or starts or continues a job: a jog, homing, a
+    /// stream start or a cycle start (resume). Its keys never run while a text field has the
+    /// keyboard, stay off the feed hold and soft reset keys and, outside Machine Control, need
+    /// a modifier or a function key (`crate::shortcuts`). File > Run only previews the
+    /// program in the Visualizer and sends nothing, so it is not one. Go to Work Zero, the
+    /// quick probes and Zero have no keys (pane buttons only).
     pub fn starts_motion(self) -> bool {
         self.is_jog()
             || matches!(
                 self,
-                Command::FileRun | Command::StreamStart | Command::CycleStart | Command::Home
+                Command::StreamStart | Command::CycleStart | Command::Home
             )
     }
 

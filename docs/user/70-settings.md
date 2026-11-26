@@ -44,12 +44,17 @@ A key is refused, with the reason shown above the list, when:
 
 - it is the E-STOP (soft reset, Ctrl+Shift+K) or feed hold (`!`, Ctrl+Shift+H) key; those two
   commands cannot be changed;
-- a command that moves the machine (jog, run, start, cycle start, home) would use the letter of
-  one of those keys;
+- a command that moves the machine (jog, home, stream start, cycle start) would use the letter
+  of one of those keys;
+- a command that moves the machine, other than the jog keys of Machine Control, would get a key
+  without Ctrl, Alt or a function key (it would run on every page);
 - a jog key is not a plain letter, digit or symbol key (with Ctrl, Alt or a function key it would
   jog while you type in a text field);
 - Alt and the letter open a menu in any of the languages;
 - another command already uses it where both could run.
+
+A command that moves the machine never runs from its key while a text field has the keyboard,
+whatever the key; File > Run only previews the program and is not one of them.
 
 Shortcuts are saved with the other settings. A saved shortcut that breaks one of these rules
 (for example after editing the settings file by hand) is replaced by the command's default.

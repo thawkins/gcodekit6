@@ -4692,3 +4692,6 @@ msgstr "Pressões duplas não são suportadas"
 
 msgid "{key} works in the wrong place"
 msgstr "{key} funciona no lugar errado"
+
+msgid "Outside Machine Control a command that moves the machine needs Ctrl, Alt or a function key"
+msgstr "Fora do Controlo da máquina, um comando que move a máquina precisa de Ctrl, Alt ou uma tecla de função"

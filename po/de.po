@@ -4697,3 +4697,6 @@ msgstr "Doppeltes Drücken wird nicht unterstützt"
 
 msgid "{key} works in the wrong place"
 msgstr "{key} wirkt am falschen Ort"
+
+msgid "Outside Machine Control a command that moves the machine needs Ctrl, Alt or a function key"
+msgstr "Außerhalb der Maschinensteuerung braucht ein Befehl, der die Maschine bewegt, Strg, Alt oder eine Funktionstaste"

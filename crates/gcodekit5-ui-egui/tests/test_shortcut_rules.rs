@@ -75,7 +75,6 @@ fn test_motion_commands_stay_off_the_safety_keys() {
     let mut keymap = commands::keymap();
     for (command, free) in [
         (Command::Home, "F9"),
-        (Command::FileRun, "F10"),
         (Command::StreamStart, "F11"),
         (Command::CycleStart, "F12"),
     ] {
@@ -89,8 +88,31 @@ fn test_motion_commands_stay_off_the_safety_keys() {
             "{command:?} {free}"
         );
     }
-    // Commands that move nothing may use those keys.
+    // Commands that move nothing may use those keys; File > Run only previews.
     assert_eq!(set(&mut keymap, Command::About, "Cmd+K"), Ok(()));
+    assert_eq!(set(&mut keymap, Command::FileRun, "Cmd+Alt+K"), Ok(()));
+}
+
+/// Outside Machine Control a motion command would run on every page from a bare key, so it
+/// needs a modifier or a function key; GTK's `~` (Shift+`) for cycle start stays a default.
+#[test]
+fn test_motion_commands_need_a_modifier_outside_machine_control() {
+    let mut keymap = commands::keymap();
+    for command in [Command::Home, Command::StreamStart, Command::CycleStart] {
+        for key in ["G", "Shift+G", "7", "/", "Space", "Enter"] {
+            assert_eq!(
+                set(&mut keymap, command, key),
+                Err(Refusal::MotionKeyNotModified),
+                "{command:?} {key}"
+            );
+        }
+    }
+    assert_eq!(set(&mut keymap, Command::Home, "Cmd+Alt+G"), Ok(()));
+    assert_eq!(set(&mut keymap, Command::CycleStart, "Shift+`"), Ok(()));
+    // Not motion: a bare key is fine.
+    assert_eq!(set(&mut keymap, Command::FileRun, "G"), Ok(()));
+    // Jog keys stay plain keys in Machine Control.
+    assert_eq!(set(&mut keymap, Command::JogYPos, "W"), Ok(()));
 }
 
 #[test]

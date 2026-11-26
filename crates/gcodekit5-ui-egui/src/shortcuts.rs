@@ -5,8 +5,12 @@
 //! - the E-STOP (soft reset) and feed hold keys ([`LOCKED`]) cannot be changed or removed, and
 //!   no other command may take one of their keys, in any scope (a panel's key would win over
 //!   them while that panel has the keyboard);
-//! - a command that starts motion ([`Command::starts_motion`]) gets no key on the letter of the
-//!   feed hold or soft reset chord, so a slipped modifier never starts what was meant to stop;
+//! - a command that moves the machine ([`Command::starts_motion`]) never runs while a text
+//!   field has the keyboard, whatever its key (the app's key dispatch holds it back); it gets
+//!   no key on the letter of the feed hold or soft reset chord, so a slipped modifier never
+//!   starts what was meant to stop; and outside Machine Control it needs Ctrl, Alt, Cmd or a
+//!   function key, since a bare key there would run on every page (GTK's `~` for cycle
+//!   start stays as a default);
 //! - a jog key is a plain letter, digit or symbol key: craft-keymap's typing rule holds those
 //!   back while a text field has the keyboard, so a rebound jog key never jogs while typing,
 //!   and Escape, Tab, Enter, Space and the arrows stay with the widgets.
@@ -53,6 +57,8 @@ pub enum Refusal {
     NearSafetyKey,
     /// A jog key that is not a plain letter, digit or symbol key.
     JogKeyNotPlain,
+    /// A command that moves the machine, outside Machine Control, on a bare key.
+    MotionKeyNotModified,
     /// Alt and a menu title's mnemonic.
     MenuMnemonic,
     /// The named command has the key where both could run.
@@ -84,6 +90,12 @@ impl Refusal {
             Self::JogKeyNotPlain => (
                 n_!(
                     "A jog key must be a letter, digit or symbol key without Ctrl or Alt, so it never jogs while you type"
+                ),
+                None,
+            ),
+            Self::MotionKeyNotModified => (
+                n_!(
+                    "Outside Machine Control a command that moves the machine needs Ctrl, Alt or a function key"
                 ),
                 None,
             ),
@@ -194,6 +206,18 @@ pub fn check(keymap: &Keymap, command: Command, binding: &Binding) -> Result<(),
     }
     if command.is_jog() && !jog_key_ok(keymap, chord) {
         return Err(Refusal::JogKeyNotPlain);
+    }
+    let own_default = keymap
+        .default_bindings(&command.command_ref())
+        .iter()
+        .any(|b| b.trigger.chord == chord);
+    if command.starts_motion()
+        && home.as_str() != commands::MACHINE_CONTROL_SCOPE
+        && chord.is_plain()
+        && !chord.is_function_key()
+        && !own_default
+    {
+        return Err(Refusal::MotionKeyNotModified);
     }
     if is_menu_mnemonic(chord) {
         return Err(Refusal::MenuMnemonic);
@@ -352,6 +376,9 @@ pub fn msgids() -> Vec<&'static str> {
         ),
         n_!(
             "A jog key must be a letter, digit or symbol key without Ctrl or Alt, so it never jogs while you type"
+        ),
+        n_!(
+            "Outside Machine Control a command that moves the machine needs Ctrl, Alt or a function key"
         ),
         n_!("{key} opens a menu"),
         n_!("{key} is already used by {command}"),

@@ -4704,3 +4704,6 @@ msgstr "Les doubles pressions ne sont pas prises en charge"
 
 msgid "{key} works in the wrong place"
 msgstr "{key} agit au mauvais endroit"
+
+msgid "Outside Machine Control a command that moves the machine needs Ctrl, Alt or a function key"
+msgstr "En dehors du Contrôle machine, une commande qui déplace la machine nécessite Ctrl, Alt ou une touche de fonction"
