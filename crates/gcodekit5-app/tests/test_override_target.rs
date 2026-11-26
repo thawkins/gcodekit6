@@ -123,6 +123,6 @@ fn test_step_limit_ends_the_sequence() {
             TargetStep::Send(_)
         ));
     }
-    let value = if MAX_STEPS % 2 == 0 { 50 } else { 51 };
+    let value = if MAX_STEPS.is_multiple_of(2) { 50 } else { 51 };
     assert_eq!(target.step(Some(&ov(value, 100)), now), TargetStep::Failed);
 }
