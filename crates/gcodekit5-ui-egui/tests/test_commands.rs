@@ -260,13 +260,9 @@ const PAGE_CONTROLS: &[(Command, Page, &str)] = &[
     (Command::ResetView, Page::Visualizer, "Reset View"),
 ];
 
-/// The commands the menus leave out that only a key runs: none since Reset View got its
-/// sidebar button (it keeps `Cmd+0`).
-const KEY_ONLY: &[Command] = &[];
-
-/// The menus hold every command but those with a page control ([`PAGE_CONTROLS`]), those
-/// only a key runs ([`KEY_ONLY`]) and those a page tab opens ([`Page::for_command`]), on
-/// every platform layout.
+/// The menus hold every command but those with a page control ([`PAGE_CONTROLS`]) and
+/// those a page tab opens ([`Page::for_command`]), on every platform layout. No command is
+/// key-only since Reset View got its sidebar button (it keeps `Cmd+0`).
 #[test]
 fn test_menu_contains_every_command() {
     let tr = Translator::new("en");
@@ -276,7 +272,6 @@ fn test_menu_contains_every_command() {
         .map(|target| (target, craft_menu::layout(&bar, target, &options).bar));
     for command in Command::ALL {
         let elsewhere = Page::for_command(command).is_some()
-            || KEY_ONLY.contains(&command)
             || PAGE_CONTROLS.iter().any(|(c, _, _)| *c == command);
         let wanted = bar.find(&command.command_ref()).is_some();
         assert_eq!(wanted, !elsewhere, "{command:?} in the menu bar");

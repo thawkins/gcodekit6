@@ -104,12 +104,14 @@ fn page_app(
 
 /// The first button named `label` (the nav cube's, where GTK also has a sidebar or floating
 /// button of the same name).
+///
+/// # Panics
+/// When no node is named `label`.
 fn first(harness: &Harness<'_, GcodeKitApp>, label: &str) -> egui::Rect {
-    harness
-        .get_all_by_label(label)
-        .next()
-        .map(|node| node.rect())
-        .unwrap_or(egui::Rect::NOTHING)
+    match harness.get_all_by_label(label).next() {
+        Some(node) => node.rect(),
+        None => panic!("no node named {label:?}"),
+    }
 }
 
 #[test]
@@ -119,8 +121,12 @@ fn test_visualizer_controls_visible_at_1280x800() -> TestResult {
         let bottom = harness.get_by_label("eStop").rect().top();
         let page = egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1280.0, bottom));
         for label in CONTROLS {
-            for node in harness.get_all_by_label(label) {
-                let rect = node.rect();
+            let rects: Vec<egui::Rect> = harness
+                .get_all_by_label(label)
+                .map(|node| node.rect())
+                .collect();
+            assert!(!rects.is_empty(), "no {label:?} at ppp {ppp}");
+            for rect in rects {
                 assert!(
                     page.contains_rect(rect),
                     "{label} at {rect:?} outside {page:?} at ppp {ppp}"
