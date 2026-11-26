@@ -62,9 +62,9 @@ Status values:
 | DRO: machine and work position | 10-machine-control | Ported | `test_machine_pane::dro_shows_two_decimals` |
 | DRO in inches | 10-machine-control | Ported | `test_machine_jog::dro_in_inches`, `test_machine_jog::report_inches_converted_for_dro_and_clamp` |
 | DRO rotary axes (A, B, C) | 10-machine-control, 6AXIS | Gap | GTK shows rotary axes in degrees; the egui DRO shows X, Y, Z only |
-| Zero X / Y / Z and Zero All (G10 L20) | 10-machine-control | Gap | GTK has "Zero" per axis and "Zero All Axes"; egui has neither |
-| Work coordinate system selector G54-G59 | 10-machine-control, SPEC 5.2.9 | Gap | GTK has the WCS selector; egui has none (probe routines pick a target WCS only) |
-| Go to Work Zero | *(GTK)* | Gap | GTK button; not in egui |
+| Zero X / Y / Z and Zero All (G10 L20) | 10-machine-control | Ported | `test_machine_work_zero::zero_x_uses_reported_g55`, `test_machine_work_zero::zero_all_needs_confirmation`, `test_machine_work_zero::work_zero_controls_disabled_when_disconnected`, `app/test_work_zero::zero_axes_command_uses_the_wcs_p_number` (rotary A/B/C zero not ported: see DRO rotary axes) |
+| Work coordinate system selector G54-G59 | 10-machine-control, SPEC 5.2.9 | Ported | `test_machine_work_zero::wcs_change_refused_during_stream`, `test_machine_work_zero::console_wcs_change_is_followed_by_zero`, `test_machine_work_zero::stream_selecting_a_wcs_is_followed_by_a_parser_state_query`, `test_machine_work_zero::status_tracks_active_wcs`, `app/test_work_zero::parser_state_wcs_reads_grbl_gc_reply` (the active WCS comes from the controller's `$G` reply) |
+| Go to Work Zero | *(GTK)* | Ported | `test_machine_work_zero::go_to_work_zero_refused_when_not_idle`, `app/test_work_zero::go_to_work_zero_command` |
 | Enter a position by clicking the DRO | 10-machine-control | Not applicable | Not in the GTK source |
 | Step jog with the step presets | 10-machine-control | Ported | `test_machine_pane::jog_x_positive_sends_jog`, `test_machine_jog::jog_step_in_inches` |
 | Continuous (press-and-hold) jog | 10-machine-control | Ported | `test_machine_jog::hold_survives_long_press_and_cancels_once_on_release` and 9 more `hold_*` tests |
@@ -257,20 +257,19 @@ Ranked by user impact. Sizes are rough estimates for one developer who knows the
 
 | Rank | Gap | User impact | Rough size |
 | --- | --- | --- | --- |
-| 1 | Work coordinates: Zero X/Y/Z, Zero All, the G54-G59 selector, Go to Work Zero | High: setting work zero is part of nearly every job; egui users must type `G10 L20` in the command line | 1-2 days (GTK logic in `machine_control`; controller already sends lines) |
-| 2 | Editor Replace / Replace All | Medium | 0.5-1 day |
-| 3 | Quick Z-touch and edge probe in Machine Control | Medium: the Probe Routines page covers it with more clicks | 1 day (routines exist) |
-| 4 | Keyboard jog | Medium: deliberate safety choice; needs a decision on keypad keys | 0.5 day plus a decision |
-| 5 | Visualizer stock removal simulation | Medium | 3-5 days (wgpu height map) |
-| 6 | Visualizer 2D mode, display toggles, grid spacing, machine bounds, fit to device | Medium | 2-3 days |
-| 7 | DRO rotary axes A/B/C | Medium for 4-6 axis machines, none otherwise | 0.5 day |
-| 8 | Designer mirror, align, cut/copy/paste, boolean ops, Ctrl+G | Medium | 2-3 days (designer commands exist in `gcodekit5-designer`) |
-| 9 | Visualizer run preview (play/pause/speed) | Low | 1-2 days |
-| 10 | Import STL | Low: behind a Settings switch in GTK | 1 day |
-| 11 | Status bar elapsed/remaining time, feed/spindle readout | Low | 0.5 day |
-| 12 | Exact override percentage field | Low | 0.5 day |
-| 13 | Preferences Controller page and shortcut editor | Low | 1-2 days |
-| 14 | Persistent console history, Clear editor, machine limits/buffer readout, designer device work area, gallery icons | Low | 1-2 days together |
+| 1 | Editor Replace / Replace All | Medium | 0.5-1 day |
+| 2 | Quick Z-touch and edge probe in Machine Control | Medium: the Probe Routines page covers it with more clicks | 1 day (routines exist) |
+| 3 | Keyboard jog | Medium: deliberate safety choice; needs a decision on keypad keys | 0.5 day plus a decision |
+| 4 | Visualizer stock removal simulation | Medium | 3-5 days (wgpu height map) |
+| 5 | Visualizer 2D mode, display toggles, grid spacing, machine bounds, fit to device | Medium | 2-3 days |
+| 6 | DRO rotary axes A/B/C (and their Zero buttons) | Medium for 4-6 axis machines, none otherwise | 0.5 day |
+| 7 | Designer mirror, align, cut/copy/paste, boolean ops, Ctrl+G | Medium | 2-3 days (designer commands exist in `gcodekit5-designer`) |
+| 8 | Visualizer run preview (play/pause/speed) | Low | 1-2 days |
+| 9 | Import STL | Low: behind a Settings switch in GTK | 1 day |
+| 10 | Status bar elapsed/remaining time, feed/spindle readout | Low | 0.5 day |
+| 11 | Exact override percentage field | Low | 0.5 day |
+| 12 | Preferences Controller page and shortcut editor | Low | 1-2 days |
+| 13 | Persistent console history, Clear editor, machine limits/buffer readout, designer device work area, gallery icons | Low | 1-2 days together |
 
 Manual checks still to run before GTK is deleted (no automated evidence): TCP and
 WebSocket connections, auto-reconnect, non-GRBL firmwares and the grblHAL simulator, Windows

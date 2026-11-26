@@ -6,9 +6,10 @@
 
 ### Added
 - **Parity checklist**: `docs/reports/egui-parity.md` lists every user-visible feature, its egui status and the test that covers it, with a ranked list of gaps
+- **Work zero in the egui Machine Control pane**: a Zero button beside each DRO axis (`G10 L20 P<n> X0`), the G54-G59 selector, Zero All Axes (after a confirmation) and Go to Work Zero with an Include Z option (off by default). The active system comes from the controller's `$G` reply, asked after a connect, a reset, a G54-G59 line (from the pane or the console) and a stream that may select one, so the zero lines never name a system other than the one shown. All are disabled while disconnected and refused while a job runs; Go to Work Zero also needs a fresh Idle report
 
 ### Known gaps
-- Not yet ported from GTK: work-coordinate zeroing and the G54-G59 selector, editor replace, quick probe buttons, keyboard jog, rotary axes in the DRO, and the visualizer and designer items listed in `docs/reports/egui-parity.md`
+- Not yet ported from GTK: editor replace, quick probe buttons, keyboard jog, rotary axes in the DRO, and the visualizer and designer items listed in `docs/reports/egui-parity.md`
 
 ## [Unreleased] - 2026-11-26 (egui + craft-libs migration, milestone M5: managers and help)
 
