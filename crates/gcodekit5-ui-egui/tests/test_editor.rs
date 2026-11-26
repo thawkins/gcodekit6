@@ -1028,3 +1028,71 @@ fn test_editor_replace_row_fits_at_1280() {
         );
     }
 }
+
+/// Types `text` into the editor's text field, then presses Ctrl+Z there.
+fn edit_then_undo(harness: &mut Harness<'_, GcodeKitApp>, text: Option<&str>) {
+    harness
+        .get_by_role_and_label(egui::accesskit::Role::TextInput, "G-Code Editor")
+        .click();
+    harness.step();
+    if let Some(text) = text {
+        harness
+            .get_by_role_and_label(egui::accesskit::Role::TextInput, "G-Code Editor")
+            .type_text(text);
+        harness.step();
+        harness.step();
+    } else {
+        harness.key_press_modifiers(egui::Modifiers::COMMAND, egui::Key::Z);
+        harness.step();
+        harness.step();
+    }
+}
+
+/// Opening another file starts a fresh undo history: Ctrl+Z cannot bring back the first
+/// file's text into the second.
+#[test]
+fn test_editor_open_resets_undo() -> TestResult {
+    let dir = scratch("undo_open")?;
+    let a = write(&dir, "a.gcode", "G0 X1\n")?;
+    let b = write(&dir, "b.gcode", "G0 Y2\n")?;
+    let mut harness = editor_app("");
+    harness.state().editor().borrow_mut().load(&a)?;
+    harness.step();
+    edit_then_undo(&mut harness, Some("M3 "));
+    harness.state().editor().borrow_mut().load(&b)?;
+    harness.step();
+    edit_then_undo(&mut harness, None);
+    assert_eq!(harness.state().editor().borrow().buffer().text(), "G0 Y2\n");
+    Ok(())
+}
+
+/// Clear editor starts a fresh undo history too.
+#[test]
+fn test_editor_clear_resets_undo() {
+    let mut harness = editor_app("G1 X1\n");
+    edit_then_undo(&mut harness, Some("M3 "));
+    harness.get_by_label("Clear editor").click();
+    harness.step();
+    answer_messages(harness.state_mut(), true);
+    app_frame(&mut harness);
+    app_frame(&mut harness);
+    assert_eq!(harness.state().editor().borrow().buffer().text(), "");
+    edit_then_undo(&mut harness, None);
+    assert_eq!(harness.state().editor().borrow().buffer().text(), "");
+}
+
+/// Generated G-code handed to the editor starts a fresh undo history.
+#[test]
+fn test_editor_generated_program_resets_undo() {
+    let mut harness = editor_app("G1 X1\n");
+    edit_then_undo(&mut harness, Some("M3 "));
+    harness
+        .state()
+        .editor()
+        .borrow_mut()
+        .buffer_mut()
+        .replace_with_generated("G0 Z5\n".to_string());
+    harness.step();
+    edit_then_undo(&mut harness, None);
+    assert_eq!(harness.state().editor().borrow().buffer().text(), "G0 Z5\n");
+}
