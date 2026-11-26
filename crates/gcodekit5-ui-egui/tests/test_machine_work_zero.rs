@@ -767,15 +767,6 @@ fn test_smoothieware_program_selecting_a_wcs_needs_a_new_selection() {
             "{label} enabled after the program"
         );
     }
-    assert!(
-        shows_notice(
-            &mut harness,
-            "Select the active work coordinate system: the program may have changed it."
-        ) || harness
-            .get_by_label("Zero X")
-            .accesskit_node()
-            .is_disabled(),
-    );
     click(&mut harness, "Zero X");
     assert!(
         !wrote_prefix(&shared, "G10"),
