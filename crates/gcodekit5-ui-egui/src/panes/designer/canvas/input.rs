@@ -14,7 +14,8 @@
 //!   Escape cancels a polyline or deselects. A text field elsewhere owns the keyboard
 //!   instead, so these never fire while typing.
 //! - Right-click with a selection: GTK's context menu with Cut, Copy, Paste, Delete, Mirror
-//!   on X / Y, Array... (the pane opens the Array dialog), Rotate and Align; with only a
+//!   on X / Y, Array... (the pane opens the Array dialog), Rotate, Align and the boolean
+//!   operations (Union, Diff, Inter); with only a
 //!   clipboard, Paste. Cut, Copy and Paste use the design's own clipboard
 //!   (`DesignerState::clipboard`), as GTK did, not the system clipboard; Paste centres the
 //!   copies on the point right-clicked. Align also has GTK's Alt keys,
@@ -540,6 +541,14 @@ const ALIGNMENTS: [(&str, SelectionOp); 6] = [
     ),
 ];
 
+/// The boolean operations: GTK's short labels and the model's operation. Each replaces the
+/// selected shapes by one new shape (the operation's result), as one undo step.
+const BOOLEANS: [(&str, SelectionOp); 3] = [
+    (n_!("Union"), DesignerState::perform_boolean_union),
+    (n_!("Diff"), DesignerState::perform_boolean_difference),
+    (n_!("Inter"), DesignerState::perform_boolean_intersection),
+];
+
 /// The msgids of the context menu.
 pub fn msgids() -> Vec<&'static str> {
     let mut ids = vec![
@@ -555,11 +564,12 @@ pub fn msgids() -> Vec<&'static str> {
     ];
     ids.extend(ROTATIONS.iter().map(|(label, _)| *label));
     ids.extend(ALIGNMENTS.iter().map(|(label, _)| *label));
+    ids.extend(BOOLEANS.iter().map(|(label, _)| *label));
     ids
 }
 
 /// The right-click menu, in GTK's order: Cut, Copy, Paste (while the clipboard holds
-/// shapes), Delete, Mirror on X and Y, Array..., Rotate by a fixed angle and, for two
+/// shapes), Delete, for two shapes or more Union, Diff and Inter, Mirror on X and Y, Array..., Rotate by a fixed angle and, for two
 /// shapes or more, Align. Without a selection only Paste is offered. Each edit is one undo
 /// step.
 ///
@@ -595,6 +605,16 @@ fn context_menu(
         ui.close();
     }
     ui.separator();
+    // GTK offers the boolean operations for two shapes or more.
+    if state.can_perform_boolean_op() {
+        for (label, op) in BOOLEANS {
+            if ui.button(tr.tr(label)).clicked() {
+                op(state);
+                ui.close();
+            }
+        }
+        ui.separator();
+    }
     if ui.button(tr.tr("Mirror on X")).clicked() {
         state.mirror_selected_x();
         ui.close();

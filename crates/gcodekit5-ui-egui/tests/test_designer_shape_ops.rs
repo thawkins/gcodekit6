@@ -304,3 +304,57 @@ fn test_clipboard_keys_run_on_the_canvas_but_not_while_typing() {
     h.run();
     assert_eq!(ids(&designer.borrow()), before);
 }
+
+/// The boolean entries of the context menu and the bounds each leaves of the squares
+/// (0,0)-(20,20) and (10,0)-(30,20).
+const BOOLEANS: [(&str, Bounds); 3] = [
+    ("Union", (0.0, 0.0, 30.0, 20.0)),
+    ("Diff", (0.0, 0.0, 10.0, 20.0)),
+    ("Inter", (10.0, 0.0, 20.0, 20.0)),
+];
+
+#[test]
+fn test_boolean_ops_replace_the_selection_by_one_new_shape_in_one_undo_step() {
+    for (item, want) in BOOLEANS {
+        let mut h = harness(pane_with_rects(&[
+            (0.0, 0.0, 20.0, 20.0),
+            (10.0, 0.0, 20.0, 20.0),
+        ]));
+        let originals = ids(h.state());
+        menu_item(&mut h, 5.0, 5.0, item);
+        let now = ids(h.state());
+        assert_eq!(now.len(), 1, "{item}");
+        assert!(!originals.contains(&now[0]), "{item}: a new id");
+        let b = bounds(h.state(), now[0]);
+        let near = |a: f64, b: f64| (a - b).abs() < 0.05;
+        assert!(
+            near(b.0, want.0) && near(b.1, want.1) && near(b.2, want.2) && near(b.3, want.3),
+            "{item}: {b:?}"
+        );
+        assert_eq!(selected(h.state()), now, "{item}: the result is selected");
+        h.state_mut().undo();
+        h.run();
+        assert_eq!(ids(h.state()), originals, "{item}");
+        assert!(close4(
+            bounds(h.state(), originals[0]),
+            (0.0, 0.0, 20.0, 20.0)
+        ));
+        assert!(close4(
+            bounds(h.state(), originals[1]),
+            (10.0, 0.0, 30.0, 20.0)
+        ));
+    }
+}
+
+#[test]
+fn test_boolean_ops_need_two_shapes() {
+    let mut h = harness(pane_with_rects(&[(0.0, 0.0, 10.0, 10.0)]));
+    open_menu_with_all_selected(&mut h, 5.0, 5.0);
+    assert!(
+        h.query_by_label("Mirror on X").is_some(),
+        "the menu is open"
+    );
+    for (item, _) in BOOLEANS {
+        assert!(h.query_by_label(item).is_none(), "{item}");
+    }
+}
