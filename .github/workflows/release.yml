@@ -39,7 +39,33 @@ jobs:
 
     - name: Set Asset Name
       shell: bash
-      run: echo "ASSET_NAME=gcodekit5-${{ github.ref_name }}-${{ matrix.platform.name_suffix }}" >> $GITHUB_ENV
+      run: |
+        # REF_SLUG names every artefact: the tag on a release, the ref with
+        # '/' replaced by '-' on a dry run (branch names like claude/egui-m7).
+        if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+          REF_SLUG="$GITHUB_REF_NAME"
+        else
+          REF_SLUG="${GITHUB_REF_NAME//\//-}"
+        fi
+        # PKG_VERSION: Cargo.toml version (e.g. 1.2.0-beta.2).
+        # CARGO_NUM_VERSION: its numeric x.y.z part (WiX install version).
+        # BUNDLE_VERSION: numeric macOS bundle version - the tag without the
+        # leading 'v' and prerelease suffix, or CARGO_NUM_VERSION on a dry run.
+        PKG_VERSION=$(sed -n '/^\[workspace.package\]/,/^\[/s/^version *= *"\(.*\)"/\1/p' Cargo.toml)
+        CARGO_NUM_VERSION="${PKG_VERSION%%[-+]*}"
+        if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+          BUNDLE_VERSION="${GITHUB_REF_NAME#v}"
+          BUNDLE_VERSION="${BUNDLE_VERSION%%[-+]*}"
+        else
+          BUNDLE_VERSION="$CARGO_NUM_VERSION"
+        fi
+        {
+          echo "REF_SLUG=$REF_SLUG"
+          echo "PKG_VERSION=$PKG_VERSION"
+          echo "CARGO_NUM_VERSION=$CARGO_NUM_VERSION"
+          echo "BUNDLE_VERSION=$BUNDLE_VERSION"
+          echo "ASSET_NAME=gcodekit5-$REF_SLUG-${{ matrix.platform.name_suffix }}"
+        } >> "$GITHUB_ENV"
 
     - name: Install Linux Dependencies
       if: matrix.platform.os == 'ubuntu-latest'
@@ -48,7 +74,7 @@ jobs:
         sudo apt-get install -y libudev-dev pkg-config libxkbcommon-dev libwayland-dev libx11-dev libxcursor-dev libxrandr-dev libxi-dev libvulkan1 mesa-vulkan-drivers \
           flatpak flatpak-builder libfuse2
         flatpak remote-add --user --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
-        flatpak install --user -y flathub org.freedesktop.Platform//25.08 org.freedesktop.Sdk//25.08 org.freedesktop.Sdk.Extension.rust-stable//25.08
+        flatpak install --user -y flathub org.freedesktop.Platform//25.08 org.freedesktop.Sdk//25.08
 
     - name: Install Rust toolchain
       uses: dtolnay/rust-toolchain@stable
@@ -101,9 +127,9 @@ jobs:
             <key>CFBundlePackageType</key>
             <string>APPL</string>
             <key>CFBundleShortVersionString</key>
-            <string>${{ github.ref_name }}</string>
+            <string>${{ env.BUNDLE_VERSION }}</string>
             <key>CFBundleVersion</key>
-            <string>1</string>
+            <string>${{ env.BUNDLE_VERSION }}</string>
             <key>LSMinimumSystemVersion</key>
             <string>11.0</string>
             <key>NSHighResolutionCapable</key>
@@ -117,7 +143,7 @@ jobs:
         EOF
 
         # Create DMG
-        bash scripts/macos-create-dmg.sh "${{ github.ref_name }}" "${{ matrix.platform.name_suffix }}"
+        bash scripts/macos-create-dmg.sh "${{ env.REF_SLUG }}" "${{ matrix.platform.name_suffix }}"
 
     - name: Build (Linux)
       if: matrix.platform.os_name == 'Linux-x86_64'
@@ -131,17 +157,16 @@ jobs:
         cargo install cargo-generate-rpm
 
         # Build Deb
-        cargo deb --target ${{ matrix.platform.target }} --no-build --output gcodekit5-${{ github.ref_name }}-linux-x86_64.deb
+        cargo deb --target ${{ matrix.platform.target }} --no-build --output gcodekit5-${{ env.REF_SLUG }}-linux-x86_64.deb
 
         # Build RPM (rpm versions may not contain '-': 1.2.0-beta.2 -> 1.2.0~beta.2)
-        PKG_VERSION=$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[] | select(.name == "gcodekit5-design") | .version')
         cargo generate-rpm --target ${{ matrix.platform.target }} \
           --set-metadata "version = \"${PKG_VERSION//-/\~}\"" \
-          --output gcodekit5-${{ github.ref_name }}-linux-x86_64.rpm
+          --output gcodekit5-${{ env.REF_SLUG }}-linux-x86_64.rpm
         
         # Build Flatpak
         flatpak-builder --user --install-deps-from=flathub --force-clean build-dir flatpak/com.github.thawkins.gcodekit5.yml --repo=repo
-        flatpak build-bundle repo gcodekit5-${{ github.ref_name }}-linux-x86_64.flatpak com.github.thawkins.gcodekit5
+        flatpak build-bundle repo gcodekit5-${{ env.REF_SLUG }}-linux-x86_64.flatpak com.github.thawkins.gcodekit5
 
         # Build AppImage
         mkdir -p AppDir/usr/bin
@@ -150,7 +175,7 @@ jobs:
         wget -q https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
         chmod +x linuxdeploy-x86_64.AppImage
         
-        export VERSION="${{ github.ref_name }}"
+        export VERSION="${{ env.REF_SLUG }}"
         ./linuxdeploy-x86_64.AppImage \
           --appdir AppDir \
           --output appimage \
@@ -158,7 +183,7 @@ jobs:
           --desktop-file flatpak/com.github.thawkins.gcodekit5.desktop \
           --executable AppDir/usr/bin/${{ matrix.platform.bin }}
 
-        find . -maxdepth 1 -name "gcodekit5-*.AppImage" -exec mv {} gcodekit5-${{ github.ref_name }}-linux-x86_64.AppImage \;
+        find . -maxdepth 1 -name "gcodekit5-*.AppImage" -exec mv {} gcodekit5-${{ env.REF_SLUG }}-linux-x86_64.AppImage \;
 
     - name: Build (Windows)
       if: matrix.platform.os == 'windows-latest'
@@ -171,6 +196,16 @@ jobs:
         Copy-Item "target\${{ matrix.platform.target }}\release\${{ matrix.platform.bin }}" "dist\gcodekit5\"
         Copy-Item "wix\License.rtf" "dist\gcodekit5\"
 
+    - name: Install WiX Toolset v3
+      if: matrix.platform.os == 'windows-latest'
+      shell: pwsh
+      run: |
+        choco install wixtoolset --version 3.14.1 -y --no-progress
+        # cargo-wix finds candle.exe/light.exe through WIX (or PATH)
+        $wix = "${env:ProgramFiles(x86)}\WiX Toolset v3.14\"
+        "WIX=$wix" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+        "${wix}bin" | Out-File -FilePath $env:GITHUB_PATH -Append -Encoding utf8
+
     - name: Create Windows MSI Installer
       if: matrix.platform.os == 'windows-latest'
       shell: pwsh
@@ -178,25 +213,40 @@ jobs:
         cargo install cargo-wix
 
         # The package is gcodekit5-design; its binary is gcodekit5.exe
-        cargo wix --package gcodekit5-design --target ${{ matrix.platform.target }} --no-build --nocapture -o gcodekit5-${{ github.ref_name }}-windows-x86_64.msi
+        cargo wix --package gcodekit5-design --target ${{ matrix.platform.target }} --no-build --nocapture --install-version ${{ env.CARGO_NUM_VERSION }} -o gcodekit5-${{ env.REF_SLUG }}-windows-x86_64.msi
 
-        Compress-Archive -Path "dist\gcodekit5\*" -DestinationPath "gcodekit5-${{ github.ref_name }}-windows-x86_64-portable.zip"
+        Compress-Archive -Path "dist\gcodekit5\*" -DestinationPath "gcodekit5-${{ env.REF_SLUG }}-windows-x86_64-portable.zip"
 
-    - name: Upload Artifact
+    - name: Upload Artifact (Linux)
+      if: matrix.platform.os_name == 'Linux-x86_64'
       uses: actions/upload-artifact@v7
       with:
         name: ${{ env.ASSET_NAME }}
         path: |
           ${{ env.ASSET_NAME }}
-          *.app
-          *.dmg
-          *.flatpak
           *.deb
           *.rpm
+          *.flatpak
           *.AppImage
+        if-no-files-found: error
+
+    - name: Upload Artifact (macOS)
+      if: startsWith(matrix.platform.os_name, 'macOS')
+      uses: actions/upload-artifact@v7
+      with:
+        name: ${{ env.ASSET_NAME }}
+        path: "*.dmg"
+        if-no-files-found: error
+
+    - name: Upload Artifact (Windows)
+      if: matrix.platform.os_name == 'Windows-x86_64'
+      uses: actions/upload-artifact@v7
+      with:
+        name: ${{ env.ASSET_NAME }}
+        path: |
           *.msi
           *-portable.zip
-        if-no-files-found: warn
+        if-no-files-found: error
 
     - name: Build Changelog
       id: build_changelog
@@ -234,11 +284,3 @@ jobs:
         files: |
           *.msi
           *-portable.zip
-
-    - name: Release (Other)
-      if: matrix.platform.os_name != 'Linux-x86_64' && startsWith(github.ref, 'refs/tags/')
-      uses: softprops/action-gh-release@v3
-      with:
-        token: ${{ secrets.RELEASE }}
-        files: |
-          ${{ env.ASSET_NAME }}

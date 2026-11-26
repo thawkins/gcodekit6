@@ -1,7 +1,8 @@
 # Windows Release Build Script
 # Builds GCodeKit5 for the MSVC target and creates the MSI installer and the
 # portable zip. No GTK runtime or MSYS2 is needed: the egui front end links
-# only against system DLLs.
+# only against system DLLs, and .cargo/config.toml links the C runtime
+# statically (+crt-static).
 #
 # Requires: Rust (MSVC toolchain), WiX Toolset v3, cargo-wix
 #   (cargo install cargo-wix)
@@ -39,9 +40,11 @@ if (-not (Test-Path "$BinDir\gcodekit5.exe")) {
     exit 1
 }
 
-# Step 2: Build the MSI
+# Step 2: Build the MSI (WiX needs a numeric x.y.z: 1.2.0-beta.2 -> 1.2.0)
+$InstallVersion = ($Version -split '[-+]')[0]
 $MsiFile = "target\wix\gcodekit5-$Version-x64.msi"
-cargo wix --package gcodekit5-design --target $Target --no-build --nocapture -o $MsiFile
+cargo wix --package gcodekit5-design --target $Target --no-build --nocapture `
+    --install-version $InstallVersion -o $MsiFile
 if ($LASTEXITCODE -ne 0) {
     Write-Host "MSI build failed" -ForegroundColor Red
     exit 1

@@ -2,8 +2,6 @@ app-id: com.github.thawkins.gcodekit5
 runtime: org.freedesktop.Platform
 runtime-version: '25.08'
 sdk: org.freedesktop.Sdk
-sdk-extensions:
-  - org.freedesktop.Sdk.Extension.rust-stable
 command: gcodekit5
 finish-args:
   - --share=ipc
