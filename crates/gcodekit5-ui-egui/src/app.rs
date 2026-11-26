@@ -61,7 +61,7 @@ use gcodekit5_app::machine::{MachineController, MachineEvent};
 use gcodekit5_settings::SettingsManager;
 use gcodekit5_settings::config::Config;
 
-use crate::commands::{self, Command};
+use crate::commands::Command;
 use crate::dialogs::{
     Asked, ConfirmChoice, ConfirmRequest, DialogAnswer, Dialogs, FileFilter, FilePurpose,
 };
@@ -432,7 +432,7 @@ impl GcodeKitApp {
     /// # Arguments
     /// * `state` - The front end's state.
     pub fn from_state(state: AppState) -> Self {
-        let keymap = commands::keymap();
+        let keymap = crate::shortcuts::keymap_from(&state.config().ui);
         let menus = Menus::new(&state.translator, &keymap);
         let wake_ctx: Arc<OnceLock<egui::Context>> = Arc::new(OnceLock::new());
         let wake = {

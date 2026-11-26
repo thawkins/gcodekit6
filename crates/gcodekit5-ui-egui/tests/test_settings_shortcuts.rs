@@ -284,3 +284,74 @@ fn test_only_the_safety_keys_run_while_a_key_is_recorded() {
         "still recording"
     );
 }
+
+#[test]
+fn test_apply_saves_the_shortcuts_and_the_app_starts_with_them() {
+    let dirs = scratch("test_apply_saves_the_shortcuts");
+    let mut h = harness(dirs.clone());
+    filter(&mut h, "Save As");
+    click(&mut h, "Change");
+    press(&mut h, ctrl_shift(), Key::A);
+    click(&mut h, "Apply");
+    drop(h);
+
+    let (settings, problem) = SettingsManager::open(dirs.clone());
+    assert!(problem.is_none(), "{problem:?}");
+    let saved = &settings.config().ui.keyboard_shortcuts;
+    assert_eq!(saved.len(), 1, "{saved:?}");
+    assert_eq!(saved[0].command, "file.save_as");
+    assert_eq!(saved[0].keys, ["Cmd+Shift+A"]);
+
+    let app = GcodeKitApp::from_state(AppState::new(
+        settings,
+        crate::test_smoke::native_decision(),
+    ));
+    let mut h = crate::machine_support::app_harness(app);
+    h.run();
+    press(&mut h, ctrl_shift(), Key::A);
+    assert_eq!(h.state().last_dispatched(), Some(Command::FileSaveAs));
+
+    // Reset All saves no changes.
+    let mut h = harness(dirs.clone());
+    click(&mut h, "Reset All");
+    click(&mut h, "Apply");
+    drop(h);
+    let (settings, _) = SettingsManager::open(dirs);
+    assert!(settings.config().ui.keyboard_shortcuts.is_empty());
+}
+
+/// A settings file edited by hand cannot move or take the E-STOP key, or make a jog key fire
+/// while typing: those entries load as the defaults.
+#[test]
+fn test_saved_shortcuts_breaking_a_rule_load_as_defaults() {
+    use gcodekit5_settings::config::{Config, ShortcutOverride};
+    let entry = |command: &str, keys: &[&str]| ShortcutOverride {
+        command: command.to_string(),
+        keys: keys.iter().map(|k| (*k).to_string()).collect(),
+    };
+    let mut config = Config::default();
+    config.ui.keyboard_shortcuts = vec![
+        entry("machine.soft_reset", &["F2"]),
+        entry("help.about", &["Cmd+Shift+K"]),
+        entry("jog.x_pos", &["Cmd+J"]),
+        entry("file.open", &["Cmd+Shift+O"]),
+    ];
+    let mut app = GcodeKitApp::from_state(AppState::new(
+        SettingsManager::detached(config),
+        crate::test_smoke::native_decision(),
+    ));
+    let keymap = app.keymap_mut();
+    assert_eq!(runs(keymap, "Cmd+Shift+K"), Some(Command::SoftReset));
+    assert_eq!(runs(keymap, "F2"), None);
+    assert_eq!(runs(keymap, "Cmd+Shift+O"), Some(Command::FileOpen));
+    let typing = Active {
+        typing: true,
+        ..Active::panel(commands::MACHINE_CONTROL_SCOPE)
+    };
+    let cmd_j = Chord::parse("Cmd+J").expect("chord");
+    assert_eq!(keymap.lookup(&cmd_j, false, &typing), Lookup::None);
+    assert_eq!(
+        keymap.bindings(&Command::JogXPos.command_ref()),
+        keymap.default_bindings(&Command::JogXPos.command_ref())
+    );
+}

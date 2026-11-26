@@ -220,6 +220,25 @@ pub struct UiSettings {
     /// app's own title bar (egui front end; read before the window opens)
     #[serde(default)]
     pub use_system_title_bar: bool,
+
+    /// The user's changes to the default keyboard shortcuts (egui front end's
+    /// Preferences > Shortcuts): each entry replaces one command's default keys.
+    /// Saved as an array, which the store replaces whole, so an entry removed
+    /// (a command reset to its defaults) stays removed. The GTK build keeps it
+    /// unchanged.
+    #[serde(default)]
+    pub keyboard_shortcuts: Vec<ShortcutOverride>,
+}
+
+/// One command's keyboard shortcuts in place of its defaults, in craft-keymap's
+/// stored form (`{ command, keys }`).
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct ShortcutOverride {
+    /// The command's stable id (`file.open`).
+    pub command: String,
+    /// The keys in canonical text form (`Cmd+Shift+O`); empty for no shortcut.
+    pub keys: Vec<String>,
 }
 
 impl Default for UiSettings {
@@ -257,6 +276,7 @@ impl Default for UiSettings {
             grid_major_line_width: 2.0,
             grid_minor_line_width: 1.0,
             use_system_title_bar: false,
+            keyboard_shortcuts: Vec::new(),
         }
     }
 }

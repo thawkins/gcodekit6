@@ -51,6 +51,9 @@ A key is refused, with the reason shown above the list, when:
 - Alt and the letter open a menu in any of the languages;
 - another command already uses it where both could run.
 
+Shortcuts are saved with the other settings. A saved shortcut that breaks one of these rules
+(for example after editing the settings file by hand) is replaced by the command's default.
+
 See [Keyboard Shortcuts Reference](90-shortcuts.md) for the full default list.
 
 ## Firmware Settings

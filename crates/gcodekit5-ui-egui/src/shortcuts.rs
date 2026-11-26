@@ -22,10 +22,16 @@
 //! Keys are compared as they work on Linux, Windows and macOS (Ctrl is Cmd off macOS), since
 //! one settings file can be used on each.
 //!
-//! Dependencies: `craft-keymap` (the keymap and chords), `gcodekit5-app` (translations).
+//! The changes are saved in the settings' `ui.keyboard_shortcuts` ([`saved`]) and loaded at
+//! start through [`sanitized`] ([`keymap_from`]), so a hand-edited file cannot take the E-STOP
+//! key either.
+//!
+//! Dependencies: `craft-keymap` (the keymap and chords), `gcodekit5-settings` (the saved
+//! form), `gcodekit5-app` (translations).
 
 use craft_keymap::{Binding, Chord, Key, Keymap, Mods, Overrides, Platform, Policy, Trigger};
 use gcodekit5_app::i18n::Translator;
+use gcodekit5_settings::config::{ShortcutOverride, UiSettings};
 
 use crate::commands::{self, Command};
 use crate::menu::MENU_MNEMONICS;
@@ -304,6 +310,36 @@ pub fn sanitized(overrides: Overrides) -> (Keymap, Vec<Command>) {
         }
     }
     (keymap, dropped)
+}
+
+/// The keymap's changes to the default keys, as the settings save them.
+///
+/// # Arguments
+/// * `keymap` - The keymap as edited.
+pub fn saved(keymap: &Keymap) -> Vec<ShortcutOverride> {
+    keymap
+        .overrides()
+        .iter()
+        .map(|(command, keys)| ShortcutOverride {
+            command: command.to_string(),
+            keys: keys.to_vec(),
+        })
+        .collect()
+}
+
+/// The app's keymap with the shortcuts saved in `ui`, each command whose saved keys break a
+/// rule put back to its defaults ([`sanitized`]).
+///
+/// # Arguments
+/// * `ui` - The UI settings holding the saved shortcuts.
+pub fn keymap_from(ui: &UiSettings) -> Keymap {
+    let mut overrides = Overrides::new();
+    for entry in &ui.keyboard_shortcuts {
+        if !overrides.insert(entry.command.clone(), entry.keys.clone()) {
+            tracing::warn!(command = %entry.command, "saved shortcut too long; ignored");
+        }
+    }
+    sanitized(overrides).0
 }
 
 /// The English msgids of the refusal messages, for the translation test.

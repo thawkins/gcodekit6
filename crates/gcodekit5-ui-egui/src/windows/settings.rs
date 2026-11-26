@@ -14,7 +14,8 @@
 //! every command with its keys: Change records the next key press as the command's key, Clear
 //! removes its keys, Reset gives it its defaults and Reset All every command. A key is given
 //! only when [`crate::shortcuts`] allows it, which keeps the E-STOP and feed hold keys fixed;
-//! otherwise the page says why. Apply hands the edited keymap to the app
+//! otherwise the page says why. Apply saves the shortcuts with the settings
+//! (`ui.keyboard_shortcuts`) and hands the edited keymap to the app
 //! ([`SettingsWindow::take_applied_keymap`]), which uses it at once.
 //!
 //! Dependencies: `egui`, `craft-ui` (combo boxes), `craft-keymap` (the keymap and recording a
@@ -289,6 +290,7 @@ impl SettingsWindow {
         copy_edited(&draft.config, &mut config, self.title_bar_row);
         // An empty field means no default directory.
         config.file_processing.output_directory = draft.directory.trim().into();
+        config.ui.keyboard_shortcuts = shortcuts::saved(&draft.keymap);
         let restart = needs_restart(&self.launch_language, &config.ui.language)
             || (self.title_bar_row
                 && config.ui.use_system_title_bar != self.launch_system_title_bar);
