@@ -177,8 +177,8 @@ fn request_id() -> egui::Id {
     egui::Id::unique("gcodekit5-help-request")
 }
 
-/// Draws a `?` button that asks for help on `topic`; the app opens it after the frame's
-/// windows are drawn ([`take_request`]).
+/// Draws the help icon button (named "Help (F1)") that asks for help on `topic`; the app
+/// opens it after the frame's windows are drawn ([`take_request`]).
 ///
 /// # Arguments
 /// * `ui` - Where the button goes.
@@ -186,10 +186,7 @@ fn request_id() -> egui::Id {
 /// * `tr` - Translates the tooltip.
 pub fn help_button(ui: &mut egui::Ui, topic: HelpTopic, tr: &Translator) {
     let label = tr.tr(n_!("Help (F1)"));
-    let response = ui.button("?").on_hover_text(label.as_ref());
-    response.widget_info(|| {
-        egui::WidgetInfo::labeled(egui::Role::Button, ui.is_enabled(), label.as_ref())
-    });
+    let response = crate::icons::icon_only_button(ui, crate::icons::Icon::Help, label.as_ref());
     if response.clicked() {
         ui.ctx().data_mut(|d| d.insert_temp(request_id(), topic));
     }

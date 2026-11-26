@@ -11,7 +11,9 @@
 //! arrive many times a second and are shown in the DRO and status bar instead. A line typed
 //! in the entry goes through [`MachineController::send_line`], the path of the Machine Control
 //! command entry, and is echoed as `> line` once the controller accepts it; a refusal is shown
-//! under the log. Up and Down in the entry walk the lines sent in this session.
+//! under the log. Up and Down in the entry walk the lines sent in this session. The header
+//! has GTK's icon buttons: Clear console, Copy last error (see [`ConsolePane::last_error`])
+//! and Help.
 //!
 //! Ported from the GTK `ui/gtk/device_console.rs` view. Not ported: the persistent command
 //! history file (the history lasts for the session), and the `ok` pairing of the GTK listener
@@ -25,6 +27,7 @@ use gcodekit5_app::console::{ConsolePanel, MessageLevel};
 use gcodekit5_app::i18n::Translator;
 use gcodekit5_app::machine::{MachineController, MachineEvent};
 
+use crate::icons::{Icon, icon_only_button};
 use crate::machine::{MachineStatus, lock, worker_message};
 use crate::windows::help::{self, HelpTopic};
 use crate::workspace::{Pane, PaneContext, PaneId};
@@ -39,7 +42,9 @@ const PROGRAM_HALTED: &str = n_!("Program halted (feed hold, then reset)");
 pub fn msgids() -> Vec<&'static str> {
     vec![
         PROGRAM_HALTED,
-        n_!("Clear"),
+        n_!("Device Console"),
+        n_!("Clear console"),
+        n_!("Copy last error"),
         n_!("Type a command and press Enter..."),
         n_!("Device connected"),
         n_!("Device disconnected"),
@@ -142,6 +147,39 @@ impl ConsolePane {
     /// The log as text, oldest first: received lines as they came, sent lines as `> line`.
     pub fn lines(&self) -> Vec<String> {
         self.log.messages.iter().map(display_text).collect()
+    }
+
+    /// The newest error or alarm line of the log, as GTK's Copy last error found it: the
+    /// newest line (acknowledgements and status reports skipped) that mentions "error" or
+    /// "alarm".
+    pub fn last_error(&self) -> Option<String> {
+        self.log.messages.iter().rev().find_map(|message| {
+            let text = display_text(message);
+            let line = text.trim();
+            let skip = line.is_empty() || line == "ok" || line.starts_with('<');
+            let low = line.to_lowercase();
+            (!skip && (low.contains("error") || low.contains("alarm"))).then(|| line.to_owned())
+        })
+    }
+
+    /// Draws the header: the title, then Clear console, Copy last error and Help at the
+    /// right, as GTK's console header has them.
+    fn show_header(&mut self, ui: &mut egui::Ui, tr: &Translator) {
+        ui.horizontal(|ui| {
+            crate::theme::section_heading(ui, &tr.tr("Device Console"));
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                // GTK's console header had the Machine Control help button.
+                help::help_button(ui, HelpTopic::MachineControl, tr);
+                if icon_only_button(ui, Icon::Copy, &tr.tr("Copy last error")).clicked()
+                    && let Some(line) = self.last_error()
+                {
+                    ui.ctx().copy_text(line);
+                }
+                if icon_only_button(ui, Icon::Trash, &tr.tr("Clear console")).clicked() {
+                    self.log.clear();
+                }
+            });
+        });
     }
 
     /// Sends the entry's line and logs it; a refusal is kept as the notice.
@@ -249,6 +287,9 @@ impl Pane for ConsolePane {
             .machine()
             .map(|m| m.status().clone())
             .unwrap_or_default();
+        egui::Panel::top("gcodekit5-console-header")
+            .show_separator_line(false)
+            .show(ui, |ui| self.show_header(ui, tr));
         egui::Panel::bottom("gcodekit5-console-input")
             .show_separator_line(false)
             .show(ui, |ui| {
@@ -257,13 +298,10 @@ impl Pane for ConsolePane {
                     ui.colored_label(ui.visuals().error_fg_color, worker_message(notice, tr));
                 }
                 ui.horizontal(|ui| {
-                    if ui.button(tr.tr("Clear")).clicked() {
-                        self.log.clear();
-                    }
-                    // GTK's console header had the Machine Control help button.
-                    help::help_button(ui, HelpTopic::MachineControl, tr);
+                    // GTK's prompt before the entry.
+                    ui.strong(">");
+                    self.show_entry(ui, tr, &status);
                 });
-                self.show_entry(ui, tr, &status);
             });
         let row_height = ui.text_style_height(&egui::TextStyle::Monospace);
         let rows = self.log.messages.len();

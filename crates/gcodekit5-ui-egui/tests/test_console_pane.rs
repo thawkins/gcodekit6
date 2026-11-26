@@ -181,3 +181,50 @@ fn test_console_echoes_soft_reset_label() {
     harness.step();
     assert!(harness.query_by_label("> 0x18 (Reset)").is_some());
 }
+
+/// Copy last error (GTK's console header button) takes the newest error or alarm line,
+/// skipping acknowledgements and status reports.
+#[test]
+fn test_console_last_error_is_newest_error_or_alarm() {
+    let (mut pane, tr) = console();
+    assert_eq!(pane.last_error(), None);
+    pane.apply(
+        &[
+            received("error:9"),
+            received("ALARM:1"),
+            received("ok"),
+            received("[MSG:hello]"),
+        ],
+        &tr,
+    );
+    assert_eq!(pane.last_error().as_deref(), Some("ALARM:1"));
+}
+
+/// The console header's icon buttons keep their names, and Copy last error puts the line
+/// on the clipboard.
+#[test]
+fn test_console_header_buttons_in_app() {
+    let (mut harness, shared) = pane_app(Duration::from_millis(1), true);
+    shared.inject("ALARM:1\n");
+    let deadline = std::time::Instant::now() + crate::machine_support::EVENTUALLY;
+    while harness.query_all_by_label("ALARM:1").next().is_none()
+        && std::time::Instant::now() < deadline
+    {
+        harness.step();
+        std::thread::sleep(Duration::from_millis(2));
+    }
+    assert!(
+        harness.query_all_by_label("ALARM:1").next().is_some(),
+        "alarm never logged"
+    );
+    assert!(harness.query_by_label("Clear console").is_some());
+    harness.get_by_label("Copy last error").click();
+    harness.step();
+    let copied = harness
+        .output()
+        .platform_output
+        .commands
+        .iter()
+        .any(|c| matches!(c, egui::OutputCommand::CopyText(text) if text.ends_with("ALARM:1")));
+    assert!(copied, "{:?}", harness.output().platform_output.commands);
+}
