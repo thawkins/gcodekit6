@@ -685,6 +685,7 @@ impl GcodeKitApp {
         while let Some(answer) = self.dialogs.poll() {
             self.handle_answer(answer);
         }
+        self.workspace.begin_frame(&ctx);
         self.dispatch_keys(&ctx);
         self.update_firmware_settings(&ctx);
         self.workspace.frame(&self.state.machine);
@@ -784,8 +785,11 @@ impl GcodeKitApp {
     /// pointer in, but only while no widget has keyboard focus and no popup (an open dropdown)
     /// is up, so a pane's keys never take a key from a focused widget.
     fn keyboard_panel(&self, ctx: &egui::Context) -> Option<&'static str> {
-        let widget_has_keys =
-            ctx.memory(|m| m.focused().is_some()) || egui::Popup::is_any_open(ctx);
+        // A window, popup or modal on screen (or closed only last frame) has the user's
+        // attention: no pane takes plain keys then.
+        let widget_has_keys = ctx.memory(|m| m.focused().is_some())
+            || egui::Popup::is_any_open(ctx)
+            || !crate::workspace::overlay_layers(ctx).is_empty();
         if widget_has_keys {
             return None;
         }

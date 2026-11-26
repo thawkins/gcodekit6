@@ -543,3 +543,74 @@ fn test_keys_return_with_the_page_after_a_press_elsewhere() {
         shared.log()
     );
 }
+
+/// Whether some widget has egui's keyboard focus.
+fn widget_focused(harness: &Harness<'_, GcodeKitApp>) -> bool {
+    harness.ctx.memory(|m| m.focused().is_some())
+}
+
+/// A window closing (here Preferences, closed through its Cancel button by assistive
+/// technology, with no pointer press) leaves the keys away from jog until a press in the pane.
+#[test]
+fn test_window_closing_disarms_keyboard_jog() {
+    let (mut harness, shared) = keyboard_app(false);
+    let _ = preferences_rect(&mut harness);
+    harness.get_by_label("Cancel").click_accesskit();
+    harness.step();
+    harness.step();
+    tap(&mut harness, egui::Key::Num6);
+    assert!(
+        settled_jogs(&harness, &shared).is_empty(),
+        "{:?}",
+        shared.log()
+    );
+}
+
+/// A text field losing the keyboard without a press (Escape in the Editor, here focused by
+/// assistive technology) leaves the keys away from jog: the next digit was meant for text.
+#[test]
+fn test_focus_lost_to_nothing_disarms_keyboard_jog() {
+    let (mut harness, shared) = keyboard_app(false);
+    harness
+        .get_by_role_and_label(egui::accesskit::Role::TextInput, "G-Code Editor")
+        .focus();
+    harness.step();
+    assert!(widget_focused(&harness), "editor not focused");
+    harness.key_press(egui::Key::Escape);
+    harness.step();
+    harness.step();
+    assert!(!widget_focused(&harness), "editor kept the focus");
+    tap(&mut harness, egui::Key::Num6);
+    assert!(
+        settled_jogs(&harness, &shared).is_empty(),
+        "{:?}",
+        shared.log()
+    );
+}
+
+/// Enter in the Jog Feed field and Escape in a Set % field end their editing; the next
+/// digit must not jog.
+#[test]
+fn test_leaving_a_number_field_disarms_keyboard_jog() {
+    for (suffix, leave) in [("mm/min", egui::Key::Enter), ("%", egui::Key::Escape)] {
+        let (mut harness, shared) = keyboard_app(false);
+        let field = harness
+            .get_all_by_role(egui::accesskit::Role::SpinButton)
+            .find(|n| n.value().is_some_and(|v| v.ends_with(suffix)))
+            .expect("field")
+            .rect()
+            .center();
+        click_at(&mut harness, field);
+        assert!(widget_focused(&harness), "{suffix}: field not editing");
+        harness.key_press(leave);
+        harness.step();
+        harness.step();
+        assert!(!widget_focused(&harness), "{suffix}: field kept the focus");
+        tap(&mut harness, egui::Key::Num6);
+        assert!(
+            settled_jogs(&harness, &shared).is_empty(),
+            "{suffix}: {:?}",
+            shared.log()
+        );
+    }
+}

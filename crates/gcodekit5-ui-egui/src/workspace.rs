@@ -497,6 +497,16 @@ pub struct Workspace {
     /// Where the page tabs were last drawn: a press on them changes the page, not which
     /// pane has the keyboard.
     tabs_rect: Option<egui::Rect>,
+    /// Whether a widget had the keyboard at the end of the last frame.
+    widget_focus_before: bool,
+    /// The windows, popups and modals shown at the end of the last frame.
+    overlays_before: Vec<egui::LayerId>,
+    /// The page changed since the last frame was drawn: focus lost by the old page's widgets
+    /// says nothing about the new page.
+    page_changed: bool,
+    /// Whether the last frame had a press other than on the page tabs (it set the keyboard
+    /// itself).
+    pressed: bool,
 }
 
 /// The panes whose bodies a frame drew; the others have their holds cancelled
@@ -540,6 +550,10 @@ impl Workspace {
             page_keyboard: Vec::new(),
             widget_focused: false,
             tabs_rect: None,
+            widget_focus_before: false,
+            overlays_before: Vec::new(),
+            page_changed: false,
+            pressed: false,
         }
     }
 
@@ -570,6 +584,7 @@ impl Workspace {
                 .iter()
                 .find(|(p, _)| *p == page)
                 .and_then(|(_, pane)| *pane);
+            self.page_changed = true;
         }
         self.page = page;
     }
@@ -717,6 +732,33 @@ impl Workspace {
         self.active.filter(|id| self.drawn.contains(id))
     }
 
+    /// Runs at the start of every frame, before its keys are dispatched, on what the last
+    /// frame left: takes the keyboard from the panes when focus left them for something
+    /// else. A widget lost the keyboard (Enter or Escape in a field, a dialog closing; egui
+    /// does not give it back to the text field the user was in before), or a window, popup
+    /// or modal closed, unless a press in a pane in that frame says where the user is now.
+    /// A digit meant for a text field then never reaches the pane's keys (a jog) until the
+    /// user presses in the pane again.
+    ///
+    /// # Arguments
+    /// * `ctx` - The egui context.
+    pub fn begin_frame(&mut self, ctx: &egui::Context) {
+        let widget_focus = ctx.memory(|m| m.focused().is_some());
+        let overlays = overlay_layers(ctx);
+        let focus_lost = self.widget_focus_before && !widget_focus;
+        let overlay_closed = self.overlays_before.iter().any(|l| !overlays.contains(l));
+        if (focus_lost || overlay_closed) && !self.pressed && !self.page_changed {
+            if self.focused.is_some() {
+                tracing::debug!(focus_lost, overlay_closed, "panes lose the keyboard");
+            }
+            self.focused = None;
+        }
+        self.widget_focus_before = widget_focus;
+        self.overlays_before = overlays;
+        self.page_changed = false;
+        self.pressed = false;
+    }
+
     /// Whether the pane `id` has the keyboard: the user last pressed in it, its page is the
     /// one shown and the last frame drew it.
     pub fn has_keyboard(&self, id: PaneId) -> bool {
@@ -859,6 +901,7 @@ impl Workspace {
             self.widget_focused = ui.ctx().memory(|m| m.focused().is_some());
         }
         self.drawn = frame.drawn;
+        self.pressed |= press.is_some() && !on_tabs;
         for pane in self
             .panes
             .iter_mut()
@@ -867,6 +910,21 @@ impl Workspace {
             pane.cancel_hold();
         }
     }
+}
+
+/// The windows, popups and modals shown (this frame or the last): `Middle` and
+/// `Foreground` layers; tooltips do not count.
+///
+/// # Arguments
+/// * `ctx` - The egui context.
+pub fn overlay_layers(ctx: &egui::Context) -> Vec<egui::LayerId> {
+    ctx.memory(|m| {
+        m.areas()
+            .visible_layer_ids()
+            .into_iter()
+            .filter(|layer| matches!(layer.order, egui::Order::Middle | egui::Order::Foreground))
+            .collect()
+    })
 }
 
 /// The Designer inspector's header: the "Inspector" heading and, on the right, the Hide
