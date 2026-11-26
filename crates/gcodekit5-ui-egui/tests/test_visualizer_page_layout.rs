@@ -1,7 +1,9 @@
 //! The Visualizer page as GTK lays it out: the sidebar (Fit to Content, Reset View, Hide,
 //! Inspector) left of the view, the nav cube at the view's top right with the Top View and
 //! Mouse Controls buttons under it. At 1280x800 (1x and 2x) none of them is clipped; the
-//! sidebar's buttons work; and a snapshot of the page at 1440x900 dark.
+//! sidebar's buttons work; and snapshots of the page at 1440x900 dark, as it starts and with
+//! the whole sidebar open (Toolpath, Guides, Simulation with stock removal on, Inspector) and
+//! a machine's bounds, as GTK's help screenshots show it.
 
 use std::time::{Duration, Instant};
 
@@ -66,12 +68,25 @@ fn page_app(
     ppp: f32,
     wgpu: bool,
 ) -> Result<Harness<'static, GcodeKitApp>, Box<dyn std::error::Error>> {
+    page_app_with(Config::default(), None, size, ppp, wgpu)
+}
+
+/// [`page_app`] with the settings `config`, the visualizer given the device `profile`.
+fn page_app_with(
+    config: Config,
+    profile: Option<gcodekit5_devicedb::DeviceProfile>,
+    size: egui::Vec2,
+    ppp: f32,
+    wgpu: bool,
+) -> Result<Harness<'static, GcodeKitApp>, Box<dyn std::error::Error>> {
     let mut state = AppState::new(
-        SettingsManager::detached(Config::default()),
+        SettingsManager::detached(config.clone()),
         crate::test_smoke::native_decision(),
     );
     state.machine.set_program(PROGRAM)?;
-    let pane = loaded_pane(&state)?;
+    let mut pane = loaded_pane(&state)?;
+    pane.configure(&config);
+    pane.set_device(profile.as_ref());
     let mut app = GcodeKitApp::from_state(state);
     app.workspace_mut().set_pane(Box::new(pane));
     app.show_page(Page::Visualizer);
@@ -246,6 +261,53 @@ fn test_snapshot_visualizer_page_dark() -> TestResult {
         .max_failed_pixels(40)
         .output_path(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/snapshots"));
     if let Err(error) = harness.try_snapshot_options("visualizer_page_dark", &options) {
+        return Err(error.to_string().into());
+    }
+    Ok(())
+}
+
+#[test]
+fn test_snapshot_visualizer_page_full_sidebar() -> TestResult {
+    let mut config = Config::default();
+    config.ui.enable_stock_removal_3d = true;
+    let axis = |min: f64, max: f64| gcodekit5_devicedb::AxisLimits {
+        min,
+        max,
+        enabled: true,
+    };
+    let profile = gcodekit5_devicedb::DeviceProfile {
+        x_axis: axis(0.0, 300.0),
+        y_axis: axis(0.0, 200.0),
+        z_axis: axis(-50.0, 0.0),
+        ..gcodekit5_devicedb::DeviceProfile::default()
+    };
+    let mut harness = page_app_with(config, Some(profile), egui::vec2(1440.0, 900.0), 1.0, true)?;
+    harness.get_by_label("Inspector").click();
+    harness.run_steps(2);
+    // Every section of GTK's sidebar is on screen at 1440x900.
+    let bottom = harness.get_by_label("eStop").rect().top();
+    for label in [
+        "2D",
+        "3D",
+        "Show Rapid Moves",
+        "Show Cutting Moves",
+        "Show Laser/Spindle",
+        "Show Grid",
+        "Show Machine Bounds",
+        "Show Stock Removal",
+        "Min S:",
+        "Avg S:",
+        "Play preview",
+        "Speed",
+    ] {
+        let rect = harness.get_by_label(label).rect();
+        assert!(rect.bottom() <= bottom, "{label} at {rect:?}");
+    }
+    let options = SnapshotOptions::new()
+        .threshold(1.0)
+        .max_failed_pixels(40)
+        .output_path(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/snapshots"));
+    if let Err(error) = harness.try_snapshot_options("visualizer_page_full_sidebar", &options) {
         return Err(error.to_string().into());
     }
     Ok(())

@@ -314,10 +314,12 @@ there is no screenshot of them. The lists below are what still differs.
 
 **Visualizer** (`visualizer.png`; V6 has the full list):
 
-- The sidebar has no Toolpath, Guides or Simulation toggles, no 2D/3D switch and no Fit
-  to Device. These are features egui lacks (Gaps rank 4).
-- There is no Zoom/Center/Cursor status line, no run preview row, and no Toggle
-  Scrollbars.
+- The sidebar matches GTK's (Task G4): toolbar with Fit to Device, the 2D / 3D pair, then
+  Toolpath, Guides, Simulation and Inspector (with Min/Max/Avg S), as
+  `visualizer_page_full_sidebar.png` shows. Grid spacing shows two decimals (GTK: three).
+- The run preview bar sits at the bottom left, as in GTK, with the bounds OSD above it.
+- There is no Zoom/Center/Cursor status line (commented out in the GTK source) and no
+  Toggle Scrollbars (the egui view has no scrollbars).
 - Cuts are drawn yellow by power (GTK: green).
 
 **CAM Tools** (no help image; compared with `ui/gtk/cam_tools/`):
