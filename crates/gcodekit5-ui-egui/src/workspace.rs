@@ -972,7 +972,17 @@ impl Content<'_, '_, '_> {
     /// Draws the pane `id`'s body into `ui`.
     fn body(&mut self, ui: &mut egui::Ui, id: PaneId) {
         self.drawn.push(id);
-        if self.press.is_some_and(|pos| ui.max_rect().contains(pos)) {
+        // Only a press on the page itself: a window, popup or modal above the pane (the
+        // Preferences, Help, a dialog) is its own layer, and a click on it is not a press in
+        // the pane below.
+        let on_page = |pos: egui::Pos2| {
+            ui.max_rect().contains(pos)
+                && ui
+                    .ctx()
+                    .layer_id_at(pos)
+                    .is_none_or(|layer| layer == ui.layer_id())
+        };
+        if self.press.is_some_and(on_page) {
             self.pressed_in = Some(id);
         }
         if let Some(pane) = self.panes.iter_mut().find(|p| p.id() == id) {

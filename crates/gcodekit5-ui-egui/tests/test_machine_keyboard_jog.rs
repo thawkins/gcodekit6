@@ -445,3 +445,56 @@ fn test_digit_typed_after_return_from_a_text_field_never_jogs() {
         );
     }
 }
+
+/// Presses and releases the primary button at `pos` (a click), then draws two frames.
+fn click_at(harness: &mut Harness<'_, GcodeKitApp>, pos: egui::Pos2) {
+    crate::test_machine_pane::pointer_button(harness, pos, true);
+    harness.step();
+    crate::test_machine_pane::pointer_button(harness, pos, false);
+    harness.step();
+    harness.step();
+}
+
+/// The Preferences window's rectangle.
+fn preferences_rect(harness: &mut Harness<'_, GcodeKitApp>) -> egui::Rect {
+    harness
+        .state_mut()
+        .dispatch(gcodekit5_ui_egui::commands::Command::OpenSettings);
+    harness.step();
+    harness.step();
+    harness
+        .ctx
+        .memory(|m| m.area_rect(egui::Id::unique("gcodekit5-preferences")))
+        .expect("Preferences window")
+}
+
+/// A click on a window floating over Machine Control (here a bare spot of the Preferences
+/// window over the centre column) is not a press in the pane: the keys stay away from jog.
+#[test]
+fn test_click_on_a_window_over_the_pane_does_not_arm_jog() {
+    let (mut harness, shared) = pane_app(Duration::from_millis(1), true);
+    report_state(
+        &mut harness,
+        &shared,
+        "<Idle|MPos:-100.000,-100.000,-50.000|FS:0,0>",
+        "Idle",
+    );
+    let window = preferences_rect(&mut harness);
+    let mc = harness
+        .get_by_role_and_label(egui::accesskit::Role::Button, "Disconnect")
+        .rect()
+        .right();
+    // A spot of the window's body over the centre column, clear of its widgets.
+    let spot = egui::pos2(window.right() - 30.0, window.center().y);
+    assert!(
+        spot.x > mc && spot.y > 120.0,
+        "the window is not over Machine Control"
+    );
+    click_at(&mut harness, spot);
+    tap(&mut harness, egui::Key::Num6);
+    assert!(
+        settled_jogs(&harness, &shared).is_empty(),
+        "{:?}",
+        shared.log()
+    );
+}
