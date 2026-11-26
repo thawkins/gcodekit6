@@ -1,4 +1,10 @@
-## [Unreleased] - 2026-11-27 (egui + craft-libs migration, milestone M7: CI and packaging)
+## [2.0.0-alpha.1] - 2026-11-27
+
+First alpha of GCodeKit5 2.0: the user interface is rewritten on egui + craft-libs. GTK4, libadwaita and GtkSourceView are no longer required to build, run or package the app. The migration landed in milestones M0-M8, listed below. Settings, machine profiles and libraries from 1.x are kept.
+
+Not yet verified on real hardware, on Windows and macOS builds, or with a release build of every installer; report problems on the issue tracker.
+
+## [2.0.0-alpha.1] - 2026-11-27 (egui + craft-libs migration, milestone M7: CI and packaging)
 
 M7 removes GTK from CI and release packaging. Nothing in CI or the release builds installs or bundles GTK, glib, gettext or MSYS2 any more.
 
@@ -20,7 +26,7 @@ M8 (documentation): the build, architecture, i18n, macOS and Windows guides, SPE
 ### Removed
 - `scripts/windows-bundle-gtk.ps1`, `scripts/macos-bundle-frameworks.sh`, `scripts/check-dll-dependencies.ps1` and the GTK parts of `wix/main.wxs`
 
-## [Unreleased] - 2026-11-26 (egui + craft-libs migration, milestone M6: cut-over)
+## [2.0.0-alpha.1] - 2026-11-26 (egui + craft-libs migration, milestone M6: cut-over)
 
 M6 completes the cut-over: the egui front end got GTK's look back (Tabler icons, GTK's page layouts and colours), the Visualizer gained GTK's stock removal simulation, the remaining parity gaps G1-G8 were closed (keyboard jog and its safety gates, work zero, overrides, quick probes, console and editor features, Visualizer and Designer menus, shortcut editor), Repetier firmware streams with its own flow control and `M112` lockout, and the GTK4 front end was deleted.
 
@@ -100,7 +106,7 @@ M6 completes the cut-over: the egui front end got GTK's look back (Tabler icons,
 ### Known gaps
 - The parity checklist's Manual checks (real controllers, TCP/WebSocket, Windows and macOS, native speakers) have not been run
 
-## [Unreleased] - 2026-11-26 (egui + craft-libs migration, milestone M5: managers and help)
+## [2.0.0-alpha.1] - 2026-11-26 (egui + craft-libs migration, milestone M5: managers and help)
 
 ### Added
 - **Firmware Settings (egui)**: read, filter and write `$` settings (GRBL family) and Repetier EEPROM values; typed values are checked before sending (classic GRBL byte settings 0-255, no negatives, Repetier type ranges); every write is read back and a different stored value is reported as "Setting stored with another value"; rows not yet read from the controller cannot be edited
@@ -125,7 +131,7 @@ M6 completes the cut-over: the egui front end got GTK's look back (Tabler icons,
 - Not run against the grblHAL simulator; Windows saves untested on Windows
 - New translations need checking by native speakers
 
-## [Unreleased] - 2026-11-26 (egui + craft-libs migration, milestone M4: designer and CAM tools)
+## [2.0.0-alpha.1] - 2026-11-26 (egui + craft-libs migration, milestone M4: designer and CAM tools)
 
 ### Added
 - **Designer (egui)**: canvas with select, move, resize and rotate; toolbox with shape tools and the Text tool; layers panel with hide and lock; properties panel; shape gallery; array dialog; toolpath preview; New, Open and Save designs; import SVG, DXF and images; export G-code and SVG; Save works from the quit prompt
@@ -145,7 +151,7 @@ M6 completes the cut-over: the egui front end got GTK's look back (Tabler icons,
 - craft-libs SVG/DXF readers are not yet used for import
 - M4 has not been run against the grblHAL simulator
 
-## [Unreleased] - 2026-11-25 (egui + craft-libs migration, milestone M3: editor and visualizer)
+## [2.0.0-alpha.1] - 2026-11-25 (egui + craft-libs migration, milestone M3: editor and visualizer)
 
 ### Added
 - **G-code editor (egui)**: open, edit and save (atomic, refuses read-only files); syntax colours for light and dark; Find; follows the streamed line; clicking a line number selects that line; files over 50,000 lines open in a fast read-only view with "Edit anyway"; read-only while a job runs; Start streams what the editor shows; Save works from the quit prompt; the first G-code file on the command line opens at startup
@@ -159,7 +165,7 @@ M6 completes the cut-over: the egui front end got GTK's look back (Tabler icons,
 - Typing near the 50,000-line editing limit takes about 0.5-1 s per keystroke
 - Not yet ported from GTK: editor replace and match count; visualizer 2D mode, machine bounds, stock removal and run preview
 
-## [Unreleased] - 2026-11-25 (egui + craft-libs migration, milestone M2: machine control)
+## [2.0.0-alpha.1] - 2026-11-25 (egui + craft-libs migration, milestone M2: machine control)
 
 ### Added
 - **Machine Control panel (egui)**: connect/disconnect, Home, Unlock, position display in mm (2 decimals) or inches (3 decimals), step and press-and-hold jog, feed/rapid/spindle overrides, stream start/pause/stop and a command line
@@ -173,7 +179,7 @@ M6 completes the cut-over: the egui front end got GTK's look back (Tabler icons,
 - **Keys**: soft reset is Ctrl/Cmd+Shift+K and feed hold Ctrl/Cmd+Shift+H, with no bare-key bindings
 - **grblHAL simulator scripts**: `start-grblhal-sim.sh` writes to this repo's `target/temp`, finds `grblHAL_sim` on PATH (or the invoking user's `~/.local/bin` under sudo); `test-grblhal-sim.sh` uses `/dev/ttyGRBL` like the start script
 
-## [Unreleased] - 2026-11-25 (egui + craft-libs migration, milestone M1: app shell)
+## [2.0.0-alpha.1] - 2026-11-25 (egui + craft-libs migration, milestone M1: app shell)
 
 ### Added
 - **egui front end (opt-in)**: `cargo run --no-default-features --features egui` starts the new front end; GTK stays the default
@@ -190,7 +196,7 @@ M6 completes the cut-over: the egui front end got GTK's look back (Tabler icons,
 ### Known gaps
 - Windows log-off and macOS logout end the app without the unsaved-work prompt (same as the GTK app)
 
-## [Unreleased] - 2026-11-25 (egui + craft-libs migration, milestone M0)
+## [2.0.0-alpha.1] - 2026-11-25 (egui + craft-libs migration, milestone M0)
 
 ### Added
 - **Migration plan**: `docs/superpowers/plans/2026-11-25-gtk4-to-egui-craft-libs-migration.md` plans the move from GTK4 to egui + storytold/craft-libs in 20 tasks, including every GitHub Actions workflow, Flatpak, WiX and helper script
