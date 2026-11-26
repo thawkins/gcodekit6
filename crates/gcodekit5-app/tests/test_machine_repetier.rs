@@ -10,7 +10,8 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use gcodekit5_app::machine::{
-    Axis, MachineController, MachineError, MachineEvent, RealtimeCommand, StreamMode, worker_text,
+    Axis, MachineController, MachineError, MachineEvent, REPETIER_ESTOP_LABEL, RealtimeCommand,
+    StreamMode, worker_text,
 };
 use gcodekit5_app::test_support::{LoopbackShared, Wrote, loopback_controller, tcp_settings};
 use gcodekit5_communication::firmware::ControllerProtocol;
@@ -232,7 +233,7 @@ fn repetier_emergency_stop_writes_m112_and_drops_the_rest() {
         .is_some(),
         "the stop did not end the stream: {seen:?}"
     );
-    assert!(seen.contains(&MachineEvent::Sent("M112".to_string())));
+    assert!(seen.contains(&MachineEvent::Sent(REPETIER_ESTOP_LABEL.to_string())));
     // A jog the user sent before the stop, reaching the worker after it, must not run.
     controller.jog_sent_earlier(Axis::X, 1.0, 1000.0, before_stop);
     let dropped = |e: &MachineEvent| matches!(e, MachineEvent::Error(m) if m.starts_with(worker_text::NOT_SENT_AFTER_RESET));
@@ -269,7 +270,7 @@ fn repetier_soft_reset_command_is_the_emergency_stop() {
     let mut seen = Vec::new();
     assert!(
         wait_for(&mut controller, &mut seen, |e| *e
-            == MachineEvent::Sent("M112".to_string()))
+            == MachineEvent::Sent(REPETIER_ESTOP_LABEL.to_string()))
         .is_some()
     );
     assert_no_grbl_writes(&shared);

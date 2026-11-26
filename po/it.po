@@ -4745,3 +4745,6 @@ msgstr "Il firmware Repetier non ha sistemi di coordinate di lavoro; Zero impost
 
 msgid "This sets the work position (G92) so the current X/Y/Z becomes 0."
 msgstr "Questo imposta la posizione di lavoro (G92) in modo che l'attuale X/Y/Z diventi 0."
+
+msgid "Emergency stop (M112): reset the controller or reconnect to continue."
+msgstr "Arresto di emergenza (M112): reimposta il controller o riconnettiti per continuare."

@@ -4749,3 +4749,6 @@ msgstr "Le micrologiciel Repetier n'a pas de systèmes de coordonnées pièce ; 
 
 msgid "This sets the work position (G92) so the current X/Y/Z becomes 0."
 msgstr "Ceci définit la position pièce (G92) pour que la position X/Y/Z actuelle devienne 0."
+
+msgid "Emergency stop (M112): reset the controller or reconnect to continue."
+msgstr "Arrêt d'urgence (M112) : réinitialisez le contrôleur ou reconnectez-vous pour continuer."

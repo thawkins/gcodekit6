@@ -374,6 +374,10 @@ pub fn realtime_label(byte: u8) -> Option<&'static str> {
     }
 }
 
+/// How [`MachineEvent::Sent`] names the Repetier emergency stop (`M112`), so a front end
+/// tells it from an `M112` typed as a command line.
+pub const REPETIER_ESTOP_LABEL: &str = "M112 (Emergency stop)";
+
 /// Builds a fresh, unconnected transport for each [`MachineController::connect`].
 pub type TransportFactory = Box<dyn Fn() -> Box<dyn Communicator> + Send>;
 
@@ -1910,7 +1914,8 @@ impl WorkerState {
     /// number it expects next (a numbered line out of sequence would only be asked again).
     fn repetier_emergency_stop(&mut self) -> Result<(), String> {
         self.write(b"M112\n")?;
-        self.sink.emit(MachineEvent::Sent("M112".to_string()));
+        self.sink
+            .emit(MachineEvent::Sent(REPETIER_ESTOP_LABEL.to_string()));
         self.reset_at = Some(Instant::now());
         if let Some(link) = self.repetier.as_mut() {
             link.acks_due = 0;

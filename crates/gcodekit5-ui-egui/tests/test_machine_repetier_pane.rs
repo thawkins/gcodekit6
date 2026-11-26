@@ -92,6 +92,26 @@ fn test_repetier_profile_streams_repetier_and_disables_grbl_controls() {
         "E-STOP did not write M112: {:?}",
         shared.log()
     );
+    // The board is killed until it restarts: motion is disabled and the pane says so.
+    let reset = "Emergency stop (M112): reset the controller or reconnect to continue.";
+    assert!(
+        step_until(&mut harness, |app| app.state().machine.status().estopped),
+        "E-STOP not recorded"
+    );
+    harness.get_by_label("Unlock").scroll_to_me();
+    for _ in 0..4 {
+        harness.step();
+    }
+    assert!(harness.query_by_label(reset).is_some(), "no reset notice");
+    for label in ["Home", "Jog X+", "Zero X", "Send"] {
+        assert!(!enabled(&harness, label), "{label} enabled after M112");
+    }
+    // The firmware restarted: motion is possible again.
+    shared.inject("start\n");
+    assert!(
+        step_until(&mut harness, |app| !app.state().machine.status().estopped),
+        "restart did not clear the E-STOP"
+    );
     assert_no_grbl_writes(&shared);
 }
 

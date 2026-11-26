@@ -21,7 +21,7 @@ use gcodekit5_app::i18n::Translator;
 use gcodekit5_app::machine::grbl_stream::{
     GrblResponseLine, MAX_LINE_LENGTH, classify_response, prepare_program,
 };
-use gcodekit5_app::machine::{MachineController, MachineEvent, worker_text};
+use gcodekit5_app::machine::{MachineController, MachineEvent, REPETIER_ESTOP_LABEL, worker_text};
 use gcodekit5_app::work_zero::{Wcs, WcsWord, parser_state_wcs, wcs_in_line};
 use gcodekit5_communication::firmware::ControllerProtocol;
 use gcodekit5_communication::firmware::grbl::status_parser::{
@@ -85,6 +85,9 @@ pub struct MachineStatus {
     /// Whether the controller reported its parser state on this connection; until it does,
     /// a front end may fall back to the system the user last selected.
     pub wcs_reported: bool,
+    /// The Repetier emergency stop (`M112`) was sent: the firmware is halted until it
+    /// restarts (its `start` line) or the connection is opened again, so motion is disabled.
+    pub estopped: bool,
     /// Whether the active system is outside G54-G59 (`G59.1`, `G54.1`), as reported or sent;
     /// [`MachineStatus::active_wcs`] is then `None`. Cleared by a G54-G59 report or line.
     pub wcs_outside: bool,
@@ -132,10 +135,12 @@ impl MachineStatus {
     /// a report, or in any other state (Home, Alarm, Hold, Check, Run, Door, ...), a `$J`
     /// would wait in the controller's buffer and run later from a stale position.
     pub fn jog_allowed(&self) -> bool {
-        self.report
-            .as_ref()
-            .and_then(|r| r.machine_state.as_deref())
-            .is_some_and(|state| state.starts_with("Idle") || state.starts_with("Jog"))
+        !self.estopped
+            && self
+                .report
+                .as_ref()
+                .and_then(|r| r.machine_state.as_deref())
+                .is_some_and(|state| state.starts_with("Idle") || state.starts_with("Jog"))
     }
 
     /// The machine position (`MPos`) of the latest report, or `WPos + WCO` when the report
@@ -239,12 +244,14 @@ impl MachineStatus {
                 MachineEvent::Connected => {
                     self.connected = true;
                     self.last_error = None;
+                    self.estopped = false;
                 }
                 MachineEvent::Disconnected => {
                     if self.streaming {
                         self.stream_end = Some(StreamEnd::Stopped);
                     }
                     self.connected = false;
+                    self.estopped = false;
                     self.streaming = false;
                     self.stream_started = None;
                     self.report = None;
@@ -268,6 +275,10 @@ impl MachineStatus {
                     self.report = Some(report);
                 }
                 MachineEvent::Received(line) => {
+                    if line.trim().eq_ignore_ascii_case("start") {
+                        // A Repetier firmware restarted: an emergency stop is over.
+                        self.estopped = false;
+                    }
                     if let Some(word) = parser_state_wcs(line) {
                         self.set_wcs(word);
                         self.wcs_reported = true;
@@ -324,6 +335,7 @@ impl MachineStatus {
                         total: *total,
                     });
                 }
+                MachineEvent::Sent(line) if line == REPETIER_ESTOP_LABEL => self.estopped = true,
                 MachineEvent::Sent(line) => {
                     // Lines run in order, so a later `G10 L20` acts on this system.
                     if let Some(word) = wcs_in_line(line) {

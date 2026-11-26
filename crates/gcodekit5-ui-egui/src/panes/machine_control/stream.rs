@@ -48,7 +48,7 @@ pub(super) fn show(
     has_program: bool,
 ) -> Option<Action> {
     crate::theme::section_heading(ui, &tr.tr("Job Control"));
-    let can_start = status.connected && !status.streaming && has_program;
+    let can_start = status.connected && !status.streaming && !status.estopped && has_program;
     let hint = if has_program {
         tr.tr("Send G-code from the editor")
     } else {

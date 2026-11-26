@@ -803,7 +803,7 @@ impl MachineControlPane {
 
     /// Draws the homing buttons, side by side and of equal width.
     fn show_homing(&mut self, ui: &mut egui::Ui, tr: &Translator, status: &MachineStatus) {
-        let idle = status.connected && !status.streaming;
+        let idle = status.connected && !status.streaming && !status.estopped;
         let width = (ui.available_width() - ui.spacing().item_spacing.x) / 2.0;
         ui.horizontal(|ui| {
             let home = egui::Button::image_and_text(Icon::Home.themed(ui), tr.tr("Home"))
@@ -883,6 +883,8 @@ impl MachineControlPane {
         }
         if !status.connected {
             ui.weak(tr.tr("Connect to enable controls."));
+        } else if status.estopped {
+            ui.colored_label(ui.visuals().warn_fg_color, tr.tr(wcs::ESTOPPED_RESET));
         } else if in_alarm(status) {
             ui.colored_label(ui.visuals().warn_fg_color, tr.tr(ALARM_UNLOCK));
         }

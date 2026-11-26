@@ -29,7 +29,7 @@ impl DirectSender {
         tr: &Translator,
         status: &MachineStatus,
     ) -> Option<String> {
-        let enabled = status.connected && !status.streaming;
+        let enabled = status.connected && !status.streaming && !status.estopped;
         let mut send = false;
         ui.add_enabled_ui(enabled, |ui| {
             ui.horizontal(|ui| {

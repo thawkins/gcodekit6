@@ -44,6 +44,7 @@ pub(super) const MSGIDS: &[&str] = &[
     WCS_OUTSIDE,
     NO_WORK_ZERO,
     NO_WCS_SYSTEMS,
+    ESTOPPED_RESET,
 ];
 
 /// Shown on the zero buttons while the active system is not known.
@@ -55,6 +56,10 @@ pub(super) const WCS_OUTSIDE: &str = n_!("Active work coordinate system is not G
 /// ([`WorkZeroSupport::Unavailable`]).
 pub(super) const NO_WORK_ZERO: &str =
     n_!("Work zero is not available for this controller type (set in the device profile).");
+/// After the Repetier emergency stop: the firmware stays halted until it restarts, so the
+/// work zero commands (and the pane's motion controls) wait.
+pub(super) const ESTOPPED_RESET: &str =
+    n_!("Emergency stop (M112): reset the controller or reconnect to continue.");
 /// Shown on the G54-G59 selector for Repetier, which zeroes with `G92`.
 pub(super) const NO_WCS_SYSTEMS: &str =
     n_!("Repetier firmware has no work coordinate systems; Zero sets the position with G92.");
@@ -140,6 +145,9 @@ impl WcsPanel {
     /// Why the zero commands (and Go to Work Zero) cannot run now, as a msgid; `None` when
     /// they can. Offline is not a reason: the controls are simply disabled.
     pub(super) fn blocked(&self, status: &MachineStatus) -> Option<&'static str> {
+        if status.estopped {
+            return Some(ESTOPPED_RESET);
+        }
         match self.support {
             WorkZeroSupport::Unavailable => return Some(NO_WORK_ZERO),
             WorkZeroSupport::PositionOnly => return None,

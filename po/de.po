@@ -4742,3 +4742,6 @@ msgstr "Die Repetier-Firmware hat keine Werkstückkoordinatensysteme; Null setzt
 
 msgid "This sets the work position (G92) so the current X/Y/Z becomes 0."
 msgstr "Dies setzt die Werkstückposition (G92), sodass die aktuelle X/Y/Z-Position 0 wird."
+
+msgid "Emergency stop (M112): reset the controller or reconnect to continue."
+msgstr "Not-Aus (M112): Controller zurücksetzen oder neu verbinden, um fortzufahren."
