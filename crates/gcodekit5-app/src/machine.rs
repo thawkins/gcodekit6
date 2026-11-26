@@ -85,6 +85,9 @@ pub mod worker_text {
     pub const ON_PROGRAM_LINE: &str = "on program line";
     /// A manual line dropped by a halt's reset; followed by the line.
     pub const DROPPED_AFTER_PROBE_ERROR: &str = "dropped: controller reset after probe error";
+    /// A manual line or a program start sent before the controller reset itself, dropped
+    /// so it never runs after the reset; followed by the line.
+    pub const NOT_SENT_AFTER_RESET: &str = "not sent: the controller was reset";
     /// A jog with an unusable distance or feed; followed by both.
     pub const JOG_INVALID: &str = "jog ignored: invalid distance or feed";
     /// A jog refused while a program streams.
@@ -97,7 +100,7 @@ pub mod worker_text {
     pub const STREAM_IN_PROGRESS: &str = "a program is already streaming";
 
     /// Every text above, for a front end's translation table.
-    pub const ALL: [&str; 14] = [
+    pub const ALL: [&str; 15] = [
         CONNECT_FAILED,
         WRITE_FAILED,
         READ_FAILED,
@@ -107,6 +110,7 @@ pub mod worker_text {
         PROGRAM_LINE_TOO_LONG,
         ON_PROGRAM_LINE,
         DROPPED_AFTER_PROBE_ERROR,
+        NOT_SENT_AFTER_RESET,
         JOG_INVALID,
         JOG_WHILE_STREAMING,
         ALREADY_CONNECTED,
@@ -1240,6 +1244,10 @@ impl WorkerState {
         // written after the reset would move a machine the user saw reset.
         if self.reset_at.is_some_and(|reset| sent < reset) {
             tracing::info!(%line, "manual line sent before a controller reset dropped");
+            self.sink.emit(MachineEvent::Error(format!(
+                "{}: {line}",
+                worker_text::NOT_SENT_AFTER_RESET
+            )));
             self.drop_line(seq);
             return;
         }

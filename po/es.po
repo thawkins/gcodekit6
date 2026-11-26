@@ -4628,3 +4628,6 @@ msgstr "El controlador no confirmó el cambio de ajuste."
 
 msgid "Rotary calibration is not a number: check Preferences > Machine."
 msgstr "La calibración del eje rotativo no es un número: revise Preferencias > Máquina."
+
+msgid "not sent: the controller was reset"
+msgstr "no enviado: el controlador se reinició"

@@ -111,3 +111,15 @@ fn test_fixed_machine_errors_are_translated() {
     let lines = german_console(&[error(&MachineError::NotConnected.to_string())]);
     assert!(!lines[0].contains("not connected"), "{lines:?}");
 }
+
+/// A line the worker dropped because the controller reset itself is shown in the console,
+/// translated, with the line.
+#[test]
+fn test_line_not_sent_after_reset_is_shown_translated() {
+    let lines = german_console(&[error(
+        "not sent: the controller was reset: $J=G91 G21 Y1.00 F1000",
+    )]);
+    assert_eq!(lines.len(), 1, "{lines:?}");
+    assert!(lines[0].contains("nicht gesendet"), "{lines:?}");
+    assert!(lines[0].ends_with(": $J=G91 G21 Y1.00 F1000"), "{lines:?}");
+}

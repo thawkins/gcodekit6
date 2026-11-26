@@ -4632,3 +4632,6 @@ msgstr "Le contrôleur n'a pas confirmé la modification de la correction."
 
 msgid "Rotary calibration is not a number: check Preferences > Machine."
 msgstr "L'étalonnage de l'axe rotatif n'est pas un nombre : vérifiez Préférences > Machine."
+
+msgid "not sent: the controller was reset"
+msgstr "non envoyé : le contrôleur a été réinitialisé"

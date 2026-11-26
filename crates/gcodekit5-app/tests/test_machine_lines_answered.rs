@@ -164,6 +164,15 @@ fn test_jog_sent_before_a_reset_never_runs_after_it() {
         "banner never read"
     );
     controller.jog_sent_earlier(Axis::Y, 1.0, 1000.0, before_reset);
+    // The drop is reported, so the user sees the jog was not sent.
+    assert!(
+        wait_event(&mut controller, |e| matches!(
+            e,
+            MachineEvent::Error(text)
+                if text == "not sent: the controller was reset: $J=G91 G21 Y1.00 F1000"
+        )),
+        "drop not reported"
+    );
     assert!(wait(&mut controller, MachineController::lines_answered));
     assert_eq!(jogs_written(&shared), 0, "{:?}", shared.log());
 }
