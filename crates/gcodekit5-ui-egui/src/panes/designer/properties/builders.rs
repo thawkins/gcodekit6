@@ -144,7 +144,7 @@ pub fn section(
     title: &str,
     contents: impl FnOnce(&mut egui::Ui),
 ) -> egui::Response {
-    egui::Frame::group(ui.style())
+    crate::theme::group_frame(ui)
         .show(ui, |ui| {
             ui.set_width(ui.available_width());
             crate::theme::section_heading(ui, title);
@@ -218,7 +218,10 @@ pub fn text_field(
             enabled,
             egui::TextEdit::singleline(&mut buffer)
                 .id_salt(("gcodekit5-property", key))
-                .desired_width(width),
+                .desired_width(width)
+                // A grid cell offers only last frame's column width; without a minimum the
+                // field never grows past the grid's 40 pt minimum column.
+                .min_size(egui::vec2(width, 0.0)),
         )
         .labelled_by(label_id);
     if response.has_focus() && editing.is_none() {

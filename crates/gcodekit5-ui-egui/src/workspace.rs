@@ -232,7 +232,15 @@ impl Page {
 
 /// Every msgid the page tabs can show, for the translation guard test.
 pub fn msgids() -> Vec<&'static str> {
-    Page::ALL.into_iter().map(Page::title_msgid).collect()
+    let mut ids: Vec<&'static str> = Page::ALL.into_iter().map(Page::title_msgid).collect();
+    ids.extend([
+        n_!("Inspector"),
+        n_!("Hide"),
+        n_!("Hide Properties"),
+        n_!("Unhide"),
+        n_!("Unhide Properties"),
+    ]);
+    ids
 }
 
 /// What a pane may use while it draws.
@@ -423,6 +431,8 @@ pub struct Workspace {
     active: Option<PaneId>,
     /// The panes whose bodies the last frame drew.
     drawn: Drawn,
+    /// Whether the Designer page's inspector column is hidden.
+    inspector_hidden: bool,
 }
 
 /// The panes whose bodies a frame drew; the others have their holds cancelled
@@ -459,6 +469,7 @@ impl Workspace {
             focused: None,
             active: None,
             drawn: Drawn::new(),
+            inspector_hidden: false,
         }
     }
 
@@ -678,18 +689,30 @@ impl Workspace {
         let side = ui.available_width() * SIDE_COLUMN;
         match self.page {
             Page::Designer => {
-                egui::Panel::right("gcodekit5-designer-inspector")
-                    .resizable(true)
-                    .default_size(side)
-                    .show(ui, |ui| {
-                        let half = ui.available_height() * 0.5;
-                        egui::Panel::bottom("gcodekit5-designer-objects")
-                            .resizable(true)
-                            .default_size(half)
-                            .show(ui, |ui| frame.pane(ui, PaneId::DesignerLayers));
-                        frame.pane(ui, PaneId::DesignerProperties);
-                    });
-                frame.pane(ui, PaneId::Designer);
+                let tr = frame.ctx.tr;
+                if self.inspector_hidden {
+                    let canvas = ui.available_rect_before_wrap();
+                    frame.pane(ui, PaneId::Designer);
+                    if unhide_button(ui, canvas, tr) {
+                        self.inspector_hidden = false;
+                    }
+                } else {
+                    egui::Panel::right("gcodekit5-designer-inspector")
+                        .resizable(true)
+                        .default_size(side)
+                        .show(ui, |ui| {
+                            if inspector_header(ui, tr) {
+                                self.inspector_hidden = true;
+                            }
+                            let objects = ui.available_height() * 0.32;
+                            egui::Panel::bottom("gcodekit5-designer-objects")
+                                .resizable(true)
+                                .default_size(objects)
+                                .show(ui, |ui| frame.pane(ui, PaneId::DesignerLayers));
+                            frame.pane(ui, PaneId::DesignerProperties);
+                        });
+                    frame.pane(ui, PaneId::Designer);
+                }
             }
             Page::MachineControl => {
                 egui::Panel::right("gcodekit5-machine-editor")
@@ -722,6 +745,65 @@ impl Workspace {
             pane.cancel_hold();
         }
     }
+}
+
+/// The Designer inspector's header: the "Inspector" heading and, on the right, the Hide
+/// button (GTK's `view-conceal` button).
+///
+/// # Returns
+/// Whether Hide was clicked.
+fn inspector_header(ui: &mut egui::Ui, tr: &Translator) -> bool {
+    ui.horizontal(|ui| {
+        crate::theme::section_heading(ui, &tr.tr("Inspector"));
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            named_icon_button(
+                ui,
+                crate::icons::Icon::Hide,
+                &tr.tr("Hide"),
+                &tr.tr("Hide Properties"),
+            )
+        })
+        .inner
+    })
+    .inner
+}
+
+/// An icon button showing `label` whose tooltip and accessible name is `name` (GTK's
+/// accessible labels for Hide and Unhide).
+///
+/// # Returns
+/// Whether it was clicked.
+fn named_icon_button(ui: &mut egui::Ui, icon: crate::icons::Icon, label: &str, name: &str) -> bool {
+    let response = crate::icons::icon_button(ui, icon, label);
+    let enabled = response.enabled();
+    response.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, enabled, name));
+    response.on_hover_text(name).clicked()
+}
+
+/// The floating Unhide button at the top right of the Designer canvas `canvas` while the
+/// inspector is hidden (GTK's `view-reveal` button).
+///
+/// # Returns
+/// Whether it was clicked.
+fn unhide_button(ui: &mut egui::Ui, canvas: egui::Rect, tr: &Translator) -> bool {
+    let strip = egui::Rect::from_min_max(
+        egui::pos2(canvas.left(), canvas.top() + 12.0),
+        egui::pos2(canvas.right() - 12.0, canvas.top() + 48.0),
+    );
+    ui.scope_builder(
+        egui::UiBuilder::new()
+            .max_rect(strip)
+            .layout(egui::Layout::right_to_left(egui::Align::Min)),
+        |ui| {
+            named_icon_button(
+                ui,
+                crate::icons::Icon::Show,
+                &tr.tr("Unhide"),
+                &tr.tr("Unhide Properties"),
+            )
+        },
+    )
+    .inner
 }
 
 /// Paints one page tab: filled with the selection colour when it is the shown page, the
