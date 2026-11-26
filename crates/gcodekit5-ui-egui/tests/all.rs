@@ -88,6 +88,8 @@ mod test_designer_properties_shapes;
 mod test_designer_shape_ops;
 #[path = "test_designer_snapshots.rs"]
 mod test_designer_snapshots;
+#[path = "test_designer_stl_import.rs"]
+mod test_designer_stl_import;
 #[path = "test_designer_text_tool.rs"]
 mod test_designer_text_tool;
 #[path = "test_designer_toolbox.rs"]

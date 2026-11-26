@@ -179,7 +179,7 @@ Status values:
 | Offset, fillet, chamfer | 40-designer | Ported | `test_designer_properties_shapes::offset_previews_while_typing_and_applies_on_commit`, `test_designer_properties_shapes::path_fillet_and_closed` |
 | Layers: hide, lock, rename, reorder | 40-designer | Ported | `test_designer_layers::layer_visibility_hides_shape`, `test_designer_layers::locked_shape_is_drawn_but_not_pickable`, `test_designer_layers::move_buttons_reorder_one_undo_step_each` |
 | Import SVG and DXF | 40-designer | Ported | `test_designer_files::import_svg_adds_its_shapes`, `test_designer_files::import_dxf_adds_its_shapes` (still the gcodekit5 readers, not craft-libs: CHANGELOG known gap) |
-| Import STL | 40-designer | Gap | `file_ops.rs` module docs |
+| Import STL | 40-designer | Ported | `test_designer_stl_import::test_stl_import_adds_the_models_shadow_when_enabled`, `test_designer_stl_import::test_stl_import_is_refused_when_disabled`, `test_designer_stl_import::test_import_dialog_offers_stl_only_when_enabled` (behind GTK's Settings switch "STL File Import", `ui.enable_stl_import`) |
 | Import images, engraving settings, Frame | 40-designer | Ported | `test_designer_files::import_image_in_laser_mode_only`, `test_designer_properties_cam::raster_image_engraving_settings`, `test_designer_files::generate_and_frame_hand_gcode_to_the_editor` |
 | Profile and pocket operations, per-shape CAM | 40-designer | Ported | `test_designer_properties_cam::cam_fields_follow_use_global_and_pocket`, `test_designer_toolpath::exported_gcode_cuts_what_the_preview_shows` |
 | Adaptive pocket strategy | 40-designer | Manual check needed | "Adaptive" strategy listed; no test selects it |
@@ -261,10 +261,8 @@ Ranked by user impact. Sizes are rough estimates for one developer who knows the
 
 | Rank | Gap | User impact | Rough size |
 | --- | --- | --- | --- |
-| 6 | Designer mirror, align, cut/copy/paste, boolean ops, Ctrl+G | Medium | 2-3 days (designer commands exist in `gcodekit5-designer`) |
-| 8 | Import STL | Low: behind a Settings switch in GTK | 1 day |
 | 11 | Preferences Controller page and shortcut editor | Low | 1-2 days |
-| 12 | Designer device work area, gallery icons | Low | 1-2 days together |
+| 12 | Designer gallery icons | Low | 1 day |
 
 Manual checks still to run before GTK is deleted (no automated evidence): TCP and
 WebSocket connections, auto-reconnect, non-GRBL firmwares and the grblHAL simulator, Windows

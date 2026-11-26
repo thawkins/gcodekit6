@@ -102,11 +102,7 @@ impl FilePurpose {
             Self::OpenDesign => open(FileFilter::DESIGN),
             Self::SaveGcode => vec![FileFilter::GCODE],
             Self::SaveDesign => vec![FileFilter::DESIGN],
-            Self::ImportDesign => {
-                let mut filters = vec![FileFilter::IMPORT, FileFilter::SVG, FileFilter::DXF];
-                filters.extend(FileFilter::all_files());
-                filters
-            }
+            Self::ImportDesign => import_design_filters(false),
             Self::ImportImage => vec![FileFilter::IMAGE],
             Self::ExportGcode => vec![FileFilter::GCODE_EXPORT],
             Self::ExportSvg => vec![FileFilter::SVG],
@@ -123,6 +119,26 @@ impl FilePurpose {
             Self::ExportCustomTools => vec![FileFilter::JSON],
         }
     }
+}
+
+/// The file types the designer's Import dialog offers, as GTK's: the supported files, SVG,
+/// DXF and, when Settings' "STL File Import" is on, STL; then All Files.
+///
+/// # Arguments
+/// * `stl_import` - Whether STL import is switched on (`ui.enable_stl_import`).
+pub fn import_design_filters(stl_import: bool) -> Vec<FileFilter> {
+    let mut filters = if stl_import {
+        vec![
+            FileFilter::IMPORT_WITH_STL,
+            FileFilter::SVG,
+            FileFilter::DXF,
+            FileFilter::STL,
+        ]
+    } else {
+        vec![FileFilter::IMPORT, FileFilter::SVG, FileFilter::DXF]
+    };
+    filters.extend(FileFilter::all_files());
+    filters
 }
 
 /// A file type a dialog offers: the English msgid of its name and its extensions.
@@ -150,6 +166,16 @@ impl FileFilter {
     pub const IMPORT: Self = Self {
         name_msgid: n_!("Supported Files"),
         extensions: &["svg", "dxf"],
+    };
+    /// GTK's "Supported Files" with STL import switched on in the settings.
+    pub const IMPORT_WITH_STL: Self = Self {
+        name_msgid: n_!("Supported Files"),
+        extensions: &["svg", "dxf", "stl"],
+    };
+    /// STL models (imported as their shadow, when the settings allow it).
+    pub const STL: Self = Self {
+        name_msgid: n_!("STL Files"),
+        extensions: &["stl"],
     };
     /// SVG drawings.
     pub const SVG: Self = Self {
@@ -636,6 +662,7 @@ pub fn msgids() -> Vec<&'static str> {
         FileFilter::IMPORT,
         FileFilter::SVG,
         FileFilter::DXF,
+        FileFilter::STL,
         FileFilter::IMAGE,
         FileFilter::GTC_PACKAGE,
     ]

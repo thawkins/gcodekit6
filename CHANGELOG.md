@@ -35,6 +35,7 @@
 - **Boolean operations in the egui Designer**: GTK's Union, Diff and Inter in the canvas context menu for two shapes or more, through the designer model's boolean operations: the selected shapes are replaced by one new shape with a new id, as one undo step
 - **Group and Ungroup keys in the egui Designer**: GTK's Ctrl+G and Ctrl+Shift+G group and ungroup the selection while the canvas has the keyboard (never while a text field has it), and the context menu has GTK's Group and Ungroup entries, one undo step each; GTK's other ungroup key, Ctrl+U, stays Unlock
 - **Device work area in the egui Designer**: the canvas outlines the active device profile's X/Y work area instead of the fixed 250 x 250 mm (GTK's fallback without a profile), Fit to Device and the empty-design Fit fit it, and exported G-code is checked against the profile's limits before the Preferences ones, as GTK did; the area follows a change of the active profile
+- **STL import in the egui Designer**: with GTK's Settings switch "STL File Import" on, File > Import offers STL files and adds the model's shadow (unscaled, where the model is, as one undo step), as GTK did; with it off, STL files are not offered and an STL file is refused with GTK's message
 
 ### Fixed
 - **Stock removal mesh memory**: the face list a stock mesh is built from stops as soon as it holds more faces than the mesh budget can take, so a stock near the vertex budget no longer holds a transient face list of up to about 1 GB before falling back to a coarser mesh (both front ends)

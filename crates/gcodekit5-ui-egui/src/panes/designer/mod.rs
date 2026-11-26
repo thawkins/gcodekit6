@@ -103,6 +103,8 @@ pub struct DesignerPane {
     config_limits: Option<MachineLimits>,
     /// The active device profile's X/Y area (mm), if any.
     device: Option<editing::Bounds>,
+    /// Whether Import reads STL files (Settings' "STL File Import").
+    stl_import: bool,
     /// The toolbox asked for G-code for the editor; the app runs it.
     editor_request: Option<ToEditor>,
     /// Counts changes to the design ([`DesignerPane::revision`]).
@@ -149,6 +151,7 @@ impl DesignerPane {
             limits: None,
             config_limits: None,
             device: None,
+            stl_import: false,
             editor_request: None,
             revision: 0,
             cursor: (0.0, 0.0),
@@ -702,6 +705,7 @@ impl Pane for DesignerPane {
 
     fn configure(&mut self, config: &Config) {
         self.units = config.ui.measurement_system;
+        self.stl_import = config.ui.enable_stl_import;
         // GTK's fallback when no device profile is active: the Preferences limits.
         let machine = &config.machine;
         self.config_limits =

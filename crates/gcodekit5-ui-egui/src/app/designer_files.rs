@@ -239,7 +239,12 @@ impl GcodeKitApp {
 
     /// Queues a file dialog for `purpose` with its filters (and a suggested name for a save).
     fn ask_file(&mut self, purpose: FilePurpose, file_name: Option<&str>) {
-        let filters = purpose.filters();
+        let filters = match purpose {
+            FilePurpose::ImportDesign => crate::dialogs::import_design_filters(
+                self.state.settings.config().ui.enable_stl_import,
+            ),
+            _ => purpose.filters(),
+        };
         match file_name {
             Some(name) => self.dialogs.save_file_named(purpose, &filters, name),
             None => self.dialogs.open_file(purpose, &filters),
