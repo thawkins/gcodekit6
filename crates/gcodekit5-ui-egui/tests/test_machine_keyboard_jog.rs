@@ -614,3 +614,79 @@ fn test_leaving_a_number_field_disarms_keyboard_jog() {
         );
     }
 }
+
+/// The first click in Machine Control after typing in a text field arms keyboard jog: the
+/// text field gives up the keyboard on the release, which belongs to that click. Checked
+/// with the press and the release in one frame and in separate frames.
+#[test]
+fn test_click_in_machine_control_after_typing_arms_jog() {
+    for field in ["G-Code Editor", "Enter G-code command..."] {
+        for split in [false, true] {
+            let (mut harness, shared) = keyboard_app(false);
+            focus_text(&mut harness, field);
+            let at = harness.get_by_label("Machine State").rect().center();
+            if split {
+                crate::test_machine_pane::pointer_button(&harness, at, true);
+                harness.step();
+                crate::test_machine_pane::pointer_button(&harness, at, false);
+                harness.step();
+                harness.step();
+            } else {
+                harness.get_by_label("Machine State").click();
+                harness.step();
+                harness.step();
+            }
+            assert!(!widget_focused(&harness), "{field}: still focused");
+            tap(&mut harness, egui::Key::Num6);
+            assert!(
+                wait_until(|| jogs(&shared).len() == 1),
+                "{field} split {split}: {:?}",
+                shared.log()
+            );
+            assert_eq!(settled_jogs(&harness, &shared).len(), 1, "{field}");
+        }
+    }
+}
+
+/// A press that starts in Machine Control and is released elsewhere (no click):
+/// - with a text field focused, the field keeps the keyboard (egui moves focus only on a
+///   click), so typing stays there and nothing jogs;
+/// - with no widget focused, the press arms Machine Control, wherever it is released.
+#[test]
+fn test_press_in_machine_control_released_elsewhere() {
+    for typing in [true, false] {
+        let (mut harness, shared) = keyboard_app(false);
+        if typing {
+            focus_text(&mut harness, "G-Code Editor");
+        } else {
+            // Away from the pane first: a press on the menu bar takes its keys.
+            harness.get_by_label("File").click();
+            harness.step();
+            harness.key_press(egui::Key::Escape);
+            harness.step();
+            harness.step();
+        }
+        let at = harness.get_by_label("Machine State").rect().center();
+        crate::test_machine_pane::pointer_button(&harness, at, true);
+        harness.step();
+        let away = harness.get_by_label("G-Code Editor").rect().center();
+        crate::test_machine_pane::pointer_button(&harness, away, false);
+        harness.step();
+        harness.step();
+        assert_eq!(widget_focused(&harness), typing);
+        tap(&mut harness, egui::Key::Num6);
+        if typing {
+            assert!(
+                settled_jogs(&harness, &shared).is_empty(),
+                "{:?}",
+                shared.log()
+            );
+        } else {
+            assert!(
+                wait_until(|| jogs(&shared).len() == 1),
+                "{:?}",
+                shared.log()
+            );
+        }
+    }
+}

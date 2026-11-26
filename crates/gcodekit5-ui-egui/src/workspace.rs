@@ -507,6 +507,12 @@ pub struct Workspace {
     /// Whether the last frame had a press other than on the page tabs (it set the keyboard
     /// itself).
     pressed: bool,
+    /// A press in a pane is held: from its press frame until the frame after its release.
+    /// egui moves the keyboard off a text field on the release (the click), so the focus
+    /// lost then belongs to that press, which already says where the keyboard goes.
+    press_held: bool,
+    /// The held press was released in the last frame.
+    press_released: bool,
 }
 
 /// The panes whose bodies a frame drew; the others have their holds cancelled
@@ -554,6 +560,8 @@ impl Workspace {
             overlays_before: Vec::new(),
             page_changed: false,
             pressed: false,
+            press_held: false,
+            press_released: false,
         }
     }
 
@@ -747,7 +755,8 @@ impl Workspace {
         let overlays = overlay_layers(ctx);
         let focus_lost = self.widget_focus_before && !widget_focus;
         let overlay_closed = self.overlays_before.iter().any(|l| !overlays.contains(l));
-        if (focus_lost || overlay_closed) && !self.pressed && !self.page_changed {
+        let pressed = self.pressed || self.press_held;
+        if (focus_lost || overlay_closed) && !pressed && !self.page_changed {
             if self.focused.is_some() {
                 tracing::debug!(focus_lost, overlay_closed, "panes lose the keyboard");
             }
@@ -757,6 +766,10 @@ impl Workspace {
         self.overlays_before = overlays;
         self.page_changed = false;
         self.pressed = false;
+        if self.press_released {
+            self.press_held = false;
+            self.press_released = false;
+        }
     }
 
     /// Whether the pane `id` has the keyboard: the user last pressed in it, its page is the
@@ -893,6 +906,7 @@ impl Workspace {
                     .layer_id_at(pos)
                     .is_none_or(|layer| layer == ui.layer_id())
         });
+        let frame_pressed_in = frame.pressed_in;
         if press.is_some() && !on_tabs {
             self.focused = frame.pressed_in;
             self.active = frame.pressed_in.or(self.active);
@@ -902,6 +916,15 @@ impl Workspace {
         }
         self.drawn = frame.drawn;
         self.pressed |= press.is_some() && !on_tabs;
+        // A press in a pane holds its keyboard choice until released, wherever the pointer
+        // is released: the press began in the pane, a deliberate choice of it.
+        if press.is_some() && !on_tabs {
+            self.press_held = frame_pressed_in.is_some();
+            self.press_released = false;
+        }
+        if self.press_held && ui.input(|i| i.pointer.any_released()) {
+            self.press_released = true;
+        }
         for pane in self
             .panes
             .iter_mut()
