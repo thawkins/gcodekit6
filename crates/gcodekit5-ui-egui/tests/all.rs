@@ -158,6 +158,8 @@ mod test_visualizer_2d;
 mod test_visualizer_bounds;
 #[path = "test_visualizer_display.rs"]
 mod test_visualizer_display;
+#[path = "test_visualizer_menu.rs"]
+mod test_visualizer_menu;
 #[path = "test_visualizer_page_layout.rs"]
 mod test_visualizer_page_layout;
 #[path = "test_visualizer_preview.rs"]

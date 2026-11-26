@@ -4635,3 +4635,15 @@ msgstr "L'étalonnage de l'axe rotatif n'est pas un nombre : vérifiez Préfére
 
 msgid "not sent: the controller was reset"
 msgstr "non envoyé : le contrôleur a été réinitialisé"
+
+msgid "Toggle Grid"
+msgstr "Afficher/masquer la grille"
+
+msgid "Toggle Machine Bounds"
+msgstr "Afficher/masquer les limites de la machine"
+
+msgid "Toggle Rapid Moves"
+msgstr "Afficher/masquer les déplacements rapides"
+
+msgid "Toggle Cutting Moves"
+msgstr "Afficher/masquer les mouvements de coupe"

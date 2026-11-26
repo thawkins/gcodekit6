@@ -4623,3 +4623,15 @@ msgstr "A calibração do eixo rotativo não é um número: verifique Preferênc
 
 msgid "not sent: the controller was reset"
 msgstr "não enviado: o controlador foi reiniciado"
+
+msgid "Toggle Grid"
+msgstr "Alternar grelha"
+
+msgid "Toggle Machine Bounds"
+msgstr "Alternar limites da máquina"
+
+msgid "Toggle Rapid Moves"
+msgstr "Alternar movimentos rápidos"
+
+msgid "Toggle Cutting Moves"
+msgstr "Alternar movimentos de corte"

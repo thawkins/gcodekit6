@@ -19,6 +19,9 @@
 //! Toolpath and Guides toggles ([`Display`]: rapids, cuts, the tool marker, the grid and its
 //! spacing, the machine bounds) and Inspector.
 //!
+//! Right-click on the view opens GTK's menu ([`menu`]): the fits, Copy cursor coordinates
+//! (the work-plane point under the pointer) and the Toggle switches of the sidebar's toggles.
+//!
 //! The run preview bar ([`preview`]) at the bottom left plays the toolpath with a preview
 //! marker of its own (GTK's cyan), at GTK's four speeds; File > Run (`Cmd+R`, F5) shows the
 //! page and starts it from the beginning, as in GTK. It only animates the view: the pane
@@ -38,7 +41,7 @@
 //!
 //! Ported from the GTK `ui/gtk/visualizer/mod.rs`, `renderer_3d.rs`, `shaders.rs` and
 //! `nav_cube.rs`. Not ported: scrollbars, the zoom/centre/cursor
-//! status line and intensity statistics.
+//! status line (commented out in the GTK source) and intensity statistics.
 //!
 //! [`Machine::program`]: crate::machine::Machine::program
 //!
@@ -47,6 +50,7 @@
 
 pub mod build;
 pub mod camera;
+pub mod menu;
 pub mod nav_cube;
 pub mod osd;
 pub mod pipeline;
@@ -118,6 +122,7 @@ pub fn default_work_area() -> Aabb {
 pub fn msgids() -> Vec<&'static str> {
     nav_cube::msgids()
         .into_iter()
+        .chain(menu::msgids())
         .chain(osd::msgids())
         .chain(preview::msgids())
         .chain(sidebar::msgids())
@@ -167,6 +172,8 @@ pub struct VisualizerPane {
     preview_on_build: bool,
     /// When the run preview last moved on, while it plays.
     preview_clock: Option<std::time::Instant>,
+    /// The work-plane point under the pointer when the right-click menu opened.
+    menu_cursor: Option<glam::Vec2>,
     /// Why File > Run started no preview: GTK's warning title and text.
     preview_notice: Option<(&'static str, &'static str)>,
     /// The `enable_stock_removal_3d` setting.
@@ -216,6 +223,7 @@ impl VisualizerPane {
             preview_on_build: false,
             preview_clock: None,
             preview_notice: None,
+            menu_cursor: None,
             stock_enabled: false,
             show_stock: false,
             stock_setup: StockSetup::default(),
@@ -614,6 +622,24 @@ impl VisualizerPane {
         repaint.request_repaint_after(preview::TICK);
     }
 
+    /// GTK's right-click menu over the view `response` ([`menu`]).
+    fn context_menu(&mut self, response: &egui::Response, rect: egui::Rect, tr: &Translator) {
+        if response.secondary_clicked() {
+            self.menu_cursor = response
+                .interact_pointer_pos()
+                .and_then(|pos| menu::cursor_on_plane(&self.camera, rect, pos));
+        }
+        let (display, cursor, units) = (&mut self.display, self.menu_cursor, self.units);
+        let mut chosen = None;
+        response.context_menu(|ui| chosen = menu::show(ui, display, cursor, units, tr));
+        match chosen {
+            Some(menu::MenuAction::Fit) => self.fit(),
+            Some(menu::MenuAction::ResetView) => self.reset_view(),
+            Some(menu::MenuAction::FitDevice) => self.fit_device(),
+            None => {}
+        }
+    }
+
     /// Orbits, pans and zooms with the mouse over `response`.
     fn handle_input(&mut self, ui: &egui::Ui, response: &egui::Response) {
         if response.dragged_by(egui::PointerButton::Primary) {
@@ -729,6 +755,7 @@ impl Pane for VisualizerPane {
             self.camera.fit(bounds);
         }
         self.handle_input(ui, &response);
+        self.context_menu(&response, rect, ctx.tr);
 
         let dark = ui.visuals().dark_mode;
         let background = if dark {

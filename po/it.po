@@ -4631,3 +4631,15 @@ msgstr "La calibrazione dell'asse rotativo non è un numero: controllare Prefere
 
 msgid "not sent: the controller was reset"
 msgstr "non inviato: il controller è stato reimpostato"
+
+msgid "Toggle Grid"
+msgstr "Mostra/nascondi griglia"
+
+msgid "Toggle Machine Bounds"
+msgstr "Mostra/nascondi limiti della macchina"
+
+msgid "Toggle Rapid Moves"
+msgstr "Mostra/nascondi movimenti rapidi"
+
+msgid "Toggle Cutting Moves"
+msgstr "Mostra/nascondi movimenti di taglio"

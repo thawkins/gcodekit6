@@ -4628,3 +4628,15 @@ msgstr "Die Rundachsen-Kalibrierung ist keine Zahl: Einstellungen > Maschine pr√
 
 msgid "not sent: the controller was reset"
 msgstr "nicht gesendet: die Steuerung wurde zur√ºckgesetzt"
+
+msgid "Toggle Grid"
+msgstr "Raster ein/aus"
+
+msgid "Toggle Machine Bounds"
+msgstr "Maschinengrenzen ein/aus"
+
+msgid "Toggle Rapid Moves"
+msgstr "Eilgangbewegungen ein/aus"
+
+msgid "Toggle Cutting Moves"
+msgstr "Schnittbewegungen ein/aus"

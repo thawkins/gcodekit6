@@ -153,7 +153,8 @@ Status values:
 | Machine bounds, fit to device | *(GTK)* | Ported | `test_visualizer_bounds::work_area_comes_from_the_profile`, `test_visualizer_bounds::fit_to_device_buttons_fit_the_work_area`, `test_visualizer_bounds::fit_to_device_without_a_profile_uses_the_default_area`, `test_visualizer_bounds::machine_bounds_drawn_when_shown` |
 | Stock removal simulation | 30-visualizer, SPEC | Ported | `test_visualizer_stock::toggle_follows_the_setting`, `test_visualizer_stock::simulation_restarts_on_program_change`, `test_visualizer_stock::frame_returns_while_simulating`, `test_visualizer_stock::rendered_cut_lies_in_its_groove`, `test_visualizer_stock::designer_generate_seeds_the_stock`, `test_visualizer_stock::designer_without_stock_keeps_the_stock`, `test_visualizer_stock::dragging_a_field_runs_one_simulation`, `test_visualizer_stock::snapshot_stock_groove` |
 | Run preview (play/pause/speed) | *(GTK)* | Ported | `test_visualizer_preview::preview_steps_by_speed_per_tick`, `test_visualizer_preview::preview_bar_buttons_drive_the_preview`, `test_visualizer_preview::preview_plays_in_frames_and_asks_nothing`, `test_visualizer_preview::file_run_in_the_app_shows_the_visualizer_and_sends_nothing`, `test_visualizer_preview::preview_marker_drawn_unless_hidden`, `test_visualizer_preview::preview_path_spacing_as_gtk` (File > Run starts it, as in GTK) |
-| Copy cursor coordinates, intensity statistics | *(GTK)* | Gap | Visualizer module docs |
+| Copy cursor coordinates (right-click menu) | *(GTK)* | Ported | `test_visualizer_menu::copy_cursor_coordinates_copies_the_clicked_point`, `test_visualizer_menu::cursor_on_plane_inverts_the_projection`, `test_visualizer_menu::coordinates_text_is_gtk_format`, `test_visualizer_menu::menu_toggles_and_fits` (GTK's menu: fits, copy, Toggle Grid/Machine Bounds/Rapid Moves/Cutting Moves) |
+| Intensity statistics | *(GTK)* | Gap | Visualizer module docs |
 
 ## Designer
 
