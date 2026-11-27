@@ -1,34 +1,7 @@
 # Project Statistics
-Last Updated: 2026-11-28 (2.0.0-alpha.4)
 
-Current snapshot (`git ls-files '*.rs' | xargs cat | wc -l`, 2026-11-27, egui migration M8, GTK front end removed):
-450 Rust files, 152,222 lines; 1391 tests (`cargo nextest run --workspace`, 2 skipped; test count from the M6 run, not re-run in M8).
+Snapshot of 2026-11-28 at commit `b0bac4c1` (2.0.0-alpha.4). Re-run each command to refresh its number.
 
-Earlier snapshot (2026-11-16, after merging PR #104): 305 Rust files, 115,022 lines; 436 tests.
-
-The table below is the earlier 0.55.0-alpha.1 snapshot (2026-05-16).
-
-===============================================================================
- Language            Files        Lines         Code     Comments       Blanks
-===============================================================================
- Rust (approx)       ~500         99824        85000         5000        9824
- JSON                   10          855          855            0            0
- SVG                    25          682          657            8           17
- Plain Text              1         1000            0         1000            0
- TOML                   10          287          251            2           34
- XML                     2           40           40            0            0
- YAML                    1           30           30            0            0
--------------------------------------------------------------------------------
- Markdown               21         6957            0         5636         1321
- |- BASH                 5           92           53           23           16
- |- JSON                 1            6            6            0            0
- |- Rust                 3           62           48            8            6
- |- TOML                 2           53           32           11           10
- (Total)                           7170          139         5678         1353
--------------------------------------------------------------------------------
- Rust                  364        90999        73650         3986        13363
- |- Markdown           231         8291            9         7769          513
- (Total)                          99290        73659        11755        13876
-===============================================================================
- Total                 435       101084        75663        10643        14778
-===============================================================================
+- Rust files: 488 (`git ls-files '*.rs' | wc -l`)
+- Rust lines: 141,934 (`git ls-files '*.rs' | xargs cat | wc -l`)
+- Tests: 1538 (`cargo nextest list --workspace 2>/dev/null | wc -l`; lists tests without running them)
