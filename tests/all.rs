@@ -19,5 +19,7 @@ pub fn global_env_lock() -> std::sync::MutexGuard<'static, ()> {
 
 #[path = "six_axis_integration_tests.rs"]
 mod six_axis_integration_tests;
+#[path = "test_cli_args.rs"]
+mod test_cli_args;
 #[path = "test_logging_file.rs"]
 mod test_logging_file;

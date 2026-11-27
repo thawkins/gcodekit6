@@ -41,6 +41,8 @@ mod test_dxf_polyline_splinefit;
 mod test_dxf_spline_import;
 #[path = "test_dxf_z_metadata.rs"]
 mod test_dxf_z_metadata;
+#[path = "test_gcode_converter.rs"]
+mod test_gcode_converter;
 #[path = "test_geometry_helpers.rs"]
 mod test_geometry_helpers;
 #[path = "test_image_engraver_camtools.rs"]
@@ -51,6 +53,8 @@ mod test_import_svg_rect_radius_units;
 mod test_import_transforms_units;
 #[path = "test_laser_merge_and_arc_ramp.rs"]
 mod test_laser_merge_and_arc_ramp;
+#[path = "test_model_shape_transforms.rs"]
+mod test_model_shape_transforms;
 #[path = "test_path_rotation.rs"]
 mod test_path_rotation;
 #[path = "test_pocket_bounds.rs"]

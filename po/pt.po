@@ -3443,6 +3443,9 @@ msgstr "Configurações da máquina"
 msgid "Cut Depth:"
 msgstr "Profundidade de corte:"
 
+msgid "Outline Step Down:"
+msgstr "Profundidade por passagem do contorno:"
+
 msgid "Stepover (%):"
 msgstr "Passo lateral (%):"
 
@@ -4643,8 +4646,8 @@ msgstr "Remoção de material demasiado grande para mostrar nesta GPU."
 msgid "The controller did not confirm the override change."
 msgstr "O controlador não confirmou a alteração do ajuste."
 
-msgid "Rotary calibration is not a number: check Preferences > Machine."
-msgstr "A calibração do eixo rotativo não é um número: verifique Preferências > Máquina."
+msgid "Rotary calibration is not a number: check rotary_calibration under [machine] in config.toml."
+msgstr "A calibração do eixo rotativo não é um número: verifique rotary_calibration em [machine] no config.toml."
 
 msgid "not sent: the controller was reset"
 msgstr "não enviado: o controlador foi reiniciado"

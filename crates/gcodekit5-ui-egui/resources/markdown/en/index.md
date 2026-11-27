@@ -25,6 +25,6 @@ Welcome to the built-in help.
 - [Settings](help:settings) — preferences and experimental features.
 
 ## Links
-- Project website: https://github.com/feveal/gcodekit5-design
+- Project website: https://github.com/thawkins/gcodekit6
 
 

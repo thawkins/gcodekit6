@@ -1,6 +1,6 @@
 //! The Console pane: the controller's traffic as a log, with a command entry.
 //!
-//! The log is a [`ConsolePanel`] (the model shared with the GTK front end) bounded to
+//! The log is a [`ConsolePanel`] (the console model from `gcodekit5-app`) bounded to
 //! [`MAX_CONSOLE_LINES`] messages, and drawn with `ScrollArea::show_rows` so only the rows in
 //! view are laid out however much traffic arrives. It follows the newest line only while the
 //! view is already at the bottom, so scrolling up to read stays put.
@@ -11,21 +11,19 @@
 //! arrive many times a second and are shown in the DRO and status bar instead. A line typed
 //! in the entry goes through [`MachineController::send_line`], the path of the Machine Control
 //! command entry, and is echoed as `> line` once the controller accepts it; a refusal is shown
-//! under the log. Up and Down in the entry walk the command history, GTK's
-//! [`CommandHistory`]: kept across sessions in GTK's `command_history.json` when the app has
-//! a settings folder (see [`ConsolePane::with_history_file`]), at most
-//! [`gcodekit5_app::command_history::MAX_HISTORY`] commands. The header
-//! has GTK's icon buttons: Clear console, Copy last error (see [`ConsolePane::last_error`])
-//! and Help. As GTK, the end of a job is logged: "Job Completed" when every line is
-//! acknowledged, "Job stopped:" with the lines done when it ends early, and "Work completed
-//! in: m:ss" (from the job's start) when the controller reports the program's end
-//! (GRBL 1.1 and grblHAL send `[MSG:Pgm End]` for M2 or M30; `Program End` is matched too).
-//! A command typed after the job (not a realtime byte) forgets its start, so an M2 sent by
-//! hand later reports no stale time. A row with an `error:N` or `ALARM:N` reply keeps its text and
-//! is drawn with the code's meaning beside it (see [`response_meaning`]).
-//!
-//! Ported from the GTK `ui/gtk/device_console.rs` view. Not ported: the `ok` pairing of the
-//! GTK listener (acknowledgements are not events here).
+//! under the log. Up and Down in the entry walk the command history, a [`CommandHistory`]:
+//! kept across sessions in `command_history.json` when the app has a settings folder (see
+//! [`ConsolePane::with_history_file`]), at most
+//! [`gcodekit5_app::command_history::MAX_HISTORY`] commands. The header has icon buttons:
+//! Clear console, Copy last error (see [`ConsolePane::last_error`]) and Help. The end of a
+//! job is logged: "Job Completed" when every line is acknowledged, "Job stopped:" with the
+//! lines done when it ends early, and "Work completed in: m:ss" (from the job's start) when
+//! the controller reports the program's end (GRBL 1.1 and grblHAL send `[MSG:Pgm End]` for M2
+//! or M30; `Program End` is matched too). A command typed after the job (not a realtime byte)
+//! forgets its start, so an M2 sent by hand later reports no stale time. A row with an
+//! `error:N` or `ALARM:N` reply keeps its text and is drawn with the code's meaning beside it
+//! (see [`response_meaning`]). Plain `ok` acknowledgements are not machine events, so they are
+//! not logged.
 //!
 //! Dependencies: `egui`, `gcodekit5-app` (console model, controller, translations),
 //! and the GRBL error and alarm texts it re-exports.
@@ -44,7 +42,7 @@ use crate::machine::{MachineStatus, lock, protocol_mismatch_text, worker_message
 use crate::windows::help::{self, HelpTopic};
 use crate::workspace::{Pane, PaneContext, PaneId};
 
-/// Messages the log keeps; older ones are dropped (the GTK console keeps 5000 lines too).
+/// Messages the log keeps; older ones are dropped.
 pub const MAX_CONSOLE_LINES: usize = 5000;
 
 /// The log's prefix for a program the controller halted after a refused line.

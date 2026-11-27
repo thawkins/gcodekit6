@@ -18,7 +18,7 @@ edition = "2024"
 rust-version = "1.95"
 license = "MIT OR Apache-2.0"
 authors = ["GCodeKit Contributors"]
-repository = "https://github.com/thawkins/gcodekit5"
+repository = "https://github.com/thawkins/gcodekit6"
 
 [workspace.dependencies]
 tracing = "0.1"
@@ -57,7 +57,7 @@ name = "gcodekit5-design"
 autotests = false
 version.workspace = true
 edition.workspace = true
-description = "A Rust-based Universal G-Code Sender for Laser and CNC machines with support for GRBL, TinyG, g2core, Smoothieware, and FluidNC controllers"
+description = "A Rust-based G-Code sender and designer for laser and CNC machines with support for GRBL, grblHAL and FluidNC (through the GRBL protocol), and Repetier controllers"
 license.workspace = true
 authors.workspace = true
 repository.workspace = true

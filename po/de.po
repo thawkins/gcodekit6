@@ -3448,6 +3448,9 @@ msgstr "Maschineneinstellungen"
 msgid "Cut Depth:"
 msgstr "Schnitttiefe:"
 
+msgid "Outline Step Down:"
+msgstr "Zustellung Umriss:"
+
 msgid "Stepover (%):"
 msgstr "Zustellung seitlich (%):"
 
@@ -4648,8 +4651,8 @@ msgstr "Materialabtrag zu groß für die Anzeige auf dieser GPU."
 msgid "The controller did not confirm the override change."
 msgstr "Die Steuerung hat die Override-Änderung nicht bestätigt."
 
-msgid "Rotary calibration is not a number: check Preferences > Machine."
-msgstr "Die Rundachsen-Kalibrierung ist keine Zahl: Einstellungen > Maschine prüfen."
+msgid "Rotary calibration is not a number: check rotary_calibration under [machine] in config.toml."
+msgstr "Die Rundachsen-Kalibrierung ist keine Zahl: rotary_calibration unter [machine] in config.toml prüfen."
 
 msgid "not sent: the controller was reset"
 msgstr "nicht gesendet: die Steuerung wurde zurückgesetzt"

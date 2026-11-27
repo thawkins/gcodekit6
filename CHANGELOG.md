@@ -5,6 +5,20 @@ All notable changes to this project are documented here. The format follows
 [Semantic Versioning](https://semver.org/). Release notes are generated from the
 `## [x.y.z]` sections by `scripts/release_notes.py`.
 
+## [Unreleased]
+
+### Added
+- **Command-line flags**: `gcodekit5 --version` prints the version and `gcodekit5 --help` (or `-h`) a short usage; both exit before the window opens. Every other argument is still opened as a file
+
+### Fixed
+- **Translations**: the Gerber page's "Outline Step Down:" label is translated in every language
+- **Rotary calibration message**: the error for a calibration that is not a number now points at `rotary_calibration` in `config.toml` instead of a Preferences row that does not exist
+- **In-app help**: "Project website" links to https://github.com/thawkins/gcodekit6
+
+### Changed
+- **Package metadata**: the repository URL is https://github.com/thawkins/gcodekit6, and the package and crate descriptions name GCodeKit5 and only the controllers it supports (GRBL, grblHAL and FluidNC through the GRBL protocol, Repetier)
+- **Tooling**: the pre-commit hook and the monthly dependency review run `cargo nextest` instead of `cargo test`; Dependabot no longer watches npm
+
 ## [2.0.0-alpha.4] - 2026-11-28
 
 ### Added

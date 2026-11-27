@@ -3374,6 +3374,9 @@ msgstr ""
 msgid "Cut Depth:"
 msgstr ""
 
+msgid "Outline Step Down:"
+msgstr ""
+
 msgid "Stepover (%):"
 msgstr ""
 
@@ -4574,7 +4577,7 @@ msgstr ""
 msgid "The controller did not confirm the override change."
 msgstr ""
 
-msgid "Rotary calibration is not a number: check Preferences > Machine."
+msgid "Rotary calibration is not a number: check rotary_calibration under [machine] in config.toml."
 msgstr ""
 
 msgid "not sent: the controller was reset"

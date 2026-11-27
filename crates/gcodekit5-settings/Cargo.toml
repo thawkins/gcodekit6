@@ -7,7 +7,7 @@ rust-version.workspace = true
 license.workspace = true
 authors.workspace = true
 repository.workspace = true
-description = "Configuration and settings management for GCodeKit4"
+description = "Configuration and settings management for GCodeKit5"
 
 [dependencies]
 gcodekit5-core = { path = "../gcodekit5-core" }

@@ -1,6 +1,6 @@
 #!/bin/bash
 # GCodeKit5 Pre-commit Hook
-# Runs formatting, linting, and unit tests before commit
+# Runs formatting, linting, and the nextest suite before commit
 # Skip with: git commit --no-verify
 # Install with: git config core.hooksPath .githooks
 
@@ -27,9 +27,11 @@ fi
 echo "✓ Clippy OK"
 echo ""
 
-# 3. Run unit tests (lib only for speed)
-echo "[3/3] Running unit tests..."
-if ! cargo test --lib 2>&1; then
+# 3. Run the test suite with nextest, as CI does. Every test lives in a
+# crate's tests/ directory (there are no --lib unit tests), so this runs the
+# whole workspace suite.
+echo "[3/3] Running tests (cargo nextest)..."
+if ! cargo nextest run --workspace 2>&1; then
     echo "✗ Tests failed. Fix them before committing."
     exit 1
 fi

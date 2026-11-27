@@ -1,7 +1,8 @@
 //! The jog section: step and feed, the continuous (hold-to-jog) switch, and the X/Y pad
 //! with the Z column.
 //!
-//! Every jog runs in the direction Preferences > Machine > Invert gives the axis
+//! Every jog runs in the direction `axis_direction_invert` (in the `[machine]` section of
+//! the settings file, `config.toml`; no Preferences row edits it) gives the axis
 //! ([`JogPanel::set_inverted`]). Step and feed are mm and mm/min
 //! internally and shown, and typed, in the user's measurement system and feed units; the `$J`
 //! line is always G21 (mm).
@@ -190,13 +191,13 @@ pub(super) struct JogPanel {
     continuous_allowed: bool,
     /// The hold in continuous mode.
     held: Option<Hold>,
-    /// The rotary jog step in degrees (Preferences > Machine > rotary jog increment).
+    /// The rotary jog step in degrees (`jog_increment_rotary` in the settings file).
     rotary_step_deg: f32,
     /// A, B and C limits in degrees: how far a continuous rotary hold moves at most.
     rotary_limit_deg: [f32; 3],
     /// Whether this frame drew the button of the pointer hold in progress.
     hold_button_drawn: bool,
-    /// X, Y, Z, A, B, C: whether Preferences > Machine > Invert reverses the axis.
+    /// X, Y, Z, A, B, C: whether `axis_direction_invert` in the settings file reverses the axis.
     inverted: [bool; 6],
 }
 
@@ -257,7 +258,7 @@ impl JogPanel {
         }
     }
 
-    /// Sets which axes jog in reverse (Preferences > Machine > Invert).
+    /// Sets which axes jog in reverse (`axis_direction_invert` in the settings file).
     ///
     /// # Arguments
     /// * `inverted` - X, Y, Z, A, B, C: whether the axis is reversed.
@@ -271,7 +272,7 @@ impl JogPanel {
     }
 
     /// The signed jog distance for `axis` moved `distance_mm` in the direction the user
-    /// asked for: negated when Preferences inverts the axis.
+    /// asked for: negated when the settings file inverts the axis.
     pub(super) fn directed(&self, axis: Axis, distance_mm: f32) -> f32 {
         if self.inverted[axis_slot(axis)] {
             -distance_mm

@@ -1,7 +1,8 @@
 //! Serialization and deserialization for designer files
 //!
-//! Implements save/load functionality for .gck4 (GCodeKit4) design files
-//! using JSON format with complete design state preservation.
+//! Implements save/load functionality for GCodeKit5 design files: JSON with
+//! complete design state preservation. The app writes `.gckd` files and also
+//! accepts `.gck5` files on open; the format is the same JSON either way.
 
 use crate::model::{
     DesignCircle as Circle, DesignEllipse as Ellipse, DesignLine as Line, DesignPath as PathShape,
