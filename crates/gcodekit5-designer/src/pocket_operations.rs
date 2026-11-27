@@ -8,15 +8,18 @@
 mod holes;
 
 use super::toolpath::{Toolpath, ToolpathSegment, ToolpathSegmentType};
+use crate::geometry::{prepare_polygon, safe_parallel_offset};
 use crate::model::{DesignCircle as Circle, DesignRectangle as Rectangle, Point};
-use crate::ops::{clean_polyline, safe_parallel_offset};
-use cavalier_contours::polyline::{PlineSourceMut, PlineVertex, Polyline};
+use crate::ops::clean_polyline;
 use std::f64::consts::PI;
 
 /// The smallest stepover and step-down (mm) the generators use. A smaller (or non-finite)
 /// value would make the offset and Z-pass loops run for millions of iterations, so it is
 /// raised to this; sane inputs are unchanged.
 const MIN_STEP_MM: f64 = 0.01;
+
+/// Duplicate-vertex tolerance (mm) when preparing a polygon pocket boundary.
+const POLYGON_DUPLICATE_TOLERANCE: f64 = 0.01;
 
 /// The Z step of each pass: `step_down` (at least [`MIN_STEP_MM`]), or the whole depth in
 /// one pass when `step_down` is not positive.
@@ -650,54 +653,6 @@ impl PocketGenerator {
         }
     }
 
-    /// Prepares a polygon for offsetting by removing duplicates and enforcing CW orientation.
-    fn prepare_polygon(vertices: &[Point]) -> Polyline {
-        let mut clean_vertices = Vec::new();
-        let tolerance = 0.01; // 0.01mm tolerance for duplicate detection
-
-        if let Some(first) = vertices.first() {
-            clean_vertices.push(*first);
-            for p in vertices.iter().skip(1) {
-                if let Some(last) = clean_vertices.last() {
-                    let dist = ((p.x - last.x).powi(2) + (p.y - last.y).powi(2)).sqrt();
-                    if dist > tolerance {
-                        clean_vertices.push(*p);
-                    }
-                }
-            }
-
-            // Remove closing vertex if it's the same as the first
-            if clean_vertices.len() > 1
-                && let (Some(first), Some(last)) = (clean_vertices.first(), clean_vertices.last())
-            {
-                let dist = ((last.x - first.x).powi(2) + (last.y - first.y).powi(2)).sqrt();
-                if dist < tolerance {
-                    clean_vertices.pop();
-                }
-            }
-        }
-
-        let mut signed_area = 0.0;
-        if !clean_vertices.is_empty() {
-            for i in 0..clean_vertices.len() {
-                let p1 = clean_vertices[i];
-                let p2 = clean_vertices[(i + 1) % clean_vertices.len()];
-                signed_area += p1.x * p2.y - p2.x * p1.y;
-            }
-        }
-
-        if signed_area > 0.0 {
-            clean_vertices.reverse();
-        }
-
-        let mut polyline = Polyline::new();
-        for p in clean_vertices {
-            polyline.add_vertex(PlineVertex::new(p.x, p.y, 0.0));
-        }
-        polyline.set_is_closed(true);
-        polyline
-    }
-
     fn generate_contour_parallel_pocket(
         &self,
         vertices: &[Point],
@@ -708,7 +663,7 @@ impl PocketGenerator {
             return toolpaths;
         }
 
-        let polyline = Self::prepare_polygon(vertices);
+        let polyline = prepare_polygon(vertices, POLYGON_DUPLICATE_TOLERANCE);
 
         // Calculate Z passes
         let total_depth = self.operation.depth.abs();
@@ -819,7 +774,7 @@ impl PocketGenerator {
             return toolpaths;
         }
 
-        let polyline = Self::prepare_polygon(vertices);
+        let polyline = prepare_polygon(vertices, POLYGON_DUPLICATE_TOLERANCE);
 
         // Calculate Z passes
         let total_depth = self.operation.depth.abs();

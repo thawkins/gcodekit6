@@ -4,12 +4,12 @@
 //! on designer shapes using the `csgrs` and `cavalier_contours` libraries.
 //! Includes polyline cleaning utilities for robust boolean results.
 
+pub use crate::geometry::safe_parallel_offset;
 use crate::model::{DesignPath, DesignerShape, Point, Shape};
 use cavalier_contours::polyline::{PlineSource, PlineSourceMut, PlineVertex, Polyline};
 use csgrs::traits::CSG;
 use lyon::path::iterator::PathIterator;
 use std::f64::consts::PI;
-use std::panic;
 
 pub enum BooleanOp {
     Union,
@@ -28,24 +28,6 @@ pub fn clean_polyline(mut pline: Polyline) -> Polyline {
         pline.remove(pline.vertex_count() - 1);
     }
     pline
-}
-
-/// Offsets `pline` by `distance`, catching a panic inside cavalier_contours.
-///
-/// # Arguments
-/// * `pline` - The polyline to offset.
-/// * `distance` - The signed offset distance in mm.
-///
-/// # Returns
-/// The offset polylines, or an empty `Vec` (logged at warn) when the offset
-/// algorithm panics.
-pub fn safe_parallel_offset(pline: &Polyline, distance: f64) -> Vec<Polyline> {
-    panic::catch_unwind(panic::AssertUnwindSafe(|| pline.parallel_offset(distance))).unwrap_or_else(
-        |_| {
-            tracing::warn!(distance, "Polyline offset failed; using an empty result");
-            Vec::new()
-        },
-    )
 }
 
 fn cross(ax: f64, ay: f64, bx: f64, by: f64) -> f64 {

@@ -12,6 +12,7 @@ use csgrs::traits::CSG;
 use nalgebra::{Matrix4, Vector3};
 
 use super::{DesignerShape, LaserParams, Point, Property, PropertyValue};
+use crate::geometry::point_in_polygon;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DesignPolygon {
@@ -155,25 +156,13 @@ impl DesignerShape for DesignPolygon {
 
         // Ray casting algorithm for local polygon
         let sides = self.sides.max(3);
-        let mut inside = false;
-        let mut j = (sides - 1) as usize;
-
-        for i in 0..sides as usize {
-            let theta_i = 2.0 * std::f64::consts::PI * (i as f64) / (sides as f64);
-            let xi = self.radius * theta_i.cos();
-            let yi = self.radius * theta_i.sin();
-
-            let theta_j = 2.0 * std::f64::consts::PI * (j as f64) / (sides as f64);
-            let xj = self.radius * theta_j.cos();
-            let yj = self.radius * theta_j.sin();
-
-            if ((yi > ry) != (yj > ry)) && (rx < (xj - xi) * (ry - yi) / (yj - yi) + xi) {
-                inside = !inside;
-            }
-            j = i;
-        }
-
-        inside
+        let vertices: Vec<Point> = (0..sides as usize)
+            .map(|i| {
+                let theta = 2.0 * std::f64::consts::PI * (i as f64) / (sides as f64);
+                Point::new(self.radius * theta.cos(), self.radius * theta.sin())
+            })
+            .collect();
+        point_in_polygon(&Point::new(rx, ry), &vertices)
     }
 
     fn resize(&mut self, handle: usize, dx: f64, dy: f64) {

@@ -37,6 +37,8 @@ mod test_dxf_polyline_splinefit;
 mod test_dxf_spline_import;
 #[path = "test_dxf_z_metadata.rs"]
 mod test_dxf_z_metadata;
+#[path = "test_geometry_helpers.rs"]
+mod test_geometry_helpers;
 #[path = "test_image_engraver_camtools.rs"]
 mod test_image_engraver_camtools;
 #[path = "test_import_svg_rect_radius_units.rs"]

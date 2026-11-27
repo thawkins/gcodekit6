@@ -1,6 +1,7 @@
 //! G-code generation from toolpaths.
 
 use super::toolpath::{Toolpath, ToolpathSegment, ToolpathSegmentType};
+use crate::geometry::point_segment_distance;
 use crate::model::Point;
 use gcodekit5_core::Units;
 
@@ -172,7 +173,7 @@ impl ToolpathToGcode {
                                 // every source point it replaces.
                                 let within_tolerance =
                                     merged_points.iter().chain([&prev.end]).all(|p| {
-                                        distance_to_segment(*p, prev.start, segment.end)
+                                        point_segment_distance(p, &prev.start, &segment.end, 0.0)
                                             <= self.curve_simplification_tolerance
                                     });
                                 if dot > 0.996 && within_tolerance {
@@ -779,18 +780,6 @@ impl ToolpathToGcode {
         self.z_min_limit = Some(z_min);
         self
     }
-}
-
-/// Distance (mm) from `p` to the segment `a`-`b`.
-fn distance_to_segment(p: Point, a: Point, b: Point) -> f64 {
-    let (dx, dy) = (b.x - a.x, b.y - a.y);
-    let len_sq = dx * dx + dy * dy;
-    let t = if len_sq > 0.0 {
-        (((p.x - a.x) * dx + (p.y - a.y) * dy) / len_sq).clamp(0.0, 1.0)
-    } else {
-        0.0
-    };
-    p.distance_to(&Point::new(a.x + t * dx, a.y + t * dy))
 }
 
 impl Default for ToolpathToGcode {

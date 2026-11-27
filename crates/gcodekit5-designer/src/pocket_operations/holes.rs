@@ -21,12 +21,11 @@ use std::collections::BTreeSet;
 use std::f64::consts::PI;
 use std::panic;
 
-use cavalier_contours::polyline::{
-    PlineSourceMut, PlineVertex, Polyline, seg_arc_radius_and_center,
-};
+use cavalier_contours::polyline::{Polyline, seg_arc_radius_and_center};
 use cavalier_contours::shape_algorithms::{Shape, ShapeOffsetOptions};
 
 use super::{PocketGenerator, PocketStrategy, add_center_cleanup, polygon_centroid, z_step};
+use crate::geometry::{point_segment_distance, ray_crosses_edge, to_pline};
 use crate::model::Point;
 use crate::toolpath::{Toolpath, ToolpathSegment, ToolpathSegmentType};
 
@@ -39,56 +38,10 @@ const BOUNDARY_EPS: f64 = 1e-3;
 const ARC_TOLERANCE: f64 = 0.005;
 /// Duplicate-vertex tolerance (mm) when building input polylines.
 const DUPLICATE_TOLERANCE: f64 = 0.01;
+/// Squared length (mm^2) below which a boundary edge is treated as a single point.
+const DEGENERATE_SEGMENT_LEN_SQ: f64 = 1e-18;
 /// Safety cap on the number of offset levels generated for one region.
 const MAX_OFFSET_LEVELS: usize = 100_000;
-
-/// Builds a closed polyline from `points` with the requested orientation.
-///
-/// Returns `None` for degenerate input (fewer than three distinct vertices or zero area).
-fn to_pline(points: &[Point], ccw: bool) -> Option<Polyline> {
-    let mut clean: Vec<Point> = Vec::with_capacity(points.len());
-    for p in points {
-        if clean
-            .last()
-            .is_none_or(|last: &Point| last.distance_to(p) > DUPLICATE_TOLERANCE)
-        {
-            clean.push(*p);
-        }
-    }
-    while clean.len() > 1
-        && clean
-            .first()
-            .zip(clean.last())
-            .is_some_and(|(f, l)| f.distance_to(l) <= DUPLICATE_TOLERANCE)
-    {
-        clean.pop();
-    }
-    if clean.len() < 3 {
-        return None;
-    }
-
-    let signed_area: f64 = (0..clean.len())
-        .map(|i| {
-            let a = clean[i];
-            let b = clean[(i + 1) % clean.len()];
-            a.x * b.y - b.x * a.y
-        })
-        .sum::<f64>()
-        * 0.5;
-    if signed_area.abs() < 1e-9 {
-        return None;
-    }
-    if (signed_area > 0.0) != ccw {
-        clean.reverse();
-    }
-
-    let mut pline = Polyline::new();
-    for p in clean {
-        pline.add_vertex(PlineVertex::new(p.x, p.y, 0.0));
-    }
-    pline.set_is_closed(true);
-    Some(pline)
-}
 
 /// Offsets `shape` inwards (shrinking filled area, growing holes) by `distance`.
 ///
@@ -151,17 +104,6 @@ fn shape_loops(shape: &Shape<f64>) -> Loops {
         .collect()
 }
 
-/// Distance from `p` to segment `a`-`b`.
-fn dist_to_segment(p: &Point, a: &Point, b: &Point) -> f64 {
-    let (dx, dy) = (b.x - a.x, b.y - a.y);
-    let len_sq = dx * dx + dy * dy;
-    if len_sq < 1e-18 {
-        return p.distance_to(a);
-    }
-    let t = (((p.x - a.x) * dx + (p.y - a.y) * dy) / len_sq).clamp(0.0, 1.0);
-    p.distance_to(&Point::new(a.x + t * dx, a.y + t * dy))
-}
-
 /// Even-odd containment test against `loops`; points within `eps` of a boundary count as inside.
 fn region_contains(p: &Point, loops: &[Vec<Point>], eps: f64) -> bool {
     let mut inside = false;
@@ -170,10 +112,10 @@ fn region_contains(p: &Point, loops: &[Vec<Point>], eps: f64) -> bool {
         for i in 0..n {
             let a = lp[i];
             let b = lp[(i + 1) % n];
-            if dist_to_segment(p, &a, &b) <= eps {
+            if point_segment_distance(p, &a, &b, DEGENERATE_SEGMENT_LEN_SQ) <= eps {
                 return true;
             }
-            if (a.y > p.y) != (b.y > p.y) && p.x < (b.x - a.x) * (p.y - a.y) / (b.y - a.y) + a.x {
+            if ray_crosses_edge(p, &a, &b) {
                 inside = !inside;
             }
         }
@@ -462,11 +404,14 @@ impl PocketGenerator {
         holes: &[Vec<Point>],
         step_down: f64,
     ) -> Vec<Toolpath> {
-        let hole_plines: Vec<Polyline> = holes.iter().filter_map(|h| to_pline(h, false)).collect();
+        let hole_plines: Vec<Polyline> = holes
+            .iter()
+            .filter_map(|h| to_pline(h, false, DUPLICATE_TOLERANCE))
+            .collect();
         if hole_plines.is_empty() {
             return self.generate_polygon_pocket(outer, step_down);
         }
-        let Some(outer_pline) = to_pline(outer, true) else {
+        let Some(outer_pline) = to_pline(outer, true, DUPLICATE_TOLERANCE) else {
             return Vec::new();
         };
         let shape = panic::catch_unwind(panic::AssertUnwindSafe(|| {
