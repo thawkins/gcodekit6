@@ -73,6 +73,13 @@ jobs:
         with:
           components: clippy
 
+      - name: Install cargo-machete
+        uses: taiki-e/install-action@cargo-machete
+
+      # Fails (exit 1) when any manifest declares a dependency its crate never uses.
+      - name: Check for unused dependencies
+        run: cargo machete
+
       - name: Install system dependencies
         run: |
           sudo apt-get update

@@ -51,10 +51,6 @@ craft-dialogs = { git = "https://github.com/storytold/craft-libs", rev = "d15bf1
 craft-platform = { git = "https://github.com/storytold/craft-libs", rev = "d15bf1f35b17b759870f9e5111b9a5d243f64888" }
 craft-quit = { git = "https://github.com/storytold/craft-libs", rev = "d15bf1f35b17b759870f9e5111b9a5d243f64888" }
 craft-settings = { git = "https://github.com/storytold/craft-libs", rev = "d15bf1f35b17b759870f9e5111b9a5d243f64888" }
-craft-i18n = { git = "https://github.com/storytold/craft-libs", rev = "d15bf1f35b17b759870f9e5111b9a5d243f64888" }
-craft-svg = { git = "https://github.com/storytold/craft-libs", rev = "d15bf1f35b17b759870f9e5111b9a5d243f64888" }
-craft-dxf = { git = "https://github.com/storytold/craft-libs", rev = "d15bf1f35b17b759870f9e5111b9a5d243f64888" }
-craft-mesh = { git = "https://github.com/storytold/craft-libs", rev = "d15bf1f35b17b759870f9e5111b9a5d243f64888" }
 
 [package]
 name = "gcodekit5-design"
@@ -87,13 +83,8 @@ opt-level = 1
 [dependencies]
 gcodekit5-ui-egui = { path = "crates/gcodekit5-ui-egui" }
 
-tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = [
-    "env-filter",
-    "fmt",
-    "json",
-] }
-anyhow = "1.0"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
+anyhow = { workspace = true }
 dirs = "7.0"
 
 [package.metadata.deb]
@@ -144,7 +135,5 @@ winit = { git = "https://github.com/storytold/winit.git", rev = "a517b3846ee8457
 name = "all"
 path = "tests/all.rs"
 
-[workspace.lints.cargo]
-# Workspace deps for craft-libs are declared ahead of the crates that use them (ADR-011).
-# The root package opts in via [lints] workspace = true so cargo stops warning about them.
-unused_workspace_dependencies = "allow"
+[workspace.lints]
+# Every crate opts in with `[lints] workspace = true`; shared lint levels go here.
