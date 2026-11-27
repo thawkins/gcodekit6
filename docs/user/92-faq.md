@@ -51,7 +51,7 @@ Yes. The Designer can import **SVG**, **DXF**, and **STL** files. Import via **F
 
 ### Can I make PCBs with GCodeKit5?
 
-Yes. The **Gerber Converter** CAM tool converts Gerber and Excellon files to G-code for isolation routing and drilling.
+Yes. The **Gerber to G-Code** CAM tool converts Gerber and Excellon files to G-code for isolation routing and drilling.
 
 ### How do I calculate speeds and feeds?
 

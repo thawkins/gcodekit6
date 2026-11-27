@@ -54,14 +54,18 @@ sudo usermod -aG dialout $USER
 3. Check for triggered limit switches
 4. See [Machine Control](10-machine-control.md) for alarm handling
 
-### Auto-Detection Fails
+### Connection Rejected: Firmware Mismatch
 
-**Symptoms**: Firmware type shows "Unknown" after connecting.
+**Symptoms**: The connection closes right after connecting with "Connection rejected: active
+machine is configured as ... but the device responded as ...".
 
-**Solutions**:
-1. Ensure the controller is fully booted before connecting
-2. Check the console for startup messages
-3. Try disconnecting and reconnecting
+**Cause**: The app does not detect the firmware. It uses the **Controller** field of the
+active device profile, and closes the connection when the controller identifies itself as a
+different protocol (for example a Repetier board on a GRBL profile).
+
+**Solution**: In the Device Manager, set the profile's **Controller** to match your firmware,
+or make the right profile active with **Set Active**. See
+[Supported Controllers](05-supported-controllers.md).
 
 ## Diagnostic Steps
 
