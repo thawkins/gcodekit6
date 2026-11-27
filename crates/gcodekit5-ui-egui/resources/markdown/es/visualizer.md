@@ -3,11 +3,11 @@
 <img src="../../help_images/visualizer3d.png" alt="Visualizer3d" width="1000">
 
 El Visualizador muestra una vista previa de las trayectorias de la herramienta y (opcionalmente) los límites del área de trabajo de la máquina.
-El visualizador es 3D y en la esquina superior derecha tiene los controles de visualización, Frontal, Lateral, trasera, isometricas, etc. Ajuste al dibujo, vista superior, zoom + y -, Visualización de barras de desplazamiento, Orbita.
+El visualizador es 3D y en la esquina superior derecha tiene los controles de visualización: Vista Superior, Vista inferior, Vista frontal, Vista izquierda, Vista derecha y cuatro vistas Isométricas, además de Zoom +, Ajustar y Zoom -. La barra lateral tiene Ajustar al contenido, Restablecer vista, Ajustar al área de trabajo y los botones 2D (Vista superior 2D) y 3D (Vista 3D giratoria).
 
 - Mostrar/Ocultar Movimientos rápidos
 - Mostrar/Ocultar Movimientos de corte
-- Mostrar/ocultar Herramienta
+- Mostrar láser/husillo
 - Mostrar/ocultar Rejilla. Se puede definir el paso de la rejilla
 - Mostrar/Ocultar Límites de Máquina
 

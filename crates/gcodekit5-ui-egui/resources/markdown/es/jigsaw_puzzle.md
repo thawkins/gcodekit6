@@ -1,44 +1,34 @@
 # Generador de puzle
 
-Crea un patrón de corte tipo puzle y genera G-code.
+Crea un patrón de corte tipo puzle como formas en el Diseñador.
 
-Esta herramienta está diseñada principalmente para **cortadoras láser** (o herramientas CNC muy pequeñas) y produce una trayectoria de herramienta 2D que define las piezas del puzle que encajan entre sí.
+Esta herramienta está diseñada principalmente para **cortadoras láser** (o herramientas CNC muy pequeñas) y produce contornos 2D de las piezas del puzle que encajan entre sí.
 
 ## Qué genera
 - Un rectángulo exterior (el límite general del puzle)
 - Líneas de corte internas que forman las piezas, utilizando un patrón de conectores de puzle pseudoaleatorio
-- Múltiples pasadas opcionales para cortar materiales más gruesos
 
 ## Parámetros clave
-### Dimensiones del puzle
-- **Ancho / Alto**: Tamaño total del puzle terminado.
-- **Radio de esquina**: Redondea las esquinas exteriores.
+### Dimensiones del puzzle
+- **Anchura / Altura**: Tamaño total del puzle terminado (50 a 2000 mm).
+- **Radio de esquina**: Redondea las esquinas exteriores (0 a 10 mm).
 
-### Configuración de la cuadrícula
-- **Piezas horizontales / Piezas verticales**: Cantidad de piezas en cada dirección. Más piezas implican más cortes internos.
+### Configuración de Matriz
+- **Piezas en ancho / Piezas en alto**: Cantidad de piezas en cada dirección (2 a 20). Más piezas implican más cortes internos. Cada pieza debe medir al menos 15 mm.
 
-### Parámetros del patrón
-- **Ancho de corte**: Compensa el ancho de corte (ancho de corte láser / diámetro de la herramienta). Aumente este valor si las piezas están demasiado juntas.
-- **Semilla aleatoria**: Cambia la forma de las piezas manteniendo la misma cuadrícula. Usa **Aleatorizar** para probar rápidamente nuevos patrones.
-- **Tamaño de pestaña / Variación**: Controla el tamaño y la variación del conector.
-
-### Configuración del láser
-- **Pasadas**: Número de pasadas de corte repetidas.
-- **Potencia (S)**: Valor de potencia del husillo/láser (el láser GRBL típico usa `S`).
-- **Velocidad de avance**: Velocidad de corte.
-
-### Desplazamientos de trabajo
-- **Desplazamiento X / Y**: Mueve todo el puzle lejos del origen de la máquina.
-- **Inicio antes de comenzar**: Si está activado, se inserta `$H` al principio.
+### Parámetros del Puzzle
+- **Tamaño de la pestaña (%)**: Controla el tamaño del conector (10 a 30).
+- **Fluctuación (%)**: Controla la variación del conector (0 a 13).
+- **Semilla aleatoria**: Cambia la forma de las piezas manteniendo la misma cuadrícula. Usa **Aleatorio** para probar rápidamente nuevos patrones.
 
 ## Flujo de trabajo
 1. Elige el tamaño del puzle y la cantidad de piezas.
-2. Configura el ancho de corte y el tamaño del conector.
-3. Selecciona la potencia/velocidad de avance del láser.
-4. Genera, previsualiza en el Visualizador y ejecuta.
+2. Configura el tamaño del conector.
+3. Pulsa **Generar**. Las piezas se añaden al Diseñador como formas agrupadas y el Diseñador pasa al frente.
+4. En el Diseñador, configura los parámetros del láser y usa **Generar G-Code** para crear el programa.
 
 ## Notas
-- Para el corte CNC: asegúrese de que el diámetro de la herramienta y la configuración del ancho de corte sean adecuados, y considere reducir la cantidad de piezas.
+- Para el corte CNC: tenga en cuenta el diámetro de la herramienta y considere reducir la cantidad de piezas.
 - Siempre previsualice el resultado antes de cortar.
 
 ## Relacionado

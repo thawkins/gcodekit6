@@ -1,8 +1,8 @@
 # Designer
 
-The designer has two distinct working modes: "2D Laser" and "3D CNC." You can access them in two ways: from the Designer's File menu by selecting "New 2D" or "New 3D," or by changing modes using the Machine Type selection in the left panel.
+The designer has two distinct working modes: "Laser 2D" and "CNC 3D." You can access them in two ways: from the app's **File** menu by selecting "New 2D" (Ctrl+N) or "New 3D," or by changing modes using the Machine Mode selection in the left panel.
 
-In 2D Laser mode, the Z coordinate is disabled. This mode is primarily used for laser engraving and cutting. You can create and edit objects using the built-in tools and import vector designs such as DXF and SVG. You can also import JPG, PNG, and other image formats for engraving.
+In Laser 2D mode, the Z coordinate is disabled. This mode is primarily used for laser engraving and cutting. You can create and edit objects using the built-in tools and import vector designs such as DXF and SVG. You can also import JPG, PNG, and other image formats for engraving.
 
 <img src="../../help_images/designer.png" alt="Designer" width="700">
 
@@ -26,7 +26,7 @@ In 2D Laser mode, the Z coordinate is disabled. This mode is primarily used for 
 
 <img src="../../help_images/global_properties.png" alt="Global Properties" width="600">
 
-Clicking the "Tool Settings" button opens the window for global job settings. This configuration will be used for all vector objects that have the "Use Global Values" checkbox selected in the "Laser Settings (Object)" object properties.
+Clicking the "Tool Settings" button opens the window for global job settings. This configuration will be used for all vector objects that have the "Use global values" checkbox selected in the "Laser Config (Object)" object properties.
 
 ---
 ## Individual Object Properties Panel
@@ -38,7 +38,7 @@ In the right-hand panel, when an object is selected, its properties appear:
     <li>Size</li>
     <li>Rotation</li>
     <li>Corner (radius/rounding)</li>
-    <li>Geometric Operations (offset, chamfer)</li>
+    <li>Geometry Operations (offset, chamfer)</li>
     <li>CAM Properties</li>
     <li>Individual Laser Settings (speed, power, and passes) of a given object</li>
 
@@ -69,7 +69,7 @@ The object panel displays the list of objects with:
 ---
 
 ---
-## Main Actions in 3D CNC Mode
+## Main Actions in CNC 3D Mode
 - In this mode, the Z coordinate is enabled. **This coordinate is the dimension to which the tool will descend from the top face of the material.**
 - Define global parameters for vector objects that do not require independent parameters using the "Stock Settings" and "Tool Settings" buttons. The first opens a dialog box with the material dimensions and the tool's safety height for non-operating movements. The second opens a dialog box to enter the travel speed, tool revolutions, diameter, and depth of cut.
 

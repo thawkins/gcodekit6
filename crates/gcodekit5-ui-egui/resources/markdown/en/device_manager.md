@@ -10,7 +10,7 @@ A *device profile* is separate from the live machine connection: it’s a saved 
 - **Add Device** creates a new profile.
 
 ## Right panel: edit tabs
-Device profiles are edited via tabs (e.g. Connection, Work Area, Capabilities).
+Device profiles are edited via four tabs: General, Connection, Dimensions, Capabilities.
 
 ### Action buttons
 - **Save** - Saves changes to the device profile
@@ -25,11 +25,13 @@ Device profiles are edited via tabs (e.g. Connection, Work Area, Capabilities).
 
 ### Connection
 Configure how to reach the controller:
+- Connection type: Serial, TCP/IP or WebSocket
 - Serial port and baud rate
-- TCP host/port (if supported)
-- Connection timeout / auto-reconnect
+- TCP host/port (TCP/IP and WebSocket)
+- Connection timeout
+- **Auto Reconnect**: when a connection drops, the app tries to reopen it up to 10 times, waiting 1 s, 2 s, then 5 s between attempts
 
-### Work area / travel limits
+### Dimensions (travel limits)
 Set machine travel limits (X/Y/Z min/max). These are used across the app for:
 - Visualizer bounds overlays
 - Designer “fit to device” behaviors

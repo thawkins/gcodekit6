@@ -15,14 +15,14 @@ Utilice el panel izquierdo para encontrar herramientas rápidamente:
 - Los filtros **Diámetro mín./máx.** ayudan a filtrar catálogos extensos.
 
 ## Panel derecho: editar detalles de la herramienta
-Las herramientas se editan mediante pestañas (Geometría, Materiales, Notas, etc.).
+Las herramientas se editan mediante cuatro pestañas: Información básica, Geometría, Fabricante, Notas.
 
 ### Geometría (lo más importante)
 - **Diámetro**: diámetro de corte
 - **Diámetro del vástago**: diámetro del vástago (compatibilidad con el portaherramientas)
 - **Longitud de la ranura**: longitud de corte axial
-- **Longitud total**: longitud total de la herramienta
-- **Ranuras**: número de ranuras de corte
+- **Longitud (mm):** longitud total de la herramienta
+- **Número de filos:** número de filos de corte
 - **Radio de esquina** (si corresponde)
 - **Ángulo de la punta** (brocas / brocas de centrado / brocas en V)
 

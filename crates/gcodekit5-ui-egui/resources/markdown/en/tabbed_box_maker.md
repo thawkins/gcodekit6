@@ -13,7 +13,7 @@ The generator creates multiple 2D panels (sides, top/bottom, dividers) and arran
 - **Box type**: Allows removing specific faces (no top, no bottom, etc.).
 - **Dividers X / Y**: Number of internal dividers.
 - **Divider keying**: Which faces include slots/tabs for dividers.
-- **Optimize layout**: Attempts to rotate/pack panels to fit within device bounds.
+- **Optimize Layout**: Packs the panels into a compact layout.
 
 ### Material settings
 - **Thickness**: Stock thickness.
@@ -24,24 +24,22 @@ The generator creates multiple 2D panels (sides, top/bottom, dividers) and arran
 - **Surrounding spaces**: Extra spacing near edges.
 - **Play**: Fit tolerance.
 - **Extra length**: Adds length to tabs for tighter fits.
+- **Finger Style**: Rectangular, Springs, Barbs or Snap Fit.
 
 ### Laser settings
 - **Passes / Power (S) / Feed rate**: Cutting parameters (laser-style), used when producing the final G-code.
+- **Z Step Down**: How far Z drops on each pass after the first.
 
 ### Work origin offsets
-Offsets the entire layout, and optionally homes before start.
+Offsets the entire layout, and optionally homes before start (**Home Device Before Start**).
 
 ## Optimize layout
-The optimizer tries to position and rotate parts to fit within the current device bounds.
-
-If a layout cannot fit:
-- You will be prompted with **Cancel** or **Continue**.
-- **Continue** ignores the out-of-bounds condition.
+The optimizer packs the panels close together, with a 5 mm gap between parts. Preview the program to check that it fits your machine.
 
 ## Workflow
 1. Set box dimensions and material thickness.
 2. Configure joints and divider options.
-3. Generate and preview bounds.
+3. Click **Generate** to make the program, then **Send to Editor**, or **Preview** to see it in the Visualizer. **Generate Shapes** adds the panel outlines to the Designer instead.
 4. Cut the panels and assemble.
 
 ## Related

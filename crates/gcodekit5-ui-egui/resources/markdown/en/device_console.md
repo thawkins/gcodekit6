@@ -11,8 +11,8 @@ The Device Console shows raw lines received from the controller and messages sen
 When a GRBL line includes `error:n`, the console will also show the decoded meaning after the raw text.
 
 ## Tips
-- Use **Copy** to copy the visible console content.
-- Use **Clear** to clear the console view.
+- **Copy last error** copies the newest error or alarm line.
+- **Clear console** empties the log.
 
 ## Related
 - [Machine Control](help:machine_control)

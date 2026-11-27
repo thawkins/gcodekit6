@@ -11,7 +11,7 @@ El generador crea múltiples paneles 2D (laterales, tapa/base, separadores) y lo
 - **Tipo de caja**: Permite eliminar caras específicas (sin tapa, sin base, etc.).
 - **Separadores X/Y**: Número de separadores internos.
 - **Clave de separadores**: Indica qué caras incluyen ranuras/pestañas para los separadores.
-- **Optimizar diseño**: Intenta rotar/ajustar los paneles para que se adapten a las dimensiones del dispositivo.
+- **Optimizar diseño**: Agrupa los paneles en un diseño compacto.
 
 ### Ajustes del material
 - **Espesor**: Espesor del material.
@@ -22,24 +22,22 @@ El generador crea múltiples paneles 2D (laterales, tapa/base, separadores) y lo
 - **Espacios circundantes**: Espacio adicional cerca de los bordes.
 - **Juego**: Tolerancia de ajuste.
 - **Longitud adicional**: Añade longitud a las pestañas para un ajuste más preciso.
+- **Estilo de Dedos**: Rectos, Muelles, Púas o Encaje a Presión.
 
 ### Ajustes del láser
 - **Pasadas/Potencia (S)/Velocidad de avance**: Parámetros de corte (tipo láser), utilizados al generar el G-code final.
+- **Paso en Z**: Cuánto baja Z en cada pasada después de la primera.
 
 ### Desplazamientos del origen de trabajo
-Desplaza todo el diseño y, opcionalmente, realiza un posicionamiento inicial antes de comenzar.
+Desplaza todo el diseño y, opcionalmente, realiza un posicionamiento inicial antes de comenzar (**Hacer 'Homing' antes de iniciar**).
 
 ## Optimizar el diseño
-El optimizador intenta posicionar y rotar las piezas para que se ajusten a los límites actuales del dispositivo.
-
-Si un diseño no cabe:
-- Se le preguntará si desea **Cancelar** o **Continuar**.
-- **Continuar** ignora la condición de fuera de límites.
+El optimizador agrupa los paneles, con una separación de 5 mm entre piezas. Previsualice el programa para comprobar que cabe en su máquina.
 
 ## Flujo de trabajo
 1. Definir las dimensiones de la caja y el grosor del material.
 2. Configurar las uniones y las opciones de divisores.
-3. Generar y previsualizar los límites.
+3. Pulsar **Generar** para crear el programa y después **Enviar al editor**, o **Vista previa** para verlo en el Visualizador. **Generar Formas** añade los contornos de los paneles al Diseñador.
 4. Cortar los paneles y ensamblarlos.
 
 ## Relacionado

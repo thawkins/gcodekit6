@@ -6,7 +6,7 @@ La herramienta Gerber a G-code permite convertir archivos Gerber estándar (com�
 
 1. **Seleccionar directorio**: Haga clic en "Examinar..." para seleccionar la carpeta que contiene sus archivos Gerber. La herramienta detectará y asignará automáticamente los archivos de capas comunes (p. ej., Cobre superior, Perforaciones).
 
-2. **Tipo de capa**: Seleccione la capa que desea procesar en el menú desplegable. El archivo detectado para esa capa se mostrará a continuación.
+2. **Tipo de capa**: Seleccione la capa que desea procesar en el menú desplegable. El archivo detectado para esa capa se mostrará a continuación. La capa **Contorno de la placa** corta por fuera del borde de la placa, desplazada el radio de la herramienta.
 
 3. **Parámetros**:
 
@@ -19,6 +19,9 @@ La herramienta Gerber a G-code permite convertir archivos Gerber estándar (com�
 * **Velocidad del husillo**: RPM del husillo.
 
 * **Profundidad de corte**: Profundidad Z del corte (negativa para cortar en el material).
+
+* **Outline Step Down**: Para la capa Contorno de la placa, lo máximo que baja Z en cada pasada hasta la Profundidad de corte (0,5 mm por defecto).
+
 * **Z seguro**: Altura de retracción para movimientos rápidos.
 
 * **Diámetro de la herramienta**: Diámetro de la broca de grabado (broca en V o fresa).
@@ -26,6 +29,8 @@ La herramienta Gerber a G-code permite convertir archivos Gerber estándar (com�
 * **Ancho de aislamiento**: Ancho adicional para dejar espacio alrededor de las pistas.
 
 * **Eliminar exceso de cobre**: (Desgaste) Si está marcada, genera trayectorias para eliminar todo el cobre que no forma parte de las pistas.
+
+* **Usar el contorno de la placa para el desbaste**: Limita el desbaste al archivo de contorno de la placa. Sin esta opción, o si no se encuentra el archivo de contorno, el desbaste cubre los límites del cobre.
 
 4. **Agujeros de alineación**:
 
@@ -43,4 +48,4 @@ La capa Agujeros de taladro lee el archivo de taladrado Excellon (`.drl`, `.xln`
 
 ## Salida
 
-Haga clic en **Generar G-code** para crear la trayectoria. El resultado se cargará en el editor/visualizador de G-code.
+Haga clic en **Generar** para crear la trayectoria y después en **Enviar al editor** para cargarla en el editor de G-code, o en **Vista previa** para cargarla y mostrarla en el Visualizador.

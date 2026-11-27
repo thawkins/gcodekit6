@@ -11,8 +11,8 @@ La consola del dispositivo muestra las líneas sin procesar recibidas del contro
 Cuando una línea GRBL incluye `error:n`, la consola también mostrará el significado decodificado después del texto sin procesar.
 
 ## Consejos
-- Use **Copiar** para copiar el contenido visible de la consola.
-- Use **Borrar** para borrar la vista de la consola.
+- **Copiar último error** copia la línea de error o alarma más reciente.
+- **Limpiar Consola** vacía el registro.
 
 ## Relacionado
 - [Control de máquina](help:machine_control)
