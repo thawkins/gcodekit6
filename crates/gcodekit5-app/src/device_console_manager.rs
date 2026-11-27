@@ -5,7 +5,6 @@
 //! ConsolePanel and CommandPanel architecture.
 
 use crate::console::{ConsolePanel, MessageLevel};
-use crate::device_status;
 use gcodekit5_communication::CommunicatorListener;
 use gcodekit5_core::{DataCallback, ThreadSafe, ThreadSafeVec, thread_safe, thread_safe_vec};
 use std::sync::Arc;
@@ -286,32 +285,6 @@ impl CommunicatorListener for ConsoleListener {
     fn on_data_sent(&self, data: &[u8]) {
         if let Ok(text) = std::str::from_utf8(data) {
             let trimmed = text.trim();
-
-            // Parse for F and S commands to update commanded values
-            let mut clean_line = trimmed.to_string();
-            // Remove comments
-            if let Some(idx) = clean_line.find(';') {
-                clean_line.truncate(idx);
-            }
-            if let Some(idx) = clean_line.find('(') {
-                clean_line.truncate(idx);
-            }
-
-            for token in clean_line.split_whitespace() {
-                if let Some(first_char) = token.chars().next()
-                    && token.len() > 1
-                {
-                    if first_char == 'F' || first_char == 'f' {
-                        if let Ok(val) = token[1..].parse::<f32>() {
-                            device_status::update_commanded_feed_rate(val);
-                        }
-                    } else if (first_char == 'S' || first_char == 's')
-                        && let Ok(val) = token[1..].parse::<f32>()
-                    {
-                        device_status::update_commanded_spindle_speed(val);
-                    }
-                }
-            }
 
             // Suppress status polling queries (just '?')
             if trimmed == "?" {

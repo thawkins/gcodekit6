@@ -1,12 +1,16 @@
 //! # GCodeKit5 App
 //!
 //! Toolkit-free application state of the GCodeKit5 front end (egui): the machine
-//! controller, work zero, device status, console model, command history, the firmware
+//! controller, work zero, console model, command history, the firmware
 //! settings and device info models, the device profile form, the tool and material manager
 //! forms and back ends, shared parameter types, and the answer to an unsaved-changes prompt.
 //!
 //! Depends on `gcodekit5-core`, `gcodekit5-communication` and
 //! `gcodekit5-settings` (which holds the shared translation tables).
+//!
+//! Rule: no process-global device state. Machine state lives in the instance that owns the
+//! connection (`MachineController` here, `Machine` in the egui front end); do not add a
+//! `static` `RwLock`/`Mutex`/`Atomic`/`LazyLock`/`OnceLock` holding device status.
 #![deny(unsafe_code)]
 
 /// Marks a string literal for translation extraction without translating it, for msgids
@@ -23,7 +27,6 @@ pub mod console;
 pub mod device_console_manager;
 pub mod device_identity;
 pub mod device_profiles;
-pub mod device_status;
 /// Saving files safely; lives in `gcodekit5-core` so `gcodekit5-devicedb` can use it too.
 pub use gcodekit5_core::files;
 pub mod firmware_settings;

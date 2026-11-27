@@ -2168,7 +2168,6 @@ dependencies = [
  "gcodekit5-core",
  "gcodekit5-devicedb",
  "gcodekit5-settings",
- "once_cell",
  "serde",
  "serde_json",
  "tempfile",

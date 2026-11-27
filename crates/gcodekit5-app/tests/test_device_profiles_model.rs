@@ -151,6 +151,26 @@ fn test_device_profiles_store_reported_settings() {
     assert!(profile.has_laser);
 }
 
+/// Ported from the retired device-status module tests: a setting value is read by its leading
+/// number, so trailing text after it is ignored and a value with no number is skipped.
+#[test]
+fn test_device_profiles_store_reported_settings_reads_numeric_prefix() {
+    let mut profile = DeviceProfile {
+        max_s_value: 42.0,
+        ..DeviceProfile::default()
+    };
+    store_reported_settings(
+        &mut profile,
+        &settings(&[(30, " 1000.500 (rpm)"), (32, "1 (laser)")]),
+    );
+    assert_eq!(profile.max_s_value, 1000.5);
+    assert!(profile.has_laser);
+
+    store_reported_settings(&mut profile, &settings(&[(30, "max"), (32, "0abc")]));
+    assert_eq!(profile.max_s_value, 1000.5);
+    assert!(!profile.has_laser);
+}
+
 #[test]
 fn test_device_profiles_search_and_delete_rule() {
     let profile = DeviceProfile {
