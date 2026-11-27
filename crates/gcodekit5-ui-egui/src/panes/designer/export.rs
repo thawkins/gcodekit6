@@ -26,10 +26,7 @@ use std::path::Path;
 
 use gcodekit5_app::i18n::Translator;
 use gcodekit5_designer::DesignerState;
-use gcodekit5_designer::designer_state::MachineMode;
-use gcodekit5_designer::engraving::image_engraver::{
-    EngravingParams, HalftoneMethod, ImageEngraver, OVERSCAN_MM, RotationAngle, ScanDirection,
-};
+use gcodekit5_designer::engraving::image_engraver::{ImageEngraver, OVERSCAN_MM};
 use gcodekit5_designer::gcode_gen::MachineLimits;
 use gcodekit5_designer::model::{DesignerShape, RasterImage, Shape};
 
@@ -180,8 +177,8 @@ impl DesignerPane {
         self.editor_request.take()
     }
 
-    /// A copy of the design without the hidden shapes, with the toolpath generator set from
-    /// the tool settings as GTK did before generating.
+    /// A copy of the design without the hidden shapes (the model sets its toolpath generator
+    /// from the tool settings when it generates).
     fn export_copy(&self) -> DesignerState {
         let mut copy = self.state.clone();
         for id in self.state.canvas.shape_store.draw_order_iter() {
@@ -189,13 +186,6 @@ impl DesignerPane {
                 copy.canvas.remove_shape(id);
             }
         }
-        let tool = copy.tool_settings.clone();
-        let generator = &mut copy.toolpath_generator;
-        generator.set_feed_rate(tool.feed_rate);
-        generator.set_spindle_speed(tool.spindle_speed);
-        generator.set_tool_diameter(tool.tool_diameter);
-        generator.set_start_depth(tool.start_depth);
-        generator.set_step_in(tool.tool_diameter * 0.4);
         copy
     }
 
@@ -236,7 +226,7 @@ impl DesignerPane {
 
     /// The export's refusals without generating anything (cheap, for asking before a file
     /// dialog): no shapes, every shape hidden, or visible objects at or above Safe Z in CNC
-    /// mode (the model's rule: an object starts at stock thickness minus its start depth).
+    /// mode (the model's rule, [`DesignerState::safe_z_clearance_violation_summary`]).
     ///
     /// # Errors
     /// Why the export would be refused.
@@ -245,31 +235,20 @@ impl DesignerPane {
         if canvas.shape_count() == 0 {
             return Err(ExportRefusal::Empty);
         }
-        let mut visible = canvas
-            .shapes()
-            .filter(|o| !self.flags.is_hidden(o.id))
-            .peekable();
-        if visible.peek().is_none() {
+        if canvas.shapes().all(|o| self.flags.is_hidden(o.id)) {
             return Err(ExportRefusal::AllHidden);
         }
-        if self.state.machine_mode() != MachineMode::Cnc3D {
-            return Ok(());
-        }
-        let stock = self.state.stock_material.as_ref();
-        let safe_z = stock.map_or(10.0, |s| f64::from(s.safe_z));
-        let thickness = stock.map_or(10.0, |s| f64::from(s.thickness));
-        let (count, max_start_z) = visible
-            .map(|o| thickness - o.start_depth)
-            .filter(|z| *z >= safe_z)
-            .fold((0, f64::NEG_INFINITY), |(n, m), z| (n + 1, m.max(z)));
-        if count > 0 {
-            return Err(ExportRefusal::AboveSafeZ {
+        match self
+            .state
+            .safe_z_clearance_violation_summary(|o| !self.flags.is_hidden(o.id))
+        {
+            Some((safe_z, count, max_start_z)) => Err(ExportRefusal::AboveSafeZ {
                 safe_z,
                 count,
                 max_start_z,
-            });
+            }),
+            None => Ok(()),
         }
-        Ok(())
     }
 
     /// Exports the design's G-code to `path` (File > Export G-Code).
@@ -417,36 +396,13 @@ impl DesignerPane {
     }
 }
 
-/// Engraves `image` with its own laser settings (GTK's Generate for an image).
+/// Engraves `image` with its own laser settings and placed size
+/// ([`RasterImage::engraving_params`], as the design export does).
 ///
 /// # Errors
 /// The msgid of the failure's title and the error.
 fn engrave(image: &RasterImage) -> Result<String, (&'static str, anyhow::Error)> {
-    let params = EngravingParams {
-        width_mm: image.width_mm as f32,
-        height_mm: None,
-        feed_rate: image.feed_rate as f32,
-        travel_rate: image.travel_rate as f32,
-        min_power: image.min_power as f32,
-        max_power: image.max_power as f32,
-        ppi: image.ppi as f32,
-        scan_direction: match image.scan_direction.as_str() {
-            "vertical" => ScanDirection::Vertical,
-            _ => ScanDirection::Horizontal,
-        },
-        bidirectional: image.bidirectional,
-        invert: image.invert,
-        mirror_x: false,
-        mirror_y: false,
-        rotation: RotationAngle::Degrees0,
-        halftone: HalftoneMethod::from_name(&image.dithering),
-        halftone_threshold: image.halftone_threshold,
-        offset_x: (image.center.x - image.width_mm / 2.0) as f32,
-        offset_y: (image.center.y - image.height_mm / 2.0) as f32,
-        power_scale: 1000.0,
-        line_spacing: 1.0,
-    };
-    let engraver = ImageEngraver::from_raster_image(image, params)
+    let engraver = ImageEngraver::from_raster_image(image, image.engraving_params())
         .map_err(|e| (n_!("Image Load Failed"), e))?;
     engraver
         .generate_gcode()

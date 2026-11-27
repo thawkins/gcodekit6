@@ -257,6 +257,39 @@ impl RasterImage {
             },
         ]
     }
+
+    /// The engraving parameters for this image: its own laser settings, its size (width
+    /// and height, so the output keeps the image's placed size), and its lower-left corner
+    /// as the offset. The one place both the design export and the designer's Generate
+    /// G-Code for a selected image build them.
+    pub fn engraving_params(&self) -> crate::engraving::EngravingParams {
+        use crate::engraving::{EngravingParams, HalftoneMethod, RotationAngle, ScanDirection};
+        EngravingParams {
+            width_mm: self.width_mm as f32,
+            height_mm: Some(self.height_mm as f32),
+            feed_rate: self.feed_rate as f32,
+            travel_rate: self.travel_rate as f32,
+            min_power: self.min_power as f32,
+            max_power: self.max_power as f32,
+            ppi: self.ppi as f32,
+            scan_direction: if self.scan_direction == "vertical" {
+                ScanDirection::Vertical
+            } else {
+                ScanDirection::Horizontal
+            },
+            bidirectional: self.bidirectional,
+            invert: self.invert,
+            mirror_x: false,
+            mirror_y: false,
+            rotation: RotationAngle::Degrees0,
+            halftone: HalftoneMethod::from_name(&self.dithering),
+            halftone_threshold: self.halftone_threshold,
+            offset_x: (self.center.x - self.width_mm / 2.0) as f32,
+            offset_y: (self.center.y - self.height_mm / 2.0) as f32,
+            power_scale: 1000.0,
+            line_spacing: 1.0,
+        }
+    }
 } // impl RasterImage
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
