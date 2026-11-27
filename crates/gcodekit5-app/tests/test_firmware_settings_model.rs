@@ -272,3 +272,29 @@ fn test_firmware_settings_grbl_family_detection() {
         GrblFamily::Unknown
     );
 }
+
+#[test]
+fn test_firmware_settings_spindle_settings_30_to_32_are_spindle() {
+    for number in 30..=32 {
+        assert_eq!(category_of(number), "Spindle", "${number}");
+    }
+    assert_eq!(category_of(22), "Homing");
+    assert_eq!(category_of(29), "Homing");
+}
+
+#[test]
+fn test_firmware_settings_identity_lathe_mode_is_not_laser() {
+    use gcodekit5_app::device_identity::DeviceIdentity;
+    let mut identity = DeviceIdentity::default();
+    identity.apply_line("$32=1");
+    assert_eq!(identity.laser, Some(true));
+    identity.apply_line("$32=2");
+    assert_eq!(identity.laser, Some(false));
+    identity.apply_line("$32=0");
+    assert_eq!(identity.laser, Some(false));
+    // `$22` is a grblHAL bitmask: any set bit means homing is on.
+    identity.apply_line("$22=5");
+    assert_eq!(identity.homing, Some(true));
+    identity.apply_line("$22=0");
+    assert_eq!(identity.homing, Some(false));
+}

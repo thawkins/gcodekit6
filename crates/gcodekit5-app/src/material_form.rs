@@ -191,13 +191,19 @@ impl Default for MaterialForm {
     }
 }
 
-/// Parses an optional number; empty is `None`.
+/// Parses an optional number; empty is `None`. Anything else must be a finite number above
+/// 0: `NaN` and `inf` would be saved by `serde_json` as `null` and so vanish on reload, and a
+/// negative tensile strength or melting point is not a material property.
 fn optional(text: &str, error: &'static str) -> Result<Option<f32>, &'static str> {
     let text = text.trim();
     if text.is_empty() {
         Ok(None)
     } else {
-        text.parse::<f32>().map(Some).map_err(|_| error)
+        text.parse::<f32>()
+            .ok()
+            .filter(|v| v.is_finite() && *v > 0.0)
+            .map(Some)
+            .ok_or(error)
     }
 }
 

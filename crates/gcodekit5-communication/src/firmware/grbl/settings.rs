@@ -104,11 +104,10 @@ impl SettingsManager {
 
             if let Ok(number) = num_str.parse::<u16>() {
                 // GRBL often returns: "$0=10 (step pulse, usec)".
-                // We only want the raw value so downstream numeric parsing works.
-                let end = value_str
-                    .find(|c: char| c.is_whitespace() || c == '(')
-                    .unwrap_or(value_str.len());
-                return Some((number, value_str[..end].to_string()));
+                // Drop the trailing comment so downstream numeric parsing works, but keep
+                // inner spaces: a grblHAL/FluidNC text setting (SSID, hostname) may hold one.
+                let end = value_str.find('(').unwrap_or(value_str.len());
+                return Some((number, value_str[..end].trim_end().to_string()));
             }
         }
 

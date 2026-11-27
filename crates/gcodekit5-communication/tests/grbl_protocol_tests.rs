@@ -91,3 +91,20 @@ fn test_inch_reports_are_converted_to_mm() {
     assert!((probe.position.x - 25.4).abs() < 1e-4);
     assert!((probe.position.z + 6.35).abs() < 1e-4);
 }
+
+#[test]
+fn test_parse_setting_line_keeps_spaces_in_text_values() {
+    use gcodekit5_communication::firmware::grbl::SettingsManager;
+    assert_eq!(
+        SettingsManager::parse_setting_line("$70=my ssid"),
+        Some((70, "my ssid".to_string()))
+    );
+    assert_eq!(
+        SettingsManager::parse_setting_line("$0=10 (step pulse, usec)"),
+        Some((0, "10".to_string()))
+    );
+    assert_eq!(
+        SettingsManager::parse_setting_line("$110=500.000"),
+        Some((110, "500.000".to_string()))
+    );
+}

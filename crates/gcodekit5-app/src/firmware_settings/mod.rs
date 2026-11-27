@@ -60,8 +60,8 @@ pub const SETTING_CATEGORIES: &[&str] = &[
 pub fn category_of(number: u16) -> &'static str {
     match number {
         0..=20 => "System",
-        21..=32 => "Homing",
-        33..=39 => "Spindle",
+        21..=29 => "Homing",
+        30..=39 => "Spindle",
         40..=65 => "System",
         70..=75 => "Network",
         100..=105 => "Steps Per Unit",
