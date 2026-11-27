@@ -145,8 +145,12 @@ pub struct VisualizerPane {
     building: bool,
     /// The last build failed, so nothing is drawn for the current program.
     build_failed: bool,
-    /// Counts programs loaded, to tag each mesh.
+    /// Counts builds requested (programs loaded, and rebuilds), to tag each mesh.
     generation: u64,
+    /// The Preferences "Arc Segment Length" (mm, clamped) the toolpath is built with.
+    arc_segment_length: f64,
+    /// The arc segment length changed: the next frame rebuilds the program shown.
+    rebuild_pending: bool,
     /// Program lines the machine acknowledged in the current or last stream.
     progress: u32,
     units: MeasurementSystem,
@@ -209,6 +213,8 @@ impl VisualizerPane {
             building: false,
             build_failed: false,
             generation: 0,
+            arc_segment_length: toolpath::DEFAULT_ARC_SEGMENT_LENGTH,
+            rebuild_pending: false,
             progress: 0,
             units: MeasurementSystem::Metric,
             view_rect: egui::Rect::NOTHING,
@@ -354,7 +360,8 @@ impl VisualizerPane {
     }
 
     /// The generation of the toolpath shown, once the current program's build has finished;
-    /// it changes only when a different program is loaded.
+    /// it changes only when a different program is loaded or the program is rebuilt (the
+    /// arc segment length changed).
     pub fn toolpath_generation(&self) -> Option<u64> {
         self.mesh.as_ref().map(|m| m.generation)
     }
@@ -531,6 +538,18 @@ impl VisualizerPane {
         self.preview.set_points(Vec::new());
     }
 
+    /// Rebuilds the program shown (with the current arc segment length), keeping the view.
+    fn rebuild(&mut self, repaint: &egui::Context) {
+        let Some(lines) = self.program.clone() else {
+            return;
+        };
+        self.generation = self.generation.wrapping_add(1);
+        self.building = true;
+        self.build_failed = false;
+        self.worker
+            .request(self.generation, lines, self.applied.clone(), repaint);
+    }
+
     /// Takes the finished build, if any.
     fn poll_build(&mut self) {
         match self.worker.take() {
@@ -689,6 +708,9 @@ impl Pane for VisualizerPane {
             self.restart_stock(ui.ctx());
         }
         self.restart_stock_if_due(ui.ctx());
+        if std::mem::take(&mut self.rebuild_pending) {
+            self.rebuild(ui.ctx());
+        }
         self.poll_build();
         if std::mem::take(&mut self.run_requested) {
             self.run_preview();
@@ -913,6 +935,13 @@ impl Pane for VisualizerPane {
             .unwrap_or(true);
         self.units = config.ui.measurement_system;
         self.stock_enabled = config.ui.enable_stock_removal_3d;
+        let arc_segment_length =
+            toolpath::clamp_arc_segment_length(config.file_processing.arc_segment_length);
+        if arc_segment_length != self.arc_segment_length {
+            self.arc_segment_length = arc_segment_length;
+            self.worker.set_arc_segment_length(arc_segment_length);
+            self.rebuild_pending = self.program.is_some();
+        }
         if !self.stock_enabled && self.show_stock {
             self.show_stock = false;
             self.stock.stop();

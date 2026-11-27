@@ -296,7 +296,8 @@ fn default_grid_minor_line_width() -> f64 {
 pub struct FileProcessingSettings {
     /// Default preprocessors to enable
     pub enabled_preprocessors: Vec<String>,
-    /// Arc segment length in mm
+    /// The longest chord (mm) the visualizer draws an arc with; arcs also take steps of at
+    /// most 5 degrees, so the default of 100 mm binds only on very large arcs.
     pub arc_segment_length: f64,
     /// Maximum line length in characters
     pub max_line_length: u32,
@@ -317,7 +318,7 @@ impl Default for FileProcessingSettings {
                 "comment_remover".to_string(),
                 "whitespace_cleaner".to_string(),
             ],
-            arc_segment_length: 0.5,
+            arc_segment_length: 100.0,
             max_line_length: 256,
             preserve_comments: false,
             output_directory: dirs::home_dir().unwrap_or_else(|| PathBuf::from(".")),

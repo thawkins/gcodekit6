@@ -56,6 +56,8 @@ struct Request {
     lines: Arc<[String]>,
     previous: Option<Arc<[String]>>,
     repaint: egui::Context,
+    /// The longest arc chord (mm) to draw with.
+    arc_segment_length: f64,
 }
 
 /// The waiting request, and whether the worker should stop.
@@ -91,6 +93,7 @@ fn run(shared: &Shared, request: Request) -> Option<Built> {
         lines,
         previous,
         repaint: _,
+        arc_segment_length,
     } = request;
     let replaced = match previous {
         Some(previous) => {
@@ -104,7 +107,7 @@ fn run(shared: &Shared, request: Request) -> Option<Built> {
     if PANIC_NEXT_BUILD.swap(false, Ordering::AcqRel) {
         panic!("toolpath build panic requested by test hook");
     }
-    let mesh = toolpath::build(&lines);
+    let mesh = toolpath::build_with(&lines, arc_segment_length);
     shared.is_current(generation).then_some(())?;
     Some(Built {
         generation,
@@ -163,6 +166,8 @@ pub struct BuildWorker {
     results: Receiver<Outcome>,
     /// Set when the thread could not start: builds then run on the caller's thread.
     inline: Option<Sender<Outcome>>,
+    /// The arc segment length (mm) later requests build with.
+    arc_segment_length: f64,
 }
 
 impl std::fmt::Debug for BuildWorker {
@@ -201,7 +206,16 @@ impl BuildWorker {
             shared,
             results,
             inline,
+            arc_segment_length: toolpath::DEFAULT_ARC_SEGMENT_LENGTH,
         }
+    }
+
+    /// Sets the Preferences "Arc Segment Length" (mm) that later requests build with.
+    ///
+    /// # Arguments
+    /// * `mm` - The longest arc chord; see [`toolpath::arc_segment_count`].
+    pub fn set_arc_segment_length(&mut self, mm: f64) {
+        self.arc_segment_length = mm;
     }
 
     /// Asks for the toolpath of `lines`, replacing any waiting request and making running
@@ -225,6 +239,7 @@ impl BuildWorker {
             lines,
             previous,
             repaint: repaint.clone(),
+            arc_segment_length: self.arc_segment_length,
         };
         if let Some(sender) = &self.inline {
             if let Some(built) = run_guarded(&self.shared, request)
