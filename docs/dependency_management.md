@@ -7,10 +7,23 @@ This document describes the dependency management process for GCodeKit5.
 Dependabot is configured to automatically create PRs for dependency updates:
 
 - **Cargo dependencies**: Weekly on Mondays at 09:00 UTC
-- **GitHub Actions**: Weekly on Mondays at 09:00 UTC  
-- **npm dependencies**: Weekly on Mondays at 09:00 UTC
+- **GitHub Actions**: Weekly on Mondays at 09:00 UTC
 
-Minor and patch updates are grouped together to reduce PR noise.
+Minor and patch updates are grouped together to reduce PR noise. The egui family
+(`egui`, `eframe`, `egui_*`, `egui-*`, `epaint`, `emath`, `ecolor`) is grouped
+separately.
+
+Dependabot ignores two upgrades (`ignore` in `.github/dependabot.yml`):
+
+- egui family 0.38 and later: egui is bumped together with the craft-libs pin
+  ([ADR-011](adr/ADR-011-egui-craft-libs-pin.md)).
+- `nalgebra` 0.34 and later: `csgrs` still depends on nalgebra 0.33.
+
+## CI Dependency Check
+
+The `dependency-audit` job in `.github/workflows/code-quality.yml` runs
+`cargo deny check` on every push and pull request to `master`, `develop` and
+`devel`. Its policy is in `deny.toml`.
 
 ### Reviewing Dependabot PRs
 
@@ -62,7 +75,7 @@ For major version updates, update manually:
 ```bash
 # Edit Cargo.toml to update version
 cargo update -p <package>
-cargo test
+cargo nextest run --workspace
 ```
 
 ## Security Vulnerability Response
@@ -101,15 +114,15 @@ Before adding a new dependency:
 
 ### Preferred Crates
 
-| Category | Preferred Crate(s) |
-|----------|-------------------|
+These are the crates the workspace already uses for each job. Reuse them before
+adding another.
+
+| Category | Crate(s) |
+|----------|----------|
 | Error handling | `thiserror`, `anyhow` |
-| Async runtime | `tokio` |
 | Serialization | `serde`, `serde_json` |
 | Logging | `tracing` |
-| HTTP client | `reqwest` |
 | Date/time | `chrono` |
-| CLI parsing | `clap` |
 | Testing | Built-in `#[test]`, `proptest` for property testing |
 
 ### Version Constraints
@@ -130,28 +143,13 @@ proptest = "1"
 
 ## Duplicate Dependencies
 
-Some duplicate dependencies are unavoidable due to transitive dependencies. Current known duplicates:
-
-- `bitflags` (1.x vs 2.x) - ecosystem-wide migration in progress
-- `itertools` - different deps require different versions
-- `syn`/`quote` - different proc-macro crates use different versions
-
-To check for duplicates:
+Some duplicate versions are unavoidable because of transitive dependencies. To
+list the current duplicates:
 
 ```bash
 cargo tree --duplicates
 ```
 
-## Monthly Review Schedule
-
-| Month | Reviewer | Status |
-|-------|----------|--------|
-| January 2026 | TBD | Pending |
-| February 2026 | TBD | Pending |
-| ... | ... | ... |
-
 ## Related Documentation
 
-- [Dependency Audit](dependency_audit.md) - Full audit of all dependencies
-- [REMEDIATION_PLAN.md](../REMEDIATION_PLAN.md) - Dependency remediation tasks
 - [CONTRIBUTING.md](../CONTRIBUTING.md) - Contribution guidelines
