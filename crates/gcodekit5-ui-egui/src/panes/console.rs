@@ -21,12 +21,14 @@
 //! in: m:ss" (from the job's start) when the controller reports the program's end
 //! (GRBL 1.1 and grblHAL send `[MSG:Pgm End]` for M2 or M30; `Program End` is matched too).
 //! A command typed after the job (not a realtime byte) forgets its start, so an M2 sent by
-//! hand later reports no stale time.
+//! hand later reports no stale time. A row with an `error:N` or `ALARM:N` reply keeps its text and
+//! is drawn with the code's meaning beside it (see [`response_meaning`]).
 //!
 //! Ported from the GTK `ui/gtk/device_console.rs` view. Not ported: the `ok` pairing of the
 //! GTK listener (acknowledgements are not events here).
 //!
-//! Dependencies: `egui`, `gcodekit5-app` (console model, controller, translations).
+//! Dependencies: `egui`, `gcodekit5-app` (console model, controller, translations),
+//! and the GRBL error and alarm texts it re-exports.
 
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
@@ -35,6 +37,7 @@ use gcodekit5_app::command_history::CommandHistory;
 use gcodekit5_app::console::{ConsolePanel, MessageLevel};
 use gcodekit5_app::i18n::Translator;
 use gcodekit5_app::machine::{MachineController, MachineEvent, realtime_label};
+use gcodekit5_app::{decode_alarm, decode_error};
 
 use crate::icons::{Icon, icon_only_button};
 use crate::machine::{MachineStatus, lock, protocol_mismatch_text, worker_message};
@@ -129,6 +132,26 @@ fn received_level(line: &str) -> MessageLevel {
     } else {
         MessageLevel::Info
     }
+}
+
+/// The meaning of the first controller `error:N` or `ALARM:N` word in a log row (the GRBL 1.1
+/// text, or grblHAL's for its extended codes), or `None` when the row has none or the code has
+/// no known text. The word may follow a prefix, as in `Error: error:22` (the worker reports
+/// rejected lines as errors) or `error:22 on program line 3`.
+///
+/// # Arguments
+/// * `line` - The text of a log row.
+pub fn response_meaning(line: &str) -> Option<String> {
+    line.split_whitespace().find_map(|word| {
+        let (code, decode): (&str, fn(u8) -> String) =
+            if let Some(code) = word.strip_prefix("error:") {
+                (code, decode_error)
+            } else {
+                (word.strip_prefix("ALARM:")?, decode_alarm)
+            };
+        let text = decode(code.parse().ok()?);
+        (!text.starts_with("Unknown ")).then_some(text)
+    })
 }
 
 impl ConsolePane {
@@ -411,7 +434,22 @@ impl Pane for ConsolePane {
                     if let Some(colour) = level_colour(ui, message.level) {
                         text = text.color(colour);
                     }
-                    ui.add(egui::Label::new(text).truncate());
+                    let meaning = (!message.is_command)
+                        .then(|| response_meaning(&message.text))
+                        .flatten();
+                    match meaning {
+                        // The reply stays its own label (the logged text); its meaning follows.
+                        Some(meaning) => {
+                            ui.horizontal(|ui| {
+                                ui.label(text);
+                                let meaning = egui::RichText::new(meaning).monospace().weak();
+                                ui.add(egui::Label::new(meaning).truncate());
+                            });
+                        }
+                        None => {
+                            ui.add(egui::Label::new(text).truncate());
+                        }
+                    }
                 }
             });
     }
