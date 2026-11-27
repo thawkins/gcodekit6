@@ -1,9 +1,12 @@
 //! Shared pieces of the manager pages (Device Manager, CNC Tools, Materials), drawn as GTK
 //! drew them: a sidebar header with the page title and help button, a boxed list of
 //! selectable rows, a centred tab switcher, framed form groups, the "select an entry"
-//! placeholder and the in-page question card.
+//! placeholder and the in-page question card, plus the pages' shared notice state
+//! ([`LibraryNotice`]).
 //!
 //! Dependencies: `egui`, `gcodekit5-app` (translations).
+
+use std::path::PathBuf;
 
 use gcodekit5_app::i18n::Translator;
 
@@ -190,6 +193,86 @@ pub(crate) fn placeholder(ui: &mut egui::Ui, text: &str) {
                 .color(ui.visuals().weak_text_color()),
         );
     });
+}
+
+/// A manager page's notice and the library-file state it reports: why the file could not
+/// be read (until the page shows it) and the backup of an unreadable file it last named.
+#[derive(Debug, Default)]
+pub(crate) struct LibraryNotice {
+    /// Why the file could not be read, until the page shows it.
+    load_error: Option<String>,
+    /// The backup of an unreadable file the notice last named.
+    backup_named: Option<PathBuf>,
+    /// The latest notice and whether it reports a failure.
+    notice: Option<(String, bool)>,
+}
+
+impl LibraryNotice {
+    /// No notice yet, holding `load_error` until [`Self::show_load_error`].
+    ///
+    /// # Arguments
+    /// * `load_error` - Why the library file could not be read, if it could not.
+    pub(crate) fn new(load_error: Option<String>) -> Self {
+        Self {
+            load_error,
+            ..Self::default()
+        }
+    }
+
+    /// Replaces the notice.
+    ///
+    /// # Arguments
+    /// * `text` - The notice, already translated.
+    /// * `error` - Whether it reports a failure.
+    pub(crate) fn say(&mut self, text: String, error: bool) {
+        self.notice = Some((text, error));
+    }
+
+    /// Removes the notice.
+    pub(crate) fn clear(&mut self) {
+        self.notice = None;
+    }
+
+    /// The notice's text, if any.
+    pub(crate) fn text(&self) -> Option<&str> {
+        self.notice.as_ref().map(|(text, _)| text.as_str())
+    }
+
+    /// The notice and whether it is an error, as [`notice`] draws it.
+    pub(crate) fn get(&self) -> Option<&(String, bool)> {
+        self.notice.as_ref()
+    }
+
+    /// Shows the load error once, as an error notice `"{title} {error}"`.
+    ///
+    /// # Arguments
+    /// * `title` - The sentence before the error, already translated.
+    pub(crate) fn show_load_error(&mut self, title: &str) {
+        if let Some(error) = self.load_error.take() {
+            self.say(format!("{title} {error}"), true);
+        }
+    }
+
+    /// Adds the path of a backup the library file got since the last notice to the notice,
+    /// turning it into an error notice.
+    ///
+    /// # Arguments
+    /// * `backup` - The file's latest backup, if it has one.
+    /// * `kept_in` - The sentence before the path, already translated.
+    pub(crate) fn name_backup(&mut self, backup: Option<PathBuf>, kept_in: &str) {
+        let Some(backup) = backup else {
+            return;
+        };
+        if self.backup_named.as_ref() == Some(&backup) {
+            return;
+        }
+        let note = format!("{kept_in} {}", backup.display());
+        self.notice = Some(match self.notice.take() {
+            Some((text, _)) => (format!("{text} {note}"), true),
+            None => (note, true),
+        });
+        self.backup_named = Some(backup);
+    }
 }
 
 /// The page's notice: an error in the error colour, else plain.

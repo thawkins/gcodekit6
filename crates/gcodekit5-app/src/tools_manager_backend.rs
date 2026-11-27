@@ -8,6 +8,7 @@ use gcodekit5_core::data::tools::{
     ShankType, Tool, ToolCoating, ToolCuttingParams, ToolId, ToolLibrary, ToolMaterial, ToolType,
 };
 use gcodekit5_core::types::aliases::BoxedError;
+use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
@@ -103,10 +104,7 @@ pub const TOOLS_FILE: &str = "custom_tools.json";
 /// copy fails, nothing is written.
 pub struct ToolsManagerBackend {
     library: ToolLibrary,
-    storage_path: PathBuf,
-    load_error: Option<String>,
-    needs_backup: bool,
-    last_backup: Option<PathBuf>,
+    file: CustomLibraryFile,
 }
 
 impl ToolsManagerBackend {
@@ -125,32 +123,11 @@ impl ToolsManagerBackend {
     /// * `storage_path` - the JSON file holding the custom tools
     pub fn with_storage_path(storage_path: PathBuf) -> Self {
         let mut library = gcodekit5_core::data::tools::init_standard_library();
-        let mut load_error = None;
-        if storage_path.exists() {
-            match Self::load_from_file(&storage_path) {
-                Ok(custom_tools) => {
-                    for tool in custom_tools {
-                        library.add_tool(tool);
-                    }
-                }
-                Err(e) => {
-                    tracing::error!(
-                        path = %storage_path.display(),
-                        error = %e,
-                        "custom tools file not readable; it is backed up before the next save"
-                    );
-                    load_error = Some(e.to_string());
-                }
-            }
+        let (file, custom_tools) = CustomLibraryFile::open::<PersistedTool>(storage_path, "tools");
+        for tool in custom_tools {
+            library.add_tool(tool.into());
         }
-        let needs_backup = load_error.is_some();
-        Self {
-            library,
-            storage_path,
-            load_error,
-            needs_backup,
-            last_backup: None,
-        }
+        Self { library, file }
     }
 
     /// The custom tools file both builds use: `custom_tools.json` in the GTK build's
@@ -162,24 +139,18 @@ impl ToolsManagerBackend {
 
     /// The file the custom tools are kept in.
     pub fn storage_path(&self) -> &Path {
-        &self.storage_path
+        self.file.path()
     }
 
     /// Why the custom tools file could not be read when the backend was created, if it
     /// could not.
     pub fn load_error(&self) -> Option<&str> {
-        self.load_error.as_deref()
+        self.file.load_error()
     }
 
     /// Where a save copied the unreadable custom tools file before replacing it, if one did.
     pub fn last_backup(&self) -> Option<&Path> {
-        self.last_backup.as_deref()
-    }
-
-    fn load_from_file(path: &Path) -> Result<Vec<Tool>, BoxedError> {
-        let contents = std::fs::read_to_string(path)?;
-        let tools: Vec<PersistedTool> = serde_json::from_str(&contents)?;
-        Ok(tools.into_iter().map(Into::into).collect())
+        self.file.last_backup()
     }
 
     /// The custom tools as the file holds them.
@@ -198,24 +169,7 @@ impl ToolsManagerBackend {
 
     fn save_to_file(&mut self) -> Result<(), BoxedError> {
         let json = self.custom_json()?;
-        self.backup_if_needed()?;
-        write_atomic(&self.storage_path, &json)?;
-        Ok(())
-    }
-
-    /// Copies an unreadable custom tools file aside before it is first replaced.
-    fn backup_if_needed(&mut self) -> Result<(), BoxedError> {
-        if !self.needs_backup {
-            return Ok(());
-        }
-        if self.storage_path.exists() {
-            let backup = backup_path(&self.storage_path);
-            std::fs::copy(&self.storage_path, &backup)?;
-            tracing::warn!(backup = %backup.display(), "backed up unreadable custom tools file");
-            self.last_backup = Some(backup);
-        }
-        self.needs_backup = false;
-        Ok(())
+        self.file.save(&json)
     }
 
     /// Adds `tool` (replacing one with the same id) and writes the custom tools file; a
@@ -312,12 +266,7 @@ impl ToolsManagerBackend {
     /// # Errors
     /// The backup or the delete failed; the library is then unchanged.
     pub fn reset_custom_tools(&mut self) -> Result<(), BoxedError> {
-        self.backup_if_needed()?;
-        match std::fs::remove_file(&self.storage_path) {
-            Ok(()) => {}
-            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
-            Err(e) => return Err(e.into()),
-        }
+        self.file.remove()?;
         self.library = gcodekit5_core::data::tools::init_standard_library();
         Ok(())
     }
@@ -388,17 +337,6 @@ pub fn string_to_tool_type(s: &str) -> Option<ToolType> {
     ToolType::all().iter().find(|t| t.to_string() == s).cloned()
 }
 
-/// The tool material with GTK's combo text `s`, if any.
-pub fn string_to_tool_material(s: &str) -> Option<ToolMaterial> {
-    match s {
-        "HSS" => Some(ToolMaterial::HSS),
-        "Carbide" => Some(ToolMaterial::Carbide),
-        "Coated Carbide" => Some(ToolMaterial::CoatedCarbide),
-        "Diamond" => Some(ToolMaterial::Diamond),
-        _ => None,
-    }
-}
-
 /// The GTK build's settings folder, or `~/gcodekit5` without a platform config folder.
 pub(crate) fn storage_dir() -> PathBuf {
     gcodekit5_settings::SettingsManager::config_directory()
@@ -407,8 +345,123 @@ pub(crate) fn storage_dir() -> PathBuf {
         .unwrap_or_else(|| PathBuf::from("."))
 }
 
+/// A custom library file (custom tools or custom materials): a JSON list read once when
+/// the library is created and replaced atomically on every save.
+///
+/// When the file exists but cannot be read, the error is kept ([`Self::load_error`]) and the
+/// next write or removal first copies the file to `<file>.bak-<time>` ([`Self::last_backup`]),
+/// so an unreadable library is never lost; if that copy fails, nothing is written.
+pub(crate) struct CustomLibraryFile {
+    path: PathBuf,
+    /// What the file holds ("tools", "materials"), for the log.
+    kind: &'static str,
+    load_error: Option<String>,
+    needs_backup: bool,
+    last_backup: Option<PathBuf>,
+}
+
+impl CustomLibraryFile {
+    /// Reads the entries in `path` (none when it does not exist or cannot be read).
+    ///
+    /// # Arguments
+    /// * `path` - The JSON file holding the custom entries.
+    /// * `kind` - What the file holds ("tools", "materials"), for the log.
+    ///
+    /// # Returns
+    /// The file and the entries it held.
+    pub(crate) fn open<T: DeserializeOwned>(path: PathBuf, kind: &'static str) -> (Self, Vec<T>) {
+        let mut entries = Vec::new();
+        let mut load_error = None;
+        if path.exists() {
+            match read_entries(&path) {
+                Ok(read) => entries = read,
+                Err(e) => {
+                    tracing::error!(
+                        path = %path.display(),
+                        error = %e,
+                        "custom {kind} file not readable; it is backed up before the next save"
+                    );
+                    load_error = Some(e.to_string());
+                }
+            }
+        }
+        let needs_backup = load_error.is_some();
+        let file = Self {
+            path,
+            kind,
+            load_error,
+            needs_backup,
+            last_backup: None,
+        };
+        (file, entries)
+    }
+
+    /// The file's path.
+    pub(crate) fn path(&self) -> &Path {
+        &self.path
+    }
+
+    /// Why the file could not be read when it was opened, if it could not.
+    pub(crate) fn load_error(&self) -> Option<&str> {
+        self.load_error.as_deref()
+    }
+
+    /// Where the unreadable file was copied before it was first replaced, if it was.
+    pub(crate) fn last_backup(&self) -> Option<&Path> {
+        self.last_backup.as_deref()
+    }
+
+    /// Writes `json` over the file (atomically), backing an unreadable file up first.
+    ///
+    /// # Errors
+    /// The backup or the write failed.
+    pub(crate) fn save(&mut self, json: &str) -> Result<(), BoxedError> {
+        self.backup_if_needed()?;
+        write_atomic(&self.path, json)?;
+        Ok(())
+    }
+
+    /// Deletes the file (a missing file is fine), backing an unreadable file up first.
+    ///
+    /// # Errors
+    /// The backup or the delete failed.
+    pub(crate) fn remove(&mut self) -> Result<(), BoxedError> {
+        self.backup_if_needed()?;
+        match std::fs::remove_file(&self.path) {
+            Ok(()) => Ok(()),
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
+            Err(e) => Err(e.into()),
+        }
+    }
+
+    /// Copies an unreadable file aside before it is first replaced.
+    fn backup_if_needed(&mut self) -> Result<(), BoxedError> {
+        if !self.needs_backup {
+            return Ok(());
+        }
+        if self.path.exists() {
+            let backup = backup_path(&self.path);
+            std::fs::copy(&self.path, &backup)?;
+            tracing::warn!(
+                backup = %backup.display(),
+                "backed up unreadable custom {} file",
+                self.kind
+            );
+            self.last_backup = Some(backup);
+        }
+        self.needs_backup = false;
+        Ok(())
+    }
+}
+
+/// The JSON list in `path`.
+fn read_entries<T: DeserializeOwned>(path: &Path) -> Result<Vec<T>, BoxedError> {
+    let contents = std::fs::read_to_string(path)?;
+    Ok(serde_json::from_str(&contents)?)
+}
+
 /// `<file>.bak-<seconds>.<millis>` beside `path`.
-pub(crate) fn backup_path(path: &Path) -> PathBuf {
+fn backup_path(path: &Path) -> PathBuf {
     let stamp = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap_or_default();
