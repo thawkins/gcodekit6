@@ -16,4 +16,5 @@ G0 Y10.000 ; Back to nominal centre
 G38.2 Y12.500 F100.0 ; Probe back wall
 G0 Y-10.000 ; Back to nominal centre
 G0 Z3.000 ; Raise back to start height
+G21 ; Restore millimetres
 G90 ; Restore absolute moves

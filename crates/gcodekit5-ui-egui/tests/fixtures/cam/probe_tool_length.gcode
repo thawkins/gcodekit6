@@ -8,4 +8,5 @@ G91 ; Incremental moves from the current position
 ; Reference: machine Z-50.000 = trigger height of the reference tool; tool length offset = trigger Z - reference
 G38.2 Z-20.000 F100.0 ; Probe down onto the setter
 G0 Z5.000 ; Retract to safe height above the setter
+G21 ; Restore millimetres
 G90 ; Restore absolute moves
