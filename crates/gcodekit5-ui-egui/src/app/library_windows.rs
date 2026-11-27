@@ -15,29 +15,29 @@ use gcodekit5_app::UnsavedChangesChoice;
 impl GcodeKitApp {
     /// The CNC Tools page.
     pub fn tools_manager(&self) -> &ToolsManagerWindow {
-        &self.tools_manager
+        &self.managers.tools_manager
     }
 
     /// The CNC Tools page, to drive it directly (tests).
     pub fn tools_manager_mut(&mut self) -> &mut ToolsManagerWindow {
-        &mut self.tools_manager
+        &mut self.managers.tools_manager
     }
 
     /// The Materials page.
     pub fn materials_manager(&self) -> &MaterialsManagerWindow {
-        &self.materials_manager
+        &self.managers.materials_manager
     }
 
     /// The Materials page, to drive it directly (tests).
     pub fn materials_manager_mut(&mut self) -> &mut MaterialsManagerWindow {
-        &mut self.materials_manager
+        &mut self.managers.materials_manager
     }
 
     /// Shows the file dialog CNC Tools asked for, and hands a changed library to the speeds
     /// and feeds calculator.
     pub(super) fn show_library_windows(&mut self) {
         self.store_tools_ui_state();
-        match self.tools_manager.take_file_request() {
+        match self.managers.tools_manager.take_file_request() {
             Some(ToolsFileRequest::Import(GtcFile::Package)) => self.dialogs.open_file(
                 FilePurpose::ImportGtcPackage,
                 &FilePurpose::ImportGtcPackage.filters(),
@@ -58,15 +58,15 @@ impl GcodeKitApp {
 
     /// Gives the speeds and feeds calculator the libraries again once one changed.
     fn sync_libraries(&mut self) {
-        let tools = self.tools_manager.take_changed();
-        let materials = self.materials_manager.take_changed();
+        let tools = self.managers.tools_manager.take_changed();
+        let materials = self.managers.materials_manager.take_changed();
         if tools || materials {
             self.cam_tools
                 .borrow_mut()
                 .speeds_feeds_mut()
                 .replace_libraries(
-                    self.tools_manager.tools(),
-                    self.materials_manager.materials(),
+                    self.managers.tools_manager.tools(),
+                    self.managers.materials_manager.materials(),
                 );
         }
     }
@@ -74,11 +74,11 @@ impl GcodeKitApp {
     /// Keeps CNC Tools' search, filters and last opened tool in the settings whenever they
     /// change, as GTK did (a failed write is not retried until they change again).
     fn store_tools_ui_state(&mut self) {
-        if !self.tools_manager.ui_state_changed() {
+        if !self.managers.tools_manager.ui_state_changed() {
             return;
         }
         let mut config = self.state.settings.config().clone();
-        self.tools_manager.store_ui_state(&mut config);
+        self.managers.tools_manager.store_ui_state(&mut config);
         if let Err(error) = self.state.settings.apply(config) {
             tracing::debug!(%error, "CNC Tools filters not kept");
         }
@@ -102,9 +102,9 @@ impl GcodeKitApp {
             UnsavedChangesChoice::Save => {
                 let tr = &self.state.translator;
                 let saved = if tools {
-                    self.tools_manager.save_for_quit(tr)
+                    self.managers.tools_manager.save_for_quit(tr)
                 } else {
-                    self.materials_manager.save_for_quit(tr)
+                    self.managers.materials_manager.save_for_quit(tr)
                 };
                 self.sync_libraries();
                 if saved {
@@ -139,15 +139,21 @@ impl GcodeKitApp {
             DialogAnswer::File {
                 purpose: FilePurpose::ImportGtcPackage,
                 path,
-            } => self.tools_manager.import_gtc(path, GtcFile::Package, tr),
+            } => self
+                .managers
+                .tools_manager
+                .import_gtc(path, GtcFile::Package, tr),
             DialogAnswer::File {
                 purpose: FilePurpose::ImportGtcJson,
                 path,
-            } => self.tools_manager.import_gtc(path, GtcFile::Json, tr),
+            } => self
+                .managers
+                .tools_manager
+                .import_gtc(path, GtcFile::Json, tr),
             DialogAnswer::File {
                 purpose: FilePurpose::ExportCustomTools,
                 path,
-            } => self.tools_manager.export_to(path, tr),
+            } => self.managers.tools_manager.export_to(path, tr),
             DialogAnswer::Cancelled {
                 purpose:
                     FilePurpose::ImportGtcPackage
