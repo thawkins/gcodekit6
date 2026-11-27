@@ -41,6 +41,20 @@ pub enum HalftoneMethod {
     Atkinson,
 }
 
+impl HalftoneMethod {
+    /// The method for a designer raster image's `dithering` name (`"none"`, `"threshold"`,
+    /// `"floyd"`, `"atkinson"`, `"bayer"`); unknown names are treated as `None`.
+    pub fn from_name(name: &str) -> Self {
+        match name {
+            "threshold" => Self::Threshold,
+            "bayer" => Self::Bayer4x4,
+            "floyd" => Self::FloydSteinberg,
+            "atkinson" => Self::Atkinson,
+            _ => Self::None,
+        }
+    }
+}
+
 /// Scan direction for laser engraving
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum ScanDirection {
@@ -123,6 +137,13 @@ pub struct EngravingParameters {
     /// See [`crate::job_preamble`]. The engraver never moves Z, so the focus height set by
     /// the user is kept either way.
     pub home_before_job: bool,
+    /// Laser-off run-up and run-out (mm) around every burn, in the scan direction (default 0).
+    ///
+    /// With a positive value each burn starts `overscan_mm` before its first pixel, so the
+    /// machine is at feed rate when the laser fires, and runs out `overscan_mm` past its last
+    /// pixel, both at S0. The run-up is not clamped: at an image origin of 0 it reaches
+    /// X/Y `-overscan_mm` with the laser off. `0.0` emits no run-up or run-out.
+    pub overscan_mm: f32,
 }
 
 impl Default for EngravingParameters {
@@ -144,6 +165,7 @@ impl Default for EngravingParameters {
             offset_y: 10.0,
             num_axes: 3,
             home_before_job: false,
+            overscan_mm: 0.0,
         }
     }
 }
@@ -183,6 +205,9 @@ impl BitmapImageEngraver {
         }
         if !positive(params.line_spacing) {
             anyhow::bail!("Line spacing must be positive");
+        }
+        if !params.overscan_mm.is_finite() || params.overscan_mm < 0.0 {
+            anyhow::bail!("Overscan must be zero or positive");
         }
         if !positive(params.feed_rate) || !positive(params.travel_rate) {
             anyhow::bail!("Feed and travel rates must be positive");
@@ -705,6 +730,7 @@ impl BitmapImageEngraver {
                     current_power,
                     first_segment_of_burst,
                 );
+                self.emit_runout(gcode, segment_end, axes, forward);
                 gcode.push_str("M5\n");
                 in_burn = false;
             }
@@ -719,8 +745,28 @@ impl BitmapImageEngraver {
                 current_power,
                 first_segment_of_burst,
             );
+            self.emit_runout(gcode, segment_end, axes, forward);
             gcode.push_str("M5\n");
         }
+    }
+
+    /// Emit the laser-off run-out of [`EngravingParameters::overscan_mm`] past `end`
+    /// (image-relative) in the direction of travel; nothing when the overscan is 0.
+    fn emit_runout(&self, gcode: &mut String, end: f32, axes: ScanAxes, forward: bool) {
+        let overscan = self.params.overscan_mm;
+        if overscan <= 0.0 {
+            return;
+        }
+        let (scan_axis, scan_offset) = match axes {
+            ScanAxes::X { .. } => ('X', self.params.offset_x),
+            ScanAxes::Y { .. } => ('Y', self.params.offset_y),
+        };
+        let sign = if forward { 1.0 } else { -1.0 };
+        gcode.push_str(&format!(
+            "G1 {}{:.3} S0\n",
+            scan_axis,
+            end + scan_offset + sign * overscan
+        ));
     }
 
     /// Emit one constant-power burn segment from `start` to `end` along the scan axis.
@@ -742,19 +788,31 @@ impl BitmapImageEngraver {
         let end = end + scan_offset;
 
         if is_new_segment {
-            // Rapid positioning with the laser at zero power
+            // Rapid positioning with the laser at zero power, `overscan_mm` before the burn.
+            let overscan = self.params.overscan_mm;
+            let sign = if end >= start { 1.0 } else { -1.0 };
+            let entry = start - sign * overscan;
             match axes {
                 ScanAxes::X { y } => {
-                    gcode.push_str(&format!("G0 X{:.3} Y{:.3} S0\n", start, y));
+                    gcode.push_str(&format!("G0 X{:.3} Y{:.3} S0\n", entry, y));
                 }
                 ScanAxes::Y { x } => {
-                    gcode.push_str(&format!("G0 X{:.3} Y{:.3} S0\n", x, start));
+                    gcode.push_str(&format!("G0 X{:.3} Y{:.3} S0\n", x, entry));
                 }
             }
-            gcode.push_str(&format!(
-                "G1 {}{:.3} S{} F{:.0} M4\n",
-                scan_axis, end, power, self.params.feed_rate
-            ));
+            if overscan > 0.0 {
+                // Laser-off run-up at feed rate, then the burn.
+                gcode.push_str(&format!(
+                    "G1 {}{:.3} S0 F{:.0} M4\n",
+                    scan_axis, start, self.params.feed_rate
+                ));
+                gcode.push_str(&format!("G1 {}{:.3} S{}\n", scan_axis, end, power));
+            } else {
+                gcode.push_str(&format!(
+                    "G1 {}{:.3} S{} F{:.0} M4\n",
+                    scan_axis, end, power, self.params.feed_rate
+                ));
+            }
         } else {
             // Continuation of the burst at a new power level
             gcode.push_str(&format!("G1 {}{:.3} S{}\n", scan_axis, end, power));
