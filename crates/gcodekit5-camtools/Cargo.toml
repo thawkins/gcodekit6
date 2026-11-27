@@ -28,6 +28,9 @@ serde_json.workspace = true
 csgrs = "0.20.1"
 nalgebra = "0.33.3"
 
+[dev-dependencies]
+tracing-subscriber = { version = "0.3", features = ["fmt"] }
+
 [[test]]
 name = "all"
 path = "tests/all.rs"

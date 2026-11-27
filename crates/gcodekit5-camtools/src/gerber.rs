@@ -133,9 +133,41 @@ impl Default for GerberParameters {
     }
 }
 
+/// Whether a lower-case file `name` with extension `ext` is a board outline layer.
+fn is_outline_file(name: &str, ext: &str) -> bool {
+    ext == "gko" || ext == "gm1" || name.contains("edge.cuts") || name.contains("outline")
+}
+
+/// The layer a lower-case file `name` with extension `ext` holds, by the usual extensions
+/// and name conventions (KiCad, Eagle and protel).
+fn classify_layer(name: &str, ext: &str) -> Option<GerberLayerType> {
+    if ext == "gtl" || name.contains("f.cu") || name.contains("top.gbr") {
+        Some(GerberLayerType::TopCopper)
+    } else if ext == "gbl" || name.contains("b.cu") || name.contains("bot.gbr") {
+        Some(GerberLayerType::BottomCopper)
+    } else if ext == "gts" || name.contains("f.mask") || name.contains("smask_top") {
+        Some(GerberLayerType::TopSolderMask)
+    } else if ext == "gbs" || name.contains("b.mask") || name.contains("smask_bot") {
+        Some(GerberLayerType::BottomSolderMask)
+    } else if ext == "gto" || name.contains("f.silks") || name.contains("legend_top") {
+        Some(GerberLayerType::TopScreenPrint)
+    } else if ext == "gbo" || name.contains("b.silks") || name.contains("legend_bot") {
+        Some(GerberLayerType::BottomScreenPrint)
+    } else if ext == "drl" || name.contains("drill") {
+        // Not every `.txt` is a drill file (a README is not); only a name that says so is.
+        Some(GerberLayerType::DrillHoles)
+    } else if is_outline_file(name, ext) {
+        Some(GerberLayerType::BoardOutline)
+    } else {
+        None
+    }
+}
+
 /// The layer files of a Gerber project folder, found by the usual file extensions and name
-/// conventions (KiCad, Eagle and protel); a layer with several matching files keeps the
-/// last one read.
+/// conventions (KiCad, Eagle and protel). The files are taken in file-name order and a layer
+/// with several matching files keeps the first, so the choice does not depend on the order
+/// the operating system lists the folder in. The rubout's board outline is the
+/// [`GerberLayerType::BoardOutline`] file chosen here.
 ///
 /// # Arguments
 /// * `dir` - The project folder; an unreadable folder has no layers.
@@ -147,11 +179,13 @@ pub fn detect_layer_files(dir: &std::path::Path) -> HashMap<GerberLayerType, Pat
     let Ok(entries) = fs::read_dir(dir) else {
         return map;
     };
-    for entry in entries.flatten() {
-        let path = entry.path();
-        if !path.is_file() {
-            continue;
-        }
+    let mut files: Vec<PathBuf> = entries
+        .flatten()
+        .map(|entry| entry.path())
+        .filter(|path| path.is_file())
+        .collect();
+    files.sort_by(|a, b| a.file_name().cmp(&b.file_name()));
+    for path in files {
         let name = path
             .file_name()
             .map(|n| n.to_string_lossy())
@@ -161,36 +195,166 @@ pub fn detect_layer_files(dir: &std::path::Path) -> HashMap<GerberLayerType, Pat
             .extension()
             .map(|e| e.to_string_lossy().to_lowercase())
             .unwrap_or_default();
-
-        if ext == "gtl" || name.contains("f.cu") || name.contains("top.gbr") {
-            map.insert(GerberLayerType::TopCopper, path.clone());
-        } else if ext == "gbl" || name.contains("b.cu") || name.contains("bot.gbr") {
-            map.insert(GerberLayerType::BottomCopper, path.clone());
-        } else if ext == "gts" || name.contains("f.mask") || name.contains("smask_top") {
-            map.insert(GerberLayerType::TopSolderMask, path.clone());
-        } else if ext == "gbs" || name.contains("b.mask") || name.contains("smask_bot") {
-            map.insert(GerberLayerType::BottomSolderMask, path.clone());
-        } else if ext == "gto" || name.contains("f.silks") || name.contains("legend_top") {
-            map.insert(GerberLayerType::TopScreenPrint, path.clone());
-        } else if ext == "gbo" || name.contains("b.silks") || name.contains("legend_bot") {
-            map.insert(GerberLayerType::BottomScreenPrint, path.clone());
-        } else if ext == "drl" || ext == "txt" || name.contains("drill") {
-            map.insert(GerberLayerType::DrillHoles, path.clone());
-        } else if ext == "gko"
-            || ext == "gm1"
-            || name.contains("edge.cuts")
-            || name.contains("outline")
-        {
-            map.insert(GerberLayerType::BoardOutline, path.clone());
+        if let Some(layer) = classify_layer(&name, &ext) {
+            map.entry(layer).or_insert(path);
         }
     }
     map
 }
 
+/// Gerber constructs the converter does not draw, counted in one file. Their copper is
+/// left out of the program (a region is stroked as its outline, a macro aperture as a
+/// 0.1 mm dot, and clear polarity is ignored), so the user must be told.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct UnsupportedConstructs {
+    /// G36 region starts (filled areas such as copper pours).
+    pub regions: usize,
+    /// Apertures defined from an aperture macro (`%AM`), such as rounded-rectangle pads.
+    pub aperture_macros: usize,
+    /// Clear-polarity (`%LPC*%`) switches, which cut holes into dark copper.
+    pub clear_polarity: usize,
+}
+
+impl UnsupportedConstructs {
+    /// Whether the file has none of the unsupported constructs.
+    pub fn is_empty(&self) -> bool {
+        self.total() == 0
+    }
+
+    /// The number of unsupported constructs of every kind together.
+    pub fn total(&self) -> usize {
+        self.regions + self.aperture_macros + self.clear_polarity
+    }
+}
+
+impl std::fmt::Display for UnsupportedConstructs {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{} region(s) (G36/G37), {} aperture macro(s) (%AM), {} clear polarity (%LPC)",
+            self.regions, self.aperture_macros, self.clear_polarity
+        )
+    }
+}
+
+/// Counts the constructs of `content` that the converter does not draw.
+///
+/// # Arguments
+/// * `content` - The Gerber file's text.
+///
+/// # Returns
+/// The counts; all zero for a file the converter draws completely (or cannot parse).
+pub fn unsupported_constructs(content: &str) -> UnsupportedConstructs {
+    count_unsupported(&parse_document(content))
+}
+
+/// Counts the unsupported constructs of a parsed document.
+fn count_unsupported(doc: &gerber_parser::GerberDoc) -> UnsupportedConstructs {
+    use gerber_types::{ExtendedCode, GCode as GGCode, Polarity};
+    let mut counts = UnsupportedConstructs {
+        aperture_macros: doc
+            .apertures
+            .values()
+            .filter(|ap| matches!(ap, gerber_types::Aperture::Macro(..)))
+            .count(),
+        ..UnsupportedConstructs::default()
+    };
+    for command in doc.commands() {
+        match command {
+            Command::FunctionCode(FunctionCode::GCode(GGCode::RegionMode(true))) => {
+                counts.regions += 1;
+            }
+            Command::ExtendedCode(ExtendedCode::LoadPolarity(Polarity::Clear)) => {
+                counts.clear_polarity += 1;
+            }
+            _ => {}
+        }
+    }
+    counts
+}
+
+/// Parses `content`, keeping only the first `%FS` and `%MO` (some exporters repeat them,
+/// which the parser refuses). A file the parser stops on keeps what was read before it.
+fn parse_document(content: &str) -> gerber_parser::GerberDoc {
+    let mut sanitized = content.to_string();
+    for pattern in [r"%FS.*?\*%", r"%MO.*?\*%"] {
+        let re = Regex::new(pattern).expect("invalid regex pattern");
+        let mut count = 0;
+        sanitized = re
+            .replace_all(&sanitized, |caps: &regex::Captures| {
+                count += 1;
+                if count > 1 {
+                    String::new()
+                } else {
+                    caps[0].to_string()
+                }
+            })
+            .to_string();
+    }
+    match parse(BufReader::new(sanitized.as_bytes())) {
+        Ok(d) => d,
+        Err((d, e)) => {
+            warn!(
+                "Gerber parser returned error, attempting to use partial document. Error: {:?}",
+                e
+            );
+            d
+        }
+    }
+}
+
+/// Unions `sketches` into one, or `None` if there are none.
+fn merge_sketches(sketches: &[Sketch<()>]) -> Option<Sketch<()>> {
+    let (first, rest) = sketches.split_first()?;
+    Some(rest.iter().fold(first.clone(), |merged, s| merged.union(s)))
+}
+
+/// Offsets one ring through `offset`, which may panic inside cavalier_contours on
+/// degenerate input. A panic drops the ring and is logged at `warn` with `stage`, so copper
+/// left uncut is never silent.
+///
+/// # Arguments
+/// * `stage` - The operation the ring belongs to, for the log.
+/// * `offset` - Computes the offset rings.
+///
+/// # Returns
+/// The offset rings, or `None` if the offset panicked.
+#[doc(hidden)]
+pub fn offset_ring_or_warn(
+    stage: &str,
+    offset: impl FnOnce() -> Vec<Polyline<f64>>,
+) -> Option<Vec<Polyline<f64>>> {
+    match panic::catch_unwind(panic::AssertUnwindSafe(offset)) {
+        Ok(rings) => Some(rings),
+        Err(_) => {
+            warn!(
+                stage,
+                "Panic during parallel offset of merged polygon; ring dropped"
+            );
+            None
+        }
+    }
+}
+
 pub struct GerberConverter;
 
 impl GerberConverter {
+    /// Makes the program for one layer file.
+    ///
+    /// # Arguments
+    /// * `params` - The layer and cutting parameters.
+    /// * `gerber_content` - The layer file's text.
+    ///
+    /// # Errors
+    /// The Drill Holes layer (Excellon drill files are not converted), a file with nothing
+    /// to cut, and unsafe parameters.
     pub fn generate(params: &GerberParameters, gerber_content: &str) -> Result<String> {
+        if params.layer_type == GerberLayerType::DrillHoles {
+            anyhow::bail!(
+                "Drill files (Excellon) are not supported; the Drill Holes layer cannot be \
+                 converted"
+            );
+        }
         let mut gcode = String::new();
 
         // Initialization sequence
@@ -223,6 +387,9 @@ impl GerberConverter {
 
         // Unified parsing logic using gerber_parser
         let sketches = Self::parse_gerber_to_sketches(gerber_content)?;
+        if sketches.is_empty() {
+            anyhow::bail!("The layer file has no Gerber shapes to cut");
+        }
 
         // If it's a copper layer, we perform isolation routing (Union + Offset)
         // Otherwise (Outline, Silk, Drill), we just trace the paths (Engrave/Cut)
@@ -463,47 +630,16 @@ impl GerberConverter {
     }
 
     fn parse_gerber_to_sketches(gerber_content: &str) -> Result<Vec<Sketch<()>>> {
-        // Sanitize content
-        let mut sanitized = gerber_content.to_string();
-        {
-            let re_fs = Regex::new(r"%FS.*?\*%").expect("invalid regex pattern");
-            let mut count = 0;
-            sanitized = re_fs
-                .replace_all(&sanitized, |caps: &regex::Captures| {
-                    count += 1;
-                    if count > 1 {
-                        String::new()
-                    } else {
-                        caps[0].to_string()
-                    }
-                })
-                .to_string();
-
-            let re_mo = Regex::new(r"%MO.*?\*%").expect("invalid regex pattern");
-            let mut count = 0;
-            sanitized = re_mo
-                .replace_all(&sanitized, |caps: &regex::Captures| {
-                    count += 1;
-                    if count > 1 {
-                        String::new()
-                    } else {
-                        caps[0].to_string()
-                    }
-                })
-                .to_string();
+        let doc = parse_document(gerber_content);
+        let unsupported = count_unsupported(&doc);
+        if !unsupported.is_empty() {
+            warn!(
+                regions = unsupported.regions,
+                aperture_macros = unsupported.aperture_macros,
+                clear_polarity = unsupported.clear_polarity,
+                "Gerber file has constructs that are not converted; their copper is missing"
+            );
         }
-
-        let reader = BufReader::new(sanitized.as_bytes());
-        let doc = match parse(reader) {
-            Ok(d) => d,
-            Err((d, e)) => {
-                warn!(
-                    "Gerber parser returned error, attempting to use partial document. Error: {:?}",
-                    e
-                );
-                d
-            }
-        };
 
         let mut sketches: Vec<Sketch<()>> = Vec::new();
         let mut current_x = 0.0;
@@ -805,15 +941,9 @@ impl GerberConverter {
         sketches: Vec<Sketch<()>>,
         gcode: &mut String,
     ) -> Result<()> {
-        if sketches.is_empty() {
+        let Some(merged) = merge_sketches(&sketches) else {
             return Ok(());
-        }
-
-        // Union all sketches
-        let mut merged = sketches[0].clone();
-        for s in sketches.iter().skip(1) {
-            merged = merged.union(s);
-        }
+        };
 
         let polylines = Self::sketch_to_polylines(&merged);
         let paths = polylines.into_iter().map(|(p, _)| p).collect();
@@ -825,15 +955,9 @@ impl GerberConverter {
         sketches: Vec<Sketch<()>>,
         gcode: &mut String,
     ) -> Result<()> {
-        if sketches.is_empty() {
+        let Some(merged) = merge_sketches(&sketches) else {
             return Ok(());
-        }
-
-        // Union all sketches
-        let mut merged = sketches[0].clone();
-        for s in sketches.iter().skip(1) {
-            merged = merged.union(s);
-        }
+        };
 
         // Offset
         let polylines = Self::sketch_to_polylines(&merged);
@@ -843,16 +967,10 @@ impl GerberConverter {
         for (poly, is_hole) in polylines {
             let poly = clean_polyline(poly);
             let offset_val = Self::outward_offset(&poly, is_hole, isolation_offset);
-            let offset_res =
-                panic::catch_unwind(panic::AssertUnwindSafe(|| poly.parallel_offset(offset_val)));
-
-            match offset_res {
-                Ok(offsets) => {
-                    isolation_paths.extend(offsets);
-                }
-                Err(_) => {
-                    warn!("Panic during parallel offset of merged polygon");
-                }
+            if let Some(offsets) =
+                offset_ring_or_warn("isolation", || poly.parallel_offset(offset_val))
+            {
+                isolation_paths.extend(offsets);
             }
         }
 
@@ -916,15 +1034,10 @@ impl GerberConverter {
         sketches: Vec<Sketch<()>>,
         gcode: &mut String,
     ) -> Result<()> {
-        if sketches.is_empty() {
-            return Ok(());
-        }
-
         // 1. Union traces
-        let mut merged = sketches[0].clone();
-        for s in sketches.iter().skip(1) {
-            merged = merged.union(s);
-        }
+        let Some(merged) = merge_sketches(&sketches) else {
+            return Ok(());
+        };
 
         // 2. Offset traces (Isolation)
         let polylines = Self::sketch_to_polylines(&merged);
@@ -936,10 +1049,9 @@ impl GerberConverter {
         for (poly, is_hole) in polylines {
             let poly = clean_polyline(poly);
             let offset_val = Self::outward_offset(&poly, is_hole, isolation_offset);
-            let offset_res =
-                panic::catch_unwind(panic::AssertUnwindSafe(|| poly.parallel_offset(offset_val)));
-
-            if let Ok(offsets) = offset_res {
+            if let Some(offsets) =
+                offset_ring_or_warn("rubout", || poly.parallel_offset(offset_val))
+            {
                 for off in offsets {
                     let s = Self::polyline_to_sketch(&off);
                     if is_hole {
@@ -964,42 +1076,14 @@ impl GerberConverter {
 
         if params.use_board_outline
             && let Some(dir) = &params.directory
+            && let Some(path) =
+                detect_layer_files(std::path::Path::new(dir)).remove(&GerberLayerType::BoardOutline)
+            && let Ok(content) = fs::read_to_string(&path)
+            && let Ok(sketches) = Self::parse_gerber_to_sketches(&content)
+            && let Some(merged_outline) = merge_sketches(&sketches)
         {
-            let path = PathBuf::from(dir);
-            if let Ok(entries) = fs::read_dir(path) {
-                for entry in entries.flatten() {
-                    let path = entry.path();
-                    if !path.is_file() {
-                        continue;
-                    }
-                    let name = path
-                        .file_name()
-                        .map(|n| n.to_string_lossy())
-                        .unwrap_or_default()
-                        .to_lowercase();
-                    let ext = path
-                        .extension()
-                        .map(|e| e.to_string_lossy().to_lowercase())
-                        .unwrap_or_default();
-
-                    if (ext == "gko"
-                        || ext == "gm1"
-                        || name.contains("edge.cuts")
-                        || name.contains("outline"))
-                        && let Ok(content) = fs::read_to_string(&path)
-                        && let Ok(sketches) = Self::parse_gerber_to_sketches(&content)
-                        && !sketches.is_empty()
-                    {
-                        let mut merged_outline = sketches[0].clone();
-                        for s in sketches.iter().skip(1) {
-                            merged_outline = merged_outline.union(s);
-                        }
-                        board = Some(merged_outline);
-                        debug!("Using board outline from file: {:?}", path);
-                        break;
-                    }
-                }
-            }
+            board = Some(merged_outline);
+            debug!("Using board outline from file: {:?}", path);
         }
 
         let board = match board {

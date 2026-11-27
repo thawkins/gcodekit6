@@ -3491,6 +3491,9 @@ msgstr ""
 msgid "Failed to read file"
 msgstr ""
 
+msgid "Unsupported Gerber content is left out of the program"
+msgstr ""
+
 msgid "Top Copper"
 msgstr ""
 

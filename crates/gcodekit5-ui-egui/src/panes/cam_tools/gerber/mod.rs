@@ -21,7 +21,8 @@ use std::path::{Path, PathBuf};
 
 use gcodekit5_app::i18n::Translator;
 use gcodekit5_camtools::gerber::{
-    GerberConverter, GerberLayerType, GerberParameters, detect_layer_files,
+    GerberConverter, GerberLayerType, GerberParameters, UnsupportedConstructs, detect_layer_files,
+    unsupported_constructs,
 };
 use gcodekit5_core::units::{self, MeasurementSystem};
 
@@ -60,6 +61,7 @@ const SELECT_A_DIRECTORY: &str = n_!("Please select a Gerber directory.");
 const SELECTED_LAYER_MISSING: &str = n_!("Selected layer not found in directory.");
 const BELOW_SURFACE: &str = n_!("Must be below the surface (negative)");
 const READ_FAILED: &str = n_!("Failed to read file");
+const UNSUPPORTED: &str = n_!("Unsupported Gerber content is left out of the program");
 
 /// The layer types and the msgids of their names, in GTK's menu order.
 const LAYER_TYPES: [(GerberLayerType, &str); 8] = [
@@ -103,6 +105,7 @@ pub fn msgids() -> Vec<&'static str> {
         SELECTED_LAYER_MISSING,
         BELOW_SURFACE,
         READ_FAILED,
+        UNSUPPORTED,
         n_!("Gerber Project"),
         n_!("Select Directory"),
         n_!("Browse..."),
@@ -158,6 +161,9 @@ pub struct GerberParams {
     pub directory: Option<PathBuf>,
     /// The layer files found in [`GerberParams::directory`].
     pub layer_files: HashMap<GerberLayerType, PathBuf>,
+    /// The constructs of each layer file in [`GerberParams::layer_files`] that the converter
+    /// does not draw; a layer whose file has none is absent.
+    pub unsupported: HashMap<GerberLayerType, UnsupportedConstructs>,
     /// The active device's axes (the pane keeps this up to date).
     pub num_axes: u8,
 }
@@ -190,6 +196,7 @@ impl GerberParams {
             use_board_outline: false,
             directory: None,
             layer_files: HashMap::new(),
+            unsupported: HashMap::new(),
             num_axes: 3,
         }
     }
@@ -218,12 +225,22 @@ impl GerberParams {
         self.units = units;
     }
 
-    /// Takes `directory` as the project folder and finds its layer files.
+    /// Takes `directory` as the project folder, finds its layer files and counts the
+    /// constructs of each that the converter does not draw.
     ///
     /// # Arguments
     /// * `directory` - The folder.
     pub fn set_directory(&mut self, directory: &Path) {
         self.layer_files = detect_layer_files(directory);
+        self.unsupported = self
+            .layer_files
+            .iter()
+            .filter(|(layer, _)| **layer != GerberLayerType::DrillHoles)
+            .filter_map(|(layer, path)| {
+                let counts = unsupported_constructs(&std::fs::read_to_string(path).ok()?);
+                (!counts.is_empty()).then_some((*layer, counts))
+            })
+            .collect();
         self.directory = Some(directory.to_path_buf());
     }
 
@@ -390,6 +407,12 @@ pub fn show(ui: &mut egui::Ui, params: &mut GerberParams, tr: &Translator) -> Ca
                     Some(file) => ui.weak(file_name(file)),
                     None => ui.weak(tr.tr(LAYER_NOT_FOUND)),
                 };
+                if let Some(counts) = params.unsupported.get(&params.layer_type) {
+                    ui.colored_label(
+                        ui.visuals().warn_fg_color,
+                        format!("{}: {counts}", tr.tr(UNSUPPORTED)),
+                    );
+                }
             }
             show_fields(ui, params, tr, &errors);
             common::page_errors(ui, tr, &errors);

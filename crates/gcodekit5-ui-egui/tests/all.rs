@@ -28,6 +28,8 @@ mod test_cam_drill_press;
 mod test_cam_generate_during_job;
 #[path = "test_cam_gerber.rs"]
 mod test_cam_gerber;
+#[path = "test_cam_gerber_input_safety.rs"]
+mod test_cam_gerber_input_safety;
 #[path = "test_cam_input_bounds.rs"]
 mod test_cam_input_bounds;
 #[path = "test_cam_jigsaw.rs"]
