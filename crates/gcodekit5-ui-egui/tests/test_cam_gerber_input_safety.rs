@@ -1,5 +1,5 @@
 //! The Gerber page tells the user about constructs the converter leaves out (audit T10), and
-//! the Drill Holes layer makes no program.
+//! the Drill Holes layer drills an Excellon file (D-4).
 
 use egui_kittest::kittest::Queryable;
 use gcodekit5_app::i18n::Translator;
@@ -51,7 +51,7 @@ fn test_cam_gerber_input_safety_region_warning_is_shown() {
 }
 
 #[test]
-fn test_cam_gerber_input_safety_drill_layer_is_refused() {
+fn test_cam_gerber_input_safety_drill_layer_drills_excellon() {
     let dir = scratch("gerber_drill").expect("scratch folder");
     std::fs::write(
         dir.join("board.drl"),
@@ -62,5 +62,10 @@ fn test_cam_gerber_input_safety_drill_layer_is_refused() {
     p.set_directory(&dir);
     p.layer_type = GerberLayerType::DrillHoles;
     assert!(p.parameters().is_ok());
-    assert!(p.generate(&Translator::new("en")).is_err());
+    let gcode = p.generate(&Translator::new("en")).expect("drill program");
+    assert!(gcode.contains("G0 X1.000 Y1.000\nG1 Z-1.800"), "{gcode}");
+
+    // The drill depth is checked for the Drill Holes layer even without alignment holes.
+    p.alignment_hole_depth = "1.0".into();
+    assert!(p.parameters().is_err());
 }

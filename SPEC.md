@@ -4,6 +4,11 @@
 **Last Updated**: 2026-11-27
 **Status**: Alpha Release
 
+### Unreleased (2026-11-28) - Excellon Drilling
+- ✅ **CAM Tools**
+  - Gerber page Drill Holes layer: `gcodekit5_camtools::excellon` parses Excellon drill files (M48 header, METRIC/INCH, LZ/TZ, `000.000` pattern or `FILE_FORMAT`/`FORMAT={a:b}` comment, default 3.3 metric / 2.4 inch TZ, tool table, G90/G91, modal coordinates, G85 and M15/G01/M16 routed slots) and drills them in one program: tools smallest first, each after `M5` + `M0` tool-change pause and `M3`; one plain `G1` plunge per hole to the Drill Depth (Z) field (`alignment_hole_depth`), slots routed; the Gerber X/Y offset applies.
+  - Drill files are found by `.drl`/`.xln`/`.exc` or a name containing `drill`, or a `.txt` whose first command is `M48`.
+
 ### Unreleased (2026-11-27) - egui + craft-libs Front End
 - ✅ **UI toolkit**
   - The UI is egui on wgpu with the craft-libs widget crates (`gcodekit5-ui-egui`); the GTK4, libadwaita and GtkSourceView front end is removed ([ADR-012](docs/adr/ADR-012-egui-craft-libs.md)).
