@@ -31,6 +31,8 @@ mod test_camtools_validation_gaps;
 mod test_comment_processor_nesting;
 #[path = "test_drill_press_plane.rs"]
 mod test_drill_press_plane;
+#[path = "test_excellon_drill.rs"]
+mod test_excellon_drill;
 #[path = "test_gerber_input_safety.rs"]
 mod test_gerber_input_safety;
 #[path = "test_gerber_outline_compensation.rs"]

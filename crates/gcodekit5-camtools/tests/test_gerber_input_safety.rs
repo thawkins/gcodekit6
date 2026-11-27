@@ -1,5 +1,5 @@
-//! Gerber input safety (audit T10): unsupported constructs are counted, a drill layer or a
-//! file with nothing to cut makes no program, the outline layer is chosen by file name and
+//! Gerber input safety (audit T10): unsupported constructs are counted, a non-Excellon
+//! drill layer or a file with nothing to cut makes no program, the outline layer is chosen by file name and
 //! the rubout uses that same file, and a panicking ring offset is logged.
 
 use std::io::Write;
@@ -57,7 +57,8 @@ fn test_gerber_drill_layer_or_empty_file_makes_no_program() {
         layer_type: GerberLayerType::DrillHoles,
         ..GerberParameters::default()
     };
-    assert!(GerberConverter::generate(&drill, excellon).is_err());
+    // The Drill Holes layer drills an Excellon file (D-4) and refuses a Gerber one.
+    assert!(GerberConverter::generate(&drill, excellon).is_ok());
     assert!(GerberConverter::generate(&drill, &square_outline(10)).is_err());
     // The same file picked as another layer has nothing to cut either.
     for layer_type in [GerberLayerType::BoardOutline, GerberLayerType::TopCopper] {

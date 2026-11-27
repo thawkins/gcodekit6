@@ -181,8 +181,9 @@ fn classify_layer(name: &str, ext: &str) -> Option<GerberLayerType> {
         Some(GerberLayerType::TopScreenPrint)
     } else if ext == "gbo" || name.contains("b.silks") || name.contains("legend_bot") {
         Some(GerberLayerType::BottomScreenPrint)
-    } else if ext == "drl" || name.contains("drill") {
-        // Not every `.txt` is a drill file (a README is not); only a name that says so is.
+    } else if ext == "drl" || ext == "xln" || ext == "exc" || name.contains("drill") {
+        // Not every `.txt` is a drill file (a README is not); only a name that says so is,
+        // or (in `detect_layer_files`) one whose content starts like Excellon.
         Some(GerberLayerType::DrillHoles)
     } else if is_outline_file(name, ext) {
         Some(GerberLayerType::BoardOutline)
@@ -223,7 +224,13 @@ pub fn detect_layer_files(dir: &std::path::Path) -> HashMap<GerberLayerType, Pat
             .extension()
             .map(|e| e.to_string_lossy().to_lowercase())
             .unwrap_or_default();
-        if let Some(layer) = classify_layer(&name, &ext) {
+        let layer = classify_layer(&name, &ext).or_else(|| {
+            (ext == "txt"
+                && fs::read_to_string(&path)
+                    .is_ok_and(|text| crate::excellon::looks_like_excellon(&text)))
+            .then_some(GerberLayerType::DrillHoles)
+        });
+        if let Some(layer) = layer {
             map.entry(layer).or_insert(path);
         }
     }
@@ -511,15 +518,15 @@ impl GerberConverter {
     /// * `gerber_content` - The layer file's text.
     ///
     /// # Errors
-    /// The Drill Holes layer (Excellon drill files are not converted), a file with nothing
-    /// to cut, and unsafe parameters.
+    /// A file with nothing to cut (for the Drill Holes layer: not an Excellon drill file,
+    /// see [`crate::excellon`]) and unsafe parameters.
     pub fn generate(params: &GerberParameters, gerber_content: &str) -> Result<String> {
-        if params.layer_type == GerberLayerType::DrillHoles {
-            anyhow::bail!(
-                "Drill files (Excellon) are not supported; the Drill Holes layer cannot be \
-                 converted"
-            );
-        }
+        // The Drill Holes layer is an Excellon drill file, drilled hole by hole.
+        let drill = if params.layer_type == GerberLayerType::DrillHoles {
+            Some(crate::excellon::parse(gerber_content)?)
+        } else {
+            None
+        };
         let mut gcode = String::new();
 
         // Initialization sequence
@@ -547,6 +554,14 @@ impl GerberConverter {
         }
 
         writeln!(gcode, "M3 S{:.1}", params.spindle_speed)?;
+
+        if let Some(drill) = &drill {
+            crate::excellon::append_drill_program(params, drill, &mut gcode)?;
+            Self::append_alignment_holes(params, &mut gcode)?;
+            writeln!(gcode, "M5")?;
+            writeln!(gcode, "G0 X0 Y0")?;
+            return Ok(gcode);
+        }
 
         // Unified parsing logic using gerber_parser
         let sketches = Self::parse_gerber_to_sketches(gerber_content)?;
