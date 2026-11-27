@@ -5,6 +5,15 @@ All notable changes to this project are documented here. The format follows
 [Semantic Versioning](https://semver.org/). Release notes are generated from the
 `## [x.y.z]` sections by `scripts/release_notes.py`.
 
+## [Unreleased]
+
+### Changed
+- **Renamed to GCodeKit6**: the product, window, About box, help, installers and packages are named GCodeKit6. The binary is `gcodekit6` (`gcodekit6.exe`), the crates are `gcodekit6-*` (Rust paths `gcodekit6_*`), the Flatpak and desktop id is `com.github.thawkins.gcodekit6`, the translation template is `po/gcodekit6.pot`, and the repository is https://github.com/thawkins/gcodekit6. The Windows installer keeps its UpgradeCode, so it upgrades a GCodeKit5 install. `.gck5` files still open; `.gckd` stays the save format
+- **Settings folder**: settings, data files and command history live in `<config folder>/gcodekit6` (the Windows log in `%LOCALAPPDATA%\gcodekit6`), and the override variables are `GCODEKIT6_CONFIG_DIR` and `GCODEKIT6_TITLEBAR`
+
+### Added
+- **Migration from GCodeKit5 on first launch**: when the `gcodekit6` folder does not exist and a `gcodekit5` one does (config folder, local data folder, or the home-folder fallback), its contents are copied to `gcodekit6` once; the old folder is left untouched and a failed copy is logged and retried on the next start. `GCODEKIT5_CONFIG_DIR` and `GCODEKIT5_TITLEBAR` are still honoured when the GCodeKit6 variable is not set
+
 ## [2.0.0-alpha.5] - 2026-11-28
 
 ### Added

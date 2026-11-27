@@ -1,10 +1,10 @@
-# GCodeKit5 Design File Format (.gckd)
+# GCodeKit6 Design File Format (.gckd)
 
 The designer saves designs as JSON files with the `.gckd` extension. Open also accepts `.gck5`
 files. The format stores shapes, viewport, toolpath parameters and metadata.
 
 The full schema is the `DesignFile` and `ShapeData` structs in
-`crates/gcodekit5-designer/src/serialization.rs`. This page covers the stable core and the
+`crates/gcodekit6-designer/src/serialization.rs`. This page covers the stable core and the
 defaults. Lengths are millimetres (`f64` in the shape data).
 
 ## File Structure
@@ -92,6 +92,6 @@ Other missing shape fields take their type's zero value or the default named in 
 
 ## Related Files
 
-- `crates/gcodekit5-designer/src/serialization.rs` - Format and conversion
-- `crates/gcodekit5-designer/src/designer_state/file_io.rs` - Save and load on `DesignerState`
-- `crates/gcodekit5-designer/tests/test_design_file_round_trip.rs` - Round-trip tests
+- `crates/gcodekit6-designer/src/serialization.rs` - Format and conversion
+- `crates/gcodekit6-designer/src/designer_state/file_io.rs` - Save and load on `DesignerState`
+- `crates/gcodekit6-designer/tests/test_design_file_round_trip.rs` - Round-trip tests

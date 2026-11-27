@@ -70,7 +70,7 @@ The edit form has five tabs: Basic Info, Properties, Machining, Safety and Notes
 
 ### Built-in Materials
 
-GCodeKit5 includes a set of standard materials. Saving a standard material stores a custom copy; deleting that copy brings the standard material back.
+GCodeKit6 includes a set of standard materials. Saving a standard material stores a custom copy; deleting that copy brings the standard material back.
 
 ## See Also
 

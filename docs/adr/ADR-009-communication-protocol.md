@@ -9,21 +9,21 @@ Amended 2026-11-28: kept the trait-abstraction decision; replaced the design wit
 2026-02-18
 
 ## Context
-GCodeKit5 must communicate with CNC controllers over multiple transport layers (USB serial, TCP/IP, WebSocket) and support multiple firmware protocols (GRBL, potentially others in the future). The communication must be non-blocking to keep the UI responsive, handle connection loss gracefully, and support command buffering for streaming G-code files.
+GCodeKit6 must communicate with CNC controllers over multiple transport layers (USB serial, TCP/IP, WebSocket) and support multiple firmware protocols (GRBL, potentially others in the future). The communication must be non-blocking to keep the UI responsive, handle connection loss gracefully, and support command buffering for streaming G-code files.
 
 ## Decision
-Implement a **trait-based abstraction** in the `gcodekit5-communication` crate, driven from a worker thread so the UI never blocks on I/O.
+Implement a **trait-based abstraction** in the `gcodekit6-communication` crate, driven from a worker thread so the UI never blocks on I/O.
 
 ### Transport Layer
-`crates/gcodekit5-communication/src/communication/mod.rs`:
+`crates/gcodekit6-communication/src/communication/mod.rs`:
 
 ```rust
 pub trait Communicator: Send + Sync {
-    fn connect(&mut self, params: &ConnectionParams) -> gcodekit5_core::Result<()>;
-    fn disconnect(&mut self) -> gcodekit5_core::Result<()>;
+    fn connect(&mut self, params: &ConnectionParams) -> gcodekit6_core::Result<()>;
+    fn disconnect(&mut self) -> gcodekit6_core::Result<()>;
     fn is_connected(&self) -> bool;
-    fn send(&mut self, data: &[u8]) -> gcodekit5_core::Result<usize>;
-    fn receive(&mut self) -> gcodekit5_core::Result<Vec<u8>>;
+    fn send(&mut self, data: &[u8]) -> gcodekit6_core::Result<usize>;
+    fn receive(&mut self) -> gcodekit6_core::Result<Vec<u8>>;
     // plus send_command, connection_params, set_connection_params and others
 }
 ```
@@ -37,10 +37,10 @@ pub trait Communicator: Send + Sync {
 
 ### Firmware
 - `firmware/protocol_registry.rs` maps a controller type to its protocol profile (init commands, detection banners, whether it is supported).
-- GRBL and Repetier handlers live under `firmware/`. GRBL response lines (`ok`, `error:N`, `ALARM:N`, `<status>`) are classified in `crates/gcodekit5-app/src/machine/grbl_stream.rs`.
+- GRBL and Repetier handlers live under `firmware/`. GRBL response lines (`ok`, `error:N`, `ALARM:N`, `<status>`) are classified in `crates/gcodekit6-app/src/machine/grbl_stream.rs`.
 
 ### Threading
-- `MachineController` (`crates/gcodekit5-app/src/machine/`) runs all I/O on one `std::thread` worker that owns the communicator (`worker.rs`).
+- `MachineController` (`crates/gcodekit6-app/src/machine/`) runs all I/O on one `std::thread` worker that owns the communicator (`worker.rs`).
 - Commands go to the worker and `MachineEvent`s come back over `std::sync::mpsc` channels; the UI polls the events each frame.
 
 ## Consequences

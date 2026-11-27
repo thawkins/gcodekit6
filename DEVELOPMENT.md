@@ -1,6 +1,6 @@
 # Developer Setup Guide
 
-This guide will help you set up a development environment for GCodeKit5.
+This guide will help you set up a development environment for GCodeKit6.
 
 ## Prerequisites
 
@@ -132,7 +132,7 @@ RUST_LOG=debug cargo run
 RUST_LOG=trace cargo run
 
 # Run specific module logging
-RUST_LOG=gcodekit5_communication=debug cargo run
+RUST_LOG=gcodekit6_communication=debug cargo run
 ```
 
 ### Release Mode
@@ -148,7 +148,7 @@ cargo run --release
 cargo check
 
 # Build or check one crate only
-cargo build -p gcodekit5-core
+cargo build -p gcodekit6-core
 ```
 
 ### Using the Development Container
@@ -157,12 +157,12 @@ If you have Podman installed, you can use the development container:
 
 ```bash
 # Build and enter the container
-podman build -t gcodekit5-dev .devcontainer/
+podman build -t gcodekit6-dev .devcontainer/
 podman run -it --rm \
     --userns=keep-id \
     --security-opt label=disable \
     -v "$(pwd):/workspace:Z" \
-    gcodekit5-dev
+    gcodekit6-dev
 
 # Inside container
 cargo build
@@ -192,13 +192,13 @@ timeout 1500 cargo nextest run --workspace
 
 ```bash
 # Run tests for a specific crate
-cargo nextest run -p gcodekit5-core
+cargo nextest run -p gcodekit6-core
 
 # Run tests whose name matches a filter (here: one test file's module)
-cargo nextest run -p gcodekit5-communication -E 'test(test_reply_ledger::)'
+cargo nextest run -p gcodekit6-communication -E 'test(test_reply_ledger::)'
 
 # Run one test file (each crate has one `all` test binary)
-cargo nextest run -p gcodekit5-core -E 'test(test_foo::)'
+cargo nextest run -p gcodekit6-core -E 'test(test_foo::)'
 ```
 
 ### Doc Tests
@@ -272,15 +272,15 @@ gcodekit6/
 ├── src/                    # Main binary
 │   └── main.rs
 ├── crates/                 # Library crates
-│   ├── gcodekit5-core/     # Core types, traits, events
-│   ├── gcodekit5-communication/  # Serial, firmware protocols
-│   ├── gcodekit5-visualizer/     # 2D/3D rendering
-│   ├── gcodekit5-designer/       # CAD/CAM tools
-│   ├── gcodekit5-camtools/       # Box maker, puzzle, etc.
-│   ├── gcodekit5-devicedb/       # Device profiles
-│   ├── gcodekit5-settings/       # App configuration
-│   ├── gcodekit5-app/            # Toolkit-free application state
-│   └── gcodekit5-ui-egui/        # egui + craft-libs front end
+│   ├── gcodekit6-core/     # Core types, traits, events
+│   ├── gcodekit6-communication/  # Serial, firmware protocols
+│   ├── gcodekit6-visualizer/     # 2D/3D rendering
+│   ├── gcodekit6-designer/       # CAD/CAM tools
+│   ├── gcodekit6-camtools/       # Box maker, puzzle, etc.
+│   ├── gcodekit6-devicedb/       # Device profiles
+│   ├── gcodekit6-settings/       # App configuration
+│   ├── gcodekit6-app/            # Toolkit-free application state
+│   └── gcodekit6-ui-egui/        # egui + craft-libs front end
 ├── docs/                   # Documentation
 ├── assets/                 # Icons, images
 ├── flatpak/                # Flatpak packaging
@@ -303,7 +303,7 @@ RUST_BACKTRACE=full cargo run  # Full backtrace with source locations
 RUST_LOG=debug cargo run
 
 # Multiple modules with different levels
-RUST_LOG=gcodekit5=debug,gcodekit5_communication=trace cargo run
+RUST_LOG=gcodekit6=debug,gcodekit6_communication=trace cargo run
 
 # All modules at debug except noisy ones
 RUST_LOG=debug,hyper=warn cargo run
@@ -321,11 +321,11 @@ RUST_LOG=debug,hyper=warn cargo run
         {
             "type": "lldb",
             "request": "launch",
-            "name": "Debug GCodeKit5",
+            "name": "Debug GCodeKit6",
             "cargo": {
-                "args": ["build", "--bin=gcodekit5", "--package=gcodekit5-design"],
+                "args": ["build", "--bin=gcodekit6", "--package=gcodekit6-design"],
                 "filter": {
-                    "name": "gcodekit5",
+                    "name": "gcodekit6",
                     "kind": "bin"
                 }
             },
@@ -349,16 +349,16 @@ RUST_LOG=debug,hyper=warn cargo run
 cargo build
 
 # Debug with GDB
-gdb target/debug/gcodekit5
+gdb target/debug/gcodekit6
 
 # Debug with LLDB
-lldb target/debug/gcodekit5
+lldb target/debug/gcodekit6
 ```
 
 ### egui Inspection
 
 The egui front end has no inspector. To check a page's layout without a display, the front
-end's tests use `egui_kittest` and write snapshot images (see `crates/gcodekit5-ui-egui/tests`).
+end's tests use `egui_kittest` and write snapshot images (see `crates/gcodekit6-ui-egui/tests`).
 
 ## Common Issues
 
@@ -399,7 +399,7 @@ brew install pkg-config
 
 **Solution**: nextest kills a single test after 150 s (see `.config/nextest.toml`). Run one crate at a time:
 ```bash
-timeout 1500 cargo nextest run -p gcodekit5-core
+timeout 1500 cargo nextest run -p gcodekit6-core
 ```
 
 ### Serial Port Permission Denied (Linux)

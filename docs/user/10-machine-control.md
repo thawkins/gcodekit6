@@ -73,7 +73,7 @@ After homing, the DRO resets to the machine's reference coordinates.
 
 ## Work Coordinate Systems (WCS)
 
-GCodeKit5 supports six work coordinate systems: **G54** through **G59**.
+GCodeKit6 supports six work coordinate systems: **G54** through **G59**.
 
 - Select the active WCS from the dropdown in the DRO panel
 - Each WCS stores independent X, Y, Z offsets

@@ -1,6 +1,6 @@
-# GCodeKit5 Architecture Overview
+# GCodeKit6 Architecture Overview
 
-This document describes the high-level architecture of GCodeKit5, including crate dependencies, data flow, design patterns, and threading model.
+This document describes the high-level architecture of GCodeKit6, including crate dependencies, data flow, design patterns, and threading model.
 
 ## Table of Contents
 
@@ -14,21 +14,21 @@ This document describes the high-level architecture of GCodeKit5, including crat
 
 ## Crate Structure
 
-GCodeKit5 is organized as a Cargo workspace with 9 library crates and 1 binary crate. The front end is egui on wgpu with the craft-libs widget crates ([ADR-012](docs/adr/ADR-012-egui-craft-libs.md)):
+GCodeKit6 is organized as a Cargo workspace with 9 library crates and 1 binary crate. The front end is egui on wgpu with the craft-libs widget crates ([ADR-012](docs/adr/ADR-012-egui-craft-libs.md)):
 
 ```
-gcodekit5/
+gcodekit6/
 ├── src/main.rs              # Binary entry point
 └── crates/
-    ├── gcodekit5-core/           # Foundation types and traits
-    ├── gcodekit5-communication/  # Device protocols
-    ├── gcodekit5-settings/       # Configuration
-    ├── gcodekit5-devicedb/       # Device profiles
-    ├── gcodekit5-visualizer/     # Toolpath parsing and geometry
-    ├── gcodekit5-designer/       # CAD/CAM design
-    ├── gcodekit5-camtools/       # CAM operations
-    ├── gcodekit5-app/            # Toolkit-free application state
-    └── gcodekit5-ui-egui/        # egui + craft-libs front end
+    ├── gcodekit6-core/           # Foundation types and traits
+    ├── gcodekit6-communication/  # Device protocols
+    ├── gcodekit6-settings/       # Configuration
+    ├── gcodekit6-devicedb/       # Device profiles
+    ├── gcodekit6-visualizer/     # Toolpath parsing and geometry
+    ├── gcodekit6-designer/       # CAD/CAM design
+    ├── gcodekit6-camtools/       # CAM operations
+    ├── gcodekit6-app/            # Toolkit-free application state
+    └── gcodekit6-ui-egui/        # egui + craft-libs front end
 ```
 
 ### Crate Responsibilities
@@ -50,11 +50,11 @@ gcodekit5/
 Internal normal (non-dev) dependencies, generated from Cargo. Regenerate it rather than editing it by hand:
 
 ```bash
-cargo metadata --format-version 1 --no-deps | jq -r '.packages[] | .name as $n | .dependencies[] | select(.name|startswith("gcodekit5")) | select(.kind==null) | "\($n) -> \(.name)"'
+cargo metadata --format-version 1 --no-deps | jq -r '.packages[] | .name as $n | .dependencies[] | select(.name|startswith("gcodekit6")) | select(.kind==null) | "\($n) -> \(.name)"'
 ```
 
 ```
-gcodekit5-design (binary gcodekit5) -> ui-egui
+gcodekit6-design (binary gcodekit6) -> ui-egui
 ui-egui       -> app, camtools, communication, core, designer, devicedb, settings, visualizer
 app           -> communication, core, devicedb, settings
 designer      -> camtools, core
@@ -66,7 +66,7 @@ settings      -> core
 core          -> (none)
 ```
 
-The `gcodekit5-` prefix is dropped above. The root package `gcodekit5-design` builds the `gcodekit5` binary.
+The `gcodekit6-` prefix is dropped above. The root package `gcodekit6-design` builds the `gcodekit6` binary.
 
 ### Dependency Rules
 
@@ -169,20 +169,20 @@ See [ADR-004: Interior Mutability](docs/adr/ADR-004-interior-mutability.md) for 
 
 ### 2. Machine Worker and Event Channel
 
-`MachineController` (`crates/gcodekit5-app/src/machine/controller.rs`) starts a worker thread that owns the transport. The UI sends commands over one `std::sync::mpsc` channel and receives `MachineEvent`s over another.
+`MachineController` (`crates/gcodekit6-app/src/machine/controller.rs`) starts a worker thread that owns the transport. The UI sends commands over one `std::sync::mpsc` channel and receives `MachineEvent`s over another.
 The UI drains pending events once per frame with `MachineController::poll`.
 
 ### 3. Firmware Protocol Registry
 
-Firmware variants are the `ControllerProtocol` enum (`crates/gcodekit5-communication/src/firmware/mod.rs`). Per-protocol behaviour is a `ProtocolProfile` looked up with `protocol_profile` in `firmware/protocol_registry.rs`; transports implement the `Communicator` trait.
+Firmware variants are the `ControllerProtocol` enum (`crates/gcodekit6-communication/src/firmware/mod.rs`). Per-protocol behaviour is a `ProtocolProfile` looked up with `protocol_profile` in `firmware/protocol_registry.rs`; transports implement the `Communicator` trait.
 
 ### 4. Geometry Kernels
 
-The designer and camtools use `csgrs` for 2D booleans (`perform_boolean` in `crates/gcodekit5-designer/src/ops.rs`, Gerber layers in `crates/gcodekit5-camtools/src/gerber.rs`) and `cavalier_contours` for offsetting.
+The designer and camtools use `csgrs` for 2D booleans (`perform_boolean` in `crates/gcodekit6-designer/src/ops.rs`, Gerber layers in `crates/gcodekit6-camtools/src/gerber.rs`) and `cavalier_contours` for offsetting.
 
 - `cavalier_contours` can panic on degenerate input: repeated consecutive vertices, or a closed polyline whose last vertex repeats the first.
-- Clean a polyline with `clean_polyline` (`crates/gcodekit5-designer/src/ops.rs`, `crates/gcodekit5-camtools/src/gerber.rs`) before `parallel_offset` or a boolean.
-- Risky calls are wrapped in `catch_unwind` (for example `safe_parallel_offset` in `crates/gcodekit5-designer/src/geometry.rs`); find them with `rg -l catch_unwind crates --type rust`.
+- Clean a polyline with `clean_polyline` (`crates/gcodekit6-designer/src/ops.rs`, `crates/gcodekit6-camtools/src/gerber.rs`) before `parallel_offset` or a boolean.
+- Risky calls are wrapped in `catch_unwind` (for example `safe_parallel_offset` in `crates/gcodekit6-designer/src/geometry.rs`); find them with `rg -l catch_unwind crates --type rust`.
 - Prefer bulge arcs over linearised segments for rounded shapes: fewer vertices and fewer offset panics.
 
 ### 5. Coordinate Conversion
@@ -267,9 +267,9 @@ ctx.request_repaint();
 
 | Crate | Error Type | Defined in |
 |-------|------------|------------|
-| **core** | `Error` | `crates/gcodekit5-core/src/error.rs` |
-| **settings** | `SettingsError` | `crates/gcodekit5-settings/src/migrate.rs` |
-| **app** | `MachineError` | `crates/gcodekit5-app/src/machine/types.rs` |
+| **core** | `Error` | `crates/gcodekit6-core/src/error.rs` |
+| **settings** | `SettingsError` | `crates/gcodekit6-settings/src/migrate.rs` |
+| **app** | `MachineError` | `crates/gcodekit6-app/src/machine/types.rs` |
 
 See [ADR-005: Error Handling](docs/adr/ADR-005-error-handling.md) for details.
 

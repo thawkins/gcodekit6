@@ -1,4 +1,4 @@
-# GCodeKit5-Design
+# GCodeKit6-Design
 
 A modern, cross-platform G-Code sender for Laser and CNC machine controller written in Rust with an egui user interface (eframe and wgpu, with the craft-libs
 window, menu, keymap and dialog crates).
@@ -8,26 +8,26 @@ window, menu, keymap and dialog crates).
 
 ## Overview
 
-GCodeKit5 is a Rust-based CNC and laser machine controller providing a modern alternative to Universal G-Code Sender. It drives GRBL (including grblHAL and FluidNC) and Repetier controllers through one interface built with egui, and includes a 2D/3D designer, a toolpath visualizer and a set of CAM tools. See [Supported Controllers](#supported-controllers).
+GCodeKit6 is a Rust-based CNC and laser machine controller providing a modern alternative to Universal G-Code Sender. It drives GRBL (including grblHAL and FluidNC) and Repetier controllers through one interface built with egui, and includes a 2D/3D designer, a toolpath visualizer and a set of CAM tools. See [Supported Controllers](#supported-controllers).
 
-<img src="crates/gcodekit5-ui-egui/resources/help_images/designer.png" alt="Designer" width="800">
+<img src="crates/gcodekit6-ui-egui/resources/help_images/designer.png" alt="Designer" width="800">
 
 ## Architecture
 
-GCodeKit5 is a Cargo workspace with one library crate per directory under `crates/`, plus the
-root `gcodekit5` binary package (`cargo metadata --no-deps --format-version 1 | jq '.packages|length'`
+GCodeKit6 is a Cargo workspace with one library crate per directory under `crates/`, plus the
+root `gcodekit6` binary package (`cargo metadata --no-deps --format-version 1 | jq '.packages|length'`
 prints 10):
 
-- **gcodekit5-core** - Core types, traits, state management, events, and data models
-- **gcodekit5-camtools** - CAM tools and special G-code processing operations
-- **gcodekit5-designer** - Visual design tools and toolpath generation
-- **gcodekit5-communication** - Serial, TCP, WebSocket protocols and firmware implementations (GRBL family and Repetier)
-- **gcodekit5-app** - Toolkit-free application logic: the machine controller worker, work zero, translations and command history
-- **gcodekit5-ui-egui** - The egui front end: pages, panes, visualizer, designer, CAM tools, managers, editor and settings
-- **gcodekit5-devicedb** - Device profile management
-- **gcodekit5-settings** - Application settings management
-- **gcodekit5-visualizer** - 2D/3D visualization engine
-- **gcodekit5** - Main binary that integrates all crates
+- **gcodekit6-core** - Core types, traits, state management, events, and data models
+- **gcodekit6-camtools** - CAM tools and special G-code processing operations
+- **gcodekit6-designer** - Visual design tools and toolpath generation
+- **gcodekit6-communication** - Serial, TCP, WebSocket protocols and firmware implementations (GRBL family and Repetier)
+- **gcodekit6-app** - Toolkit-free application logic: the machine controller worker, work zero, translations and command history
+- **gcodekit6-ui-egui** - The egui front end: pages, panes, visualizer, designer, CAM tools, managers, editor and settings
+- **gcodekit6-devicedb** - Device profile management
+- **gcodekit6-settings** - Application settings management
+- **gcodekit6-visualizer** - 2D/3D visualization engine
+- **gcodekit6** - Main binary that integrates all crates
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for the crate dependency graph and data flow.
 
@@ -61,18 +61,18 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for the crate dependency graph and data f
 - **Boundary check**: G-code that falls outside the machine working area gets a warning comment in the G-code and a warning dialog
 - **Toolpath generation**: designs to G-code, plus a Frame button that generates bounds G-code
 
-<img src="crates/gcodekit5-ui-egui/resources/help_images/visualizer3d2.png" alt="Visualizer" width="800">
+<img src="crates/gcodekit6-ui-egui/resources/help_images/visualizer3d2.png" alt="Visualizer" width="800">
 
-<img src="crates/gcodekit5-ui-egui/resources/help_images/visualizer3d1.png" alt="Renderer" width="800">
+<img src="crates/gcodekit6-ui-egui/resources/help_images/visualizer3d1.png" alt="Renderer" width="800">
 
 To machine chain sprockets and gears, create the element in the Designer (pitch, number of teeth,
 and so on), then add an external offset equal to the cutter radius so the cut lands on the profile.
 
-<img src="crates/gcodekit5-ui-egui/resources/help_images/visualizer3d5.png" alt="Renderer" width="800">
+<img src="crates/gcodekit6-ui-egui/resources/help_images/visualizer3d5.png" alt="Renderer" width="800">
 
-<img src="crates/gcodekit5-ui-egui/resources/help_images/visualizer3d4.png" alt="Renderer" width="300">
+<img src="crates/gcodekit6-ui-egui/resources/help_images/visualizer3d4.png" alt="Renderer" width="300">
 
-<img src="crates/gcodekit5-ui-egui/resources/help_images/visualizer3d3.png" alt="Renderer" width="500">
+<img src="crates/gcodekit6-ui-egui/resources/help_images/visualizer3d3.png" alt="Renderer" width="500">
 
 ### Visualizer
 - **2D/3D toggle**: a locked top-down 2D view (left-drag pans) or the free-orbit 3D view
@@ -113,8 +113,8 @@ and so on), then add an external offset equal to the cutter radius so the cut la
 | **Marlin** | Detected, not supported |
 
 grblHAL and FluidNC are driven with the GRBL protocol. A machine profile with an unsupported
-controller cannot be saved. Sources: `crates/gcodekit5-communication/src/firmware/protocol_registry.rs`
-and `CONTROLLER_CHOICES` in `crates/gcodekit5-app/src/device_profiles.rs`.
+controller cannot be saved. Sources: `crates/gcodekit6-communication/src/firmware/protocol_registry.rs`
+and `CONTROLLER_CHOICES` in `crates/gcodekit6-app/src/device_profiles.rs`.
 
 ## Installation
 
@@ -134,11 +134,11 @@ cd gcodekit6
 cargo build --release
 
 # Run the application (optionally with files to open)
-./target/release/gcodekit5
+./target/release/gcodekit6
 
 # Print the version or the usage
-./target/release/gcodekit5 --version
-./target/release/gcodekit5 --help
+./target/release/gcodekit6 --version
+./target/release/gcodekit6 --help
 ```
 
 The GTK4 front end has been removed; egui is the only front end. Features ported from it,
@@ -150,7 +150,7 @@ and the manual checks still pending before release, are listed in
 See the [User Guide](docs/user/README.md) for the full walkthrough.
 
 ### 1. Connect to Your CNC Controller
-1. Launch GCodeKit5
+1. Launch GCodeKit6
 2. Click **Refresh ports** to detect available serial devices
 3. Select your controller's port from the dropdown
 4. Choose baud rate (typically **115200** for GRBL)
@@ -199,11 +199,16 @@ The full list is in [docs/user/90-shortcuts.md](docs/user/90-shortcuts.md).
 
 Settings files are stored in platform-specific locations:
 
-- **Linux**: `~/.config/gcodekit5/config.toml`
-- **macOS**: `~/Library/Application Support/gcodekit5/config.toml`
-- **Windows**: `%APPDATA%\gcodekit5\config.toml`
+- **Linux**: `~/.config/gcodekit6/config.toml`
+- **macOS**: `~/Library/Application Support/gcodekit6/config.toml`
+- **Windows**: `%APPDATA%\gcodekit6\config.toml`
 
 On first start the app imports the settings and data files of the older GTK builds (`config.json` and the JSON data files beside it). The old files are left unchanged.
+
+On the first start after the rename from GCodeKit5, an existing `gcodekit5` settings folder is
+copied to `gcodekit6` (once, only when `gcodekit6` does not exist yet); the old folder is left
+unchanged. `GCODEKIT5_CONFIG_DIR` and `GCODEKIT5_TITLEBAR` are still read when the `GCODEKIT6_`
+variable is not set.
 
 ## Development
 
@@ -254,7 +259,7 @@ You may choose either license for your use of this software.
 
 - **Icons**: the egui front end's toolbar and button icons are from
   [Tabler Icons](https://tabler.io/icons) 3.31.0 (c) Pawel Kuna, MIT License. The SVGs the
-  code uses and the licence text are in `crates/gcodekit5-ui-egui/resources/icons/tabler/`.
+  code uses and the licence text are in `crates/gcodekit6-ui-egui/resources/icons/tabler/`.
 
 ## Support
 

@@ -2,13 +2,13 @@
 
 ## General
 
-### What CNC controllers does GCodeKit5 support?
+### What CNC controllers does GCodeKit6 support?
 
-GCodeKit5 supports **GRBL** and **Repetier**. **grblHAL** and **FluidNC** are supported via GRBL. You choose the controller in the device profile. See [Supported Controllers](05-supported-controllers.md).
+GCodeKit6 supports **GRBL** and **Repetier**. **grblHAL** and **FluidNC** are supported via GRBL. You choose the controller in the device profile. See [Supported Controllers](05-supported-controllers.md).
 
-### Is GCodeKit5 free?
+### Is GCodeKit6 free?
 
-Yes. GCodeKit5 is open-source and free to use.
+Yes. GCodeKit6 is open-source and free to use.
 
 ### What operating systems are supported?
 
@@ -16,7 +16,7 @@ Linux, macOS, and Windows are all supported. Linux is the primary development pl
 
 ### What connection methods are available?
 
-GCodeKit5 supports **Serial/USB**, **TCP/IP**, and **WebSocket** connections. See [Device Setup](04-device-setup.md) for details.
+GCodeKit6 supports **Serial/USB**, **TCP/IP**, and **WebSocket** connections. See [Device Setup](04-device-setup.md) for details.
 
 ## Connection Issues
 
@@ -37,19 +37,19 @@ Yes, for controllers that support it (e.g., FluidNC). Use the **WebSocket** or *
 
 ## Features
 
-### Can I use GCodeKit5 with a laser?
+### Can I use GCodeKit6 with a laser?
 
-Yes. GCodeKit5 supports laser mode with variable power control (M3/M4 with S values). The CAM tools include a **Laser Image Engraver** for raster images. The device type follows the controller's `$32` (laser mode) report.
+Yes. GCodeKit6 supports laser mode with variable power control (M3/M4 with S values). The CAM tools include a **Laser Image Engraver** for raster images. The device type follows the controller's `$32` (laser mode) report.
 
 ### Does it support 4-axis or more?
 
-Yes. GCodeKit5 supports up to 6 axes (X, Y, Z, A, B, C). The DRO automatically displays additional axes when detected.
+Yes. GCodeKit6 supports up to 6 axes (X, Y, Z, A, B, C). The DRO automatically displays additional axes when detected.
 
 ### Can I import SVG or DXF files?
 
 Yes. The Designer can import **SVG**, **DXF**, and **STL** files. Import via **File → Import** and select the file type.
 
-### Can I make PCBs with GCodeKit5?
+### Can I make PCBs with GCodeKit6?
 
 Yes. The **Gerber to G-Code** CAM tool converts Gerber and Excellon files to G-code for isolation routing and drilling.
 

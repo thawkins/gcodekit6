@@ -64,7 +64,7 @@ lines alone tell the reader what to do next and what just happened.
 
 - DateTime: UTC internally, locale representation in the UI layer.
 - Dimensions: millimetres (`mm`) as `f64` internally, shown to 2 decimal places where relevant. The
-  `gcodekit5_core::units` format, parse and feed-rate helpers also take and return `f64` (see ADR-008).
+  `gcodekit6_core::units` format, parse and feed-rate helpers also take and return `f64` (see ADR-008).
 - Text: UTF-8 internally where feasible; convert to UI-specific encodings only when required.
 
 ## GitHub Access

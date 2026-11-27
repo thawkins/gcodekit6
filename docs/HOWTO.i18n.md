@@ -1,13 +1,13 @@
 # HOWTO: i18n / Translations
 
-GCodeKit5 reads its translations from gettext `.po` files, but it does not use gettext at run time. `build.rs` parses `po/*.po` and embeds the catalogs in the binary. You do not need `msgfmt`, `.mo` files or a gettext library to build or run the app.
+GCodeKit6 reads its translations from gettext `.po` files, but it does not use gettext at run time. `build.rs` parses `po/*.po` and embeds the catalogs in the binary. You do not need `msgfmt`, `.mo` files or a gettext library to build or run the app.
 
 ## Where translations live
 
-- Template (source strings): `po/gcodekit5.pot`
+- Template (source strings): `po/gcodekit6.pot`
 - Per-language translations: `po/<lang>.po` (e.g. `po/fr.po`)
-- Build-time embedding: `crates/gcodekit5-app/build.rs` (parses the catalogs with `polib`)
-- Runtime lookup: `crates/gcodekit5-app/src/i18n.rs` (`gcodekit5_app::i18n`)
+- Build-time embedding: `crates/gcodekit6-app/build.rs` (parses the catalogs with `polib`)
+- Runtime lookup: `crates/gcodekit6-app/src/i18n.rs` (`gcodekit6_app::i18n`)
 - Extraction/update script: `scripts/update-po.sh`
 
 ## How strings are translated in code
@@ -15,13 +15,13 @@ GCodeKit5 reads its translations from gettext `.po` files, but it does not use g
 In the egui front end, translate through the app's `Translator`:
 
 ```rust
-use gcodekit5_app::i18n::Translator;
+use gcodekit6_app::i18n::Translator;
 
 let label = translator.tr("Machine Control");
 let lines = translator.trn("line", "lines", n);
 ```
 
-Model code in `gcodekit5-app` has no translator at hand. It uses the `tr!` and `trn!` macros, which read the process-wide current language:
+Model code in `gcodekit6-app` has no translator at hand. It uses the `tr!` and `trn!` macros, which read the process-wide current language:
 
 ```rust
 let reason = crate::tr!("the machine must be idle");
@@ -103,7 +103,7 @@ LANGUAGE=fr cargo run
 
 Checklist:
 - The string goes through `tr(...)`, `trn(...)`, `tr!(...)`, `trn!(...)` or `n_!(...)`.
-- `po/gcodekit5.pot` contains the `msgid` (run `./scripts/update-po.sh`).
+- `po/gcodekit6.pot` contains the `msgid` (run `./scripts/update-po.sh`).
 - Your `po/<lang>.po` has a non-empty, non-fuzzy `msgstr`.
 - You rebuilt after editing the `.po` file (`build.rs` re-embeds the catalogs).
 - The language is set in Preferences, or `LANGUAGE=<lang>` is set.

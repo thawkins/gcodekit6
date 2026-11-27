@@ -2,7 +2,7 @@
 
 ## Overview
 
-GCodeKit5 can drive machines with up to six axes: X, Y and Z plus the rotary axes A, B and C. It shows and jogs the rotary axes and streams programs that use them.
+GCodeKit6 can drive machines with up to six axes: X, Y and Z plus the rotary axes A, B and C. It shows and jogs the rotary axes and streams programs that use them.
 
 ## Supported Axes
 

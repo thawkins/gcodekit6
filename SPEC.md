@@ -1,4 +1,4 @@
-# GCodeKit5 - Specification Document
+# GCodeKit6 - Specification Document
 
 **Version**: 2.0.0-alpha.5
 **Last Updated**: 2026-11-28
@@ -9,10 +9,10 @@ code. Release history: [CHANGELOG.md](CHANGELOG.md).
 
 ## 1. Product
 
-GCodeKit5 is a desktop G-code sender for GRBL-family CNC and laser machines, with a 2D/3D
+GCodeKit6 is a desktop G-code sender for GRBL-family CNC and laser machines, with a 2D/3D
 designer, CAM tool generators and a toolpath visualizer in one window. The UI is egui on
 wgpu with the craft-libs widget crates ([ADR-012](docs/adr/ADR-012-egui-craft-libs.md)).
-The binary is `gcodekit5` (`src/main.rs`); it opens any files named on the command line. `--version` prints the version and `--help` (or `-h`) a short usage, both without opening the window (`src/lib.rs` `parse_args`).
+The binary is `gcodekit6` (`src/main.rs`); it opens any files named on the command line. `--version` prints the version and `--help` (or `-h`) a short usage, both without opening the window (`src/lib.rs` `parse_args`).
 
 User guides: [docs/user/](docs/user/README.md), including
 [6-axis machines](docs/user/6AXIS.md) and [probing](docs/user/PROBING.md).
@@ -24,20 +24,20 @@ Workspace members (`cargo metadata --no-deps --format-version 1 | jq -r '.packag
 
 | Crate | Role |
 |-------|------|
-| `gcodekit5-design` (root) | The `gcodekit5` binary: logging setup, then the egui front end |
-| `gcodekit5-core` | Shared types, units, G-code words and arcs, probe types, tool and material data |
-| `gcodekit5-communication` | Serial, TCP and WebSocket transports; GRBL and Repetier protocol support; firmware detection |
-| `gcodekit5-camtools` | CAM generators (tabbed box, jigsaw, laser engraving, Gerber, Excellon, spoilboard, drill press, probe routines, speeds and feeds) |
-| `gcodekit5-designer` | Designer model, shapes, geometry operations, pocketing and toolpath generation |
-| `gcodekit5-visualizer` | G-code parsing for preview, toolpath geometry, 3D stock removal simulation |
-| `gcodekit5-devicedb` | Device profiles |
-| `gcodekit5-settings` | Application settings (`config.toml`) and the one-time import of older files |
-| `gcodekit5-app` | Toolkit-free application state: machine worker, console, managers, translations |
-| `gcodekit5-ui-egui` | The egui front end: pages, panes, dialogs, in-app help |
+| `gcodekit6-design` (root) | The `gcodekit6` binary: logging setup, then the egui front end |
+| `gcodekit6-core` | Shared types, units, G-code words and arcs, probe types, tool and material data |
+| `gcodekit6-communication` | Serial, TCP and WebSocket transports; GRBL and Repetier protocol support; firmware detection |
+| `gcodekit6-camtools` | CAM generators (tabbed box, jigsaw, laser engraving, Gerber, Excellon, spoilboard, drill press, probe routines, speeds and feeds) |
+| `gcodekit6-designer` | Designer model, shapes, geometry operations, pocketing and toolpath generation |
+| `gcodekit6-visualizer` | G-code parsing for preview, toolpath geometry, 3D stock removal simulation |
+| `gcodekit6-devicedb` | Device profiles |
+| `gcodekit6-settings` | Application settings (`config.toml`) and the one-time import of older files |
+| `gcodekit6-app` | Toolkit-free application state: machine worker, console, managers, translations |
+| `gcodekit6-ui-egui` | The egui front end: pages, panes, dialogs, in-app help |
 
 ## 3. Controllers
 
-Defined in `crates/gcodekit5-communication/src/firmware/protocol_registry.rs`:
+Defined in `crates/gcodekit6-communication/src/firmware/protocol_registry.rs`:
 
 - **Supported**: GRBL and Repetier.
 - **Detected, not supported**: grblHAL, FluidNC, TinyG, g2core, Smoothieware and Marlin.
@@ -58,7 +58,7 @@ Defined in `crates/gcodekit5-communication/src/firmware/protocol_registry.rs`:
 
 ## 5. UI Pages
 
-The main window has 8 pages, in tab order (`crates/gcodekit5-ui-egui/src/workspace.rs`):
+The main window has 8 pages, in tab order (`crates/gcodekit6-ui-egui/src/workspace.rs`):
 
 | Page | Contents |
 |------|----------|
@@ -102,7 +102,7 @@ Keyboard shortcuts: [docs/user/90-shortcuts.md](docs/user/90-shortcuts.md).
 
 ### 5.3 CAM Tools
 
-The picker lists 9 tools (`crates/gcodekit5-ui-egui/src/panes/cam_tools/tools.rs`):
+The picker lists 9 tools (`crates/gcodekit6-ui-egui/src/panes/cam_tools/tools.rs`):
 
 - **Jigsaw Puzzle Generator**.
 - **Tabbed Box Maker**: box types Full Box, No Top, No Bottom, No Sides, No Front/Back and
@@ -130,12 +130,15 @@ The picker lists 9 tools (`crates/gcodekit5-ui-egui/src/panes/cam_tools/tools.rs
 
 - Settings are saved in `config.toml` (craft-settings). The older `config.json` and data
   files (such as `devices.json`) are imported once on first start.
+- The settings folder is `gcodekit6` in the platform config folder. On first start a
+  pre-rename `gcodekit5` folder (config, local data, or home fallback) is copied to `gcodekit6`
+  once when `gcodekit6` does not exist; the old folder is left unchanged.
 - Translations: `po/*.po` (de, es, fr, it, pt). The build script embeds the catalogs, so
   there is no gettext at run time.
 
 ## 6. G-code the Visualizer Interprets
 
-The preview parser (`crates/gcodekit5-visualizer/src/visualizer/parse.rs`) acts on these
+The preview parser (`crates/gcodekit6-visualizer/src/visualizer/parse.rs`) acts on these
 words. Other words do not change the preview.
 
 | Words | Effect in the preview |

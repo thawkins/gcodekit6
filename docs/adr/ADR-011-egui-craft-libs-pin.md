@@ -7,7 +7,7 @@ Accepted
 2026-11-25
 
 ## Context
-The front end is migrating from GTK4 to egui using the `storytold/craft-libs` crates. craft-libs is a git-only dependency and itself patches egui and winit to forks (its root `[patch.crates-io]`). Cargo patches do not propagate to dependents, so GCodeKit5 must replicate them to keep a single egui version in `Cargo.lock`.
+The front end is migrating from GTK4 to egui using the `storytold/craft-libs` crates. craft-libs is a git-only dependency and itself patches egui and winit to forks (its root `[patch.crates-io]`). Cargo patches do not propagate to dependents, so GCodeKit6 must replicate them to keep a single egui version in `Cargo.lock`.
 
 ## Decision
 - Pin craft-libs at rev `d15bf1f35b17b759870f9e5111b9a5d243f64888` (egui 0.37, rust-version 1.95).

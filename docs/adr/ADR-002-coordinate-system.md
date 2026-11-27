@@ -15,7 +15,7 @@ CNC machines and CAD software use different coordinate system conventions:
 
 - **Mathematical Convention**: Y-axis increases upward (Cartesian coordinates).
 
-GCodeKit5 must display G-code toolpaths in a way that matches the physical machine orientation while rendering correctly on screen.
+GCodeKit6 must display G-code toolpaths in a way that matches the physical machine orientation while rendering correctly on screen.
 
 ## Decision
 
@@ -29,13 +29,13 @@ We implement a **Y-flip transformation** at the rendering layer:
    - This matches how operators visualize their machine bed
 
 3. **Centralized Transform**: two types own the conversion between world coordinates (mm) and screen coordinates:
-   - `CanvasView::world_to_screen` and `CanvasView::screen_to_world` in `crates/gcodekit5-ui-egui/src/panes/designer/canvas/mod.rs` (egui points).
-   - `Viewport::world_to_pixel` and `Viewport::pixel_to_world` in `crates/gcodekit5-designer/src/viewport.rs` (pixels).
+   - `CanvasView::world_to_screen` and `CanvasView::screen_to_world` in `crates/gcodekit6-ui-egui/src/panes/designer/canvas/mod.rs` (egui points).
+   - `Viewport::world_to_pixel` and `Viewport::pixel_to_world` in `crates/gcodekit6-designer/src/viewport.rs` (pixels).
 
 ### Implementation
 
 ```rust
-// CanvasView, crates/gcodekit5-ui-egui/src/panes/designer/canvas/mod.rs
+// CanvasView, crates/gcodekit6-ui-egui/src/panes/designer/canvas/mod.rs
 pub fn world_to_screen(&self, p: Vec2) -> Pos2 {
     pos2(
         self.rect.left() + p.x * self.zoom + self.pan.x,

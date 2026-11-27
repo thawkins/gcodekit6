@@ -2,7 +2,7 @@
 
 ## Overview
 
-GCodeKit5 has three safety controls: E-STOP, Feed Hold and jog travel limits. Their keys are
+GCodeKit6 has three safety controls: E-STOP, Feed Hold and jog travel limits. Their keys are
 fixed and cannot be changed in Settings. `Ctrl` is `Cmd` on macOS.
 
 ## E-STOP

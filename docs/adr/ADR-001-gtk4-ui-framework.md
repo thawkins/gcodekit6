@@ -7,7 +7,7 @@ The GTK4 front end was removed in the egui + craft-libs migration. This record i
 
 ## Context
 
-GCodeKit5 needed a cross-platform UI framework that could:
+GCodeKit6 needed a cross-platform UI framework that could:
 - Run natively on Linux, Windows, and macOS
 - Provide modern, professional-looking widgets
 - Support complex custom drawing (for visualizer and designer)

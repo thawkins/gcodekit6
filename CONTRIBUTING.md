@@ -1,6 +1,6 @@
-# Contributing to GCodeKit5
+# Contributing to GCodeKit6
 
-Thank you for your interest in contributing to GCodeKit5! This document provides guidelines and information to help you contribute effectively.
+Thank you for your interest in contributing to GCodeKit6! This document provides guidelines and information to help you contribute effectively.
 
 ## Table of Contents
 
@@ -271,7 +271,7 @@ All new features must include tests:
 
 ```rust
 // crates/<crate>/tests/test_new_feature_basic.rs
-use gcodekit5_core::new_feature;
+use gcodekit6_core::new_feature;
 
 #[test]
 fn test_new_feature_basic() {
@@ -306,7 +306,7 @@ Tests do not go inline in `src/`. Each crate sets `autotests = false` and builds
 binary, `tests/all.rs`:
 
 ```
-crates/gcodekit5-core/
+crates/gcodekit6-core/
 ├── src/
 │   └── lib.rs
 └── tests/
@@ -331,7 +331,7 @@ Run that file alone with `cargo nextest run -p <crate> -E 'test(test_x::)'`.
 cargo nextest run --workspace
 
 # Specific crate
-cargo nextest run -p gcodekit5-core
+cargo nextest run -p gcodekit6-core
 
 # With output
 cargo nextest run --success-output immediate
@@ -364,7 +364,7 @@ All public APIs must be documented:
 /// # Examples
 ///
 /// ```
-/// use gcodekit5_core::parse_line;
+/// use gcodekit6_core::parse_line;
 ///
 /// let line = parse_line("G1 X10 Y20 F1000")?;
 /// assert_eq!(line.command, "G1");
@@ -391,7 +391,7 @@ Each module should have a top-level doc comment:
 //! ## Usage
 //!
 //! ```
-//! use gcodekit5_core::parser;
+//! use gcodekit6_core::parser;
 //! let result = parser::parse_file("program.nc")?;
 //! ```
 ```
@@ -409,7 +409,7 @@ Each module should have a top-level doc comment:
 ### Bug Reports
 
 Include:
-1. **GCodeKit5 version** and **OS**
+1. **GCodeKit6 version** and **OS**
 2. **Steps to reproduce**
 3. **Expected behavior**
 4. **Actual behavior**
