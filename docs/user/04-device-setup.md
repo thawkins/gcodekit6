@@ -78,7 +78,9 @@ shows an "Invalid No of Axes" error when you save. The default is 3. If no profi
 the CAM tools assume 3 axes.
 
 For a machine without a Z axis, such as a pen plotter, set **No of Axes** to `2` and click
-**Set Active**. **Drill Press** and **Spoilboard Surfacing** need a Z axis: with fewer than 3
+**Set Active**. With fewer than 3 axes, the Designer, **Tabbed Box Maker** and Gerber converter
+leave Z moves (safe-height retracts, plunges and step-downs) out of the G-code.
+**Drill Press** and **Spoilboard Surfacing** need a Z axis: with fewer than 3
 axes they refuse to generate and show "This tool needs at least 3 axes (X, Y, Z); the active
 device has fewer."
 
