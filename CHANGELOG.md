@@ -1,4 +1,4 @@
-## [Unreleased]
+## [2.0.0-alpha.4] - 2026-11-28
 
 ### Added
 - **Gerber regions, aperture macros and clear polarity**: copper pours (G36/G37 regions, including arc edges and cut-in holes) are filled, aperture macro pads such as KiCad's rounded rectangles and thermals are flashed at their real shape, and clear-polarity (`%LPC`) objects are cut out of the copper, so isolation and rubout follow them instead of milling pours away. The Gerber page now warns only about macros it cannot draw (moire, unreadable) and step and repeat (`%SR`)
@@ -11,6 +11,28 @@
 - **Designer laser output on curves**: merging nearly collinear laser segments now keeps every merged point within the curve tolerance (0.05 mm), which was set but never used; before, an r = 50 mm arc could be cut up to 0.18 mm inside the drawn curve. Curved laser shapes (ellipses, paths, polygons with many points) now produce more G-code moves; straight lines are merged as before
 - **Designer laser point filter**: the last point of a run of cuts is no longer dropped when it is closer than 0.1 mm to the previous point, so closed laser contours close fully; after an arc the filter measures from the arc's end, not from the point before the arc
 - **Designer ramp over arcs**: ramped contours measure arcs by their length along the arc instead of the straight chord, so circles and rounded corners ramp at the requested angle (they were about 10% shallower)
+- **CAM tools follow the machine**: Drill Press and the other CAM pages read the axis count from the device profile and laser mode (`$32`) from the controller, so a laser machine is no longer handed a drilling program with Z plunges, and a 2-axis device no longer gets Z moves
+- **Gerber input safety**: a drill layer or a file with no Gerber shapes no longer produces an empty "valid" program, the board outline file is chosen the same way every time, and a failed rubout offset is logged
+- **Design files**: opening a design names the shapes it could not load and the missing image files, and re-saving keeps the created time, author, description, start depth and stock origin
+- **Designer canvas matches the cut**: rotated paths are drawn, exported to SVG and clicked where they are cut, and text is laid out the same way on the canvas and in G-code (rotated text was cut mirrored; text now sits inside the bounds the canvas shows)
+- **Pockets**: the adaptive pocket clears its centre once per pass instead of twice, a tiny stepover or step-down can no longer loop for millions of iterations, and a 2-point or flat polygon no longer hangs the generator
+- **SVG export**: angled lines are no longer rotated twice, text is anchored at its centre, and raster images export as a filled box
+- **SVG and DXF import**: SVG rectangle corner radii and sizes without a viewBox import correctly; DXF R12 polyline arcs, circles and arcs import as true curves (within 0.01 mm), Windows-1252 files open, and unsupported entities (INSERT, MTEXT and others) are listed
+- **Designer image engraving**: engraves through the same engraver as the CAM page, with a 2.5 mm laser-off overscan on every scan line (the CAM Laser Image Engraver page gains the same overscan), and a resized image now fills its whole box
+- **Drill press, Gerber outline and probes**: the drill press emits G17; the Gerber board outline is cut one tool radius outside the edge in Outline Step Down passes; probe programs restore inch or mm mode and absolute moves at the end
+- **Speeds and feeds**: a spindle slower than 1000 RPM is no longer told to run at 1000 RPM, and the power estimate uses Kc x MRR (the default page shows 29 W instead of 45 W)
+- **Firmware settings and tools**: `$32=2` (lathe mode) is not shown as laser, `$30`-`$32` appear under Spindle, text settings keep their spaces, material numbers reject NaN, infinity and negatives, and an edited tool number survives a restart
+- **CAM page validation**: the tabbed box, jigsaw, probe and drill press pages refuse values the generators cannot use (negative feed or power, too large a jigsaw seed, too many pecks) instead of producing wrong G-code
+- **Serial and Repetier**: a serial write that times out is retried instead of failing the line; Repetier keeps the modal motion of bare axis lines, no longer treats "waiting for heater" as an acknowledgement, zeroes all axes on a bare G92, and keeps the words after a `;` inside a parenthesis comment
+- **Nested comments**: G-code with nested parenthesis comments no longer produces phantom moves in the visualizer or the CAM tools
+- **grblHAL error and alarm messages** now match grblHAL's own texts, and the console shows what each `error:N` and `ALARM:N` means
+- **Machine Control**: the left panel no longer drifts wider by itself
+- **Windows**: the log file is written to `%LOCALAPPDATA%\gcodekit5\gcodekit5.log` instead of beside the program
+
+### Changed
+- **Visualizer**: the Preferences Arc Segment Length now controls how finely arcs are drawn (new default 100 mm, which draws as before; older settings files that stored 0.5 mm now draw finer arcs)
+- **Code cleanup**: a deep-refactor audit (`docs/reports/2026-11-27-deep-refactor-audit.md`) removed unused GTK-era code (the device status global, the console manager, the settings-dialog stack, the visualizer scene graph and pipeline, uncalled designer and core items), dropped 28 settings fields that nothing read (older settings files still load), removed unused dependencies, split the largest functions and files, and translated or corrected misleading comments
+- **CI**: one strict clippy job (any `.unwrap()` is an error, unused dependencies fail the build), shared system-dependency setup, and the duplicate and no-op jobs removed
 
 ## [2.0.0-alpha.3] - 2026-11-27
 

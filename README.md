@@ -623,11 +623,15 @@ You may choose either license for your use of this software.
 
 ## Project Status
 
-  - **Current Version**: 2.0.0-alpha.3
+  - **Current Version**: 2.0.0-alpha.4
   - **Status**: Active Development
   - **Stability**: Alpha
 
 ## Updates
+
+### Recent Updates (2.0.0-alpha.4) - Audit fixes and four features (2026-11-28)
+- New: WebSocket connections with Auto Reconnect, Excellon drilling on the Gerber Drill Holes layer, filled Gerber copper pours and macro pads, and Springs, Barbs and Snap Fit tabbed box joints.
+- Fixes from a full code audit: the CAM tools follow the machine's axes and laser mode, the designer canvas matches what is cut, and many import, export, CAM and controller fixes. See CHANGELOG.md.
 
 ### Recent Updates (2.0.0-alpha.3) - Full release notes (2026-11-27)
 - Each GitHub release now carries the full CHANGELOG notes for its version, and suffixed versions are marked as pre-releases. The application is unchanged from 2.0.0-alpha.2.
