@@ -17,7 +17,6 @@ pub mod tcp;
 
 use serde::{Deserialize, Serialize};
 use std::fmt;
-use std::sync::Arc;
 
 pub use serial::{SerialPortInfo, list_ports};
 pub use tcp::TcpConnectionInfo;
@@ -181,63 +180,6 @@ impl ConnectionParams {
     }
 }
 
-/// Communicator events for connection state changes
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum CommunicatorEvent {
-    /// Connection established successfully
-    Connected,
-    /// Connection lost or disconnected
-    Disconnected,
-    /// Connection error occurred
-    Error,
-    /// Data received from device
-    DataReceived,
-    /// Data sent to device
-    DataSent,
-    /// Connection timeout
-    Timeout,
-}
-
-impl fmt::Display for CommunicatorEvent {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::Connected => write!(f, "Connected"),
-            Self::Disconnected => write!(f, "Disconnected"),
-            Self::Error => write!(f, "Error"),
-            Self::DataReceived => write!(f, "DataReceived"),
-            Self::DataSent => write!(f, "DataSent"),
-            Self::Timeout => write!(f, "Timeout"),
-        }
-    }
-}
-
-/// Callback for communicator events
-pub type CommunicatorCallback = Box<dyn Fn(CommunicatorEvent, &str) + Send + Sync>;
-
-/// Trait for objects that listen to communicator events
-pub trait CommunicatorListener: Send + Sync {
-    /// Called when connection is established
-    fn on_connected(&self);
-
-    /// Called when connection is lost
-    fn on_disconnected(&self);
-
-    /// Called when a connection error occurs
-    fn on_error(&self, error: &str);
-
-    /// Called when data is received from the device
-    fn on_data_received(&self, data: &[u8]);
-
-    /// Called when data is sent to the device
-    fn on_data_sent(&self, data: &[u8]);
-
-    /// Called when a timeout occurs
-    fn on_timeout(&self);
-}
-
-/// Arc-wrapped communicator listener for thread-safe sharing
-pub type CommunicatorListenerHandle = Arc<dyn CommunicatorListener>;
-
 /// Abstract communicator trait for pluggable communication backends
 ///
 /// Provides a unified interface for different communication protocols
@@ -277,12 +219,6 @@ pub trait Communicator: Send + Sync {
         self.send_command(command)?;
         self.receive()
     }
-
-    /// Add a listener for communicator events
-    fn add_listener(&mut self, listener: CommunicatorListenerHandle);
-
-    /// Remove a listener for communicator events
-    fn remove_listener(&mut self, listener: &CommunicatorListenerHandle);
 
     /// Get connection parameters
     fn connection_params(&self) -> Option<&ConnectionParams>;
@@ -358,10 +294,6 @@ impl Communicator for NoOpCommunicator {
         Ok(vec![])
     }
 
-    fn add_listener(&mut self, _listener: CommunicatorListenerHandle) {}
-
-    fn remove_listener(&mut self, _listener: &CommunicatorListenerHandle) {}
-
     fn connection_params(&self) -> Option<&ConnectionParams> {
         self.params.as_ref()
     }
@@ -380,7 +312,6 @@ impl Communicator for NoOpCommunicator {
 pub struct SerialCommunicator {
     port: Option<Box<dyn serial::SerialPort>>,
     params: Option<ConnectionParams>,
-    listeners: Vec<CommunicatorListenerHandle>,
 
     /// Lines written on the GRBL path that await their `ok` / `error:N`.
     reply_ledger: reply_ledger::ReplyLedger,
@@ -396,7 +327,6 @@ impl SerialCommunicator {
         Self {
             port: None,
             params: None,
-            listeners: Vec::new(),
             reply_ledger: reply_ledger::ReplyLedger::new(),
             unread: Vec::new(),
         }
@@ -452,8 +382,8 @@ impl SerialCommunicator {
         }
     }
 
-    /// Drops a port whose connection is gone, so `is_connected()` is false,
-    /// and tells listeners. Returns the error to report.
+    /// Drops a port whose connection is gone, so `is_connected()` is false.
+    /// Returns the error to report.
     fn drop_dead_port(&mut self, e: &std::io::Error) -> gcodekit5_core::Error {
         if let Some(mut port) = self.port.take()
             && let Err(close_err) = port.close()
@@ -462,7 +392,6 @@ impl SerialCommunicator {
         }
         let msg = format!("Connection lost: {}", e);
         tracing::warn!("{}", msg);
-        self.notify_listeners(CommunicatorEvent::Disconnected, &msg);
         gcodekit5_core::Error::other(msg)
     }
 
@@ -473,23 +402,7 @@ impl SerialCommunicator {
         if is_terminal_io_error(e.kind()) {
             self.drop_dead_port(&e)
         } else {
-            let msg = format!("Send error: {}", e);
-            self.notify_listeners(CommunicatorEvent::Error, &msg);
-            gcodekit5_core::Error::other(msg)
-        }
-    }
-
-    /// Notify listeners of an event
-    fn notify_listeners(&self, event: CommunicatorEvent, message: &str) {
-        for listener in &self.listeners {
-            match event {
-                CommunicatorEvent::Connected => listener.on_connected(),
-                CommunicatorEvent::Disconnected => listener.on_disconnected(),
-                CommunicatorEvent::Error => listener.on_error(message),
-                CommunicatorEvent::DataReceived => listener.on_data_received(message.as_bytes()),
-                CommunicatorEvent::DataSent => listener.on_data_sent(message.as_bytes()),
-                CommunicatorEvent::Timeout => listener.on_timeout(),
-            }
+            gcodekit5_core::Error::other(format!("Send error: {}", e))
         }
     }
 }
@@ -582,20 +495,11 @@ impl Communicator for SerialCommunicator {
 
         match opened {
             Ok(port) => {
-                let name = port.name();
                 self.port = Some(port);
                 self.params = Some(params.clone());
-                self.notify_listeners(
-                    CommunicatorEvent::Connected,
-                    &format!("Connected to {name}"),
-                );
                 Ok(())
             }
-            Err(e) => {
-                let msg = format!("Failed to connect: {}", e);
-                self.notify_listeners(CommunicatorEvent::Error, &msg);
-                Err(e)
-            }
+            Err(e) => Err(e),
         }
     }
 
@@ -605,18 +509,11 @@ impl Communicator for SerialCommunicator {
 
         match self.port.take() {
             Some(mut port) => match port.close() {
-                Ok(()) => {
-                    self.notify_listeners(
-                        CommunicatorEvent::Disconnected,
-                        "Disconnected from serial port",
-                    );
-                    Ok(())
-                }
-                Err(e) => {
-                    let msg = format!("Error closing port: {}", e);
-                    self.notify_listeners(CommunicatorEvent::Error, &msg);
-                    Err(gcodekit5_core::Error::other(msg))
-                }
+                Ok(()) => Ok(()),
+                Err(e) => Err(gcodekit5_core::Error::other(format!(
+                    "Error closing port: {}",
+                    e
+                ))),
             },
             _ => Ok(()),
         }
@@ -631,12 +528,9 @@ impl Communicator for SerialCommunicator {
             match port.write(data) {
                 Ok(n) => {
                     tracing::debug!("[TX] (raw) {:?}", String::from_utf8_lossy(data));
-                    let sent_data = &data[..n];
                     // Each complete line written gets exactly one reply.
                     self.reply_ledger
-                        .on_lines_sent(sent_data.iter().filter(|&&b| b == b'\n').count());
-                    let data_str = String::from_utf8_lossy(sent_data);
-                    self.notify_listeners(CommunicatorEvent::DataSent, &data_str);
+                        .on_lines_sent(data[..n].iter().filter(|&&b| b == b'\n').count());
                     Ok(n)
                 }
                 Err(e) => Err(self.write_failed(e)),
@@ -657,9 +551,12 @@ impl Communicator for SerialCommunicator {
                     let data = buf[..n].to_vec();
 
                     if !data.is_empty() {
-                        let data_str = String::from_utf8_lossy(&data);
-                        tracing::debug!("[RX] {}", data_str.trim_end().replace('\n', " | "));
-                        self.notify_listeners(CommunicatorEvent::DataReceived, &data_str);
+                        tracing::debug!(
+                            "[RX] {}",
+                            String::from_utf8_lossy(&data)
+                                .trim_end()
+                                .replace('\n', " | ")
+                        );
                     }
                     Ok(data)
                 }
@@ -671,26 +568,19 @@ impl Communicator for SerialCommunicator {
                     } else if is_terminal_io_error(e.kind()) {
                         // The connection is gone (serialport reports a pulled USB
                         // cable as BrokenPipe): drop the port so is_connected() is
-                        // false and listeners (the UI) see the disconnect.
+                        // false and the UI sees the disconnect.
                         Err(self.drop_dead_port(&e))
                     } else {
-                        let msg = format!("Receive error: {}", e);
-                        self.notify_listeners(CommunicatorEvent::Error, &msg);
-                        Err(gcodekit5_core::Error::other(msg))
+                        Err(gcodekit5_core::Error::other(format!(
+                            "Receive error: {}",
+                            e
+                        )))
                     }
                 }
             }
         } else {
             Err(gcodekit5_core::Error::other("Not connected to serial port"))
         }
-    }
-
-    fn add_listener(&mut self, listener: CommunicatorListenerHandle) {
-        self.listeners.push(listener);
-    }
-
-    fn remove_listener(&mut self, listener: &CommunicatorListenerHandle) {
-        self.listeners.retain(|l| !Arc::ptr_eq(l, listener));
     }
 
     fn connection_params(&self) -> Option<&ConnectionParams> {

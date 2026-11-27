@@ -24,7 +24,6 @@ macro_rules! n_ {
 
 pub mod command_history;
 pub mod console;
-pub mod device_console_manager;
 pub mod device_identity;
 pub mod device_profiles;
 /// Saving files safely; lives in `gcodekit5-core` so `gcodekit5-devicedb` can use it too.

@@ -9,8 +9,8 @@ pub mod communication;
 pub mod firmware;
 
 pub use communication::{
-    Communicator, CommunicatorEvent, CommunicatorListener, CommunicatorListenerHandle,
-    ConnectionDriver, ConnectionParams, NoOpCommunicator, SerialCommunicator, SerialParity,
+    Communicator, ConnectionDriver, ConnectionParams, NoOpCommunicator, SerialCommunicator,
+    SerialParity,
     serial::{SerialPortInfo, list_ports},
     tcp::TcpConnectionInfo,
 };
