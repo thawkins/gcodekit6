@@ -15,14 +15,14 @@ use crate::test_designer_files_app::{default_state, frames};
 
 const WARNING: &str = "Unsupported Gerber content is left out of the program";
 
-/// A top copper layer with one G36/G37 region (a copper pour).
-const REGION_COPPER: &str = "%FSLAX46Y46*%\n%MOMM*%\n%ADD10C,0.2*%\nD10*\nG36*\nX0Y0D02*\n\
-                             X10000000Y0D01*\nX10000000Y10000000D01*\nX0Y0D01*\nG37*\nM02*\n";
+/// A top copper layer with a step and repeat block, which the converter does not draw.
+const STEP_REPEAT_COPPER: &str = "%FSLAX46Y46*%\n%MOMM*%\n%ADD10C,0.2*%\n%SRX2Y1I5.0J0*%\n\
+                                  D10*\nX0Y0D03*\n%SR*%\nM02*\n";
 
 #[test]
-fn test_cam_gerber_input_safety_region_warning_is_shown() {
-    let dir = scratch("gerber_region").expect("scratch folder");
-    std::fs::write(dir.join("board.gtl"), REGION_COPPER).expect("write");
+fn test_cam_gerber_input_safety_step_repeat_warning_is_shown() {
+    let dir = scratch("gerber_step_repeat").expect("scratch folder");
+    std::fs::write(dir.join("board.gtl"), STEP_REPEAT_COPPER).expect("write");
 
     let (mut h, _script) = cam_app(default_state());
     h.get_by_label("Gerber to G-Code").click();
@@ -41,7 +41,7 @@ fn test_cam_gerber_input_safety_region_warning_is_shown() {
             .gerber_mut()
             .unsupported
             .get(&GerberLayerType::TopCopper)
-            .map(|c| c.regions),
+            .map(|c| c.step_repeat),
         Some(1)
     );
     assert!(

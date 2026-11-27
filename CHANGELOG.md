@@ -1,5 +1,8 @@
 ## [Unreleased]
 
+### Added
+- **Gerber regions, aperture macros and clear polarity**: copper pours (G36/G37 regions, including arc edges and cut-in holes) are filled, aperture macro pads such as KiCad's rounded rectangles and thermals are flashed at their real shape, and clear-polarity (`%LPC`) objects are cut out of the copper, so isolation and rubout follow them instead of milling pours away. The Gerber page now warns only about macros it cannot draw (moire, unreadable) and step and repeat (`%SR`)
+
 ### Fixed
 - **Designer laser output on curves**: merging nearly collinear laser segments now keeps every merged point within the curve tolerance (0.05 mm), which was set but never used; before, an r = 50 mm arc could be cut up to 0.18 mm inside the drawn curve. Curved laser shapes (ellipses, paths, polygons with many points) now produce more G-code moves; straight lines are merged as before
 - **Designer laser point filter**: the last point of a run of cuts is no longer dropped when it is closer than 0.1 mm to the previous point, so closed laser contours close fully; after an arc the filter measures from the arc's end, not from the point before the arc

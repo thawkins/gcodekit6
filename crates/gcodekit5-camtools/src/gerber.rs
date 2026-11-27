@@ -8,8 +8,13 @@
 //! flashes and for linear draws (a linear draw is the convex hull of the aperture at both
 //! ends, which is exact for these convex shapes). Circular-arc draws are only defined for
 //! circular apertures by the Gerber specification; a non-circular aperture on an arc is
-//! approximated by a round stroke of its smallest dimension. Aperture macros and aperture
-//! holes are not supported.
+//! approximated by a round stroke of its smallest dimension. Aperture holes are not
+//! supported.
+//!
+//! Regions (G36/G37) are filled: each contour, built from linear and circular D01
+//! segments, becomes a filled polygon. Aperture macros (`%AM`) are flashed through
+//! [`aperture_macro`]. Clear polarity (`%LPC`) objects are cut out of the dark objects
+//! that come before them, in file order. Step and repeat (`%SR`) is not supported.
 
 use crate::hatch_generator;
 use anyhow::Result;
@@ -33,6 +38,8 @@ use std::io::BufReader;
 use std::panic;
 use std::path::PathBuf;
 use tracing::{debug, warn};
+
+mod aperture_macro;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum GerberLayerType {
@@ -224,16 +231,17 @@ pub fn detect_layer_files(dir: &std::path::Path) -> HashMap<GerberLayerType, Pat
 }
 
 /// Gerber constructs the converter does not draw, counted in one file. Their copper is
-/// left out of the program (a region is stroked as its outline, a macro aperture as a
-/// 0.1 mm dot, and clear polarity is ignored), so the user must be told.
+/// left out of the program or drawn wrongly (a macro aperture the converter cannot
+/// evaluate is a 0.1 mm dot, a step and repeat block is drawn once), so the user must be
+/// told.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct UnsupportedConstructs {
-    /// G36 region starts (filled areas such as copper pours).
-    pub regions: usize,
-    /// Apertures defined from an aperture macro (`%AM`), such as rounded-rectangle pads.
+    /// Apertures defined from an aperture macro (`%AM`) that cannot be drawn: the macro is
+    /// missing, has a primitive the converter does not draw (such as moire) or an
+    /// expression it cannot evaluate.
     pub aperture_macros: usize,
-    /// Clear-polarity (`%LPC*%`) switches, which cut holes into dark copper.
-    pub clear_polarity: usize,
+    /// Step and repeat blocks (`%SR`) that repeat their content more than once.
+    pub step_repeat: usize,
 }
 
 impl UnsupportedConstructs {
@@ -244,7 +252,7 @@ impl UnsupportedConstructs {
 
     /// The number of unsupported constructs of every kind together.
     pub fn total(&self) -> usize {
-        self.regions + self.aperture_macros + self.clear_polarity
+        self.aperture_macros + self.step_repeat
     }
 }
 
@@ -252,8 +260,8 @@ impl std::fmt::Display for UnsupportedConstructs {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "{} region(s) (G36/G37), {} aperture macro(s) (%AM), {} clear polarity (%LPC)",
-            self.regions, self.aperture_macros, self.clear_polarity
+            "{} aperture macro(s) (%AM), {} step and repeat block(s) (%SR)",
+            self.aperture_macros, self.step_repeat
         )
     }
 }
@@ -269,29 +277,165 @@ pub fn unsupported_constructs(content: &str) -> UnsupportedConstructs {
     count_unsupported(&parse_document(content))
 }
 
+/// The dark geometry of a Gerber file, all objects unioned (mm), as the converter cuts it.
+///
+/// # Arguments
+/// * `content` - The Gerber file's text.
+///
+/// # Returns
+/// The geometry, or `None` when the file draws nothing.
+#[doc(hidden)]
+pub fn layer_geometry(content: &str) -> Result<Option<Sketch<()>>> {
+    Ok(merge_sketches(&GerberConverter::parse_gerber_to_sketches(
+        content,
+    )?))
+}
+
+/// The aperture macros (`%AM`) a parsed document defines, by name.
+fn document_macros(doc: &gerber_parser::GerberDoc) -> HashMap<&str, &gerber_types::ApertureMacro> {
+    doc.commands()
+        .into_iter()
+        .filter_map(|command| match command {
+            Command::ExtendedCode(gerber_types::ExtendedCode::ApertureMacro(am)) => {
+                Some((am.name.as_str(), am))
+            }
+            _ => None,
+        })
+        .collect()
+}
+
+/// The shape a macro aperture flashes, centred on the origin (mm), or `None` when the
+/// aperture is not a macro or its macro cannot be drawn.
+fn macro_aperture_sketch(
+    ap: &gerber_types::Aperture,
+    macros: &HashMap<&str, &gerber_types::ApertureMacro>,
+    unit_scale: f64,
+) -> Option<Sketch<()>> {
+    match ap {
+        gerber_types::Aperture::Macro(name, args) => aperture_macro::macro_sketch(
+            macros.get(name.as_str())?,
+            args.as_deref().unwrap_or(&[]),
+            unit_scale,
+        ),
+        _ => None,
+    }
+}
+
 /// Counts the unsupported constructs of a parsed document.
 fn count_unsupported(doc: &gerber_parser::GerberDoc) -> UnsupportedConstructs {
-    use gerber_types::{ExtendedCode, GCode as GGCode, Polarity};
+    use gerber_types::{ExtendedCode, StepAndRepeat};
+    let macros = document_macros(doc);
     let mut counts = UnsupportedConstructs {
         aperture_macros: doc
             .apertures
             .values()
-            .filter(|ap| matches!(ap, gerber_types::Aperture::Macro(..)))
+            .filter(|ap| {
+                matches!(ap, gerber_types::Aperture::Macro(..))
+                    && macro_aperture_sketch(ap, &macros, 1.0).is_none()
+            })
             .count(),
         ..UnsupportedConstructs::default()
     };
     for command in doc.commands() {
-        match command {
-            Command::FunctionCode(FunctionCode::GCode(GGCode::RegionMode(true))) => {
-                counts.regions += 1;
-            }
-            Command::ExtendedCode(ExtendedCode::LoadPolarity(Polarity::Clear)) => {
-                counts.clear_polarity += 1;
-            }
-            _ => {}
+        if let Command::ExtendedCode(ExtendedCode::StepAndRepeat(StepAndRepeat::Open {
+            repeat_x,
+            repeat_y,
+            ..
+        })) = command
+            && repeat_x.saturating_mul(*repeat_y) > 1
+        {
+            counts.step_repeat += 1;
         }
     }
     counts
+}
+
+/// Points of a circular arc from `start` to `end` around `center`, without `start` and
+/// ending exactly on `end`. Coincident ends are a full circle.
+fn arc_points(
+    start: (f64, f64),
+    end: (f64, f64),
+    center: (f64, f64),
+    clockwise: bool,
+) -> Vec<[f64; 2]> {
+    let radius = (start.0 - center.0).hypot(start.1 - center.1);
+    let start_angle = (start.1 - center.1).atan2(start.0 - center.0);
+    let sweep = gcodekit5_core::gcode::arc::angular_travel(
+        (start.0 - center.0, start.1 - center.1),
+        (end.0 - center.0, end.1 - center.1),
+        clockwise,
+    );
+    let n = arc_segments(radius, sweep);
+    let mut pts: Vec<[f64; 2]> = (1..n)
+        .map(|i| {
+            let a = start_angle + sweep * i as f64 / n as f64;
+            [center.0 + radius * a.cos(), center.1 + radius * a.sin()]
+        })
+        .collect();
+    pts.push([end.0, end.1]);
+    pts
+}
+
+/// Number of chords for an arc of `radius` and `sweep` (radians) in filled geometry: at
+/// most 5 degrees each and at most 0.005 mm from the true arc.
+fn arc_segments(radius: f64, sweep: f64) -> usize {
+    const MAX_DEVIATION: f64 = 0.005;
+    let mut step = 5.0f64.to_radians();
+    if radius > MAX_DEVIATION {
+        step = step.min(2.0 * (1.0 - MAX_DEVIATION / radius).acos());
+    }
+    ((sweep.abs() / step).ceil() as usize).max(1)
+}
+
+/// The objects of one layer, combined in file order by polarity: a clear object cuts the
+/// dark objects before it. Consecutive clear objects are cut out together.
+#[derive(Default)]
+struct PolarityLayer {
+    dark: Vec<Sketch<()>>,
+    clear: Vec<Sketch<()>>,
+    clear_mode: bool,
+}
+
+impl PolarityLayer {
+    /// Adds one object in the current polarity.
+    fn push(&mut self, s: Sketch<()>) {
+        if self.clear_mode {
+            self.clear.push(s);
+        } else {
+            self.cut_clear();
+            self.dark.push(s);
+        }
+    }
+
+    /// Cuts the pending clear objects out of the dark objects.
+    fn cut_clear(&mut self) {
+        let clear = merge_sketches(&self.clear);
+        self.clear.clear();
+        if let (Some(dark), Some(clear)) = (merge_sketches(&self.dark), clear) {
+            let cut = dark.difference(&clear);
+            self.dark = if cut.to_multipolygon().0.is_empty() {
+                Vec::new()
+            } else {
+                vec![cut]
+            };
+        }
+    }
+
+    /// The layer's dark geometry, unchanged when it had no clear objects.
+    fn finish(mut self) -> Vec<Sketch<()>> {
+        self.cut_clear();
+        self.dark
+    }
+}
+
+/// Closes a region contour (G36/G37) and adds it to `layer` as a filled polygon. The union
+/// with nothing resolves a contour with cut-ins into an outline with holes.
+fn close_contour(contour: &mut Vec<[f64; 2]>, layer: &mut PolarityLayer) {
+    let pts = std::mem::take(contour);
+    if pts.len() >= 3 {
+        let polygon: Sketch<()> = Sketch::polygon(&pts, None);
+        layer.push(polygon.union(&Sketch::new()));
+    }
 }
 
 /// Parses `content`, keeping only the first `%FS` and `%MO` (some exporters repeat them,
@@ -655,14 +799,17 @@ impl GerberConverter {
         let unsupported = count_unsupported(&doc);
         if !unsupported.is_empty() {
             warn!(
-                regions = unsupported.regions,
                 aperture_macros = unsupported.aperture_macros,
-                clear_polarity = unsupported.clear_polarity,
+                step_repeat = unsupported.step_repeat,
                 "Gerber file has constructs that are not converted; their copper is missing"
             );
         }
 
-        let mut sketches: Vec<Sketch<()>> = Vec::new();
+        let macros = document_macros(&doc);
+        let mut macro_shapes: HashMap<i32, Option<Sketch<()>>> = HashMap::new();
+        let mut layer = PolarityLayer::default();
+        // The open G36 region's current contour, or `None` outside a region.
+        let mut region: Option<Vec<[f64; 2]>> = None;
         let mut current_x = 0.0;
         let mut current_y = 0.0;
         let mut current_aperture_code = 0;
@@ -720,6 +867,57 @@ impl GerberConverter {
                                         .map(|v| convert_coord(v, false))
                                         .unwrap_or(current_y);
 
+                                    if let Some(contour) = region.as_mut() {
+                                        // Inside G36/G37 a draw adds an edge to the contour.
+                                        if contour.is_empty() {
+                                            contour.push([current_x, current_y]);
+                                        }
+                                        match interpolation {
+                                            InterpolationMode::Linear => contour.push([x, y]),
+                                            InterpolationMode::ClockwiseCircular
+                                            | InterpolationMode::CounterclockwiseCircular => {
+                                                let ij = |c: Option<&CoordinateNumber>| {
+                                                    c.map(|v| convert_coord(v, true)).unwrap_or(0.0)
+                                                };
+                                                let i_val =
+                                                    ij(offset.as_ref().and_then(|c| c.x.as_ref()));
+                                                let j_val =
+                                                    ij(offset.as_ref().and_then(|c| c.y.as_ref()));
+                                                let clockwise = matches!(
+                                                    interpolation,
+                                                    InterpolationMode::ClockwiseCircular
+                                                );
+                                                let start = (current_x, current_y);
+                                                let single =
+                                                    matches!(quadrant_mode, QuadrantMode::Single);
+                                                if single && (x - start.0).hypot(y - start.1) < 1e-9
+                                                {
+                                                    // A zero-length G74 arc adds nothing.
+                                                } else {
+                                                    let center = if single {
+                                                        single_quadrant_center(
+                                                            start,
+                                                            (x, y),
+                                                            (i_val, j_val),
+                                                            clockwise,
+                                                        )
+                                                    } else {
+                                                        (start.0 + i_val, start.1 + j_val)
+                                                    };
+                                                    contour.extend(arc_points(
+                                                        start,
+                                                        (x, y),
+                                                        center,
+                                                        clockwise,
+                                                    ));
+                                                }
+                                            }
+                                        }
+                                        current_x = x;
+                                        current_y = y;
+                                        continue;
+                                    }
+
                                     use gerber_types::Aperture as GAperture;
                                     let aperture = doc.apertures.get(&current_aperture_code);
                                     // Round-stroke width: exact for circles, the smallest
@@ -762,7 +960,7 @@ impl GerberConverter {
                                                     width,
                                                 ),
                                             };
-                                            sketches.push(stroke);
+                                            layer.push(stroke);
                                         }
                                         InterpolationMode::ClockwiseCircular
                                         | InterpolationMode::CounterclockwiseCircular => {
@@ -788,7 +986,7 @@ impl GerberConverter {
                                                     // is a point, not a full circle.
                                                     // It still paints the aperture there.
                                                     if (x - current_x).hypot(y - current_y) < 1e-9 {
-                                                        sketches.push(Self::create_thick_segment(
+                                                        layer.push(Self::create_thick_segment(
                                                             (current_x, current_y),
                                                             (x, y),
                                                             width,
@@ -813,7 +1011,7 @@ impl GerberConverter {
                                                      approximated by a round stroke"
                                                 );
                                             }
-                                            sketches.push(Self::create_thick_arc(
+                                            layer.push(Self::create_thick_arc(
                                                 (current_x, current_y),
                                                 (x, y),
                                                 (cx, cy),
@@ -827,7 +1025,10 @@ impl GerberConverter {
                                     current_y = y;
                                 }
                                 Operation::Move(coord) => {
-                                    // D02 - Move
+                                    // D02 - Move; inside a region it closes the contour.
+                                    if let Some(contour) = region.as_mut() {
+                                        close_contour(contour, &mut layer);
+                                    }
                                     current_x = coord
                                         .as_ref()
                                         .and_then(|c| c.x.as_ref())
@@ -856,12 +1057,22 @@ impl GerberConverter {
                                         let s: Sketch<()> =
                                             match Self::aperture_outline(ap, unit_scale) {
                                                 Some(outline) => Sketch::polygon(&outline, None),
-                                                None => Sketch::circle(0.05, 8, None),
+                                                None => macro_shapes
+                                                    .entry(current_aperture_code)
+                                                    .or_insert_with(|| {
+                                                        macro_aperture_sketch(
+                                                            ap, &macros, unit_scale,
+                                                        )
+                                                    })
+                                                    .clone()
+                                                    .unwrap_or_else(|| {
+                                                        Sketch::circle(0.05, 8, None)
+                                                    }),
                                             };
                                         let s = s.transform(&Matrix4::new_translation(
                                             &Vector3::new(x, y, 0.0),
                                         ));
-                                        sketches.push(s);
+                                        layer.push(s);
                                     }
                                     current_x = x;
                                     current_y = y;
@@ -882,14 +1093,31 @@ impl GerberConverter {
                         GGCode::QuadrantMode(mode) => {
                             quadrant_mode = *mode;
                         }
+                        GGCode::RegionMode(true) => {
+                            region = Some(Vec::new());
+                        }
+                        GGCode::RegionMode(false) => {
+                            if let Some(mut contour) = region.take() {
+                                close_contour(&mut contour, &mut layer);
+                            }
+                        }
                         _ => {}
                     }
+                }
+                Command::ExtendedCode(gerber_types::ExtendedCode::LoadPolarity(polarity)) => {
+                    layer.clear_mode = match polarity {
+                        gerber_types::Polarity::Clear => true,
+                        gerber_types::Polarity::Dark => false,
+                    };
                 }
                 _ => {}
             }
         }
+        if let Some(mut contour) = region.take() {
+            close_contour(&mut contour, &mut layer);
+        }
 
-        Ok(sketches)
+        Ok(layer.finish())
     }
 
     fn sketch_to_polylines(sketch: &Sketch<()>) -> Vec<(Polyline<f64>, bool)> {

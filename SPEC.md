@@ -4,6 +4,13 @@
 **Last Updated**: 2026-11-27
 **Status**: Alpha Release
 
+### Unreleased (2026-11-28) - Gerber Regions, Aperture Macros and Clear Polarity
+- ✅ **Gerber to G-Code**
+  - G36/G37 regions (copper pours) are filled, with linear and circular (G74/G75) contour edges and cut-in holes.
+  - Aperture macros (`%AM`) are flashed: primitives 1, 4, 5, 7, 20 and 21, comments, `$n` variables and arithmetic expressions.
+  - Clear polarity (`%LPC`) cuts its objects out of the dark copper before it, in file order.
+  - The page still warns about what is not drawn: macros with moire (6) or unreadable content, and step and repeat (`%SR`).
+
 ### Unreleased (2026-11-27) - egui + craft-libs Front End
 - ✅ **UI toolkit**
   - The UI is egui on wgpu with the craft-libs widget crates (`gcodekit5-ui-egui`); the GTK4, libadwaita and GtkSourceView front end is removed ([ADR-012](docs/adr/ADR-012-egui-craft-libs.md)).

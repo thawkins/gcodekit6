@@ -33,19 +33,15 @@ fn square_outline(size: u32) -> String {
 
 #[test]
 fn test_gerber_unsupported_constructs_are_counted() {
-    let region = format!(
-        "{HEADER}%ADD10C,0.1*%\nD10*\nG36*\nX0Y0D02*\nX10000000Y0D01*\n\
-         X10000000Y10000000D01*\nX0Y0D01*\nG37*\nM02*\n"
-    );
-    let counts = unsupported_constructs(&region);
-    assert_eq!(counts.regions, 1, "{counts:?}");
+    // Regions, clear polarity and evaluable macros are drawn (P2CAM-1b); see
+    // test_gerber_regions_macros for those.
+    let step = format!("{HEADER}%ADD10C,1*%\n%SRX2Y1I5.0J0*%\nD10*\nX0Y0D03*\n%SR*%\nM02*\n");
+    let counts = unsupported_constructs(&step);
+    assert_eq!(counts.step_repeat, 1, "{counts:?}");
     assert!(!counts.is_empty());
 
-    let polarity = format!("{HEADER}%ADD10C,1*%\nD10*\n%LPC*%\nX0Y0D03*\n%LPD*%\nM02*\n");
-    assert_eq!(unsupported_constructs(&polarity).clear_polarity, 1);
-
-    let macro_pad = format!("{HEADER}%AMPAD*\n1,1,1.0,0,0*%\n%ADD11PAD*%\nD11*\nX0Y0D03*\nM02*\n");
-    assert_eq!(unsupported_constructs(&macro_pad).aperture_macros, 1);
+    let undefined_macro = format!("{HEADER}%ADD11PAD*%\nD11*\nX0Y0D03*\nM02*\n");
+    assert_eq!(unsupported_constructs(&undefined_macro).aperture_macros, 1);
 
     // A plain stroke board has nothing to warn about.
     assert_eq!(
