@@ -9,23 +9,12 @@ use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
 use tracing::{debug, trace};
 
-const _CANVAS_PADDING_2X: f32 = 40.0;
 const MIN_ZOOM: f32 = 0.1;
 const MAX_ZOOM: f32 = 50.0;
 const ZOOM_STEP: f32 = 1.1;
 const PAN_PERCENTAGE: f32 = 0.1;
 const BOUNDS_PADDING_FACTOR: f32 = core_constants::VIEW_PADDING as f32;
-const _FIT_MARGIN_FACTOR: f32 = 0.05;
-const _ORIGIN_CROSS_SIZE: i32 = 5;
-const _MARKER_RADIUS: i32 = 4;
-const _MAX_GRID_ITERATIONS: usize = 500;
-const _MAX_SCALE: f32 = 100.0;
-const _MIN_SCALE: f32 = 0.1;
 const DEFAULT_SCALE_FACTOR: f32 = 1.0;
-const _GRID_MAJOR_STEP_MM: f32 = 10.0;
-const _GRID_MINOR_STEP_MM: f32 = 1.0;
-const _GRID_MAJOR_VISIBILITY_SCALE: f32 = 0.3;
-const _GRID_MINOR_VISIBILITY_SCALE: f32 = 1.5;
 
 /// Decide whether `new` replaces `old` (a newly loaded program) rather than
 /// being an edit of it.
