@@ -35,66 +35,45 @@ gcodekit5/
 
 | Crate | Purpose | Key Types |
 |-------|---------|-----------|
-| **core** | Shared types, traits, events, state | `MachineState`, `Position`, `GCodeLine`, `AppEvent` |
-| **communication** | Serial/TCP/WebSocket protocols, firmware implementations | `Connection`, `GrblController`, `Protocol` |
-| **visualizer** | G-code parsing for the toolpath view, viewport transforms | `ViewportTransform` |
+| **core** | Shared types, traits, events, state | `Position`, `MachineStatus`, `Error` |
+| **communication** | Serial/TCP/WebSocket transports, firmware protocol registry | `Communicator`, `ControllerProtocol`, `ProtocolProfile` |
+| **visualizer** | G-code parsing for the toolpath view, 3D camera, stock simulation | `Visualizer`, `Camera`, `StockSimulator3D` |
 | **designer** | Shape drawing, toolpath generation, CAD operations | `Shape`, `DesignerState`, `ToolpathGenerator` |
-| **camtools** | Box maker, puzzle generator, image engraver | `TabbedBoxMaker`, `JigsawPuzzle`, `LaserEngraver` |
-| **devicedb** | Device profile CRUD, persistence | `DeviceProfile`, `DeviceDatabase` |
-| **settings** | Application preferences, serialization | `AppSettings`, `Preferences` |
+| **camtools** | Box maker, puzzle generator, image engraver | `TabbedBoxMaker`, `JigsawPuzzleMaker`, `BitmapImageEngraver` |
+| **devicedb** | Device profile CRUD, persistence | `DeviceProfile`, `DeviceManager` |
+| **settings** | Application preferences, serialization | `Config`, `SettingsError` |
 | **app** | Toolkit-free application state: machine controller, console model, device and tool forms | `MachineController`, `MachineEvent` |
 | **ui-egui** | egui front end: window, menus, panes, dialogs, wgpu visualizer | `GcodeKitApp`, `Machine` |
 
 ## Crate Dependency Graph
 
+Internal normal (non-dev) dependencies, generated from Cargo. Regenerate it rather than editing it by hand:
+
+```bash
+cargo metadata --format-version 1 --no-deps | jq -r '.packages[] | .name as $n | .dependencies[] | select(.name|startswith("gcodekit5")) | select(.kind==null) | "\($n) -> \(.name)"'
 ```
-                              ┌─────────────────┐
-                              │    gcodekit5    │
-                              │   (binary)      │
-                              └────────┬────────┘
-                                       │
-                              ┌────────▼────────┐
-                              │ gcodekit5-ui-   │
-                              │      egui       │
-                              └────────┬────────┘
-                                       │
-         ┌─────────────┬───────────────┼───────────────┬─────────────┐
-         │             │               │               │             │
-         ▼             ▼               ▼               ▼             ▼
-┌─────────────┐ ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ ┌─────────────┐
-│  camtools   │ │  designer   │ │ visualizer  │ │     app     │ │communication│
-└──────┬──────┘ └──────┬──────┘ └──────┬──────┘ └──────┬──────┘ └──────┬──────┘
-       │               │               │               │               │
-       │               │               │               │               │
-       │        ┌──────┴───────┐       │               │               │
-       │        │              │       │               │               │
-       │        ▼              │       │               │               │
-       │  ┌───────────┐        │       │               │               │
-       │  │ devicedb  │        │       │               │               │
-       │  └─────┬─────┘        │       │               │               │
-       │        │              │       │               │               │
-       │        │   ┌──────────┴───────┴───────────────┴───────────────┘
-       │        │   │
-       │        ▼   ▼
-       │  ┌───────────┐
-       │  │ settings  │
-       │  └─────┬─────┘
-       │        │
-       └────────┼────────────────────────────────────────────┐
-                │                                            │
-                ▼                                            ▼
-        ┌─────────────┐                              ┌─────────────┐
-        │    core     │◄─────────────────────────────│  (all use)  │
-        │ (foundation)│                              └─────────────┘
-        └─────────────┘
+
 ```
+gcodekit5-design (binary gcodekit5) -> ui-egui
+ui-egui       -> app, camtools, communication, core, designer, devicedb, settings, visualizer
+app           -> communication, core, devicedb, settings
+designer      -> camtools, core
+camtools      -> core, devicedb
+visualizer    -> core
+communication -> core
+devicedb      -> core
+settings      -> core
+core          -> (none)
+```
+
+The `gcodekit5-` prefix is dropped above. The root package `gcodekit5-design` builds the `gcodekit5` binary.
 
 ### Dependency Rules
 
 1. **core** has no internal dependencies (only external crates like `serde`, `thiserror`)
-2. All crates depend on **core**
-3. **ui-egui** depends on all other crates (aggregates everything); **app** holds the state it shows and has no GUI dependency
-4. **designer** depends on **visualizer** (reuses rendering)
+2. Every other library crate depends on **core**
+3. **ui-egui** depends on all other library crates; **app** holds the state it shows and has no GUI dependency
+4. **settings** is used only by **app** and **ui-egui**
 5. No circular dependencies allowed
 
 ## Data Flow
@@ -188,96 +167,27 @@ pub fn ui(&mut self, ui: &mut egui::Ui) {
 
 See [ADR-004: Interior Mutability](docs/adr/ADR-004-interior-mutability.md) for the history of the GTK-era pattern.
 
-### 2. Event-Driven Architecture
+### 2. Machine Worker and Event Channel
 
-Application events flow through a central event system:
+`MachineController` (`crates/gcodekit5-app/src/machine/controller.rs`) starts a worker thread that owns the transport. The UI sends commands over one `std::sync::mpsc` channel and receives `MachineEvent`s over another.
+The UI drains pending events once per frame with `MachineController::poll`.
 
-```rust
-// Core event types
-pub enum AppEvent {
-    // Machine events
-    MachineStateChanged(MachineState),
-    PositionUpdated(Position),
-    
-    // Connection events
-    Connected(DeviceInfo),
-    Disconnected,
-    
-    // G-code events
-    StreamingStarted,
-    StreamingProgress(usize, usize),
-    StreamingComplete,
-    
-    // UI events
-    FileOpened(PathBuf),
-    SettingsChanged,
-}
+### 3. Firmware Protocol Registry
 
-// Event dispatch
-fn dispatch_event(event: AppEvent) {
-    // Notify all registered listeners
-    for listener in &self.listeners {
-        listener.on_event(&event);
-    }
-}
-```
+Firmware variants are the `ControllerProtocol` enum (`crates/gcodekit5-communication/src/firmware/mod.rs`). Per-protocol behaviour is a `ProtocolProfile` looked up with `protocol_profile` in `firmware/protocol_registry.rs`; transports implement the `Communicator` trait.
 
-### 3. Builder Pattern for Configuration
+### 4. Geometry Kernels
 
-Used for complex object construction:
+The designer and camtools use `csgrs` for 2D booleans (`perform_boolean` in `crates/gcodekit5-designer/src/ops.rs`, Gerber layers in `crates/gcodekit5-camtools/src/gerber.rs`) and `cavalier_contours` for offsetting.
 
-```rust
-// Builder pattern example
-let toolpath = ToolpathBuilder::new()
-    .feed_rate(1000.0)
-    .plunge_rate(500.0)
-    .safe_height(5.0)
-    .step_down(2.0)
-    .build()?;
-```
+- `cavalier_contours` can panic on degenerate input: repeated consecutive vertices, or a closed polyline whose last vertex repeats the first.
+- Clean a polyline with `clean_polyline` (`crates/gcodekit5-designer/src/ops.rs`, `crates/gcodekit5-camtools/src/gerber.rs`) before `parallel_offset` or a boolean.
+- Risky calls are wrapped in `catch_unwind` (for example `safe_parallel_offset` in `crates/gcodekit5-designer/src/geometry.rs`); find them with `rg -l catch_unwind crates --type rust`.
+- Prefer bulge arcs over linearised segments for rounded shapes: fewer vertices and fewer offset panics.
 
-### 4. Strategy Pattern for Firmware Protocols
+### 5. Coordinate Conversion
 
-Different firmware types implement a common protocol trait:
-
-```rust
-pub trait FirmwareProtocol: Send + Sync {
-    fn name(&self) -> &str;
-    fn parse_status(&self, response: &str) -> Option<MachineStatus>;
-    fn format_command(&self, cmd: &Command) -> String;
-    fn supports_feature(&self, feature: Feature) -> bool;
-}
-
-// Implementations
-struct GrblProtocol;
-struct TinyGProtocol;
-struct FluidNCProtocol;
-```
-
-### 5. Viewport Transform for Coordinate Conversion
-
-Centralized coordinate transformation:
-
-```rust
-pub struct ViewportTransform {
-    pub zoom: f64,
-    pub pan_x: f64,
-    pub pan_y: f64,
-    pub width: f64,
-    pub height: f64,
-}
-
-impl ViewportTransform {
-    /// World (mm) to screen (pixels) with Y-flip
-    pub fn world_to_screen(&self, x: f64, y: f64) -> (f64, f64) {
-        let sx = (x - self.pan_x) * self.zoom + self.width / 2.0;
-        let sy = self.height - ((y - self.pan_y) * self.zoom + self.height / 2.0);
-        (sx, sy)
-    }
-}
-```
-
-See [Coordinate System Documentation](docs/COORDINATE_SYSTEM.md) for details.
+CNC coordinates are millimetres with Y up; egui screen coordinates are points with Y down. The designer canvas converts between them in `CanvasView`; the visualizer uses a 3D orbit `Camera`. See [Coordinate System Documentation](docs/COORDINATE_SYSTEM.md) for details.
 
 ## Threading Model
 
@@ -355,12 +265,11 @@ ctx.request_repaint();
 
 ### Error Types by Crate
 
-| Crate | Error Type | Key Variants |
-|-------|------------|--------------|
-| **core** | `GCodeError` | `ParseError`, `ValidationError` |
-| **communication** | `CommunicationError` | `PortNotFound`, `Timeout`, `ProtocolError` |
-| **settings** | `SettingsError` | `IoError`, `SerializationError` |
-| **devicedb** | `DeviceDbError` | `NotFound`, `DuplicateId` |
+| Crate | Error Type | Defined in |
+|-------|------------|------------|
+| **core** | `Error` | `crates/gcodekit5-core/src/error.rs` |
+| **settings** | `SettingsError` | `crates/gcodekit5-settings/src/migrate.rs` |
+| **app** | `MachineError` | `crates/gcodekit5-app/src/machine/types.rs` |
 
 See [ADR-005: Error Handling](docs/adr/ADR-005-error-handling.md) for details.
 
