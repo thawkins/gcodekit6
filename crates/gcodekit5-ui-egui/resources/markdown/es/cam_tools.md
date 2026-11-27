@@ -9,6 +9,8 @@ Las herramientas CAM proporcionan generadores y asistentes que crean G-code para
 - [Calculadora de velocidades y avances](help:speeds_feeds_calculator) — puntos de referencia de RPM/avance inicial
 - [Planeado de Sufridera](help:spoilboard_surfacing) — Planear un tablero sufridera
 - [Rejilla en la Sufridera](help:spoilboard_grid) — marcado/grabado de cuadrícula en la sufridera
+- [De Gerber a G-Code](help:gerber) — fresado de aislamiento de PCB a partir de archivos Gerber
+- [Taladradora de columna](help:drill_press) — taladra un agujero, recto o helicoidal
 
 ## Relacionado
 - [Visualizador](help:visualizer)

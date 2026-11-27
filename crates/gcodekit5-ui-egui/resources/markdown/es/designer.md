@@ -38,10 +38,11 @@ Pulsando el botón "Configuración de Herramienta" se abre la ventana para la co
         <li> Propiedades CAM</li>
         <li> Configuración individual Láser (velocidad, potencia y pasadas) de un objeto determinado</li>
 
-      ### Notas sobre Esquina y Chaflán
-      - Para polilíneas (abiertas y cerradas), el redondeo de vértices se ajusta desde el panel Esquina usando Radius.
-      - En objetos tipo Path, Radius (Esquina) y Chaflán son excluyentes para evitar geometrías duplicadas.
-      - El valor de chaflán se aplica con medida real sobre la arista (por ejemplo, chaflán 10 = recorte de 10 mm por lado en una esquina de 90 grados).
+### Notas sobre Esquina y Chaflán
+- Para polilíneas (abiertas y cerradas), el redondeo de vértices se ajusta desde el panel Esquina usando Radio.
+- En objetos tipo Path, Radio (Esquina) y Chaflán son excluyentes para evitar geometrías duplicadas.
+- El valor de chaflán se aplica con medida real sobre la arista (por ejemplo, chaflán 10 = recorte de 10 mm por lado en una esquina de 90 grados).
+
 ---
 ## Panel de Objetos
   <img src="../../help_images/order_objects_1.png" width="300">
