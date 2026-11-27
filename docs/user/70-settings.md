@@ -2,31 +2,48 @@
 
 ## Overview
 
-Access settings from the **Settings** panel. Changes take effect immediately unless noted otherwise.
+Open **Edit > Preferences**. The window has six pages: General, Machine, User Interface, File Processing, Shortcuts and Advanced. **Apply** saves the changes and closes the window; **Cancel** drops them. A Language or "Use system title bar" change takes effect after a restart.
 
-## General Settings
-
-| Setting | Description |
-|---------|-------------|
-| **Default Units** | Metric (mm) or Imperial (inches) for all displays |
-| **Theme** | Light, Dark, or System theme |
-| **Auto-connect** | Automatically connect to the last-used device on startup |
-| **Reconnect Timeout** | Time in seconds before auto-reconnect attempts (default: 10s) |
-
-## Connection Settings
+## General
 
 | Setting | Description |
 |---------|-------------|
-| **Default Connection Type** | Serial, TCP/IP, or WebSocket |
-| **Device Type** | CNC, Laser, or Other — affects laser mode ($32) and UI behavior |
+| **Measurement System** | Metric or Imperial for all displays |
+| **Feed Rate Units** | The units feed rates are shown in |
+| **Default Directory** | The folder file dialogs start in |
 
-## Display Settings
+## Machine
 
 | Setting | Description |
 |---------|-------------|
-| **DRO Decimal Places** | Number of decimal places shown in the DRO |
-| **Grid Spacing** | Default grid spacing for the Designer and Visualizer |
-| **Unit Display** | Show units label next to values |
+| **Jog Step Size (Linear)** | Default jog step, mm |
+| **Jog Feed Rate** | Jog speed, mm/min |
+| **X Axis Limit**, **Y Axis Limit**, **Z Axis Limit** | Machine travel, mm |
+
+## User Interface
+
+| Setting | Description |
+|---------|-------------|
+| **Theme** | System, Light or Dark |
+| **Language** | The interface language, or System |
+| **Show About on Startup** | Show the About dialog when the app starts |
+| **Grid Major Line Width (px)**, **Grid Minor Line Width (px)** | Grid line widths |
+| **Use system title bar** | Use the platform's window title bar (shown only where it changes something) |
+
+## File Processing
+
+| Setting | Description |
+|---------|-------------|
+| **Preserve Comments** | Keep comments when processing G-code |
+| **Arc Segment Length** | Length of the segments arcs are drawn with, mm |
+| **Max Line Length** | Maximum G-code line length |
+
+## Advanced
+
+| Setting | Description |
+|---------|-------------|
+| **3D Stock Removal Visualization** | Enable the 3D stock removal view |
+| **STL File Import** | Offer STL files in the Designer's import dialog |
 
 ## Keyboard Shortcuts
 
@@ -67,18 +84,18 @@ See [Keyboard Shortcuts Reference](90-shortcuts.md) for the full default list.
 
 ## Firmware Settings
 
-When connected to a controller, you can view and modify firmware parameters:
+The **Firmware Settings** command opens the Device Config page, where you can view and modify the controller's parameters:
 
 ### GRBL Settings
 
-- View all `$` settings with descriptions (e.g., `$110` = X max rate)
-- Modify individual settings and click **Apply**
-- **Export** settings to a text file for backup
-- **Import** settings from a file to restore configuration
+- **Retrieve** reads all `$` settings from the controller, with descriptions (e.g., `$110` = X max rate)
+- Click a setting to edit it, then click **Apply** to write it
+- **Save** (Save Settings to File) writes the list to a JSON file for backup
+- **Load** (Load Settings from File) reads a saved list for viewing; it does not write the values to the controller
 
 ### Laser Mode
 
-When the device type is set to **Laser**, GCodeKit5 automatically configures `$32=1` (GRBL laser mode) to enable variable power during motion.
+The Device Config page's device type selector chooses CNC, Laser or Other. Choosing **Laser** writes `$32=1` (GRBL laser mode) and **CNC** writes `$32=0`; **Other** leaves `$32` alone. The selector also follows the `$32` value the controller reports.
 
 ## See Also
 

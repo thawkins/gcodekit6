@@ -2,7 +2,7 @@
 
 ## Overview
 
-GCodeKit5 provides comprehensive support for 6-axis CNC machines, enabling advanced machining operations including simultaneous 5-axis milling, complex rotary table operations, and full trunnion table support.
+GCodeKit5 can drive machines with up to six axes: X, Y and Z plus the rotary axes A, B and C. It shows and jogs the rotary axes and streams programs that use them.
 
 ## Supported Axes
 
@@ -19,50 +19,31 @@ GCodeKit5 provides comprehensive support for 6-axis CNC machines, enabling advan
 
 ### Prerequisites
 
-- GCodeKit5 version 0.56.0-alpha or later
-- 6-axis capable CNC controller (GRBL, grblHAL, TinyG, g2core, FluidNC, or Smoothieware)
+- A GRBL-family controller (GRBL, grblHAL or FluidNC) with rotary axis support
 - Rotary axes properly configured on your controller
 
 ### Device Configuration
 
-1. **Select Your Device**: Go to Devices → Device Manager
-2. **Configure Axis Count**: Set the number of axes your machine supports (4, 5, or 6)
-3. **Set Axis Limits**: Configure travel limits for each axis:
-   - Linear axes (X/Y/Z): Set in millimeters
-   - Rotary axes (A/B/C): Set in degrees (typically 0-360° or 0-9999 for continuous rotation)
+1. **Select Your Device**: Open the **Device Manager** page and select or add your device
+2. **Configure Axis Count**: Set **No of Axes:** to the number of axes your machine has
+3. **Set Axis Limits**: Set the X, Y and Z travel limits (mm) in the device's Limits
 
-### Dynamic UI
+### Rotary Axes in Machine Control
 
-GCodeKit5 automatically adapts the UI based on your configured axis count:
-
-- **3-axis machines**: Standard X/Y/Z controls
-- **4-axis machines**: Adds A-axis (rotary table) controls
-- **5-axis machines**: Adds A and B-axis controls
-- **6-axis machines**: Full X/Y/Z/A/B/C control
+The DRO shows A, B and C positions (in degrees) when the machine reports them in its status reports. Each rotary row has a **Zero** button and `-` / `+` jog buttons.
 
 ## Jogging Rotary Axes
 
-### Step Sizes
+### Step Size
 
-Rotary axes use degree-based step sizes:
-
-| Step Size | Description |
-|-----------|-------------|
-| 0.1° | Fine adjustment |
-| 0.5° | Small increments |
-| 1° | Standard increment |
-| 5° | Medium moves |
-| 10° | Large moves |
-| 45° | Quick positioning |
-| 90° | Quarter rotation |
+A rotary jog button moves by the rotary step, 1 degree by default. In continuous mode, holding the button jogs until you release it, up to the axis limit (360 degrees by default).
 
 ### G-Code Generation
 
-Rotary jog commands are generated using relative positioning:
+Rotary jogs are sent as GRBL jog commands (`$J=`) with relative moves; a rotary distance is written in degrees with three decimals, for example:
 
 ```gcode
-G91 G21 A10 F500   ; Rotate A axis +10 degrees at 500 units/min
-G91 G21 B-5 F500   ; Rotate B axis -5 degrees
+$J=G91 G21 A10.000 F1000
 ```
 
 ## Work Coordinate Systems
@@ -78,38 +59,6 @@ Example setting WCS with rotary offsets:
 ```gcode
 G10 L2 P1 X0 Y0 Z0 A0 B90 C0   ; Set G54 with B at 90°
 ```
-
-## Visualizer
-
-The 2D/3D visualizer supports 6-axis toolpaths:
-
-- **Rotary moves**: Shown with distinct colors
-- **Helical interpolation**: Visualized as spiral paths
-- **Bounds tracking**: Includes all 6 axes in calculations
-- **Projection modes**: Different views for rotary machining
-
-## Settings
-
-### Machine Settings
-
-Access via Settings → Machine:
-
-- **Jog Step Size (Rotary)**: Default step for A/B/C axes (degrees)
-- **Axis Limits**: Maximum travel for each axis
-- **Steps per Degree**: Stepper configuration for rotary axes
-- **Direction Inversion**: Reverse rotation direction per axis
-- **Calibration Offsets**: Compensate for mechanical errors
-
-### Preset Configurations
-
-GCodeKit5 includes presets for common 6-axis setups:
-
-- **3-Axis Mill**: Standard XYZ
-- **4-Axis Mill**: XYZ + A rotary
-- **5-Axis Mill**: XYZ + A/B trunnion
-- **6-Axis Mill**: Full XYZABC
-- **Desktop 6-Axis**: Compact machines (e.g., PocketNC)
-- **Industrial 6-Axis**: Large machining centers
 
 ## G-Code Compatibility
 
@@ -137,36 +86,13 @@ G2 X50 Y0 Z-5 I25 J0 A360      ; 360° helix while cutting
 ### Common Issues
 
 **Issue**: Rotary axis doesn't move
-- **Check**: Verify axis is enabled in device configuration
-- **Check**: Confirm steps per degree is set correctly
+- **Check**: Verify the axis is enabled and configured on your controller
+- **Check**: Confirm the controller reports the axis in its status reports (the DRO shows it)
 - **Check**: Ensure axis limits aren't exceeded
 
 **Issue**: Incorrect rotary positioning
-- **Check**: Calibration offset values
-- **Check**: Direction inversion settings
+- **Check**: The controller's rotary axis scaling and direction settings
 - **Check**: Work coordinate system offsets
-
-**Issue**: Visualizer shows wrong toolpath
-- **Check**: G-code includes A/B/C coordinates
-- **Check**: Visualizer bounds include rotary axes
-
-## Advanced Features
-
-### Continuous Rotation
-
-Set axis limit to 9999° for continuous rotation:
-
-- Useful for indexing operations
-- Allows multiple full rotations
-- No need to unwind between operations
-
-### Kinematics (g2core)
-
-For g2core controllers, advanced kinematics are supported:
-
-- **Forward kinematics**: Position from joint angles
-- **Inverse kinematics**: Joint angles from position
-- **Configuration**: Set via g2core settings
 
 ## Firmware-Specific Notes
 
@@ -180,35 +106,23 @@ For g2core controllers, advanced kinematics are supported:
 - Plugin system for custom kinematics
 - Network connectivity available
 
-### TinyG/g2core
-- JSON status reports
-- Automatic axis detection
-- Built-in kinematics support
-
 ### FluidNC
 - YAML configuration
 - Web interface for settings
 - WiFi and Ethernet support
 
-### Smoothieware
-- Config file-based setup
-- Up to 6 axes supported
-- Smooth motion planning
-
 ## Best Practices
 
 1. **Start Small**: Begin with 4-axis before attempting full 6-axis
 2. **Test Limits**: Verify axis limits match your machine capabilities
-3. **Use Presets**: Start with built-in presets and customize
-4. **Save Configurations**: Export settings for backup
-5. **Monitor Temperature**: Rotary axes can heat up during continuous operation
-6. **Lubrication**: Keep rotary table bearings properly lubricated
+3. **Save Configurations**: Save your controller settings to a file from Firmware Settings for backup
+4. **Monitor Temperature**: Rotary axes can heat up during continuous operation
+5. **Lubrication**: Keep rotary table bearings properly lubricated
 
 ## References
 
 - [GRBL Documentation](https://github.com/gnea/grbl/wiki)
 - [grblHAL Features](https://github.com/grblHAL/core/wiki)
-- [TinyG/G2Core Wiki](https://github.com/synthetos/g2/wiki)
 - [FluidNC Documentation](https://github.com/bdring/FluidNC/wiki)
 
 ## Support
@@ -216,10 +130,4 @@ For g2core controllers, advanced kinematics are supported:
 For issues or questions about 6-axis support:
 
 1. Check this documentation first
-2. Review the [6AXISPLAN.md](../6AXISPLAN.md) for implementation details
-3. File an issue on GitHub with your machine configuration
-
----
-
-*Last Updated: 2025-01-20*
-*Version: 0.56.0-alpha*
+2. File an issue on GitHub with your machine configuration

@@ -10,21 +10,18 @@ Messages are color-coded by level:
 
 | Level | Description |
 |-------|-------------|
-| **Info** | Standard responses from the controller |
-| **Success** | Confirmation messages (e.g., "ok") |
+| **Info** | Standard responses from the controller (default text color) |
+| **Success** | Confirmation messages |
 | **Warning** | Non-critical issues |
 | **Error** | Failures, faults, or alarm messages |
-| **Debug** | Diagnostic messages (hidden by default) |
+| **Debug** | Diagnostic messages (dimmed) |
 
-Each message includes an optional timestamp in HH:MM:SS format.
+An `error:N` or `ALARM:N` reply is shown with the meaning of its code beside it. Status reports are not logged; they appear in the DRO and status bar instead. The console keeps the newest 5000 messages.
 
-## Message Filtering
+## Header Buttons
 
-Toggle message levels on and off to focus on what matters:
-
-- Click a level filter button to show/hide that level
-- Enable **Debug** to see diagnostic messages
-- Filter buttons apply immediately to the current console content
+- **Clear console** empties the log.
+- **Copy last error** copies the newest error or alarm line to the clipboard.
 
 ## Sending Commands
 

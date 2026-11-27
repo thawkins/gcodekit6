@@ -2,65 +2,75 @@
 
 ## Tool Library
 
-The tool library stores your cutting tools so they can be selected when generating toolpaths.
+The **CNC Tools** page stores your cutting tools. It lists standard tools and your own custom tools, searchable by name, ID, type and diameter, and filterable by type, material and diameter.
 
 ### Tool Properties
 
-| Property | Description |
-|----------|-------------|
-| **Tool Number** | Reference number for the tool |
-| **Name / Description** | Descriptive label |
-| **Diameter** | Tool diameter in mm |
-| **Length Offset** | Tool length offset for Z compensation |
-| **Flute Count** | Number of cutting flutes |
-| **Max RPM** | Maximum spindle speed for this tool |
+The edit form has four tabs: Basic Info, Geometry, Manufacturer and Notes. Its fields include:
+
+| Field | Description |
+|-------|-------------|
+| **Tool Number:** | Reference number for the tool |
+| **Name:** | Descriptive label |
+| **Tool Type:** | The kind of tool (end mill, drill, V-bit, ...) |
+| **Tool Material:** | What the tool is made of |
+| **Coating:** | Tool coating |
+| **Diameter (mm):** | Cutting diameter |
+| **Shaft Diameter (mm):** | Shank diameter |
+| **Flute Length (mm):** | Length of the cutting flutes |
+| **Length (mm):** | Overall length |
+| **Number of Flutes:** | Number of cutting flutes |
+| **Corner Radius (mm):** | Only for corner radius end mills |
+| **Tip Angle (deg):** | Used for drills and V-bits |
+| **Manufacturer:** | Maker of the tool |
+| **Part Number:** | Maker's part number |
 
 ### Managing Tools
 
-- **Add Tool** — Click Add and enter the tool properties
-- **Edit Tool** — Select a tool from the list and modify its values
-- **Delete Tool** — Remove a tool from the library
+- **New Tool** — Create a new custom tool and enter its properties
+- **Edit Tool** — Select a tool from the list, modify its values, then **Save**
+- **Delete** — Remove a custom tool (standard tools cannot be deleted)
+- **Import GTC (.zip)...** / **Import GTC (.json)...** — Import a tool catalog
+- **Export Custom Tools...** — Export your custom tools to a JSON file
+- **Reset Custom Tools...** — Remove all custom and imported tools
 
-Tool data is stored persistently and available across sessions.
+Custom tools are saved in `custom_tools.json` in the settings folder and are available across sessions.
 
 ### Using Tools
 
-When generating toolpaths in the [Designer](40-designer.md) or [CAM Tools](50-camtools.md), select a tool from the library. The toolpath generator uses the tool diameter for offset calculations and the flute count for feeds and speeds.
+The [Speeds and Feeds Calculator](50-camtools.md) picks its tool from this library. The [Designer](40-designer.md) and the other [CAM Tools](50-camtools.md) take the tool diameter as a field of their own.
 
 ## Materials Database
 
-The materials database stores cutting parameters for different materials, used by the [Speeds & Feeds Calculator](50-camtools.md).
+The **Materials Manager** stores material properties, used by the [Speeds and Feeds Calculator](50-camtools.md).
 
 ### Material Properties
 
-| Property | Description |
-|----------|-------------|
-| **Material Name** | Descriptive name (e.g., "Aluminum 6061", "Baltic Birch Plywood") |
-| **Recommended Feed Rate** | Suggested feed rate in mm/min |
-| **Recommended Spindle Speed** | Suggested RPM |
-| **Tool Compatibility** | Which tool types and diameters work well |
+The edit form has five tabs: Basic Info, Properties, Machining, Safety and Notes. Its fields include:
+
+| Field | Description |
+|-------|-------------|
+| **Name:**, **Category:**, **Subcategory:** | What the material is (e.g., "Hardwood", "Alloy") |
+| **Density (kg/m3):** | Density |
+| **Machinability (1-10):** | How easy the material is to cut |
+| **Tensile Strength (MPa):** | Strength |
+| **Melting Point (deg C):** | Melting point |
+| **Chip Type:** | The chips the material forms |
+| **Heat Sensitivity:** | How sensitive the material is to heat |
+| **Abrasiveness:** | How abrasive the material is to tools |
+| **Surface Finish:** | The finish to expect |
+| **Dust Hazard:**, **Fume Hazard:** | Safety hazards |
+| **Coolant Required** | Whether coolant is needed |
 
 ### Managing Materials
 
-- **Add Material** — Define a new material with its cutting parameters
-- **Edit Material** — Modify properties of an existing material
-- **Delete Material** — Remove a material from the database
+- **New Material** — Define a new custom material
+- **Edit Material** — Modify an existing material, then **Save**
+- **Delete** — Remove a custom material
 
 ### Built-in Materials
 
-GCodeKit5 includes a set of common materials with recommended parameters. You can customize these or add your own.
-
-## Tool Change
-
-GCodeKit5 supports three tool change modes:
-
-| Mode | Description |
-|------|-------------|
-| **None** | No tool change support — single-tool operations |
-| **Manual** | Pauses the program and prompts the operator to change the tool |
-| **Automatic** | Sends ATC (Automatic Tool Changer) commands to the controller |
-
-Configure the tool change mode in [Settings](70-settings.md) or the [Advanced Features](85-safety-diagnostics.md) panel.
+GCodeKit5 includes a set of standard materials. Saving a standard material stores a custom copy; deleting that copy brings the standard material back.
 
 ## See Also
 
