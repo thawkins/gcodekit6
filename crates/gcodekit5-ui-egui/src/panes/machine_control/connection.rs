@@ -128,30 +128,36 @@ impl ConnectionForm {
             }
         });
         let mut action = None;
+        // Right to left: the refresh button takes its own width first and Connect fills
+        // exactly what is left. A fixed allowance for the refresh button made the row wider
+        // than the sidebar, and the resizable sidebar grew to fit it on every frame.
+        // Inside `horizontal`, so the row keeps one widget's height.
         ui.horizontal(|ui| {
-            let refresh = if network { 0.0 } else { 40.0 };
-            let size = egui::vec2(ui.available_width() - refresh, 0.0);
-            let button = if status.connected || self.connecting {
-                let label = tr.tr("Disconnect");
-                egui::Button::image_and_text(Icon::Disconnected.themed(ui), label).min_size(size)
-            } else {
-                crate::theme::primary_icon_button(Icon::Network.themed(ui), tr.tr("Connect"))
-                    .min_size(size)
-            };
-            if ui.add(button).clicked() {
-                action = Some(if status.connected || self.connecting {
-                    Action::Disconnect
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                if !network {
+                    ui.add_enabled_ui(editable, |ui| {
+                        if icon_only_button(ui, Icon::Refresh, &tr.tr("Refresh ports")).clicked() {
+                            self.refresh_ports();
+                        }
+                    });
+                }
+                let size = egui::vec2(ui.available_width(), 0.0);
+                let button = if status.connected || self.connecting {
+                    let label = tr.tr("Disconnect");
+                    egui::Button::image_and_text(Icon::Disconnected.themed(ui), label)
+                        .min_size(size)
                 } else {
-                    Action::Connect
-                });
-            }
-            if !network {
-                ui.add_enabled_ui(editable, |ui| {
-                    if icon_only_button(ui, Icon::Refresh, &tr.tr("Refresh ports")).clicked() {
-                        self.refresh_ports();
-                    }
-                });
-            }
+                    crate::theme::primary_icon_button(Icon::Network.themed(ui), tr.tr("Connect"))
+                        .min_size(size)
+                };
+                if ui.add(button).clicked() {
+                    action = Some(if status.connected || self.connecting {
+                        Action::Disconnect
+                    } else {
+                        Action::Connect
+                    });
+                }
+            });
         });
         action
     }
