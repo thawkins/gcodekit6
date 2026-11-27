@@ -292,3 +292,43 @@ fn translate_raw(p: &mut RepetierProcessor, line: &str) -> Vec<String> {
         .map(str::to_string)
         .collect()
 }
+
+/// A bare axis line continues the modal motion: after `G0` it stays a rapid and is
+/// not forced to `G1` (P2FW-6).
+#[test]
+fn test_bare_axis_line_continues_modal_motion() {
+    let mut p = RepetierProcessor::new();
+    assert_eq!(translate(&mut p, "G0 X1"), vec!["G0 X1"]);
+    assert_eq!(translate(&mut p, "X10"), vec!["G0 X10"]);
+    assert_eq!(translate(&mut p, "G1 X2 F100"), vec!["G1 X2 F100"]);
+    assert_eq!(translate(&mut p, "Y3"), vec!["G1 Y3"]);
+    // A jog does not change the program's modal motion.
+    translate(&mut p, "G0 X0");
+    translate(&mut p, "$J=G91 X1 F500");
+    assert_eq!(translate(&mut p, "X5"), vec!["G0 X5"]);
+    assert!(status(&mut p).contains("MPos:5.000,3.000,0.000"));
+}
+
+/// Only `ok` and a bare `wait` acknowledge a line; a message that mentions waiting
+/// does not (P2FW-6).
+#[test]
+fn test_waiting_message_is_not_an_ack() {
+    let mut p = RepetierProcessor::new();
+    let r = p.process_incoming(b"echo:waiting for heater\n".to_vec());
+    assert!(!r.events.contains(&RepetierEvent::Ack), "{:?}", r.events);
+    let r = p.process_incoming(b"wait\n".to_vec());
+    assert!(r.events.contains(&RepetierEvent::Ack), "{:?}", r.events);
+}
+
+/// A bare `G92` resets the `G92` offset reported as the stand-in `WCO` (P2FW-6).
+#[test]
+fn test_bare_g92_resets_wco() {
+    let mut p = RepetierProcessor::new();
+    translate(&mut p, "G1 X10 Y4");
+    translate(&mut p, "G92 X0 Y0");
+    assert!(status(&mut p).contains("WCO:10.000,4.000,0.000"));
+    translate(&mut p, "G92");
+    let s = status(&mut p);
+    assert!(s.contains("WCO:0.000,0.000,0.000"), "got {s:?}");
+    assert!(s.contains("MPos:10.000,4.000,0.000"), "got {s:?}");
+}

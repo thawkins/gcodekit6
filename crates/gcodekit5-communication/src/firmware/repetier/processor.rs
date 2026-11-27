@@ -45,6 +45,9 @@ pub struct RepetierProcessor {
     relative_moves: bool,
     /// Units of the commanded moves (`G20` when true).
     inch_units: bool,
+    /// The modal motion word (`G0`-`G3`) last commanded; a bare axis line
+    /// continues it, as in GRBL.
+    motion_word: &'static str,
     /// Bytes of an incoming line whose newline has not arrived yet.
     rx_partial: String,
     /// The exact numbered lines sent, by line number, for resend replays.
@@ -66,6 +69,7 @@ impl RepetierProcessor {
             offset: [0.0; 3],
             relative_moves: false,
             inch_units: false,
+            motion_word: "G1",
             rx_partial: String::new(),
             sent_history: BTreeMap::new(),
             is_waiting_for_hardware: false,
@@ -193,9 +197,12 @@ impl RepetierProcessor {
                 tracing::warn!("Repetier: jog without axis words ignored: {}", gcode);
                 return None;
             }
+            // A GRBL jog leaves the modal motion of the program unchanged.
+            let motion_word = self.motion_word;
             for line in &lines {
                 self.emit(line, &mut payload);
             }
+            self.motion_word = motion_word;
             return Some(payload.into_bytes());
         }
 
@@ -208,9 +215,10 @@ impl RepetierProcessor {
             return Some(payload.into_bytes());
         }
 
-        // A bare coordinate line continues the current move.
+        // A bare coordinate line continues the modal motion (`G0`-`G3`),
+        // which Repetier/Marlin do not track, so the word is written out.
         let gcode = if gcode.starts_with(['X', 'Y', 'Z']) {
-            format!("G1 {}", gcode)
+            format!("{} {}", self.motion_word, gcode)
         } else {
             gcode
         };
@@ -266,7 +274,10 @@ impl RepetierProcessor {
                 'G' if value == 21.0 => self.inch_units = false,
                 'G' if value == 28.0 => homing = true,
                 'G' if value == 92.0 => set_position = true,
-                'G' if [0.0, 1.0, 2.0, 3.0].contains(&value) => motion = true,
+                'G' if value == 0.0 => (motion, self.motion_word) = (true, "G0"),
+                'G' if value == 1.0 => (motion, self.motion_word) = (true, "G1"),
+                'G' if value == 2.0 => (motion, self.motion_word) = (true, "G2"),
+                'G' if value == 3.0 => (motion, self.motion_word) = (true, "G3"),
                 'X' => axes.push((0, value)),
                 'Y' => axes.push((1, value)),
                 'Z' => axes.push((2, value)),
@@ -285,6 +296,9 @@ impl RepetierProcessor {
                     self.offset[axis] = 0.0;
                 }
             }
+        } else if set_position && axes.is_empty() {
+            // A bare `G92` resets the offset of every axis.
+            self.offset = [0.0; 3];
         } else if set_position {
             for (axis, value) in axes {
                 self.offset[axis] = self.machine[axis] - value * scale;
@@ -333,7 +347,9 @@ impl RepetierProcessor {
 
             let lower = l.to_lowercase();
 
-            if lower.starts_with("ok") || lower.contains("wait") {
+            // `wait` alone is Repetier's idle acknowledgement; a message that
+            // merely mentions waiting (`echo:waiting for heater`) is not one.
+            if lower.starts_with("ok") || lower == "wait" {
                 events.push(RepetierEvent::Ack);
                 self.is_waiting_for_hardware = false;
             }
