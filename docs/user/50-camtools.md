@@ -4,13 +4,15 @@ GCodeKit5 includes a suite of specialized CAM tools for generating G-code direct
 
 ## Using CAM Tools
 
-1. Open a CAM tool from the **CAM Tools** tab
+1. Open the **CAM Tools** page, pick a tool from the list and click **Open**
 2. Configure the parameters for your project
-3. Click **Generate G-Code**
-4. Preview the toolpath in the visualizer
-5. Send to machine or save to file
+3. Click **Generate** to show the program on the page
+4. Click **Send to Editor** to replace the editor's program with it, or **Preview** to do that and show it in the visualizer
+5. Stream it from the editor or save it to a file
 
-Each CAM tool also has a **Help** button that opens context-sensitive documentation.
+**Load** and **Save** read and write a tool's parameters as a JSON preset. Most tools also have a **Help** button in the page header. Generating is refused while a job is running.
+
+The tools are: Tabbed Box Maker, Jigsaw Puzzle Generator, Laser Image Engraver, Speeds and Feeds Calculator, Spoilboard Surfacing, Create Spoilboard Grid, Gerber to G-Code, Drill Press and Probe Tools.
 
 ---
 
@@ -19,80 +21,58 @@ Each CAM tool also has a **Help** button that opens context-sensitive documentat
 Generate laser or CNC cut boxes with finger joints (tab-and-slot construction).
 
 **Parameters**:
-- Box dimensions (width, height, depth)
-- Material thickness
-- Finger/tab width and spacing
-- Box type (open top, closed, with dividers)
-- X and Y divider count
+- Box dimensions: X (Width), Y (Depth), H (Height), Outside Dims
+- Material: Thickness, Burn / Tool Dia
+- Finger joints (multiples of thickness): Finger Width, Space Width, Surrounding Spaces, Play (fit tolerance), Extra Length
+- **Finger Style:** Rectangular, Springs, Barbs or Snap Fit
+- **Box Type:** Full Box, No Top, No Bottom, No Sides, No Front/Back, No Left/Right
+- Dividers X / Dividers Y, and **Divider Keying:** Walls and Floor, Walls Only, Floor Only, None
+- Laser settings: Passes, Power (S), Feed Rate, Z Step Down; work origin Offset X / Offset Y
 
-**Output**: G-code for cutting all box panels with interlocking finger joints, laid out flat.
-
----
-
-## Jigsaw Puzzle Maker
-
-Create laser-cut jigsaw puzzles with randomized interlocking tabs.
-
-**Parameters**:
-- Puzzle dimensions (width, height)
-- Number of pieces across and down
-- Tab size and jitter (randomization)
-- Random seed (change for different patterns)
-
-**Output**: G-code for cutting the puzzle piece grid.
+**Output**: G-code for cutting all box panels laid out flat. **Generate Shapes** adds the panel outlines to the Designer instead.
 
 ---
 
-## Drill Press
+## Jigsaw Puzzle Generator
 
-Emulate a drill press on your CNC with multiple drilling strategies.
-
-**Drilling Modes**:
-- **Standard drilling** — Single plunge to depth
-- **Peck drilling** — Incremental plunges with retract for chip clearing
-- **Helical interpolation** — Spiral milling for holes larger than the tool diameter
+Create jigsaw puzzles with randomized interlocking tabs.
 
 **Parameters**:
-- Hole position (X, Y)
-- Hole diameter, top Z, bottom Z
-- Tool diameter
-- Peck depth (for peck drilling)
-- Helix angle (for helical mode)
-- Plunge rate, feed rate, spindle speed, safe Z height
+- Puzzle dimensions: Width, Height
+- Pieces Across, Pieces Down
+- Tab Size (%), Jitter (%), Corner Radius
+- Random Seed (**Randomize** picks a new one)
 
-**Import/Export**: Save and load drill parameters as JSON.
+**Output**: **Generate** adds the puzzle outlines to the Designer as grouped shapes and brings the Designer to the front. It does not produce G-code directly.
 
 ---
 
-## Laser Bitmap Engraver
+## Laser Image Engraver
 
-Convert raster images (PNG, JPEG, BMP) to G-code for laser engraving.
+Convert raster images (PNG, JPEG, BMP, GIF, TIFF) to G-code for laser engraving.
 
 **Parameters**:
-- **Image**: Width (mm), rotation, mirror X/Y
-- **Halftone method**: Threshold, ordered dither, or error diffusion (Floyd-Steinberg)
-- **Laser**: Feed rate, travel rate, min/max power, power scaling
-- **Raster**: Pixels per mm, line spacing, bidirectional scanning
-- **Positioning**: Offset X, offset Y
-
-**Scan directions**: Left-to-right, right-to-left, top-to-bottom.
+- **Image**: Image Path (Browse...), Width, Rotation (0, 90, 180, 270 degrees), Mirror X, Mirror Y, Invert
+- **Halftoning**: Method (None, Threshold, Bayer 4x4, Floyd-Steinberg, Atkinson), Threshold
+- **Laser**: Feed Rate, Travel Rate, Min Power (%), Max Power (%), Power Scale (S)
+- **Scanning**: Pixels per mm, Line Spacing, Bidirectional, Scan Direction (Horizontal or Vertical)
+- **Work Offsets**: Offset X, Offset Y
 
 **Output**: G-code with variable laser power based on pixel intensity.
 
 ---
 
-## Laser Vector Engraver
+## Speeds and Feeds Calculator
 
-Engrave or cut vector paths (from SVG/DXF imports or designer shapes) with a laser.
+Calculate cutting parameters from a tool, a material and a device.
 
-**Parameters**:
-- **Cutting**: Feed rate, travel rate, cut power, engrave power, power scale
-- **Multi-pass**: Enable multiple passes with Z step-down per pass
-- **Hatching**: Fill closed shapes with parallel lines at a specified angle and spacing
-- **Cross-hatching**: Add a second perpendicular hatch pass
-- **Effects**: Dwell time, width adjustment, position offset
+**Inputs**:
+- Tool (from the CNC Tools manager) and Material (from the Materials manager)
+- Device (its spindle limits come from the Device Manager)
+- Operation Type: Slotting, Pocketing, Profiling, Adaptive / HSM, Drilling, Plunging
+- Depth of Cut, Stepover, Tool Stick-out, Coolant, Conservative Calculation
 
-**Output**: G-code for vector cutting and/or fill engraving.
+**Outputs** (after **Calculate**): spindle speed, feed rate, chip load, surface speed, material removal rate, spindle power and estimated deflection. **Reset** restores the defaults.
 
 ---
 
@@ -101,74 +81,72 @@ Engrave or cut vector paths (from SVG/DXF imports or designer shapes) with a las
 Generate a parallel toolpath to flatten your CNC machine's spoilboard or wasteboard.
 
 **Parameters**:
-- Surface width and height
-- Tool diameter and stepover percentage
-- Feed rate, spindle speed, cutting depth
-- Safe Z height
+- Width, Height
+- Tool Diameter, Stepover (%)
+- Feed Rate, Spindle Speed, Cut Depth
+- Safe Z Height
 
 **Output**: G-code for back-and-forth parallel passes covering the entire surface area.
 
 ---
 
-## Spoilboard Grid
+## Create Spoilboard Grid
 
-Generate a reference grid of holes on your spoilboard for workholding.
+Engrave a reference grid of lines on your spoilboard with a laser, for workpiece alignment.
 
 **Parameters**:
-- Grid width and height
-- X and Y spacing between holes
-- Hole diameter and depth
+- Width, Height
+- Grid Spacing
+- Feed Rate, Laser Power (S)
+- Laser Mode: M3 (Constant Power) or M4 (Dynamic Power)
 
-**Output**: G-code with drill operations at each grid intersection point.
+**Output**: G-code that engraves the grid lines.
 
 ---
 
-## Gerber Converter (PCB Milling)
+## Gerber to G-Code (PCB Milling)
 
-Convert Gerber and Excellon files to G-code for PCB isolation routing and drilling.
+Convert one layer of a Gerber project folder to G-code. **Browse...** picks the folder; the layer files are found by name.
 
-**Supported Layers**:
-- Top Copper
-- Bottom Copper
-- Solder Mask
-- Screen Print
+**Layer Type**:
+- Top Copper, Bottom Copper
+- Top Solder Mask, Bottom Solder Mask
+- Top Screen Print, Bottom Screen Print
+- Drill Holes (an Excellon drill file)
+- Board Outline
 
 **Parameters**:
-- Tool diameter for isolation routing
-- Isolation width
-- Drill file processing (Excellon format)
+- Board Width, Board Height, Offset X, Offset Y
+- Tool Diameter, Isolation Width, Cut Depth, Safe Z, Feed Rate, Spindle Speed
+- Remove Excess Copper, Use Board Outline for Rubout
+- Alignment holes: Generate Alignment Holes, Hole Diameter, Margin, Drill Depth (Z)
 
-**Output**: G-code for isolation milling around copper traces and drilling through-holes.
+**Output**: G-code for isolation milling around copper traces, the board outline, or drilling.
 
 ---
 
-## Speeds and Feeds Calculator
+## Drill Press
 
-Calculate optimal cutting parameters based on material properties and tool geometry.
+Drill one hole: a single plunge, peck drilling, or helical milling for a hole larger than the tool.
 
-**Inputs**:
-- Material type (from the materials library or custom)
-- Tool diameter, flute count, tool type
-- Machine constraints (max RPM)
+**Parameters**:
+- Hole Diameter, Center X, Center Y
+- Tool Diameter
+- Top Z (Surface), Bottom Z (Depth), Peck Depth (0 for none)
+- Plunge Rate, Feed Rate, Spindle Speed, Safe Z
 
-**Outputs**:
-- Recommended RPM
-- Calculated feed rate (mm/min)
-- Chip load per tooth
-- Warnings if parameters exceed machine limits or recommended ranges
+The Drill Press is refused when the device is in laser mode (`$32=1`).
+
+---
+
+## Probe Tools
+
+Probe for Z, edges and corners on the machine. See [Probing](PROBING.md).
 
 ---
 
 ## Common Settings Across CAM Tools
 
-Many CAM tools share these parameters:
-
-| Parameter | Description |
-|-----------|-------------|
-| Feed Rate | Cutting speed in mm/min |
-| Plunge Rate | Z-axis descent speed in mm/min |
-| Safe Height | Z clearance for rapid positioning moves |
-| Spindle Speed | RPM for the spindle or laser power |
-| Material Thickness | For through-cutting operations |
+Many G-code tools have a **Home Device Before Start** option that homes the machine (`$H`) at the start of the program.
 
 All dimensional values are entered in mm (or inches, depending on your unit setting). Internal calculations always use mm.

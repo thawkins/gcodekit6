@@ -36,24 +36,23 @@ A gallery of pre-built parametric shape templates for quick insertion.
 
 ### Selection
 - **Click** a shape to select it (displays handles)
-- **Ctrl+Click** to add/remove from selection
+- **Shift+Click** adds to the selection; **Ctrl+Click** adds or removes a shape
 - **Drag** a selection box to select multiple shapes
-- **Ctrl+A** to select all shapes
 
 ### Transform Operations
-- **Move** — Drag a selected shape to reposition
+- **Move** — Drag a selected shape to reposition (Shift locks the axis)
 - **Resize** — Drag corner handles to scale
-- **Rotate** — Drag rotation handle or enter exact angle
-- **Mirror** — Flip horizontally or vertically
-- **Scale** — Scale by a precise factor
+- **Rotate** — Right-click > **Rotate** by a fixed angle, or enter an exact **Rotation:** in Properties
+- **Mirror** — Right-click > **Mirror on X** / **Mirror on Y**
+- **Exact size** — Enter width and height in Properties. With **Lock Aspect:** on, editing the width sets height = width / ratio (and the reverse)
 
 ### Alignment
-Align multiple selected shapes:
-- Left, Right, Top, Bottom edge alignment
-- Center horizontally or vertically
+Align two or more selected shapes from the right-click **Align** menu:
+- Align Left, Align Right, Align Top, Align Bottom
+- Align Center X, Align Center Y
 
 ### Arrays
-Duplicate shapes in patterns:
+Duplicate shapes in patterns with right-click > **Array...**:
 - **Linear array** — Copies along a line
 - **Circular array** — Copies around a center point
 - **Grid array** — Copies in a rectangular grid
@@ -68,17 +67,17 @@ These operations modify shape geometry without destroying the original:
 
 | Operation | Description |
 |-----------|-------------|
-| **Offset** | Expand or contract the shape boundary by a distance |
-| **Fillet** | Round corners with a specified radius |
-| **Chamfer** | Bevel corners at a specified distance |
+| **Offset:** | Expand or contract the shape boundary by a distance (Properties > Geometry Operations) |
+| **Chamfer:** | Bevel corners at a specified distance (Properties > Geometry Operations) |
+| **Corner > Radius:** | Round a rectangle's corners or fillet a path's corners |
 
-## Layers
+## Objects List
 
-The layers panel lets you organize shapes into layers:
-- Create, rename, and delete layers
-- Toggle layer visibility
-- Lock layers to prevent editing
-- Reorder layer stacking
+The Layers pane lists the design's shapes in drawing order (there are no separate layers):
+- Click a row to select the shape on the canvas
+- Toggle a shape's visibility, or lock it so it cannot be selected
+- Rename a shape
+- Move shapes up and down the drawing order, or group and ungroup them
 
 ## Importing Files
 
@@ -92,6 +91,8 @@ The layers panel lets you organize shapes into layers:
 
 Imported geometry is scaled correctly to millimeters.
 
+STL import is offered only when **Preferences > Advanced > STL File Import** is on.
+
 # Import external designs via **File → Import Image**:
 
 | Format | Description |
@@ -100,10 +101,13 @@ Imported geometry is scaled correctly to millimeters.
 | **PNG** | Raster Image |
 | **BMP** | Raster Image |
 | **TIF** | Raster Image |
+| **WebP** | Raster Image |
+
+Image import is available in **Laser 2D** machine mode only.
 
 - Import image and then select it. With the image selected, the Properties Inspector will display its size and position, as well as the engraving settings: speed, laser power, resolution, etc.
-- Once all properties are configured, click "Frame" to generate the G-code for the rectangle the image will occupy.
-- Then, with the image still selected, click "Generate G-code" button to generate  G-code for the image itself.
+- Once all properties are configured, click **Frame** to generate the G-code for the rectangle the image will occupy.
+- Then, with the image still selected, click the **Generate G-Code** button to generate  G-code for the image itself.
 - In Viewer, you will see the image that will be engraved based on the generated G-code. Note that there are two 2.5mm margins on each side if you choose horizontal engraving, or above and below the image if you choose vertical engraving. These are inertial adjustments to increase the engraving speed and ensure continuity. To prevent the laser from going into a negative position, if the image is positioned at X0, Y0, the image will automatically shift an offset of X2.5, Y2.5.
 
 ## Toolpath Generation
@@ -112,30 +116,31 @@ Convert designer shapes into G-code toolpaths:
 
 ### Operations
 
+Each shape's **CAM Properties** (CNC 3D mode) set its **Operation:**:
+
 | Operation | Description |
 |-----------|-------------|
-| **Contour** | Cut along the outline of a shape (inside, outside, or on-line) |
+| **Profile** | Cut along the outline of a shape |
 | **Pocket** | Remove material from inside a closed shape |
-| **V-Carve** | Engrave using a V-shaped bit with variable depth |
-| **Adaptive Clearing** | Advanced stock removal with optimized tool engagement |
-| **Multi-pass** | Automatic depth stepping for deep cuts |
-| **Drilling** | Generate drill points from circles or marked positions |
+
+A pocket also has **Step In:** and a **Strategy:** of Raster, Offset or Adaptive. Every operation steps down in passes (**Step Down:**) and has a **Ramp Angle:**. Turn off **Use global values** to edit these per shape.
 
 ### Toolpath Parameters
-- Tool selection from the [Tool Library](60-tool-library.md)
-- Feed rate, plunge rate, spindle speed
-- Depth of cut per pass
-- Safe Z height for rapid moves
+
+The toolbox's Tool Settings and Stock Settings hold the global values:
+- CNC 3D: Feed Rate, Spindle Speed, Tool Dia, Step Down, Continuous Z
+- Laser 2D: Laser Speed, Laser Power, Laser Width, Passes
+- Stock: Stock Width, Stock Height, Stock Thickness, Safe Z Height
 
 ## Undo / Redo
 
 - **Ctrl+Z** — Undo the last action
-- **Ctrl+Y** — Redo
-- Full history is maintained until the file is closed
+- **Ctrl+Y** or **Ctrl+Shift+Z** — Redo
+- The last 50 actions can be undone
 
 ## Project Files
 
-Save your designs as `.gck4` project files, which preserve all shapes, layers, properties, and toolpath settings.
+Save your designs as `.gckd` design files, which preserve all shapes, properties, and toolpath settings. **Open** also reads older `.gck5` files.
 
 ## See Also
 

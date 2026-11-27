@@ -7,8 +7,8 @@ The G-Code Editor provides a full-featured text editor for viewing and modifying
 ## Opening Files
 
 - **File → Open** or **Ctrl+O** to open a G-code file
-- Supported extensions: `.nc`, `.gcode`, `.ngc`, `.gco`
-- Large files (100k+ lines) load with a progress indicator
+- The file dialog lists `.gcode`, `.nc`, `.gc` and `.tap` files
+- Large files (more than 50,000 lines) open read-only to stay fast; tick **Edit anyway** to edit them
 
 ## Syntax Highlighting
 
@@ -24,35 +24,29 @@ G-code elements are color-coded for readability:
 
 ## Search and Replace
 
-Open search with **Ctrl+F**:
+The find row sits above the text:
 
-- **Find**: Enter text and navigate matches with Find Next / Find Previous
-- **Replace**: Replace single occurrences or all at once
-- **Case sensitive**: Toggle case-sensitive matching
-- **Match count**: Total number of matches displayed
+- **Search...**: enter text; matching ignores case (`x10` finds `X10`)
+- **Previous Match** / **Next Match**: step through matches, wrapping around
+- **Matches:** shows the total number of matches
+- **Replace with ...**: enter the replacement, then **Replace** (the current match, then on to the next) or **Replace All**
+- **Clear editor** empties the editor after asking
 
-## File Statistics
-
-When a file is loaded, the editor calculates:
-
-- Total line count
-- Rapid moves (G0), linear moves (G1), arc moves (G2/G3)
-- M-code and comment counts
-- Estimated run time (formatted as hours:minutes:seconds)
+Replace is disabled while a job runs or while a large file is shown read-only.
 
 ## Execution Tracking
 
 While streaming a program to the machine:
 
-- The **current line** is marked with a ▶ indicator
-- **Executed lines** are marked with ✓
+- The line in progress becomes the **current line**, highlighted in the line-number gutter
 - The editor **auto-scrolls** to keep the current line visible
+- The text is read-only while the job runs
 
 ## Saving Files
 
 - **Ctrl+S** — Save to the current file
 - **Ctrl+Shift+S** — Save As with a new filename
-- Unsaved changes are indicated in the title bar; you are prompted to save when closing
+- Unsaved changes are marked with `*` after the file name under the text; you are asked to save before opening another file or quitting
 
 ## See Also
 
