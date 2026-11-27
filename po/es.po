@@ -902,6 +902,21 @@ msgstr "Sin Frontal/Trasero"
 msgid "No Left/Right"
 msgstr "Sin Izquierda/Derecha"
 
+msgid "Finger Style:"
+msgstr "Estilo de Dedos:"
+
+msgid "Rectangular"
+msgstr "Rectos"
+
+msgid "Springs"
+msgstr "Muelles"
+
+msgid "Barbs"
+msgstr "Púas"
+
+msgid "Snap Fit"
+msgstr "Encaje a Presión"
+
 msgid "Walls and Floor"
 msgstr "Paredes y Fondo"
 

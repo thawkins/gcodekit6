@@ -47,3 +47,5 @@ mod test_probe_mode_restore;
 mod test_speeds_feeds_calculator;
 #[path = "test_speeds_feeds_service.rs"]
 mod test_speeds_feeds_service;
+#[path = "test_tabbed_box_finger_styles.rs"]
+mod test_tabbed_box_finger_styles;

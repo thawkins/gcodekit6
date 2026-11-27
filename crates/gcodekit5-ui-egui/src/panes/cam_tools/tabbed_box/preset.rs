@@ -44,6 +44,7 @@ impl TabbedBoxParams {
         self.surrounding_spaces = p.finger_joint.surrounding_spaces.to_string();
         self.play = len(p.finger_joint.play);
         self.extra_length = len(p.finger_joint.extra_length);
+        self.finger_style = p.finger_joint.style;
         self.box_type = p.box_type;
         self.dividers_x = p.dividers_x.to_string();
         self.dividers_y = p.dividers_y.to_string();

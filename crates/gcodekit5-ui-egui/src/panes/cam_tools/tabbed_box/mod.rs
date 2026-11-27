@@ -17,8 +17,8 @@ mod preset;
 
 use gcodekit5_app::i18n::Translator;
 use gcodekit5_camtools::tabbed_box::{
-    BoxParameters, BoxType, FingerJointSettings, KeyDividerType, MAX_THICKNESS_MM, MIN_JOINT_WIDTH,
-    MIN_LASER_PASSES, MIN_SIDE_MM, MIN_THICKNESS_MM, TabbedBoxMaker,
+    BoxParameters, BoxType, FingerJointSettings, FingerStyle, KeyDividerType, MAX_THICKNESS_MM,
+    MIN_JOINT_WIDTH, MIN_LASER_PASSES, MIN_SIDE_MM, MIN_THICKNESS_MM, TabbedBoxMaker,
 };
 use gcodekit5_core::units::{self, MeasurementSystem};
 
@@ -45,6 +45,7 @@ const SPACE_WIDTH: &str = n_!("Space Width:");
 const SURROUNDING_SPACES: &str = n_!("Surrounding Spaces:");
 const PLAY: &str = n_!("Play (fit tolerance):");
 const EXTRA_LENGTH: &str = n_!("Extra Length:");
+const FINGER_STYLE: &str = n_!("Finger Style:");
 const PASSES: &str = n_!("Passes:");
 const POWER: &str = n_!("Power (S):");
 const FEED_RATE: &str = n_!("Feed Rate:");
@@ -88,6 +89,14 @@ const BOX_TYPES: [(BoxType, &str); 6] = [
     (BoxType::NoLeftRight, n_!("No Left/Right")),
 ];
 
+/// The finger styles and the msgids of their names, in menu order.
+const FINGER_STYLES: [(FingerStyle, &str); 4] = [
+    (FingerStyle::Rectangular, n_!("Rectangular")),
+    (FingerStyle::Springs, n_!("Springs")),
+    (FingerStyle::Barbs, n_!("Barbs")),
+    (FingerStyle::Snap, n_!("Snap Fit")),
+];
+
 /// The divider keying choices and the msgids of their names, in menu order.
 const KEYINGS: [(KeyDividerType, &str); 4] = [
     (KeyDividerType::WallsAndFloor, n_!("Walls and Floor")),
@@ -115,6 +124,7 @@ pub fn msgids() -> Vec<&'static str> {
         SURROUNDING_SPACES,
         PLAY,
         EXTRA_LENGTH,
+        FINGER_STYLE,
         PASSES,
         POWER,
         FEED_RATE,
@@ -142,6 +152,7 @@ pub fn msgids() -> Vec<&'static str> {
     ];
     ids.extend(BOX_TYPES.iter().map(|(_, msgid)| *msgid));
     ids.extend(KEYINGS.iter().map(|(_, msgid)| *msgid));
+    ids.extend(FINGER_STYLES.iter().map(|(_, msgid)| *msgid));
     ids
 }
 
@@ -172,6 +183,8 @@ pub struct TabbedBoxParams {
     pub play: String,
     /// Extra length.
     pub extra_length: String,
+    /// The shape of the fingers (the notches stay plain).
+    pub finger_style: FingerStyle,
     /// Which panels the box has.
     pub box_type: BoxType,
     /// Dividers along X.
@@ -220,6 +233,7 @@ impl TabbedBoxParams {
             surrounding_spaces: "2".into(),
             play: len(0.0),
             extra_length: len(0.0),
+            finger_style: FingerStyle::Rectangular,
             box_type: BoxType::FullBox,
             dividers_x: "0".into(),
             dividers_y: "0".into(),
@@ -332,6 +346,7 @@ impl TabbedBoxParams {
                 surrounding_spaces: surrounding_spaces as f32,
                 play: play as f32,
                 extra_length: extra_length as f32,
+                style: self.finger_style,
                 ..FingerJointSettings::default()
             },
             box_type: self.box_type,
@@ -536,6 +551,14 @@ fn show_fields(ui: &mut egui::Ui, p: &mut TabbedBoxParams, tr: &Translator, erro
         );
         field_row(ui, tr, PLAY, &mut p.play, unit, errors);
         field_row(ui, tr, EXTRA_LENGTH, &mut p.extra_length, unit, errors);
+        combo_row(
+            ui,
+            tr,
+            "cam-box-finger-style",
+            FINGER_STYLE,
+            &mut p.finger_style,
+            &FINGER_STYLES,
+        );
     });
     heading(ui, tr, n_!("Laser Settings"));
     grid(ui, "cam-box-laser", |ui| {

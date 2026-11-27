@@ -10,10 +10,10 @@
 
 use egui_kittest::kittest::Queryable;
 use gcodekit5_app::i18n::Translator;
-use gcodekit5_camtools::tabbed_box::{BoxType, KeyDividerType};
+use gcodekit5_camtools::tabbed_box::{BoxType, FingerStyle, KeyDividerType};
 use gcodekit5_core::units::MeasurementSystem;
 use gcodekit5_ui_egui::panes::cam_tools::CamTool;
-use gcodekit5_ui_egui::panes::cam_tools::common::format_len;
+use gcodekit5_ui_egui::panes::cam_tools::common::{CamError, format_len};
 use gcodekit5_ui_egui::panes::cam_tools::requests::DesignerPaths;
 use gcodekit5_ui_egui::panes::cam_tools::tabbed_box::TabbedBoxParams;
 use gcodekit5_ui_egui::workspace::PaneId;
@@ -304,4 +304,39 @@ fn test_cam_tabbed_box_preset_loads_the_gtk_file_and_round_trips() {
         unreadable.preset_json(&tr),
         Err("Thickness: Not a valid length".to_string())
     );
+}
+
+/// The Finger Style menu lists plain fingers and the three boxes.py styles, and the
+/// chosen one reaches the program.
+#[test]
+fn test_cam_tabbed_box_finger_style_menu_lists_and_selects_the_styles() {
+    use egui::accesskit::Role;
+    let mut h = open_tool_tall(CamTool::TabbedBox);
+    assert!(
+        h.query_by_value("Rectangular").is_some(),
+        "plain is the default"
+    );
+    h.get_by_role_and_label(Role::ComboBox, "Finger Style:")
+        .scroll_to_me();
+    frames(&mut h, 3);
+    h.get_by_role_and_label(Role::ComboBox, "Finger Style:")
+        .click();
+    frames(&mut h, 2);
+    for option in ["Springs", "Barbs", "Snap Fit"] {
+        assert!(h.query_by_label(option).is_some(), "{option} not listed");
+    }
+    h.get_by_label("Springs").click();
+    frames(&mut h, 2);
+    let page = pane(&h).tabbed_box_mut().clone();
+    assert_eq!(page.finger_style, FingerStyle::Springs);
+    let program = page.generate().expect("generates");
+    assert!(program.contains("; Finger Style: Springs\n"));
+    assert_ne!(program, fixture("tabbed_box_default.gcode"));
+
+    // A joint the style cannot draw is the generator's refusal, as for the burn and play.
+    let mut snap = TabbedBoxParams::new(METRIC);
+    snap.finger_style = FingerStyle::Snap;
+    assert!(snap.generate().is_ok());
+    snap.dividers_x = "1".into();
+    assert!(matches!(snap.generate(), Err(CamError::Generator(_))));
 }

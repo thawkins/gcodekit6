@@ -2,6 +2,7 @@
 
 ### Added
 - **Gerber Drill Holes layer drills Excellon files**: the layer reads the project's Excellon drill file (KiCad, Eagle, Altium: METRIC/INCH, LZ/TZ, explicit or FILE_FORMAT number formats, tool table, G85 and routed slots) and drills every hole to the Drill Depth (Z) field at the feed rate, smallest drill first, with a spindle stop and `M0` pause naming each drill. Holes get the same X/Y offset as the other layers so they line up with the isolation cut. Slots are routed (plunge at the start, cut to the end). `.drl`, `.xln`, `.exc` and `*drill*` files are drill files, and a `.txt` whose content starts with `M48`; before, the layer was refused
+- **Tabbed box finger styles**: the Tabbed Box page has a Finger Style menu with Springs, Barbs and Snap Fit beside the plain Rectangular fingers (boxes.py's FingerJoint styles). These styles could be named in a preset before but were drawn as plain fingers. Plain fingers produce the same output as before; a joint a style cannot draw (fingers or spaces too narrow, Snap Fit with dividers or on too small a box) is refused with a message
 
 ### Fixed
 - **Designer laser output on curves**: merging nearly collinear laser segments now keeps every merged point within the curve tolerance (0.05 mm), which was set but never used; before, an r = 50 mm arc could be cut up to 0.18 mm inside the drawn curve. Curved laser shapes (ellipses, paths, polygons with many points) now produce more G-code moves; straight lines are merged as before
