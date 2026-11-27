@@ -10,58 +10,6 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  clippy-unwrap-check:
-    name: Check for unwrap() usage
-    runs-on: ubuntu-26.04
-    steps:
-      - uses: actions/checkout@v7
-
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          components: clippy
-
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libudev-dev pkg-config libxkbcommon-dev libwayland-dev libx11-dev libxcursor-dev libxrandr-dev libxi-dev libvulkan1 mesa-vulkan-drivers
-
-      - name: Cache cargo registry
-        uses: actions/cache@v6
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ runner.os }}-cargo-clippy-v2-${{ hashFiles('**/Cargo.lock') }}
-
-      - name: check-no-gtk
-        run: "! cargo tree --workspace -e normal | grep -E '^.*(gtk4|libadwaita|sourceview5|glib-sys) '"
-
-      - name: Run clippy with unwrap warning
-        run: |
-          cargo clippy --workspace --all-targets -- \
-            -W clippy::unwrap_used \
-            -A clippy::too_many_arguments \
-            -A clippy::type_complexity \
-            2>&1 | tee clippy_output.txt
-          
-          # Count unwrap warnings
-          # Count the lint diagnostics themselves; a plain "unwrap_used" match also counts
-          # clippy's "run `cargo clippy --fix ... -W clippy::unwrap_used`" hint lines.
-          UNWRAP_COUNT=$(grep -c 'used `unwrap()` on ' clippy_output.txt || true)
-          echo "Found $UNWRAP_COUNT unwrap() usages"
-          
-          if [ "$UNWRAP_COUNT" -gt 0 ]; then
-            echo "::error::Found $UNWRAP_COUNT unwrap() calls. Please replace with proper error handling."
-            echo ""
-            echo "Unwrap locations:"
-            grep -A1 'used `unwrap()` on ' clippy_output.txt
-            exit 1
-          fi
-          
-          echo "✅ No unwrap() calls detected"
-
   clippy-strict:
     name: Clippy (warnings are errors)
     runs-on: ubuntu-26.04
@@ -81,9 +29,7 @@ jobs:
         run: cargo machete
 
       - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libudev-dev pkg-config libxkbcommon-dev libwayland-dev libx11-dev libxcursor-dev libxrandr-dev libxi-dev libvulkan1 mesa-vulkan-drivers
+        uses: ./.github/actions/install-system-deps
 
       - name: Cache cargo registry
         uses: actions/cache@v6
@@ -94,8 +40,12 @@ jobs:
             target
           key: ${{ runner.os }}-cargo-clippy-v2-${{ hashFiles('**/Cargo.lock') }}
 
+      - name: check-no-gtk
+        run: "! cargo tree --workspace -e normal | grep -E '^.*(gtk4|libadwaita|sourceview5|glib-sys) '"
+
+      # unwrap_used becomes an error through -D warnings.
       - name: Run clippy
-        run: cargo clippy --workspace --all-targets -- -D warnings
+        run: cargo clippy --workspace --all-targets -- -D warnings -W clippy::unwrap_used
 
   nextest:
     name: Tests (nextest)
@@ -107,9 +57,7 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libudev-dev pkg-config libxkbcommon-dev libwayland-dev libx11-dev libxcursor-dev libxrandr-dev libxi-dev libvulkan1 mesa-vulkan-drivers
+        uses: ./.github/actions/install-system-deps
 
       - name: Install cargo-nextest
         uses: taiki-e/install-action@nextest
@@ -148,39 +96,6 @@ jobs:
       - name: Run doc tests
         run: cargo test --workspace --doc
 
-  unwrap-audit:
-    name: Unwrap Audit Report
-    runs-on: ubuntu-26.04
-    steps:
-      - uses: actions/checkout@v7
-
-      - name: Count unwraps in source code
-        run: |
-          echo "## Unwrap Audit" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          
-          # Count unwraps excluding test code and build artifacts
-          TOTAL=$(grep -r "\.unwrap()" --include="*.rs" crates/*/src/ src/ 2>/dev/null | \
-                  grep -v "unwrap_or" | grep -v "unwrap_or_else" | grep -v "unwrap_or_default" | \
-                  wc -l || echo "0")
-          
-          echo "| Metric | Count |" >> $GITHUB_STEP_SUMMARY
-          echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
-          echo "| Total unwrap() calls | $TOTAL |" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          
-          if [ "$TOTAL" -gt 0 ]; then
-            echo "::warning::Found $TOTAL unwrap() calls in source code"
-            echo "### Locations:" >> $GITHUB_STEP_SUMMARY
-            echo '```' >> $GITHUB_STEP_SUMMARY
-            grep -rn "\.unwrap()" --include="*.rs" crates/*/src/ src/ 2>/dev/null | \
-              grep -v "unwrap_or" | grep -v "unwrap_or_else" | grep -v "unwrap_or_default" | \
-              head -20 >> $GITHUB_STEP_SUMMARY
-            echo '```' >> $GITHUB_STEP_SUMMARY
-          else
-            echo "✅ No unwrap() calls found in source code" >> $GITHUB_STEP_SUMMARY
-          fi
-
   fmt-check:
     name: Format Check
     runs-on: ubuntu-26.04
@@ -209,3 +124,27 @@ jobs:
 
       - name: Run dependency checks
         run: cargo deny check
+
+  benchmarks:
+    name: Benchmarks compile
+    runs-on: ubuntu-26.04
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install system dependencies
+        uses: ./.github/actions/install-system-deps
+
+      - name: Cache cargo registry
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-bench-v2-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Verify benchmarks compile
+        run: cargo bench --no-run --workspace

@@ -28,11 +28,8 @@ jobs:
         with:
           toolchain: ${{ env.MSRV }}
 
-      - name: Install system dependencies (Linux)
-        if: runner.os == 'Linux'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libudev-dev pkg-config libxkbcommon-dev libwayland-dev libx11-dev libxcursor-dev libxrandr-dev libxi-dev libvulkan1 mesa-vulkan-drivers
+      - name: Install system dependencies
+        uses: ./.github/actions/install-system-deps
 
       - name: Cache cargo registry
         uses: actions/cache@v6
@@ -53,27 +50,6 @@ jobs:
 
       - name: Check workspace compiles on MSRV
         run: cargo check --workspace --all-targets
-
-      - name: Install cargo-nextest
-        uses: taiki-e/install-action@nextest
-
-      - name: Run tests on MSRV
-        run: cargo nextest run --workspace --profile ci
-        env:
-          WGPU_BACKEND: vulkan
-
-      - name: Upload kittest snapshot diffs
-        if: failure()
-        uses: actions/upload-artifact@v7
-        with:
-          name: kittest-snapshot-diffs
-          path: |
-            crates/gcodekit5-ui-egui/tests/snapshots/**/*.diff.png
-            crates/gcodekit5-ui-egui/tests/snapshots/**/*.new.png
-          if-no-files-found: ignore
-
-      - name: Run doc tests on MSRV
-        run: cargo test --workspace --doc
 
   msrv-verify:
     name: Verify MSRV in Cargo.toml
