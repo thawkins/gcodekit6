@@ -333,3 +333,26 @@ fn test_bare_g92_resets_wco() {
     assert!(s.contains("WCO:10.000,4.000,0.000"), "got {s:?}");
     assert!(s.contains("MPos:10.000,4.000,0.000"), "got {s:?}");
 }
+
+/// Characterization of the outgoing comment stripping (T58, CAMVIS-10).
+///
+/// Repetier/Marlin firmware treats `;` as a line comment and has no
+/// parenthesis comments, so the processor strips both before sending. These
+/// assertions pin the current behaviour, including its known gaps.
+#[test]
+fn test_comment_stripping_characterization() {
+    let mut p = RepetierProcessor::new();
+    // A removed comment between words leaves them separated.
+    assert_eq!(translate(&mut p, "G1(c)X10"), vec!["G1 X10"]);
+    // Current gap: `;` is split off before parentheses are read, so the `;`
+    // inside the comment drops the whole line and the `G1` is lost.
+    assert!(translate(&mut p, "(a;b) G1").is_empty());
+    assert_eq!(translate(&mut p, "G1 X10 ; c"), vec!["G1 X10"]);
+    assert_eq!(translate(&mut p, "G1 X10 (c) Y5"), vec!["G1 X10 Y5"]);
+    // A comment-only line sends nothing.
+    assert!(translate(&mut p, "(only a comment)").is_empty());
+    assert!(translate(&mut p, "; only a comment").is_empty());
+    // Nested parentheses are tracked by depth, so the whole comment goes.
+    assert_eq!(translate(&mut p, "(a(b)c) G1 X1"), vec!["G1 X1"]);
+    assert_eq!(translate(&mut p, "(a(b)X5) G1"), vec!["G1"]);
+}
