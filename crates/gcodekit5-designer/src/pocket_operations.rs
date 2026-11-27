@@ -285,11 +285,6 @@ impl PocketOperation {
         self.spindle_speed = spindle_speed;
     }
 
-    /// Enables or disables climb milling.
-    pub fn set_climb_milling(&mut self, enable: bool) {
-        self.climb_milling = enable;
-    }
-
     /// Sets the pocket strategy.
     pub fn set_strategy(&mut self, strategy: PocketStrategy) {
         self.strategy = strategy;
@@ -302,16 +297,6 @@ impl PocketOperation {
             "ramp_angle must be 0..90 degrees, got {angle}"
         );
         self.ramp_angle = angle.clamp(0.0, 90.0);
-    }
-
-    /// Sets raster fill percentage where 100 keeps full strokes and 0 removes them.
-    pub fn set_raster_fill_percent(&mut self, percent: f64) {
-        self.raster_fill_ratio = (percent / 100.0).clamp(0.0, 1.0);
-    }
-
-    /// Calculates the offset distance for the given pass number.
-    pub fn calculate_offset(&self, pass: u32) -> f64 {
-        self.stepover * pass as f64
     }
 }
 
@@ -352,21 +337,6 @@ impl PocketGenerator {
             operation,
             islands: Vec::new(),
         }
-    }
-
-    /// Adds an island to the pocket.
-    pub fn add_island(&mut self, island: Island) {
-        self.islands.push(island);
-    }
-
-    /// Adds a circular island.
-    pub fn add_circular_island(&mut self, center: Point, radius: f64) {
-        self.add_island(Island::new(center, radius));
-    }
-
-    /// Clears all islands.
-    pub fn clear_islands(&mut self) {
-        self.islands.clear();
     }
 
     /// Checks if a point is in any island.
@@ -956,37 +926,5 @@ impl PocketGenerator {
             None => self.add_entry_move(toolpath, start, pass, pass.is_first),
         }
         self.add_feed_move(toolpath, start, end);
-    }
-
-    /// Generates offset paths for the pocket boundary.
-    pub fn generate_offset_paths(&self, rect: &Rectangle, offset_count: u32) -> Vec<Vec<Point>> {
-        let mut paths = Vec::new();
-
-        for offset_idx in 1..=offset_count {
-            let offset = self.operation.calculate_offset(offset_idx);
-            if offset > (rect.width.min(rect.height) / 2.0) {
-                break;
-            }
-
-            let inset_x = (rect.center.x - rect.width / 2.0) + offset;
-            let inset_y = (rect.center.y - rect.height / 2.0) + offset;
-            let inset_width = (rect.width - 2.0 * offset).max(0.0);
-            let inset_height = (rect.height - 2.0 * offset).max(0.0);
-
-            if inset_width <= 0.0 || inset_height <= 0.0 {
-                break;
-            }
-
-            let path = vec![
-                Point::new(inset_x, inset_y),
-                Point::new(inset_x + inset_width, inset_y),
-                Point::new(inset_x + inset_width, inset_y + inset_height),
-                Point::new(inset_x, inset_y + inset_height),
-            ];
-
-            paths.push(path);
-        }
-
-        paths
     }
 }

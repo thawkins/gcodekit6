@@ -142,11 +142,6 @@ impl Viewport {
         (pixel_x, pixel_y)
     }
 
-    /// Converts world coordinates to pixel coordinates (using Point).
-    pub fn world_point_to_pixel(&self, point: &Point) -> (f64, f64) {
-        self.world_to_pixel(point.x, point.y)
-    }
-
     /// Fits the given bounding box into the viewport with padding.
     ///
     /// # Arguments
@@ -219,16 +214,6 @@ impl Viewport {
         self.zoom = new_zoom;
         self.pan_x = pixel_x - world_point.x * new_zoom;
         self.pan_y = self.canvas_height - pixel_y - world_point.y * new_zoom;
-    }
-
-    /// Zooms in at a specific world point (maintaining cursor position).
-    pub fn zoom_in_at(&mut self, world_point: &Point) {
-        self.zoom_to_point(world_point, self.zoom * 1.2);
-    }
-
-    /// Zooms out at a specific world point (maintaining cursor position).
-    pub fn zoom_out_at(&mut self, world_point: &Point) {
-        self.zoom_to_point(world_point, self.zoom / 1.2);
     }
 
     /// Centers the viewport on a world coordinate.

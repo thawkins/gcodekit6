@@ -366,11 +366,6 @@ impl DxfFile {
         self.layers.entry(layer).or_default().push(entity);
     }
 
-    /// Get all entities in a layer
-    pub fn get_layer_entities(&self, layer: &str) -> Option<&Vec<DxfEntity>> {
-        self.layers.get(layer)
-    }
-
     /// Get layer names
     pub fn layer_names(&self) -> Vec<&str> {
         self.layers.keys().map(|s| s.as_str()).collect()
@@ -478,12 +473,6 @@ impl DxfFile {
             self.header.extents_max.x * factor,
             self.header.extents_max.y * factor,
         );
-    }
-
-    /// Apply unit conversion
-    pub fn convert_units(&mut self, from_unit: DxfUnit, to_unit: DxfUnit) {
-        let conversion_factor = from_unit.to_mm_factor() / to_unit.to_mm_factor();
-        self.scale(conversion_factor);
     }
 }
 
@@ -1538,13 +1527,5 @@ impl DxfParser {
         } else {
             None
         }
-    }
-
-    /// Validate DXF file format
-    pub fn validate_header(content: &str) -> Result<()> {
-        if !content.contains("SECTION") || !content.contains("ENDSEC") {
-            return Err(anyhow::anyhow!("Invalid DXF file format"));
-        }
-        Ok(())
     }
 }

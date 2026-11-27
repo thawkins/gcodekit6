@@ -9,7 +9,6 @@ use crate::gcode_gen::MachineLimits;
 use crate::model::DesignerShape;
 use crate::model::LaserParams;
 use crate::shapes::OperationType;
-use gcodekit5_core::Units;
 
 /// Comment block added when a toolpath leaves the machine's working area.
 const LIMIT_WARNING: &str = ";
@@ -94,7 +93,7 @@ impl DesignerState {
             .as_ref()
             .map(|s| s.safe_z as f64)
             .unwrap_or(10.0);
-        let mut gcode_gen = ToolpathToGcode::new(Units::MM, safe_z)
+        let mut gcode_gen = ToolpathToGcode::new(safe_z)
             .with_continuous_z_between_passes(self.tool_settings.continuous_z_between_passes);
 
         if let Some(limits) = machine_limits {

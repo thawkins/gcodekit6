@@ -4,7 +4,6 @@
 //! G-code modal/line-number output, Bezier-to-arc fitting, shape ID allocation,
 //! save/load round-trips, mirror undo, and SVG/DXF import parsing.
 
-use gcodekit5_core::Units;
 use gcodekit5_designer::designer_state::MachineMode;
 use gcodekit5_designer::model::{
     DesignCircle, DesignGear, DesignLine, DesignPath, DesignPolygon, DesignRectangle,
@@ -139,7 +138,7 @@ fn test_line_render_and_hit_test_use_endpoints() {
 
 #[test]
 fn test_gcode_no_duplicate_line_numbers_and_g01_after_arc() {
-    let generator = ToolpathToGcode::with_line_numbers(Units::MM, 5.0, true);
+    let generator = ToolpathToGcode::with_line_numbers(5.0, true);
     let mut tp = Toolpath::new(3.0, -1.0);
     tp.add_segment(ToolpathSegment::new(
         ToolpathSegmentType::RapidMove,

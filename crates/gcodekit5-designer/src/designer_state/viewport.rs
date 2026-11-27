@@ -3,16 +3,6 @@
 use super::DesignerState;
 
 impl DesignerState {
-    /// Toggle grid visibility.
-    pub fn toggle_grid(&mut self) {
-        self.show_grid = !self.show_grid;
-    }
-
-    /// Toggle toolpath visibility.
-    pub fn toggle_toolpaths(&mut self) {
-        self.show_toolpaths = !self.show_toolpaths;
-    }
-
     /// Zooms in on the canvas.
     pub fn zoom_in(&mut self) {
         let current = self.canvas.zoom();

@@ -29,36 +29,6 @@ impl DesignerState {
         self.push_command(cmd);
     }
 
-    /// Snaps the selected shape to whole millimeters.
-    pub fn snap_selected_to_mm(&mut self) {
-        let updates = self.canvas.calculate_snapped_shapes();
-        if updates.is_empty() {
-            return;
-        }
-
-        let mut commands = Vec::new();
-        for (id, new_obj) in updates {
-            if let Some(old_obj) = self.canvas.get_shape(id) {
-                commands.push(DesignerCommand::ChangeProperty(ChangeProperty {
-                    id,
-                    old_state: old_obj.clone(),
-                    new_state: new_obj,
-                }));
-            }
-        }
-
-        let cmd = DesignerCommand::CompositeCommand(CompositeCommand {
-            commands,
-            name: "Snap to Grid".to_string(),
-        });
-        self.push_command(cmd);
-    }
-
-    /// Sets the position and size of the selected shape.
-    pub fn set_selected_position_and_size(&mut self, x: f64, y: f64, w: f64, h: f64) {
-        self.set_selected_position_and_size_with_flags(x, y, w, h, true, true);
-    }
-
     /// Sets the position and size of the selected shape with flags for which properties to update.
     pub fn set_selected_position_and_size_with_flags(
         &mut self,
@@ -284,11 +254,6 @@ impl DesignerState {
             name: "Set Offset".to_string(),
         });
         self.push_command(cmd);
-    }
-
-    /// Sets the fillet for the selected shapes.
-    pub fn set_fillet_selected(&mut self, radius: f64) {
-        self.set_corner_selected("Set Fillet", |o| o.fillet = radius, |o| o.chamfer = 0.0);
     }
 
     /// Sets the chamfer for the selected shapes.

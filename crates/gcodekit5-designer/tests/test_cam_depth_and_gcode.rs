@@ -4,7 +4,6 @@
 //! ramped contours, the machine boundary-violation check, and per-segment laser
 //! power changes.
 
-use gcodekit5_core::Units;
 use gcodekit5_designer::designer_state::MachineMode;
 use gcodekit5_designer::gcode_gen::MachineLimits;
 use gcodekit5_designer::model::{DesignRectangle, Point};
@@ -139,7 +138,7 @@ fn cut(z: f64, from: Point, to: Point) -> Toolpath {
 
 #[test]
 fn test_boundary_violation_ignores_normal_negative_z_cut() {
-    let generator = ToolpathToGcode::new(Units::MM, 10.0).with_machine_limits(limits());
+    let generator = ToolpathToGcode::new(10.0).with_machine_limits(limits());
     let tp = cut(-3.0, Point::new(10.0, 10.0), Point::new(20.0, 20.0));
     assert!(!generator.has_boundary_violation(&tp));
     let mut whole = Toolpath::new(3.0, -7.0);
@@ -155,14 +154,14 @@ fn test_boundary_violation_ignores_normal_negative_z_cut() {
 
 #[test]
 fn test_boundary_violation_checks_xy_limits() {
-    let generator = ToolpathToGcode::new(Units::MM, 10.0).with_machine_limits(limits());
+    let generator = ToolpathToGcode::new(10.0).with_machine_limits(limits());
     let tp = cut(-1.0, Point::new(10.0, 10.0), Point::new(120.0, 20.0));
     assert!(generator.has_boundary_violation(&tp));
 }
 
 #[test]
 fn test_boundary_violation_checks_z_against_configured_floor() {
-    let generator = ToolpathToGcode::new(Units::MM, 10.0)
+    let generator = ToolpathToGcode::new(10.0)
         .with_machine_limits(limits())
         .with_z_min_limit(0.0);
     assert!(!generator.has_boundary_violation(&cut(
@@ -205,7 +204,7 @@ fn laser_segment(from: Point, to: Point, power: u32) -> ToolpathSegment {
 
 #[test]
 fn test_laser_power_changes_are_emitted_per_segment() {
-    let generator = ToolpathToGcode::new(Units::MM, 5.0).with_laser_2d();
+    let generator = ToolpathToGcode::new(5.0).with_laser_2d();
     let mut tp = Toolpath::new(0.1, 0.0);
     tp.add_segment(ToolpathSegment::new(
         ToolpathSegmentType::RapidMove,
@@ -252,11 +251,11 @@ fn test_laser_power_changes_are_emitted_per_segment() {
 fn test_generate_header_records_stock_z0_for_cnc_only() {
     // The designer's CNC workflow zeroes Z on the stock bottom; the header must say so
     // explicitly so the visualizer's stock simulation uses the right origin.
-    let cnc = ToolpathToGcode::new(Units::MM, 10.0).generate_header(3000, 1000.0, 3.175, -5.0, 0.0);
+    let cnc = ToolpathToGcode::new(10.0).generate_header(3000, 1000.0, 3.175, -5.0, 0.0);
     assert!(cnc.contains("; Stock Z0: bottom"), "{cnc}");
 
     // Laser output has no Z stock origin.
-    let laser = ToolpathToGcode::new(Units::MM, 5.0)
+    let laser = ToolpathToGcode::new(5.0)
         .with_laser_2d()
         .generate_header(500, 1000.0, 0.1, 0.0, 0.0);
     assert!(!laser.contains("Stock Z0"), "{laser}");
@@ -283,7 +282,7 @@ fn test_cnc_program_starts_spindle_before_cutting_and_stops_it_at_end() {
         1000.0,
         12000,
     ));
-    let gcode = ToolpathToGcode::new(Units::MM, 5.0).generate(&tp);
+    let gcode = ToolpathToGcode::new(5.0).generate(&tp);
     let lines = gcode_words(&gcode);
 
     let m3 = lines.iter().position(|l| l == "M3 S12000");
@@ -301,7 +300,7 @@ fn test_cnc_program_starts_spindle_before_cutting_and_stops_it_at_end() {
 
 #[test]
 fn test_laser_program_does_not_start_spindle() {
-    let gcode = ToolpathToGcode::new(Units::MM, 5.0)
+    let gcode = ToolpathToGcode::new(5.0)
         .with_laser_2d()
         .generate_header(500, 1000.0, 0.1, 0.0, 0.0);
     assert!(
@@ -351,7 +350,7 @@ fn test_small_rotated_arcs_pass_grbl_radius_check() {
     let mut generator = ToolpathGenerator::new();
     generator.set_start_depth(10.0);
     generator.set_cut_depth(1.0);
-    let out = ToolpathToGcode::new(Units::MM, 15.0);
+    let out = ToolpathToGcode::new(15.0);
     for deg in 0..360 {
         let mut rect = DesignRectangle::new(1.234, 5.678, 20.0, 10.0);
         rect.corner_radius = 1.5;
@@ -422,7 +421,7 @@ fn test_cnc_spindle_speed_change_is_emitted() {
         1000.0,
         8000,
     ));
-    let gcode = ToolpathToGcode::new(Units::MM, 5.0).generate(&tp);
+    let gcode = ToolpathToGcode::new(5.0).generate(&tp);
     let lines = gcode_words(&gcode);
     let start = lines.iter().position(|l| l == "M3 S12000");
     let change = lines.iter().position(|l| l == "S8000");

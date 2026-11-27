@@ -2,7 +2,6 @@
 //! spatial index operations, and DXF parsing.
 
 use criterion::{Criterion, criterion_group, criterion_main};
-use gcodekit5_core::Units;
 use gcodekit5_designer::dxf_parser::DxfParser;
 use gcodekit5_designer::gcode_gen::ToolpathToGcode;
 use gcodekit5_designer::model::Point;
@@ -85,7 +84,7 @@ fn make_large_toolpath(n_segments: usize) -> Toolpath {
 
 fn bench_gcode_generation_small(c: &mut Criterion) {
     let tp = make_large_toolpath(20);
-    let generator = ToolpathToGcode::new(Units::MM, 5.0);
+    let generator = ToolpathToGcode::new(5.0);
     c.bench_function("gcode_gen_20_segments", |b| {
         b.iter(|| {
             let _ = generator.generate(black_box(&tp));
@@ -95,7 +94,7 @@ fn bench_gcode_generation_small(c: &mut Criterion) {
 
 fn bench_gcode_generation_medium(c: &mut Criterion) {
     let tp = make_large_toolpath(200);
-    let generator = ToolpathToGcode::new(Units::MM, 5.0);
+    let generator = ToolpathToGcode::new(5.0);
     c.bench_function("gcode_gen_200_segments", |b| {
         b.iter(|| {
             let _ = generator.generate(black_box(&tp));
@@ -105,7 +104,7 @@ fn bench_gcode_generation_medium(c: &mut Criterion) {
 
 fn bench_gcode_generation_large(c: &mut Criterion) {
     let tp = make_large_toolpath(2000);
-    let generator = ToolpathToGcode::new(Units::MM, 5.0);
+    let generator = ToolpathToGcode::new(5.0);
     c.bench_function("gcode_gen_2000_segments", |b| {
         b.iter(|| {
             let _ = generator.generate(black_box(&tp));
