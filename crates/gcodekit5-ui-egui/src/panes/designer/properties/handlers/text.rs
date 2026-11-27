@@ -62,7 +62,7 @@ pub fn apply(cx: &mut Ctx<'_>, key: &str, text: &str) -> Option<Check> {
 
 /// The Text section.
 pub fn show(ui: &mut egui::Ui, cx: &mut Ctx<'_>) {
-    let Some(Shape::Text(t)) = &cx.summary.single else {
+    let Some(Shape::Text(t)) = cx.summary.single() else {
         return;
     };
     let t = t.clone();

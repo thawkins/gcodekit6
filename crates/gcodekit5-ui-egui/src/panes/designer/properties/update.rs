@@ -118,8 +118,6 @@ pub struct Summary {
     pub ids: Vec<u64>,
     /// The first selected shape; its CAM and effect values are shown.
     pub first: DrawingObject,
-    /// The shape, when exactly one is selected.
-    pub single: Option<Shape>,
     /// Centre of the selection's box, mm.
     pub center: (f64, f64),
     /// Width and height shown, mm.
@@ -155,8 +153,8 @@ impl Summary {
             let (a, b, c, d) = obj.shape.bounds();
             (x0, y0, x1, y1) = (x0.min(a), y0.min(b), x1.max(c), y1.max(d));
         }
-        let single = (selected.len() == 1).then(|| first.shape.clone());
-        let (size, rotation) = match &single {
+        let single = (selected.len() == 1).then_some(&first.shape);
+        let (size, rotation) = match single {
             Some(shape) => shape_size_and_rotation(shape),
             None => ((x1 - x0, y1 - y0), 0.0),
         };
@@ -174,20 +172,25 @@ impl Summary {
             raster,
             any_not_text: selected.iter().any(|o| !matches!(o.shape, Shape::Text(_))),
             laser: LaserSummary::from_params(&params, &state.tool_settings),
-            single,
             first,
         })
+    }
+
+    /// The shape, when exactly one is selected (the first shape's copy, so the selection is
+    /// copied once per frame, not twice).
+    pub fn single(&self) -> Option<&Shape> {
+        (self.ids.len() == 1).then_some(&self.first.shape)
     }
 
     /// Whether the one selected shape is rotated: its size fields are then read-only and
     /// its aspect ratio locked (GTK's "Rotated object" notice).
     pub fn rotated(&self) -> bool {
-        self.single.is_some() && self.rotation.abs() > ROTATED_DEG
+        self.single().is_some() && self.rotation.abs() > ROTATED_DEG
     }
 
     /// Whether the one selected shape is a timing pulley.
     pub fn timing_pulley(&self) -> Option<(f64, usize, f64, f64)> {
-        self.single.as_ref().and_then(timing_pulley)
+        self.single().and_then(timing_pulley)
     }
 }
 

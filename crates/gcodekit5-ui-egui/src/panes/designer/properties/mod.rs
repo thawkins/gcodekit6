@@ -177,7 +177,7 @@ impl PropertiesPane {
             let warning = crate::theme::palette(ui.ctx().theme()).warning;
             ui.colored_label(warning, tr.tr(geometry::ROTATED_NOTICE));
         }
-        let single = summary.single.as_ref();
+        let single = summary.single();
         let pulley = summary.timing_pulley().is_some();
         let path = matches!(single, Some(Shape::Path(_))) && !pulley;
         dimensions::position(ui, &mut cx);

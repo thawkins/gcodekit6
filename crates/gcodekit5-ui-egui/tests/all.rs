@@ -34,6 +34,8 @@ mod test_cam_gerber_input_safety;
 mod test_cam_input_bounds;
 #[path = "test_cam_jigsaw.rs"]
 mod test_cam_jigsaw;
+#[path = "test_cam_output_staleness.rs"]
+mod test_cam_output_staleness;
 #[path = "test_cam_presets.rs"]
 mod test_cam_presets;
 #[path = "test_cam_probe_backstop.rs"]
@@ -90,6 +92,8 @@ mod test_designer_properties_cam;
 mod test_designer_properties_commit;
 #[path = "test_designer_properties_shapes.rs"]
 mod test_designer_properties_shapes;
+#[path = "test_designer_properties_summary.rs"]
+mod test_designer_properties_summary;
 #[path = "test_designer_shape_ops.rs"]
 mod test_designer_shape_ops;
 #[path = "test_designer_snapshots.rs"]

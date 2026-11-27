@@ -45,7 +45,7 @@ fn pos(text: &str) -> Result<f64, &'static str> {
 /// * `key` - The field.
 /// * `text` - The committed text.
 pub fn apply(cx: &mut Ctx<'_>, key: &str, text: &str) -> Option<Check> {
-    let single = cx.summary.single.clone();
+    let single = cx.summary.single().cloned();
     let pulley = cx.summary.timing_pulley();
     let state = cx.state();
     let result = match (key, &single) {
@@ -101,7 +101,7 @@ fn row(ui: &mut egui::Ui, cx: &mut Ctx<'_>, msgid: &str, key: &'static str, show
 
 /// The Gear section.
 pub fn gear(ui: &mut egui::Ui, cx: &mut Ctx<'_>) {
-    let Some(Shape::Gear(g)) = &cx.summary.single else {
+    let Some(Shape::Gear(g)) = cx.summary.single() else {
         return;
     };
     let (module, teeth, angle) = (g.module, g.teeth, g.pressure_angle_deg);
@@ -115,7 +115,7 @@ pub fn gear(ui: &mut egui::Ui, cx: &mut Ctx<'_>) {
 
 /// The Sprocket section.
 pub fn sprocket(ui: &mut egui::Ui, cx: &mut Ctx<'_>) {
-    let Some(Shape::Sprocket(s)) = &cx.summary.single else {
+    let Some(Shape::Sprocket(s)) = cx.summary.single() else {
         return;
     };
     let (pitch, teeth, roller) = (s.pitch, s.teeth, s.roller_diameter);

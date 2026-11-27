@@ -48,6 +48,7 @@ use gcodekit5_devicedb::model::DeviceProfile;
 use gerber::GerberParams;
 use jigsaw::JigsawParams;
 use probe_pane::ProbeState;
+use probe_routines::ProbeParams;
 pub use requests::{DesignerPath, PresetRequest};
 use requests::{DesignerPaths, PendingPreset};
 pub use shared::SharedCamTools;
@@ -119,13 +120,35 @@ pub fn msgids() -> Vec<&'static str> {
     ids
 }
 
+/// A copy of a page's input, taken when its program is generated, to tell when the
+/// program is out of date.
+#[derive(Debug, PartialEq)]
+enum PageInput {
+    /// A page whose input never makes its output stale (it makes no program).
+    Unkeyed,
+    /// The Tabbed Box Maker page.
+    TabbedBox(TabbedBoxParams),
+    /// The Gerber to G-Code page.
+    Gerber(GerberParams),
+    /// The Laser Image Engraver page.
+    BitmapEngraving(BitmapEngravingParams),
+    /// The Probe Tools page.
+    ProbeRoutines(ProbeParams),
+    /// The Spoilboard Surfacing page.
+    SpoilboardSurfacing(SpoilboardSurfacingParams),
+    /// The Create Spoilboard Grid page.
+    SpoilboardGrid(SpoilboardGridParams),
+    /// The Drill Press page.
+    DrillPress(DrillPressParams),
+}
+
 /// The program Generate made, and the page input it was made from.
 #[derive(Debug)]
 struct Output {
     /// The page.
     tool: CamTool,
-    /// The page's input ([`CamToolsPane::input_key`]).
-    input: String,
+    /// The page's input ([`CamToolsPane::input_snapshot`]).
+    input: PageInput,
     /// The program.
     gcode: String,
     /// Where each line of `gcode` is, so the view draws only the rows in sight.
@@ -134,7 +157,7 @@ struct Output {
 
 impl Output {
     /// `gcode`, made by `tool`'s page from `input`, with its lines found once.
-    fn new(tool: CamTool, input: String, gcode: String) -> Self {
+    fn new(tool: CamTool, input: PageInput, gcode: String) -> Self {
         let mut start = 0;
         let lines = gcode
             .split_inclusive('\n')
@@ -318,20 +341,37 @@ impl CamToolsPane {
     fn current_output(&self) -> Option<&Output> {
         self.output
             .as_ref()
-            .filter(|o| Some(o.tool) == self.open && o.input == self.input_key(o.tool))
+            .filter(|o| Some(o.tool) == self.open && self.input_unchanged(&o.input))
     }
 
-    /// Everything `tool`'s page holds, to tell when its output is out of date.
-    fn input_key(&self, tool: CamTool) -> String {
+    /// A copy of everything `tool`'s page holds, taken when its program is generated.
+    fn input_snapshot(&self, tool: CamTool) -> PageInput {
         match tool {
-            CamTool::SpeedsFeeds | CamTool::Jigsaw => String::new(),
-            CamTool::TabbedBox => format!("{:?}", self.tabbed_box),
-            CamTool::Gerber => format!("{:?}", self.gerber),
-            CamTool::BitmapEngraving => format!("{:?}", self.bitmap_engraving),
-            CamTool::ProbeRoutines => format!("{:?}", self.probe.params),
-            CamTool::SpoilboardSurfacing => format!("{:?}", self.spoilboard_surfacing),
-            CamTool::SpoilboardGrid => format!("{:?}", self.spoilboard_grid),
-            CamTool::DrillPress => format!("{:?}", self.drill_press),
+            CamTool::SpeedsFeeds | CamTool::Jigsaw => PageInput::Unkeyed,
+            CamTool::TabbedBox => PageInput::TabbedBox(self.tabbed_box.clone()),
+            CamTool::Gerber => PageInput::Gerber(self.gerber.clone()),
+            CamTool::BitmapEngraving => PageInput::BitmapEngraving(self.bitmap_engraving.clone()),
+            CamTool::ProbeRoutines => PageInput::ProbeRoutines(self.probe.params.clone()),
+            CamTool::SpoilboardSurfacing => {
+                PageInput::SpoilboardSurfacing(self.spoilboard_surfacing.clone())
+            }
+            CamTool::SpoilboardGrid => PageInput::SpoilboardGrid(self.spoilboard_grid.clone()),
+            CamTool::DrillPress => PageInput::DrillPress(self.drill_press.clone()),
+        }
+    }
+
+    /// Whether the page `input` was taken from still holds it. Compared in place, as it
+    /// runs every frame a program is shown.
+    fn input_unchanged(&self, input: &PageInput) -> bool {
+        match input {
+            PageInput::Unkeyed => true,
+            PageInput::TabbedBox(p) => *p == self.tabbed_box,
+            PageInput::Gerber(p) => *p == self.gerber,
+            PageInput::BitmapEngraving(p) => *p == self.bitmap_engraving,
+            PageInput::ProbeRoutines(p) => *p == self.probe.params,
+            PageInput::SpoilboardSurfacing(p) => *p == self.spoilboard_surfacing,
+            PageInput::SpoilboardGrid(p) => *p == self.spoilboard_grid,
+            PageInput::DrillPress(p) => *p == self.drill_press,
         }
     }
 
@@ -501,7 +541,7 @@ impl CamToolsPane {
                 self.notice = None;
                 match delivery {
                     None => {
-                        let input = self.input_key(tool);
+                        let input = self.input_snapshot(tool);
                         self.output = Some(Output::new(tool, input, gcode));
                     }
                     Some(delivery) => self.request_to_editor(gcode, delivery),

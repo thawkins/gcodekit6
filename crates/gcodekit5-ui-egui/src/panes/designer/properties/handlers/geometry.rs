@@ -73,7 +73,7 @@ pub fn apply(cx: &mut Ctx<'_>, key: &str, text: &str) -> Option<Check> {
 pub fn rotation(ui: &mut egui::Ui, cx: &mut Ctx<'_>) {
     let s = cx.summary;
     let tr = cx.tr;
-    let (shown, tip) = match &s.single {
+    let (shown, tip) = match s.single() {
         Some(shape) => (
             format!("{:.1}", shape_rotation(shape)),
             n_!("Rotation angle (degrees). Applied on Enter or when leaving the field."),
@@ -103,7 +103,7 @@ pub fn rotation(ui: &mut egui::Ui, cx: &mut Ctx<'_>) {
 pub fn corner(ui: &mut egui::Ui, cx: &mut Ctx<'_>) {
     let s = cx.summary;
     let units = cx.units;
-    let (radius, slot, is_rect) = match &s.single {
+    let (radius, slot, is_rect) = match s.single() {
         Some(Shape::Rectangle(r)) => (r.corner_radius, r.is_slot, true),
         _ => (s.first.fillet, false, false),
     };
@@ -126,7 +126,7 @@ pub fn corner(ui: &mut egui::Ui, cx: &mut Ctx<'_>) {
 
 /// The Polygon section.
 pub fn polygon(ui: &mut egui::Ui, cx: &mut Ctx<'_>) {
-    let Some(Shape::Polygon(p)) = &cx.summary.single else {
+    let Some(Shape::Polygon(p)) = cx.summary.single() else {
         return;
     };
     let (sides, rotated) = (p.sides, cx.summary.rotated());
@@ -146,7 +146,7 @@ pub fn polygon(ui: &mut egui::Ui, cx: &mut Ctx<'_>) {
 
 /// The Path section (open or closed).
 pub fn path(ui: &mut egui::Ui, cx: &mut Ctx<'_>) {
-    let Some(Shape::Path(p)) = &cx.summary.single else {
+    let Some(Shape::Path(p)) = cx.summary.single() else {
         return;
     };
     let (closed, id) = (p.closed, cx.summary.first.id);
