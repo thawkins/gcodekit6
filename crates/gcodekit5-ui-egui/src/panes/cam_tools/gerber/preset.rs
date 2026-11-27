@@ -48,6 +48,7 @@ impl GerberParams {
         self.alignment_hole_margin = len(p.alignment_hole_margin);
         self.alignment_hole_depth = len(p.alignment_hole_depth);
         self.cut_depth = len(p.cut_depth);
+        self.outline_step_down = len(p.outline_step_down);
         self.safe_z = len(p.safe_z);
         self.tool_diameter = len(p.tool_diameter);
         self.isolation_width = len(p.isolation_width);
