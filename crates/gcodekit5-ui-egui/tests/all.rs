@@ -92,6 +92,8 @@ mod test_designer_shape_ops;
 mod test_designer_snapshots;
 #[path = "test_designer_stl_import.rs"]
 mod test_designer_stl_import;
+#[path = "test_designer_svg_export.rs"]
+mod test_designer_svg_export;
 #[path = "test_designer_text_tool.rs"]
 mod test_designer_text_tool;
 #[path = "test_designer_toolbox.rs"]

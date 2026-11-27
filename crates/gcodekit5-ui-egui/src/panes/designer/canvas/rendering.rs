@@ -219,6 +219,7 @@ fn outlines(view: &CanvasView, shape: &Shape) -> Vec<(Vec<Pos2>, bool)> {
     let to_screen = |p: lyon::math::Point| view.to_screen(f64::from(p.x), f64::from(p.y));
     let path = match shape {
         Shape::Text(text) => text_outline::text_path(text).unwrap_or_else(|| shape.render()),
+        Shape::Path(path) => path.rotated_render(),
         _ => shape.render(),
     };
     for event in path.iter().flattened(tolerance) {

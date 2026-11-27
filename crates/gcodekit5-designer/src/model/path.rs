@@ -93,13 +93,26 @@ impl DesignPath {
         self.transform(&transform);
     }
 
+    /// The path as it is drawn and cut: [`DesignerShape::render`] rotated by `rotation`
+    /// degrees (counter-clockwise) about the centre of its bounds. The G-code generator and
+    /// `ops::perform_offset` apply the same rotation to `render()` themselves, so `render()`
+    /// itself stays unrotated.
+    pub fn rotated_render(&self) -> Path {
+        let path = self.render();
+        if self.rotation.abs() <= 1e-6 {
+            return path;
+        }
+        let (x1, y1, x2, y2) = self.bounds();
+        let (cx, cy) = (((x1 + x2) / 2.0) as f32, ((y1 + y2) / 2.0) as f32);
+        let transform = Transform::translation(-cx, -cy)
+            .then_rotate(lyon::math::Angle::degrees(self.rotation as f32))
+            .then_translate(lyon::math::Vector::new(cx, cy));
+        path.transformed(&transform)
+    }
+
     pub fn distance_to_point(&self, point: &Point) -> f64 {
-        // Get path to Lyon
-        let path = if let Some(p) = &self.original_path {
-            p.clone()
-        } else {
-            self.render()
-        };
+        // The path where it is drawn, rotated as the canvas shows it.
+        let path = self.rotated_render();
 
         let tolerance = 0.1;
         let mut min_distance = f64::INFINITY;

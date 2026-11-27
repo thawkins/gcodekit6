@@ -114,11 +114,11 @@ fn element(shape: &Shape, flip: &dyn Fn(f64) -> f64) -> String {
                 flip(y1) - flip(y2)
             )
         }
-        Shape::Path(_)
-        | Shape::Triangle(_)
-        | Shape::Polygon(_)
-        | Shape::Gear(_)
-        | Shape::Sprocket(_) => format!(
+        Shape::Path(p) => format!(
+            "<path d=\"{}\" style=\"{STYLE}\" />",
+            path_data(&p.rotated_render(), flip)
+        ),
+        Shape::Triangle(_) | Shape::Polygon(_) | Shape::Gear(_) | Shape::Sprocket(_) => format!(
             "<path d=\"{}\" style=\"{STYLE}\" />",
             path_data(&shape.render(), flip)
         ),
