@@ -1,10 +1,10 @@
-//! Colours and egui visuals of the egui front end, ported from the GTK build.
+//! Colours and egui visuals of the egui front end.
 //!
 //! The light and dark [`Palette`]s carry the libadwaita named colours that
-//! `crates/gcodekit5-ui/src/ui/gtk/style.css` refers to (`@window_bg_color`, `@accent_color`,
+//! the original stylesheet referred to (`@window_bg_color`, `@accent_color`,
 //! `@success_color`, ...); the status colours are the values
-//! `crates/gcodekit5-ui/src/ui/gtk/common/colors.rs` hard-codes. The fixed constants are the
-//! rendering colours of `colors.rs` and the literal colours of `style.css`.
+//! the original front end hard-coded. The fixed constants are the
+//! original rendering colours and stylesheet literals.
 //!
 //! Which palette applies is [`resolve`]d from the user's choice in
 //! [`gcodekit5_settings::config::UiSettings::theme`] and the desktop's preference.
@@ -170,7 +170,7 @@ pub const VECTOR_PREVIEW_BG: Color32 = Color32::from_rgb(0x80, 0x80, 0x80);
 /// * `desktop` - The desktop's preference, when known.
 ///
 /// # Returns
-/// The forced mode, else the desktop's, else dark (the GTK build's default look).
+/// The forced mode, else the desktop's, else dark (the default look).
 pub fn resolve(choice: Theme, desktop: Option<egui::Theme>) -> egui::Theme {
     match choice {
         Theme::Light => egui::Theme::Light,
@@ -224,7 +224,7 @@ pub fn visuals(mode: egui::Theme) -> Visuals {
 
 /// The libadwaita accent blue (`#3584e4`), the fill of primary buttons and checked boxes.
 pub const ACCENT_BLUE: Color32 = Color32::from_rgb(0x35, 0x84, 0xe4);
-/// Outer margin of a page, in points (GTK pages have 12 px margins).
+/// Outer margin of a page, in points (12 px).
 pub const PAGE_MARGIN: i8 = 12;
 /// Corner radius of a button, text field and other widget (libadwaita: 6 px).
 const WIDGET_RADIUS: u8 = 6;
@@ -245,7 +245,7 @@ pub fn destructive_fill(mode: egui::Theme) -> Color32 {
 /// The egui style (visuals, spacing and text sizes) of `mode`, ported from libadwaita.
 ///
 /// Widgets get 6 px corners and a 6 px row gap, windows a 12 px margin, text-edit fields a
-/// raised fill like GTK entries, and the body text 14 px.
+/// raised fill like libadwaita entries, and the body text 14 px.
 ///
 /// # Arguments
 /// * `mode` - Light or dark.
@@ -336,7 +336,7 @@ pub fn title(ui: &mut egui::Ui, text: &str, size: f32) -> egui::Response {
     response
 }
 
-/// A small green badge with bold white text, like GTK's `active-badge` ("Active",
+/// A small green badge with bold white text, like libadwaita's `active-badge` ("Active",
 /// "Connected"). The text is a normal accessible label.
 ///
 /// # Arguments

@@ -1,5 +1,5 @@
-//! The Tabbed Box page's presets: GTK's file is the generator's `BoxParameters` as pretty
-//! JSON, so a preset saved by either front end loads in the other.
+//! The Tabbed Box page's presets: the file is the generator's `BoxParameters` as pretty
+//! JSON, so presets saved by earlier releases still load.
 //!
 //! Dependencies: `gcodekit5-camtools` (the parameters), `serde_json`.
 
@@ -10,18 +10,18 @@ use super::TabbedBoxParams;
 use crate::panes::cam_tools::common;
 
 impl TabbedBoxParams {
-    /// The page's input as GTK's preset file.
+    /// The page's input as a preset file.
     ///
     /// # Arguments
     /// * `tr` - Translator for the current UI language.
     ///
     /// # Errors
-    /// The first field that does not parse (GTK refused to save then too).
+    /// The first field that does not parse (saving is refused then).
     pub fn preset_json(&self, tr: &Translator) -> Result<String, String> {
         common::preset_text(self.build(false).map_err(common::first_error), tr)
     }
 
-    /// Sets the page from a preset file in GTK's format ([`Self::preset_json`]); the axis
+    /// Sets the page from a preset file ([`Self::preset_json`]); the axis
     /// count is the device's, not the file's.
     ///
     /// # Arguments

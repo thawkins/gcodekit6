@@ -3,7 +3,7 @@
 //!
 //! The outlines are added as one undo step, each as a path through its points (closed or
 //! open as the page made it); a page that asks for it has them grouped, so they move
-//! together (GTK grouped the puzzle). The view then fits the design.
+//! together (the puzzle is grouped). The view then fits the design.
 //!
 //! Dependencies: `gcodekit5-designer` (model).
 

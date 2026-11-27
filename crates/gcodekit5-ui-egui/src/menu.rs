@@ -1,7 +1,7 @@
 //! The menus: built from the command catalog, laid out by `craft_menu` for the platform, and
 //! shown natively on macOS or as an in-window bar elsewhere.
 //!
-//! [`menu_bar`] is the app's own menu tree: GTK's File, Edit, Machine and Help. [`Menus`] keeps
+//! [`menu_bar`] is the app's own menu tree: File, Edit, Machine and Help. [`Menus`] keeps
 //! it laid out for [`Target::current`] with the keymap's shortcuts, and either draws it with
 //! `craft_menu::MenuBarUi` (Windows, Linux, and macOS when AppKit refused the native menus) or
 //! drives the macOS `NativeMenu`, whose key equivalents come back to egui as key presses so the
@@ -52,7 +52,7 @@ pub const LAYOUT_LABELS: [&str; 25] = [
     n_!("Scroll menu down"),
 ];
 
-/// The English msgids of the top-level menu titles, in bar order: GTK's four.
+/// The English msgids of the top-level menu titles, in bar order: the four menus.
 pub const MENU_TITLES: [&str; 4] = [n_!("File"), n_!("Edit"), n_!("Machine"), n_!("Help")];
 
 /// The access keys (mnemonics) the in-window menu bar gives [`MENU_TITLES`], in bar order, for
@@ -86,7 +86,7 @@ fn menu(tr: &Translator, title: &str, role: MenuRole, rows: &[Option<Command>]) 
 }
 
 /// The app's menus, labelled through `tr`, before any platform layout and without shortcuts
-/// ([`apply_shortcuts`] adds them): GTK's File, Edit, Machine and Help. The commands
+/// ([`apply_shortcuts`] adds them): File, Edit, Machine and Help. The commands
 /// left out have a home elsewhere: jogging and the visualizer's view commands are buttons on
 /// their pages (Reset View also keeps its `Cmd+0` key), and the manager windows of earlier
 /// builds are page tabs ([`crate::workspace::Page::for_command`]). About, Preferences and
@@ -177,7 +177,7 @@ pub fn menu_bar(tr: &Translator) -> MenuBar {
 /// item only a key that works on every page. A key bound in one pane's scope only (Cycle
 /// Start's `~`, which works only while Machine Control has the keyboard) would promise a key
 /// that does nothing elsewhere, so such an item shows no key; Preferences' Shortcuts page
-/// lists it with where it works. GTK's menus had no such item.
+/// lists it with where it works.
 ///
 /// # Arguments
 /// * `bar` - The menus to label.
@@ -376,7 +376,7 @@ impl Menus {
     /// * `ui` - Where the bar goes: a top panel or the title-bar strip.
     /// * `tr` - Translator for the labels the bar writes itself.
     /// * `gate` - What may run this frame.
-    /// * `max_width` - The widest the bar may be; titles past it overflow into a `⋯` menu.
+    /// * `max_width` - The widest the bar may be; titles past it overflow into a `...` menu.
     pub fn show(
         &self,
         ui: &mut egui::Ui,

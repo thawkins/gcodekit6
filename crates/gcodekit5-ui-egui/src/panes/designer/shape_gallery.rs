@@ -1,14 +1,13 @@
 //! The Fast Shape Gallery: parametric shapes with preset parameters, placed with one click.
 //!
-//! Ported from the GTK `fast_shape_gallery.rs` and the canvas's pending fast shape. The
-//! toolbox's "Shape Gallery…" button opens a modal with one card per template (name and
+//! The toolbox's "Shape Gallery..." button opens a modal with one card per template (name and
 //! description). Choosing a card closes the gallery and arms the shape: the canvas then shows
 //! it as a dashed ghost centred on the pointer, with the hint "Click to position shape". A
-//! primary click places it there (snapped unless the Select tool is active, as GTK) as one
+//! primary click places it there (snapped unless the Select tool is active) as one
 //! undo step; Escape drops it.
 //!
-//! Each card shows the template's SVG icon (GTK's resources, 48 points) over its name and
-//! description.
+//! Each card shows the template's SVG icon (from the app resources, 48 points) over its name
+//! and description.
 //!
 //! Dependencies: `egui`, `gcodekit5-designer` (shapes, parametric generators),
 //! `gcodekit5-app` (translations).
@@ -36,7 +35,7 @@ pub struct ShapeTemplate {
     pub make: fn(Point) -> Shape,
 }
 
-/// GTK's templates, in gallery order, with GTK's parameters.
+/// The templates, in gallery order, with their preset parameters.
 pub const TEMPLATES: [ShapeTemplate; 6] = [
     ShapeTemplate {
         name: n_!("Spur Gear"),
@@ -245,10 +244,10 @@ impl ShapeGallery {
     }
 }
 
-/// Edge length of a card's icon in points (GTK's 48 px).
+/// Edge length of a card's icon in points (48).
 const CARD_ICON: f32 = 48.0;
 
-/// One card, as GTK's: the icon over the name and the description in a framed group; the
+/// One card: the icon over the name and the description in a framed group; the
 /// whole card is clickable. The name is the card's accessible label.
 ///
 /// # Returns

@@ -66,7 +66,7 @@ impl ConnectionForm {
     }
 
     /// Lists the serial ports again. A failure leaves the list empty and is logged. An
-    /// `"Auto"` or empty port becomes the first port found, as the GTK front end chose it.
+    /// `"Auto"` or empty port becomes the first port found.
     fn refresh_ports(&mut self) {
         let ports: Vec<String> = match gcodekit5_app::list_ports() {
             Ok(ports) => ports.into_iter().map(|p| p.port_name).collect(),
@@ -89,8 +89,8 @@ impl ConnectionForm {
         self.connecting
     }
 
-    /// Draws the status strip (port or host, baud rate, state) above the section, as GTK's
-    /// sidebar starts with it.
+    /// Draws the status strip (port or host, baud rate, state) at the top of the
+    /// sidebar.
     pub(super) fn show_strip(&self, ui: &mut egui::Ui, tr: &Translator, status: &MachineStatus) {
         let network = !matches!(self.settings.connection_type, ConnectionType::Serial);
         ui.horizontal_wrapped(|ui| {
@@ -201,7 +201,7 @@ impl ConnectionForm {
     }
 }
 
-/// The connection state as text: Connected, Connecting… or Disconnected.
+/// The connection state as text: Connected, Connecting... or Disconnected.
 pub(super) fn state_text(
     tr: &Translator,
     status: &MachineStatus,

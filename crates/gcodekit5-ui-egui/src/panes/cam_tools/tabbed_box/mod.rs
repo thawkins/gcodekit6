@@ -1,10 +1,10 @@
 //! The Tabbed Box Maker page: a box of finger-jointed panels for a laser or a router.
 //!
-//! GTK's defaults: a 100 x 100 x 100 mm full box of 3 mm material, fingers and spaces of 2
+//! Defaults: a 100 x 100 x 100 mm full box of 3 mm material, fingers and spaces of 2
 //! thicknesses, 3 laser passes at S1000 and 500 mm/min, work origin offsets of 10 mm. The
 //! program goes to the editor (Send to Editor, Preview) and the panels' outlines to the
-//! designer (Generate Shapes). GTK silently used a default for a field it could not read;
-//! here the field shows the problem and the actions wait. The generator's limits are checked
+//! designer (Generate Shapes). A field that cannot be read shows the problem;
+//! the actions wait until it is fixed. The generator's limits are checked
 //! at the fields: a box of at least 20 mm each way in 1 to 20 mm material, at least one
 //! pass, a finger and a space that add up to something, a Z step down that is not negative;
 //! and, beyond the generator, a feed above 0, a power that is not negative and, for an
@@ -78,7 +78,7 @@ const TOO_MANY_PASSES: &str = n_!("Must be at most 100");
 /// The most laser passes the page accepts (each pass repeats every path).
 const MAX_PASSES: f64 = 100.0;
 
-/// The box types and the msgids of their names, in GTK's menu order.
+/// The box types and the msgids of their names, in menu order.
 const BOX_TYPES: [(BoxType, &str); 6] = [
     (BoxType::FullBox, n_!("Full Box")),
     (BoxType::NoTop, n_!("No Top")),
@@ -88,7 +88,7 @@ const BOX_TYPES: [(BoxType, &str); 6] = [
     (BoxType::NoLeftRight, n_!("No Left/Right")),
 ];
 
-/// The divider keying choices and the msgids of their names, in GTK's menu order.
+/// The divider keying choices and the msgids of their names, in menu order.
 const KEYINGS: [(KeyDividerType, &str); 4] = [
     (KeyDividerType::WallsAndFloor, n_!("Walls and Floor")),
     (KeyDividerType::WallsOnly, n_!("Walls Only")),
@@ -201,7 +201,7 @@ pub struct TabbedBoxParams {
 }
 
 impl TabbedBoxParams {
-    /// GTK's initial values in `units`.
+    /// The initial values in `units`.
     ///
     /// # Arguments
     /// * `units` - The display units.
@@ -412,7 +412,7 @@ impl TabbedBoxParams {
         Ok(maker.to_gcode())
     }
 
-    /// Makes the panels' outlines for the designer, each closed (GTK's Generate Shapes).
+    /// Makes the panels' outlines for the designer, each closed (Generate Shapes).
     ///
     /// # Errors
     /// [`CamError::Invalid`] while the input has problems, else the generator's refusal.

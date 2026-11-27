@@ -1,8 +1,8 @@
 //! The Spoilboard Grid page: a laser-engraved alignment grid.
 //!
-//! GTK's defaults: 400 x 300 mm with lines every 10 mm, power S1000 at 1000 mm/min in M4
-//! (dynamic power). GTK silently used a default for a field it could not read; here the
-//! field shows the problem and Generate waits.
+//! Defaults: 400 x 300 mm with lines every 10 mm, power S1000 at 1000 mm/min in M4
+//! (dynamic power). A field that cannot be read shows the
+//! problem and Generate waits.
 //!
 //! Dependencies: `egui`, `gcodekit5-camtools` (generator), `gcodekit5-app` (translations),
 //! `gcodekit5-core` (units).
@@ -92,7 +92,7 @@ pub struct SpoilboardGridParams {
 }
 
 impl SpoilboardGridParams {
-    /// GTK's initial values in `units`.
+    /// The initial values in `units`.
     ///
     /// # Arguments
     /// * `units` - The display units.
@@ -153,14 +153,14 @@ impl SpoilboardGridParams {
         })
     }
 
-    /// The page's input as GTK's preset file: lengths in millimetres, feed and power as
-    /// typed, the laser mode's word (GTK's keys; Home is not kept).
+    /// The page's input as a preset file: lengths in millimetres, feed and power as
+    /// typed, the laser mode's word (Home is not kept).
     ///
     /// # Arguments
     /// * `tr` - Translator for the current UI language.
     ///
     /// # Errors
-    /// The first length that does not parse (GTK refused to save then too).
+    /// The first length that does not parse (saving is refused then).
     pub fn preset_json(&self, tr: &Translator) -> Result<String, String> {
         let u = self.units;
         let len = |label, text: &str| common::preset_len(label, text, u);
@@ -177,7 +177,7 @@ impl SpoilboardGridParams {
         common::preset_text(preset, tr)
     }
 
-    /// Sets the page from a preset file in GTK's format ([`Self::preset_json`]); keys it
+    /// Sets the page from a preset file ([`Self::preset_json`]); keys it
     /// does not hold, and a laser mode other than `M3` / `M4`, leave their fields as they
     /// are.
     ///

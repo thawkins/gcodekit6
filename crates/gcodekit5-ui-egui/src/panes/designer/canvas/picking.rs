@@ -104,7 +104,7 @@ pub fn select_at(
     state.canvas.selection_manager.set_selected_id(primary);
 }
 
-/// Selects the shapes whose bounds touch the box from `a` to `b` (GTK's marquee: it replaces
+/// Selects the shapes whose bounds touch the box from `a` to `b` (the marquee: it replaces
 /// the selection, and leaves it empty when nothing is touched).
 ///
 /// # Arguments

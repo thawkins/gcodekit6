@@ -1,10 +1,10 @@
 //! The Gerber to G-Code page: isolation routing, rubout, outline and drill cuts for one layer
 //! of a PCB project.
 //!
-//! GTK picked a project folder, found its layer files by their names and generated the layer
-//! chosen in a drop-down; Browse does that here through the non-blocking folder dialog. GTK
-//! refused at Generate when no folder or layer was found; here that is shown on the page and
-//! the actions wait, as they do for a field that does not parse. GTK's defaults: the top
+//! Browse picks a project folder through the non-blocking folder dialog; the page finds its
+//! layer files by their names and generates the layer chosen in a drop-down. When
+//! no folder or layer is found, that is shown on the page and
+//! the actions wait, as they do for a field that does not parse. Defaults: the top
 //! copper of a 100 x 100 mm board, a 0.1 mm tool at 100 mm/min and 10000 RPM, a cut depth of
 //! -0.1 mm below a safe Z of 5 mm. The generator checks nothing, so the page's limits are
 //! its own: feed, speed, tool and board above 0, a cut depth below the surface and a safe Z
@@ -66,7 +66,7 @@ const BELOW_SURFACE: &str = n_!("Must be below the surface (negative)");
 const READ_FAILED: &str = n_!("Failed to read file");
 const UNSUPPORTED: &str = n_!("Unsupported Gerber content is left out of the program");
 
-/// The layer types and the msgids of their names, in GTK's menu order.
+/// The layer types and the msgids of their names, in menu order.
 const LAYER_TYPES: [(GerberLayerType, &str); 8] = [
     (GerberLayerType::TopCopper, n_!("Top Copper")),
     (GerberLayerType::BottomCopper, n_!("Bottom Copper")),
@@ -174,7 +174,7 @@ pub struct GerberParams {
 }
 
 impl GerberParams {
-    /// GTK's initial values in `units`, with no project folder.
+    /// The initial values in `units`, with no project folder.
     ///
     /// # Arguments
     /// * `units` - The display units.

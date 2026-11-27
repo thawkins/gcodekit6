@@ -32,7 +32,7 @@ impl ToolsManagerWindow {
     /// * `ui` - The page's `Ui`.
     /// * `tr` - Translates the labels.
     pub fn show(&mut self, ui: &mut egui::Ui, tr: &Translator) {
-        // GTK: the tool list sidebar | the edit form | the library sidebar.
+        // The tool list sidebar | the edit form | the library sidebar.
         ui.horizontal_top(|ui| {
             let size = egui::vec2(SIDEBAR_WIDTH, ui.available_height());
             ui.allocate_ui_with_layout(size, egui::Layout::top_down(egui::Align::Min), |ui| {
@@ -145,7 +145,7 @@ impl ToolsManagerWindow {
         }
     }
 
-    /// New Tool and the Library actions (GTK's right-hand sidebar).
+    /// New Tool and the Library actions (the right-hand sidebar).
     fn library_actions(&mut self, ui: &mut egui::Ui, tr: &Translator) {
         let has_store = self.backend.is_some();
         let new = theme::primary_icon_button(Icon::Add.image(), tr.tr(n_!("New Tool")))
@@ -333,7 +333,7 @@ impl ToolsManagerWindow {
     }
 }
 
-/// Width of the library sidebar on the right (GTK: `set_width_request(280)`).
+/// Width of the library sidebar on the right (280 px).
 const LIBRARY_WIDTH: f32 = 280.0;
 
 /// A labelled single-line field in a grid row.

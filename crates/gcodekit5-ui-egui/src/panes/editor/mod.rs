@@ -18,20 +18,20 @@
 //! for the File commands and hands the text to the machine as the program to stream
 //! ([`EditorPane::program_stale`], [`EditorPane::program_fed`]).
 //!
-//! Clear editor (GTK's button in the Machine Control editor header) sits at the end of the
+//! Clear editor sits at the end of the
 //! find row: it is disabled, and refused, while a job runs (the text is read-only then), and
-//! asks first when the editor holds any G-code, as GTK did; the question is asked again at
+//! asks first when the editor holds any G-code; the question is asked again at
 //! Yes, which is refused if a job started meanwhile.
 //!
-//! Under the find row, GTK's replace row: "Replace with ...", Replace (the current match,
+//! Under the find row, the replace row: "Replace with ...", Replace (the current match,
 //! then on to the next; with no current match it moves to the first) and Replace All. Both
-//! are enabled, as in GTK, when the query has matches and the replacement is not empty, and
+//! are enabled when the query has matches and the replacement is not empty, and
 //! are disabled, and refused, while a job runs or a large file is shown read-only. Each is
 //! one step of the text field's undo: the text before it is recorded as an undo point (see
 //! [`EditorPane::pending_undo`]) before the field draws the new text.
 //!
-//! Ported from the GTK `ui/gtk/editor.rs` (GtkSourceView). Not ported: the line-counter
-//! tooltip; the GTK find box's match index ("2 of 5") is shown as the match count only.
+//! There is no line-counter
+//! tooltip, and the find row shows the match count only, not a match index ("2 of 5").
 //!
 //! Dependencies: `egui`, `anyhow`, `gcodekit5-app` (machine events, translations).
 
@@ -391,7 +391,7 @@ impl EditorPane {
     }
 
     /// Clear editor: refused while a job runs; with only whitespace (or nothing) the text is
-    /// cleared at once, otherwise the app is asked to confirm first (as GTK did).
+    /// cleared at once, otherwise the app is asked to confirm first.
     ///
     /// # Arguments
     /// * `tr` - Translator for the refusal.
@@ -439,7 +439,7 @@ impl EditorPane {
     }
 
     /// The find row: query, previous and next (chevron icon buttons named "Previous Match"
-    /// and "Next Match"), match count, then GTK's Clear editor and Save G-code buttons. The
+    /// and "Next Match"), match count, then the Clear editor and Save G-code buttons. The
     /// query takes the room the rest leaves, so the row fits a narrow editor column.
     ///
     /// # Returns
@@ -508,7 +508,7 @@ impl EditorPane {
         }
     }
 
-    /// GTK's replace row: "Replace with ...", Replace and Replace All (icon buttons), enabled
+    /// The replace row: "Replace with ...", Replace and Replace All (icon buttons), enabled
     /// when the query has matches, the replacement is not empty and the text may be changed.
     fn show_replace(&mut self, ui: &mut egui::Ui, tr: &Translator) {
         ui.horizontal(|ui| {
@@ -598,7 +598,7 @@ impl Pane for EditorPane {
             .show_separator_line(false)
             .show(ui, |ui| self.show_find(ui, tr))
             .inner;
-        // GTK's editor header Save button: File > Save for the editor.
+        // The Save button: File > Save for the editor.
         if save {
             ctx.request(crate::commands::Command::FileSave);
         }

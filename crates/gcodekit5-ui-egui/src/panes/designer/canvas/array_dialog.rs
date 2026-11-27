@@ -1,11 +1,10 @@
 //! The Designer's "Array..." dialog: copies the selection in a line, a grid or around a
 //! centre point, as one undo step.
 //!
-//! Ported from the GTK `designer_canvas/array_dialog.rs` and the canvas's
-//! `create_{linear,grid,circular}_array`. The canvas's context menu opens it. The fields
-//! keep GTK's defaults; lengths are in the display units. Create checks the values, then adds
+//! The canvas's context menu opens it. The fields
+//! keep their defaults; lengths are in the display units. Create checks the values, then adds
 //! every copy with one `PasteShapes` command; copies get fresh group ids so they form their
-//! own groups, and the originals and the copies end selected, as GTK. Invalid values show an
+//! own groups, and the originals and the copies end selected. Invalid values show an
 //! inline error and keep the dialog open.
 //!
 //! Dependencies: `egui`, `gcodekit5-designer` (model, undo commands), `gcodekit5-core`
@@ -107,7 +106,7 @@ pub struct ArrayInput {
 }
 
 impl Default for ArrayInput {
-    /// GTK's defaults.
+    /// The defaults.
     fn default() -> Self {
         Self {
             kind: ArrayKind::Linear,
@@ -321,7 +320,7 @@ pub struct ArrayDialog {
 }
 
 impl ArrayDialog {
-    /// Opens the dialog with the values used last (GTK's defaults the first time).
+    /// Opens the dialog with the values used last (the defaults the first time).
     pub fn open(&mut self) {
         self.open = true;
         self.error = None;
@@ -374,10 +373,10 @@ impl ArrayDialog {
         }
     }
 
-    /// The fields the chosen arrangement uses, as GTK shows them.
+    /// The fields the chosen arrangement uses.
     ///
     /// # Returns
-    /// Whether Enter was pressed in a field (GTK's entries activate Create).
+    /// Whether Enter was pressed in a field (Enter activates Create).
     fn fields(&mut self, ui: &mut egui::Ui, system: MeasurementSystem, tr: &Translator) -> bool {
         let unit = units::get_unit_label(system);
         let kind = self.input.kind;

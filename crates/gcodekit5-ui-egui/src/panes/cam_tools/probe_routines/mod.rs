@@ -1,16 +1,15 @@
 //! The Probe Tools page: touch probe routines for work coordinate setup (Z-touch, edge,
 //! corner, bore and boss centre, tool length).
 //!
-//! Generate makes the routine's program, as GTK's "Generate G-code" did, for the editor.
+//! Generate makes the routine's program for the editor.
 //! Probe runs it on the machine ([`run`]): the program streams through the shared
 //! `MachineController`, the `[PRB:...]` reports are read as they arrive, and the result can
 //! be written into a work coordinate system with Apply to WCS (`G10 L2`).
 //!
 //! Lengths are typed in the display units (mm or inch, the shared `units` module) and held
-//! in mm; feeds stay in mm/min as on every CAM page. (GTK's page took every value in mm
-//! whatever the setting; the controller ruled that the setting applies here too.) The
-//! program is the same for the same physical values. GTK reported a field that was not a
-//! number in a dialog at Generate; here every field is checked where it is typed, with the
+//! in mm; feeds stay in mm/min as on every CAM page. The
+//! program is the same for the same physical values. Every field is
+//! checked where it is typed, with the
 //! generator's own limits, and the actions wait.
 //!
 //! Dependencies: `egui`, `gcodekit5-camtools` (routine engine, presets), `gcodekit5-core`
@@ -32,7 +31,7 @@ use super::common::{
 };
 pub use page::{ProbeView, show};
 
-/// Field label msgids (GTK's titles).
+/// Field label msgids.
 const SAFE_HEIGHT: &str = n_!("Safe Height:");
 const FAST_FEED: &str = n_!("Fast Feed Rate:");
 const SLOW_FEED: &str = n_!("Slow Feed Rate:");
@@ -70,7 +69,7 @@ pub fn msgids() -> Vec<&'static str> {
     ids
 }
 
-/// The probe routines, in GTK's order.
+/// The probe routines, in display order.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum RoutineKind {
     /// Surface probe to set Z=0.
@@ -88,7 +87,7 @@ pub enum RoutineKind {
 }
 
 impl RoutineKind {
-    /// Every routine, in GTK's order.
+    /// Every routine, in display order.
     pub const ALL: [RoutineKind; 6] = [
         RoutineKind::ZTouch,
         RoutineKind::EdgeFind,
@@ -98,7 +97,7 @@ impl RoutineKind {
         RoutineKind::ToolLength,
     ];
 
-    /// GTK's id (its preset files hold it).
+    /// The routine's id (its preset files hold it).
     pub fn id(self) -> &'static str {
         match self {
             RoutineKind::ZTouch => "z_touch",
@@ -127,7 +126,7 @@ impl RoutineKind {
     }
 }
 
-/// GTK's edge axis, direction and corner ids.
+/// The edge axis, direction and corner ids presets hold.
 const AXES: [(ProbeAxis, &str); 3] = [
     (ProbeAxis::X, "X"),
     (ProbeAxis::Y, "Y"),
@@ -161,7 +160,7 @@ fn from_id<T: Copy>(table: &[(T, &'static str)], id: Option<&str>) -> Option<T> 
 
 /// The page's input: lengths as typed in [`ProbeParams::units`], feeds in mm/min.
 ///
-/// The edge axis, direction and corner start unchosen (`None`), as GTK's drop-downs did;
+/// The edge axis, direction and corner start unchosen (`None`) in their drop-downs;
 /// unchosen they mean X, negative and X-min / Y-min, and a preset saves them as `null`.
 #[derive(Clone, Debug, PartialEq)]
 pub struct ProbeParams {
@@ -208,7 +207,7 @@ pub struct ProbeParams {
 }
 
 impl Default for ProbeParams {
-    /// GTK's initial values in millimetres.
+    /// The initial values in millimetres.
     fn default() -> Self {
         Self::new(MeasurementSystem::Metric)
     }
@@ -232,7 +231,7 @@ fn length_fields(p: &mut ProbeParams) -> [&mut String; 11] {
 }
 
 impl ProbeParams {
-    /// GTK's initial values, lengths shown in `units` (feeds as GTK wrote them).
+    /// The initial values, lengths shown in `units` (feeds with three decimals).
     ///
     /// # Arguments
     /// * `units` - The display units.
@@ -377,7 +376,7 @@ impl ProbeParams {
         Ok((routine, options))
     }
 
-    /// The routine's program (GTK's Generate G-code), with `start` written into its header.
+    /// The routine's program (Generate G-code), with `start` written into its header.
     ///
     /// # Arguments
     /// * `start` - The machine position in mm (the routines move relative to the probe).
@@ -403,13 +402,13 @@ impl ProbeParams {
         run::program_lines(&output.gcode).map_err(CamError::Generator)
     }
 
-    /// The page's input as GTK's preset file (`ProbePreset`, values in mm).
+    /// The page's input as a preset file (`ProbePreset`, values in mm).
     ///
     /// # Arguments
     /// * `tr` - Translator for the current UI language.
     ///
     /// # Errors
-    /// The first field that is not a number (GTK refused to save then too).
+    /// The first field that is not a number (saving is refused then).
     pub fn preset_json(&self, tr: &Translator) -> Result<String, String> {
         let preset = (|| {
             let feed = |label, text: &str| common::preset_number(label, text);
@@ -444,8 +443,8 @@ impl ProbeParams {
         preset.to_json().map_err(|e| e.to_string())
     }
 
-    /// Sets the page from a preset file in GTK's format (lengths in mm, shown in the page's
-    /// units; feeds written with three decimals, as GTK did); ids GTK did not know leave
+    /// Sets the page from a preset file (lengths in mm, shown in the page's
+    /// units; feeds written with three decimals); unknown ids leave
     /// their choice as it is.
     ///
     /// # Arguments
@@ -454,7 +453,7 @@ impl ProbeParams {
     /// # Errors
     /// The text is not a probe preset; the page is left as it was.
     pub fn apply_preset(&mut self, json: &str) -> Result<(), String> {
-        // GTK read any JSON value as an old preset of defaults; only an object can be one.
+        // Only a JSON object can be a preset; any other value is refused.
         common::preset_object(json)?;
         let loaded = ProbePreset::from_json(json).map_err(|e| e.to_string())?;
         for warning in &loaded.warnings {

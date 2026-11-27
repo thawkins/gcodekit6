@@ -4,10 +4,10 @@
 //! Every G-code export goes through [`DesignerPane::generate_gcode`], which works on a copy
 //! of the design without the layers panel's hidden shapes, so a hidden shape is never cut
 //! (it reads nothing back from the live design: the copy's `generated_gcode` is discarded).
-//! Before generating, GTK's checks apply ([`DesignerPane::export_check`], which generates
+//! Before generating, these checks apply ([`DesignerPane::export_check`], which generates
 //! nothing): nothing to export, every shape hidden ("Nothing to
 //! export: all shapes are hidden"), or objects at or above Safe Z in CNC mode (export
-//! blocked, with the counts). Toolpaths outside the machine limits still export, with GTK's
+//! blocked, with the counts). Toolpaths outside the machine limits still export, with a
 //! warning. Generate G-Code with one raster image selected engraves that image instead.
 //!
 //! The toolbox's buttons only ask ([`DesignerPane::request_to_editor`]); the app checks for a
@@ -15,9 +15,6 @@
 //! or [`DesignerPane::frame_to_editor`] and takes the result from
 //! [`DesignerPane::take_editor_gcode`].
 //!
-//! Ported from the GTK `designer/file_ops.rs` (`export_gcode`, `export_svg`),
-//! `designer/mod.rs` (Generate G-Code, frame bounds) and `designer_toolbox.rs`
-//! (`generate_frame_gcode`).
 //!
 //! Dependencies: `gcodekit5-designer` (G-code generation, image engraving),
 //! `gcodekit5-app` (translations).
@@ -111,7 +108,7 @@ pub struct GcodeExport {
     pub out_of_limits: bool,
 }
 
-/// GTK's out-of-limits warning.
+/// The out-of-limits warning.
 const OUT_OF_LIMITS: &str = n_!(
     "The generated G-code contains coordinates outside the machine working area (Negative values). Review the path before sending it to the machine."
 );
@@ -144,7 +141,7 @@ pub fn msgids() -> Vec<&'static str> {
     ]
 }
 
-/// GTK's low-power laser frame around (x1, y1)-(x2, y2) mm.
+/// A low-power laser frame around (x1, y1)-(x2, y2) mm.
 fn frame_gcode(x1: f64, y1: f64, x2: f64, y2: f64) -> String {
     format!(
         "; --- Laser Frame Start ---\n\
@@ -386,7 +383,7 @@ impl DesignerPane {
         self.editor_gcode.take()
     }
 
-    /// The selected shape when it is a raster image (GTK's primary selection).
+    /// The selected shape when it is a raster image (the primary selection).
     fn selected_image(&self) -> Option<RasterImage> {
         let id = self.state.canvas.selection_manager.selected_id()?;
         match &self.state.canvas.get_shape(id)?.shape {
@@ -409,7 +406,7 @@ fn engrave(image: &RasterImage) -> Result<String, (&'static str, anyhow::Error)>
         .map_err(|e| (n_!("Image Engraving Failed"), e))
 }
 
-/// Appends GTK's out-of-limits warning to `notice` when `out_of_limits`.
+/// Appends the out-of-limits warning to `notice` when `out_of_limits`.
 fn push_limits_warning(notice: &mut String, out_of_limits: bool, tr: &Translator) {
     if out_of_limits {
         notice.push('\n');

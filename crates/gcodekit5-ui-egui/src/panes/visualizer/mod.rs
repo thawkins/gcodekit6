@@ -4,47 +4,45 @@
 //! that program changes (by `Arc` identity), on one background worker that builds only the
 //! latest program ([`build`]), and uploaded to the GPU once ([`pipeline`]); a frame only
 //! writes the camera and the stream progress. A newly opened program is fitted into an
-//! isometric view; an edit of the shown program keeps the user's view (GTK's rule). Rapids and
+//! isometric view; an edit of the shown program keeps the user's view. Rapids and
 //! moves with the spindle/laser off are grey, cuts are coloured by power, and the lines the
 //! machine has acknowledged are drawn in the accent colour. The tool marker follows the work
 //! position the machine reports.
 //!
-//! Mouse, as in GTK: left drag orbits, Shift + left drag pans, the wheel zooms. GTK's 2D
+//! Mouse: left drag orbits, Shift + left drag pans, the wheel zooms. The 2D
 //! view mode ([`VisualizerPane::set_2d`]) locks the camera to the orthographic top view: left
 //! drag pans, the nav cube's view grid and zoom row are hidden, and only the Top view is
 //! taken from the View commands; a program loaded in 2D is fitted from the top. The nav cube
 //! ([`nav_cube`]) and the View commands switch to standard views, zoom and fit; the OSD
 //! ([`osd`]) shows the bounds and the tool position. The left sidebar ([`sidebar`]) has
-//! GTK's toolbar (Fit to Content, Reset View, Fit to Device Working Area, Hide), its
+//! a toolbar (Fit to Content, Reset View, Fit to Device Working Area, Hide), its
 //! Toolpath and Guides toggles ([`Display`]: rapids, cuts, the tool marker, the grid and its
 //! spacing, the machine bounds) and Inspector.
 //!
 //! Whether the sidebar is hidden is kept between runs in the settings' `panel_visibility`
-//! under GTK's `visualizer_sidebar` key ([`Pane::panel_visibility`]).
+//! under the `visualizer_sidebar` key ([`Pane::panel_visibility`]).
 //!
-//! Right-click on the view opens GTK's menu ([`menu`]): the fits, Copy cursor coordinates
+//! Right-click on the view opens a menu ([`menu`]): the fits, Copy cursor coordinates
 //! (the work-plane point under the pointer) and the Toggle switches of the sidebar's toggles.
 //!
 //! The run preview bar ([`preview`]) at the bottom left plays the toolpath with a preview
-//! marker of its own (GTK's cyan), at GTK's four speeds; File > Run (`Cmd+R`, F5) shows the
-//! page and starts it from the beginning, as in GTK. It only animates the view: the pane
+//! marker of its own (cyan), at four speeds; File > Run (`Cmd+R`, F5) shows the
+//! page and starts it from the beginning. It only animates the view: the pane
 //! never asks the machine for anything while it plays. A new program stops it.
 //!
 //! The machine bounds and Fit to Device Working Area use the active device profile's X, Y
 //! and Z limits ([`work_area_of`], handed in through [`Pane::set_device`]); with no profile,
-//! Fit to Device does nothing and no bounds are drawn, as in GTK's 3D view.
+//! Fit to Device does nothing and no bounds are drawn.
 //!
 //! With the `enable_stock_removal_3d` setting on, the sidebar's Simulation section shows
-//! GTK's "Show Stock Removal": the stock is cut by the program on a worker ([`stock`]) and
+//! "Show Stock Removal": the stock is cut by the program on a worker ([`stock`]) and
 //! drawn lit and depth-tested with the toolpath. The run restarts when the program or the
 //! stock changes (field edits after a short pause), and stops when the toggle or the setting
-//! is turned off. As in GTK, each program the Designer generates brings the Designer's stock
+//! is turned off. Each program the Designer generates brings the Designer's stock
 //! size and tool diameter with it ([`StockSeed`], through [`PaneContext::stock_seed`]); edits
 //! in the sidebar hold until the next one.
 //!
-//! Ported from the GTK `ui/gtk/visualizer/mod.rs`, `renderer_3d.rs`, `shaders.rs` and
-//! `nav_cube.rs`. Not ported: scrollbars, the zoom/centre/cursor
-//! status line (commented out in the GTK source).
+//! Not shown: scrollbars and a zoom/centre/cursor status line.
 //!
 //! [`Machine::program`]: crate::machine::Machine::program
 //!
@@ -85,16 +83,16 @@ pub use toolpath::ToolpathMesh;
 use crate::commands::Command;
 use crate::workspace::{Pane, PaneContext, PaneId};
 
-/// The settings' `panel_visibility` key of the sidebar (GTK's), kept between runs.
+/// The settings' `panel_visibility` key of the sidebar, kept between runs.
 pub const SIDEBAR_KEY: &str = "visualizer_sidebar";
-/// Millimetres the Zoom In / Zoom Out buttons and commands move the eye (GTK's step).
+/// Millimetres the Zoom In / Zoom Out buttons and commands move the eye.
 pub const ZOOM_STEP: f32 = 10.0;
 /// How long a stock field must stay unchanged before the simulation restarts with it.
 pub const STOCK_EDIT_DEBOUNCE: std::time::Duration = std::time::Duration::from_millis(250);
-/// Millimetres of zoom per point of wheel scroll (GTK: 5 mm per wheel notch).
+/// Millimetres of zoom per point of wheel scroll (5 mm per wheel notch).
 const ZOOM_PER_SCROLL_POINT: f32 = 0.1;
 
-/// The work area of `profile`: its X, Y and Z limits in mm (GTK's machine bounds).
+/// The work area of `profile`: its X, Y and Z limits in mm (the machine bounds).
 ///
 /// # Arguments
 /// * `profile` - The device profile.
@@ -160,7 +158,7 @@ pub struct VisualizerPane {
     sidebar_hidden: bool,
     /// The sidebar's Toolpath and Guides toggles.
     display: Display,
-    /// GTK's 2D view mode: the camera stays in the top view.
+    /// The 2D view mode: the camera stays in the top view.
     view_2d: bool,
     /// The active device profile's work area, if a profile is active.
     work_area: Option<Aabb>,
@@ -174,7 +172,7 @@ pub struct VisualizerPane {
     preview_clock: Option<std::time::Instant>,
     /// The work-plane point under the pointer when the right-click menu opened.
     menu_cursor: Option<glam::Vec2>,
-    /// Why File > Run started no preview: GTK's warning title and text.
+    /// Why File > Run started no preview: the warning title and text.
     preview_notice: Option<(&'static str, &'static str)>,
     /// The `enable_stock_removal_3d` setting.
     stock_enabled: bool,
@@ -321,8 +319,7 @@ impl VisualizerPane {
         }
     }
 
-    /// Takes the Designer's stock and tool when it generated a program not applied yet
-    /// (GTK's `sync_stock_from_designer` and tool sync).
+    /// Takes the Designer's stock and tool when it generated a program not applied yet.
     ///
     /// # Returns
     /// Whether the stock changed.
@@ -337,7 +334,7 @@ impl VisualizerPane {
         changed
     }
 
-    /// Starts the simulation afresh when shown (GTK's `restart_stock_simulation`), else
+    /// Starts the simulation afresh when shown, else
     /// stops it.
     fn restart_stock(&mut self, repaint: &egui::Context) {
         self.stock_restart_at = None;
@@ -417,14 +414,14 @@ impl VisualizerPane {
         &mut self.preview
     }
 
-    /// Why File > Run started no preview (GTK's warning title and text), until the next
+    /// Why File > Run started no preview (the warning title and text), until the next
     /// program or Run.
     pub fn preview_notice(&self) -> Option<(&'static str, &'static str)> {
         self.preview_notice
     }
 
     /// File > Run: starts the run preview from the beginning, once the program's toolpath is
-    /// built (GTK's `run_preview_from_gcode`). With no program or no motion, says why
+    /// built. With no program or no motion, says why
     /// instead.
     pub fn run_preview(&mut self) {
         self.preview_notice = None;
@@ -449,7 +446,7 @@ impl VisualizerPane {
     }
 
     /// Switches to the 2D view mode (the top view, locked) or back to the 3D view (the
-    /// isometric view), as GTK's 2D / 3D pair does.
+    /// isometric view).
     ///
     /// # Arguments
     /// * `on` - `true` for 2D, `false` for 3D.
@@ -465,7 +462,7 @@ impl VisualizerPane {
     }
 
     /// Fits the active device's work area into the view (Fit to Device Working Area); with
-    /// no active profile it does nothing, as GTK's 3D button did.
+    /// no active profile it does nothing.
     pub fn fit_device(&mut self) {
         if let Some(area) = self.work_area {
             self.camera.fit(area);
@@ -483,7 +480,7 @@ impl VisualizerPane {
     /// Shows `program` (the program as the machine streams it), building its toolpath on the
     /// background worker when it is not the program already shown. `None` clears the view.
     /// The view is refitted only when the program replaces the one shown (a newly opened
-    /// file); an edit keeps the user's view, as in GTK.
+    /// file); an edit keeps the user's view.
     ///
     /// # Arguments
     /// * `program` - The program's lines, or `None`.
@@ -500,7 +497,7 @@ impl VisualizerPane {
         self.generation = self.generation.wrapping_add(1);
         self.progress = 0;
         self.program = program.clone();
-        // A new program ends the preview of the old one (GTK's `apply_gcode`).
+        // A new program ends the preview of the old one.
         self.preview.stop();
         self.preview_on_build = false;
         self.preview_notice = None;
@@ -570,7 +567,7 @@ impl VisualizerPane {
         }
     }
 
-    /// Shows `mesh`; for a newly loaded program, fits it into an isometric view, as GTK does.
+    /// Shows `mesh`; for a newly loaded program, fits it into an isometric view.
     fn set_mesh(&mut self, mesh: ToolpathMesh, refit: bool) {
         let ToolpathMesh {
             vertices,
@@ -643,7 +640,7 @@ impl VisualizerPane {
         repaint.request_repaint_after(preview::TICK);
     }
 
-    /// GTK's right-click menu over the view `response` ([`menu`]).
+    /// The right-click menu over the view `response` ([`menu`]).
     fn context_menu(&mut self, response: &egui::Response, rect: egui::Rect, tr: &Translator) {
         if response.secondary_clicked() {
             self.menu_cursor = response
@@ -674,7 +671,7 @@ impl VisualizerPane {
         if response.hovered() {
             let scroll = ui.input(|i| i.smooth_scroll_delta.y);
             if scroll != 0.0 {
-                // GTK zooms in as the wheel turns toward the user.
+                // Zoom in as the wheel turns toward the user.
                 self.camera.zoom(-scroll * ZOOM_PER_SCROLL_POINT);
             }
         }

@@ -9,7 +9,7 @@
 //!   field has the keyboard, whatever its key (the app's key dispatch holds it back); it gets
 //!   no key on the letter of the feed hold or soft reset chord, so a slipped modifier never
 //!   starts what was meant to stop; and outside Machine Control it needs Ctrl, Alt, Cmd or a
-//!   function key, since a bare key there would run on every page (GTK's `~` for cycle
+//!   function key, since a bare key there would run on every page (the `~` for cycle
 //!   start is therefore a Machine Control key);
 //! - a jog key is a plain letter, digit or symbol key: craft-keymap's typing rule holds those
 //!   back while a text field has the keyboard, so a rebound jog key never jogs while typing,
@@ -185,7 +185,7 @@ pub fn check(keymap: &Keymap, command: Command, binding: &Binding) -> Result<(),
     }
     let home = home(keymap, command);
     // A key works in the command's own scope, or in a scope one of its default keys works
-    // in (the designer canvas's view keys and Ctrl+I, which GTK bound there as well).
+    // in (the designer canvas's view keys and Ctrl+I).
     let scope = binding.scope_or(&home);
     let default_scope = keymap
         .default_bindings(&command.command_ref())

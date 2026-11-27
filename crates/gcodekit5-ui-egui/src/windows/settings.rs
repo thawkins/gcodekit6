@@ -1,16 +1,16 @@
 //! The Preferences window: a copy of the settings edited page by page, saved by Apply and
 //! dropped by Cancel.
 //!
-//! Ported from the GTK crate's `ui/gtk/settings.rs` and the rows
-//! `gcodekit5_settings::persistence` fills it with. The rows are the GTK pages' rows that a
+//! The rows are the settings
+//! `gcodekit5_settings::persistence` fills it with: those a
 //! [`Config`] field backs and that mean something to this front end: General (units, feed rate
 //! units, default folder), Machine (jog step, jog feed rate, X/Y/Z travel), User Interface
 //! (theme, language, About on startup, grid line widths, and "Use system title bar" where
 //! craft-window says it changes something), File Processing, Shortcuts and Advanced. A
 //! language or title-bar change takes effect after a restart; [`SettingsOutcome::Applied`] says
-//! when one is needed. GTK's Controller page had no rows, so there is none here.
+//! when one is needed. There is no Controller page: it would have no rows.
 //!
-//! The Shortcuts page (documented in `docs/user/70-settings.md`; GTK's page was empty) lists
+//! The Shortcuts page (documented in `docs/user/70-settings.md`) lists
 //! every command with its keys: Change records the next key press in place of the chosen key
 //! (the first, or the one clicked), Add records one more key, Clear removes its keys, Reset gives it its defaults and Reset All every command. A key is given
 //! only when [`crate::shortcuts`] allows it, which keeps the E-STOP and feed hold keys fixed;

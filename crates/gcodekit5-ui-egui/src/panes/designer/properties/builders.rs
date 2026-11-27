@@ -1,7 +1,7 @@
 //! The panel's widgets: a titled section with a label / field / unit grid, text fields that
 //! apply on commit, checkboxes and drop-downs, and the length formatting.
 //!
-//! A field applies when the user commits it, as GTK's `connect_entry_commit`: Enter, or
+//! A field applies when the user commits it: Enter, or
 //! moving the focus away. Typing changes nothing in the design, so one edit is one undo
 //! step. The panel commits a finished [`Edit`] to the shapes that were selected when the
 //! editing began, even when the selection changed since (a click on the canvas both ends

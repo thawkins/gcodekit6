@@ -18,7 +18,7 @@ use gcodekit5_app::UnsavedChangesChoice;
 use gcodekit5_app::machine::MachineEvent;
 use gcodekit5_devicedb::DeviceProfile;
 
-/// Width of the Device Config page's Device Info panel (GTK: 320 px).
+/// Width of the Device Config page's Device Info panel (320 px).
 const DEVICE_INFO_WIDTH: f32 = 320.0;
 
 impl GcodeKitApp {
@@ -138,7 +138,7 @@ impl GcodeKitApp {
         );
     }
 
-    /// Draws the Device Config page into `ui` as GTK lays it out: the Device Info panel
+    /// Draws the Device Config page into `ui`: the Device Info panel
     /// on the left, the firmware settings on the right.
     pub(super) fn show_firmware_settings(&mut self, ui: &mut egui::Ui) {
         let controller = self.profile_controller();

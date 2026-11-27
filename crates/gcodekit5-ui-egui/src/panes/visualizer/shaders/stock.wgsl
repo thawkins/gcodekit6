@@ -1,6 +1,6 @@
-// Stock removal surface (port of the GTK `shaders.rs` StockRemovalShaderProgram): position,
+// Stock removal surface (the stock removal shader): position,
 // normal and colour per vertex, a diffuse term (at least 0.1) and a soft specular highlight
-// with the light in view space at (0.35, 0.35, 1). GTK draws into a non-sRGB framebuffer, so
+// with the light in view space at (0.35, 0.35, 1). The original drew into a non-sRGB target, so
 // the shaded colour is taken as sRGB and converted to linear when the target is an sRGB
 // format. Output is opaque.
 

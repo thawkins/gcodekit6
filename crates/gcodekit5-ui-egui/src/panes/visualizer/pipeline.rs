@@ -10,16 +10,16 @@
 //! `max_buffer_size` is not uploaded ([`toolpath_fits`]) and the pane says so. Its `paint`
 //! draws, in order: the grid (when shown), the origin axes, the machine bounds (when shown),
 //! the toolpath (its travel and
-//! its cuts each when shown, GTK's Show Rapid Moves and Show Cutting Moves), the tool
+//! its cuts each when shown: Show Rapid Moves and Show Cutting Moves), the tool
 //! marker and the run preview's marker.
 //!
-//! The shaders are WGSL ports of the GTK `ui/gtk/shaders.rs` line and stock removal shaders.
+//! The shaders are WGSL: a line shader and a stock removal shader.
 //! The callback draws inside egui's render pass, which has no depth buffer, so later draws
-//! cover earlier ones (the GTK view also draws the grid and the tool marker without depth
+//! cover earlier ones (the grid and the tool marker are drawn without depth
 //! testing).
 //!
-//! The stock removal mesh ([`super::stock`]) must be depth-tested with the toolpath, as in
-//! GTK. While one is shown, `prepare` draws the stock and then the toolpath into an offscreen
+//! The stock removal mesh ([`super::stock`]) must be depth-tested with the toolpath.
+//! While one is shown, `prepare` draws the stock and then the toolpath into an offscreen
 //! colour and depth target of the view's size, in its own pass; `paint` then copies that
 //! image over the grid in place of the direct toolpath draw. The mesh is uploaded once per
 //! run, and one larger than `max_buffer_size` is not drawn ([`stock_fits`]).
@@ -44,21 +44,21 @@ use super::camera::Aabb;
 use super::stock::StockMesh;
 use super::toolpath::ToolpathVertex;
 
-/// Grid size (mm, centred on the origin), as GTK draws it.
+/// Grid size (mm, centred on the origin).
 const GRID_SIZE: f32 = 4000.0;
-/// The grid spacing in mm until the sidebar changes it (GTK's default).
+/// The grid spacing in mm until the sidebar changes it (the default).
 pub const DEFAULT_GRID_SPACING: f32 = 50.0;
-/// Grid colour (GTK's 30% grey).
+/// Grid colour (30% grey).
 const GRID_COLOR: [u8; 4] = [77, 77, 77, 255];
-/// Machine bounds colour (GTK's bright blue).
+/// Machine bounds colour (bright blue).
 const BOUNDS_COLOR: [u8; 4] = [0, 128, 255, 255];
 /// Vertices of the machine bounds box: its 12 edges.
 const BOUNDS_VERTICES: usize = 24;
 /// Length of the origin axes in mm.
 const AXIS_LENGTH: f32 = 100.0;
-/// Tool marker colour: red at 40% opacity, as GTK draws it.
+/// Tool marker colour: red at 40% opacity.
 const MARKER_COLOR: [u8; 4] = [255, 0, 0, 102];
-/// Run preview marker colour: GTK's cyan (0, 0.85, 1) at 55% opacity.
+/// Run preview marker colour: cyan (0, 0.85, 1) at 55% opacity.
 pub const PREVIEW_MARKER_COLOR: [u8; 4] = [0, 217, 255, 140];
 /// Tool marker cone height and radius in mm, and its number of sides.
 const MARKER_HEIGHT: f32 = 10.0;
@@ -97,7 +97,7 @@ const SHOW_TRAVEL: u32 = 1;
 /// The toolpath shader draws cuts.
 const SHOW_CUTS: u32 = 2;
 
-/// The stock shader's light direction in view space (GTK's `uLightDir`).
+/// The stock shader's light direction in view space.
 const STOCK_LIGHT_DIR: [f32; 4] = [0.35, 0.35, 1.0, 0.0];
 /// Depth format of the offscreen stock pass.
 const DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float;
@@ -162,7 +162,7 @@ fn push_line(v: &mut Vec<SceneVertex>, a: Vec3, b: Vec3, color: [u8; 4]) {
     });
 }
 
-/// The grid lines at Z = 0, `step` mm apart (GTK's `generate_grid_data`); a step under
+/// The grid lines at Z = 0, `step` mm apart; a step under
 /// 1 mm is taken as 1 mm.
 ///
 /// # Arguments
@@ -190,7 +190,7 @@ pub fn grid_vertices(step: f32) -> Vec<SceneVertex> {
     v
 }
 
-/// The 12 edges of `bounds` (GTK's `generate_bounds_data`).
+/// The 12 edges of `bounds`.
 ///
 /// # Arguments
 /// * `bounds` - The machine's work area in mm.
@@ -402,7 +402,7 @@ pub fn install(render_state: &egui_wgpu::RenderState) {
         step_mode: wgpu::VertexStepMode::Vertex,
         attributes: &wgpu::vertex_attr_array![0 => Float32x3, 1 => Float32x3, 2 => Float32x4],
     };
-    // GTK culls back faces (counter-clockwise front) and tests with LESS. The bias pushes the
+    // Back faces are culled (counter-clockwise front) and tests with LESS. The bias pushes the
     // stock back a little, so toolpath lines on a cut floor are not lost to depth fighting.
     let stock_draw = Draw {
         vertex: Some(stock_layout),

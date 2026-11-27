@@ -3,7 +3,7 @@
 //! X and Y are the centre of the selection's box; W and H its size, above 0. With the
 //! aspect locked, a new width sets the height by the shape's ratio (and the reverse), in the
 //! same step. A rotated shape's size is read-only with the aspect locked, and a raster
-//! image's aspect is always locked, as in GTK. A text's aspect is always locked too: the
+//! image's aspect is always locked. A text's aspect is always locked too: the
 //! model scales its font by the mean of the two factors, so a free W or H would not be what
 //! the text becomes. Z is the start depth below the stock top (0 or more; the G-code starts
 //! at stock thickness minus it), and only a CNC's: a laser shows 0, read-only.

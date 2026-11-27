@@ -1,5 +1,5 @@
 //! The Speeds and Feeds page: results, the active device, the tool and material selection
-//! (a searchable dialog over each library, as GTK's), the operation, the cutting
+//! (a searchable dialog over each library), the operation, the cutting
 //! parameters, the options, and Calculate / Reset.
 //!
 //! Dependencies: `egui`, `gcodekit5-camtools` (operation types), `gcodekit5-app`
@@ -14,7 +14,7 @@ use super::{
     SpeedsFeedsParams, TOOL,
 };
 
-/// The operations, in GTK's order, with their msgids.
+/// The operations, in display order, with their msgids.
 const OPERATIONS: [(OperationType, &str); 6] = [
     (OperationType::Slotting, n_!("Slotting")),
     (OperationType::Pocketing, n_!("Pocketing")),
@@ -270,7 +270,7 @@ fn show_picker(ui: &mut egui::Ui, params: &mut SpeedsFeedsParams, tr: &Translato
 /// [`CamAction::Generate`] when Calculate is pressed (never while the input has problems).
 pub fn show(ui: &mut egui::Ui, params: &mut SpeedsFeedsParams, tr: &Translator) -> CamAction {
     let errors = params.input().err().unwrap_or_default();
-    // GTK's layout: the results in the sidebar (35%), the input beside them, Calculate
+    // The layout: the results in the sidebar (35%), the input beside them, Calculate
     // and Reset at the bottom right.
     let action = common::cam_page(
         ui,
@@ -287,7 +287,7 @@ pub fn show(ui: &mut egui::Ui, params: &mut SpeedsFeedsParams, tr: &Translator) 
     action
 }
 
-/// Share of the width the results take (GTK's paned starts at 35%).
+/// Share of the width the results take (35%).
 const SIDEBAR_SHARE: f32 = 0.35;
 
 /// The selections, operation, cutting parameters and options.

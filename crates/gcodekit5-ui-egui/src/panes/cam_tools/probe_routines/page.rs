@@ -1,5 +1,5 @@
 //! Drawing of the Probe Tools page: the machine's state, the routine and its parameters
-//! (only the settings the chosen routine uses, as GTK showed them), the last result, and
+//! (only the settings the chosen routine uses), the last result, and
 //! the actions.
 //!
 //! Dependencies: `egui`, `gcodekit5-core` (probe types), `gcodekit5-app` (translations).
@@ -155,7 +155,7 @@ pub fn show(
         params,
         |ui, _| {
             ui.label(tr.tr(DESCRIPTION));
-            // GTK's sidebar also holds the machine and probe state.
+            // The sidebar also holds the machine and probe state.
             ui.add_space(8.0);
             ui.horizontal_wrapped(|ui| {
                 ui.label(format!(
@@ -259,7 +259,7 @@ pub fn show(
     )
 }
 
-/// The rows of the settings the chosen routine uses (GTK's visibility rules).
+/// The rows of the settings the chosen routine uses (the visibility rules).
 fn routine_settings(
     ui: &mut egui::Ui,
     p: &mut ProbeParams,
@@ -310,7 +310,7 @@ fn routine_settings(
 }
 
 /// The fields the page shows for `kind`: the common parameters and the routine's settings
-/// (GTK's visibility rules, as [`routine_settings`] draws them).
+/// (the visibility rules, as [`routine_settings`] draws them).
 fn shown_fields(kind: RoutineKind) -> Vec<&'static str> {
     let mut fields = vec![SAFE_HEIGHT, FAST_FEED, SLOW_FEED, BACKOFF, MAX_DEPTH];
     let sideways = matches!(

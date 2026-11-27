@@ -40,7 +40,7 @@ impl DeviceManagerWindow {
     /// * `tr` - Translates the labels.
     pub fn show(&mut self, ui: &mut egui::Ui, machine: &Machine, config: &Config, tr: &Translator) {
         let (units, feed_units) = (config.ui.measurement_system, config.ui.feed_rate_units);
-        // GTK: the device list sidebar | the edit form.
+        // The device list sidebar | the edit form.
         ui.horizontal_top(|ui| {
             let size = egui::vec2(SIDEBAR_WIDTH, ui.available_height());
             ui.allocate_ui_with_layout(size, egui::Layout::top_down(egui::Align::Min), |ui| {
@@ -56,7 +56,7 @@ impl DeviceManagerWindow {
                         .desired_width(f32::INFINITY),
                 );
                 ui.add_space(4.0);
-                // Add Device sits under the list, as in GTK.
+                // Add Device sits under the list.
                 let add_height = ui.spacing().interact_size.y + 12.0;
                 egui::ScrollArea::vertical()
                     .id_salt("gcodekit5-device-manager-list")
@@ -174,7 +174,7 @@ impl DeviceManagerWindow {
             .is_some_and(|e| self.active_id().as_deref() == Some(e.id.as_str()));
         let asking = self.confirm_delete.is_some();
         let mut action = None;
-        // GTK's action bar: Save (suggested), Cancel, Delete (destructive), Sync, and Set
+        // The action bar: Save (suggested), Cancel, Delete (destructive), Sync, and Set
         // Active at the right end.
         ui.horizontal(|ui| {
             ui.add_enabled_ui(!asking, |ui| {

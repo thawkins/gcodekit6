@@ -2,7 +2,7 @@
 //! maximum power (%), resolution (PPI), scan direction, bidirectional, invert, dithering
 //! and the halftone threshold.
 //!
-//! Every change applies to all selected raster images as one undo step. GTK's limits
+//! Every change applies to all selected raster images as one undo step. These limits
 //! apply: rates 0 or more, powers 0 to 100, resolution 1 to 1000 PPI, threshold 0 to 255.
 //!
 //! Dependencies: `egui`, `gcodekit5-designer` (model).

@@ -1,16 +1,16 @@
-//! The Materials Manager page (GTK's Materials Manager): the material library searched
+//! The Materials Manager page: the material library searched
 //! and filtered by category, listed by category then name, and an edit form in five tabs
 //! (Basic Info, Properties, Machining, Safety, Notes).
 //!
-//! - Custom materials are kept in the GTK build's `custom_materials.json` (legacy settings
-//!   folder) through `gcodekit5-app`'s `MaterialsManagerBackend`, so a library written by
-//!   either build loads in the other. Saves are atomic; an unreadable file is reported when
+//! - Custom materials are kept in `custom_materials.json` (legacy settings
+//!   folder) through `gcodekit5-app`'s `MaterialsManagerBackend`, so a library from
+//!   earlier versions loads unchanged. Saves are atomic; an unreadable file is reported when
 //!   the window opens and backed up (`custom_materials.json.bak-<time>`, named in the
 //!   notice) before the first save replaces it.
-//! - The form's rules and messages are GTK's ([`MaterialForm`]). Saving a standard material
-//!   stores a custom copy (GTK's override); only custom materials can be deleted, and
+//! - The form's rules and messages are [`MaterialForm`]'s. Saving a standard material
+//!   stores a custom copy (an override); only custom materials can be deleted, and
 //!   deleting an override brings the standard material back.
-//! - Switching away from an edited material asks Save / Discard / Cancel (GTK dropped the
+//! - Switching away from an edited material asks Save / Discard / Cancel instead of dropping the
 //!   edits silently).
 //! - Every change is reported through [`MaterialsManagerWindow::take_changed`], so the app
 //!   hands the library to the speeds and feeds calculator at once.
@@ -261,7 +261,7 @@ impl MaterialsManagerWindow {
         });
     }
 
-    /// Saves the form (GTK's `save_material`).
+    /// Saves the form.
     ///
     /// # Returns
     /// Whether the material was saved.

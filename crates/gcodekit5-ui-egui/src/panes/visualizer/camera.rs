@@ -1,13 +1,13 @@
 //! The visualizer's orbit camera: orbit, pan, zoom, fit to a box and the standard views.
 //!
-//! The camera keeps the GTK build's maths by wrapping the shared
+//! The camera wraps the shared
 //! [`gcodekit5_visualizer::Camera3D`] (Z up, yaw and pitch around a target): the drag and
-//! wheel sensitivities and the standard view angles are those of the GTK
-//! `ui/gtk/visualizer/mod.rs` and `ui/gtk/nav_cube.rs`. Like GTK, a standard view (within 5
+//! wheel sensitivities and the standard view angles match the original
+//! behaviour. A standard view (within 5
 //! degrees) is drawn with an orthographic projection and any other angle in perspective.
 //!
-//! Fitting differs from GTK on purpose: it fits the box's bounding sphere to the narrower of
-//! the view's two sides, so a tall, narrow pane still shows the whole program.
+//! Fitting deliberately differs from the original: it fits the box's bounding sphere to the
+//! narrower of the view's two sides, so a tall, narrow pane still shows the whole program.
 //!
 //! Dependencies: `glam`, `gcodekit5-visualizer` (camera maths).
 
@@ -76,7 +76,7 @@ pub enum StdView {
 }
 
 impl StdView {
-    /// Yaw and pitch in degrees, as the GTK nav cube sets them.
+    /// Yaw and pitch in degrees, as the nav cube sets them.
     pub fn angles(self) -> (f32, f32) {
         match self {
             StdView::Top => (-90.0, 90.0),
@@ -139,7 +139,7 @@ impl Camera {
         }
     }
 
-    /// Orbits around the target for a drag of `dx`, `dy` points, as GTK does: slower close
+    /// Orbits around the target for a drag of `dx`, `dy` points: slower close
     /// up, faster far away.
     ///
     /// # Arguments

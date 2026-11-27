@@ -1,14 +1,14 @@
-//! Quick probes from Machine Control (GTK's "Probe Z" button and its "Edge:" row): a Z
+//! Quick probes from Machine Control (the "Probe Z" button and its "Edge:" row): a Z
 //! touch down to 20 mm, or an edge find 10 mm along X or Y, both at 100 mm/min, the values
-//! of GTK's quick buttons.
+//! of the quick buttons.
 //!
 //! Each runs through the Probe Routines generator and run of the CAM page
 //! (`cam_tools::probe_routines`): the same guards (connected, no job, no other run, Idle with
 //! a fresh report, probe input not triggered), the same stop-on-error stream with its
-//! backstop, the `[PRB:...]` result and the `G90` restored after a failed probe. GTK sent
-//! one `G21 G91 G38.2` line and restored `G90`; the generator also lifts 1 mm off the
+//! backstop, the `[PRB:...]` result and the `G90` restored after a failed probe. Beyond
+//! one `G21 G91 G38.2` line and a restored `G90`, the generator also lifts 1 mm off the
 //! surface (Z) or moves 1 mm clear of the edge after the touch, and writes no work offset
-//! (no WCS is set, as in GTK).
+//! (no WCS is set).
 //!
 //! Dependencies: `egui`, `gcodekit5-app` (translations), `gcodekit5-core` (probe axes),
 //! the CAM page's probe routines.
@@ -34,11 +34,11 @@ pub(super) const MSGIDS: &[&str] = &[
     n_!("Probe Y+ edge"),
 ];
 
-/// GTK's quick Z probe distance (mm, downward).
+/// The quick Z probe distance (mm, downward).
 pub const Z_DISTANCE_MM: f64 = 20.0;
-/// GTK's quick edge-find distance (mm).
+/// The quick edge-find distance (mm).
 pub const EDGE_DISTANCE_MM: f64 = 10.0;
-/// GTK's quick probe feed (mm/min).
+/// The quick probe feed (mm/min).
 pub const FEED_MM_MIN: f64 = 100.0;
 
 /// A quick probe the user asked for.
@@ -51,7 +51,7 @@ pub enum QuickProbe {
 }
 
 impl QuickProbe {
-    /// The Probe Routines input for this probe, in mm: GTK's distance and feed, no back-off
+    /// The Probe Routines input for this probe, in mm: the quick distance and feed, no back-off
     /// and re-probe, no descent before an edge probe, no work offset written.
     pub fn params(self) -> ProbeParams {
         let units = MeasurementSystem::Metric;
@@ -82,7 +82,7 @@ impl QuickProbe {
     }
 }
 
-/// The edge buttons: icon, tooltip msgid, axis and direction (GTK's order).
+/// The edge buttons: icon, tooltip msgid, axis and direction, in button order.
 const EDGES: [(Icon, &str, ProbeAxis, ProbeDirection); 4] = [
     (
         Icon::JogLeft,

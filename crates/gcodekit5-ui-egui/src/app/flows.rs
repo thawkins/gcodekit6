@@ -40,6 +40,6 @@ pub(super) struct Flows {
     pub(super) editor_prompt: Option<EditorNext>,
     /// The design's New / Open / Save waiting for a dialog.
     pub(super) design: DesignFlow,
-    /// The last dialog answer no feature has taken yet (until the editor and designer can).
+    /// The last dialog answer handled, whether or not a feature took it (for tests).
     pub(super) last_dialog_answer: Option<DialogAnswer>,
 }

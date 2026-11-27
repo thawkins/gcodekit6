@@ -1,7 +1,7 @@
 //! G-code syntax highlighting: one line becomes a `LayoutJob` whose sections are coloured by
 //! class (G/M words, coordinates, line numbers, comments, the rest) from [`crate::theme`].
 //!
-//! Replaces the GtkSourceView G-code language of the GTK editor. Highlighting is per line, so
+//! Highlighting is per line, so
 //! the large-file view highlights only the rows in view.
 //!
 //! Dependencies: `egui` (layout jobs), [`crate::theme`] (colours).

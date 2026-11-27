@@ -2,9 +2,7 @@
 //! a polyline, resizing the selection by a corner handle, rotating, marquee selection and the
 //! view changes (zoom at a point, fit, reset).
 //!
-//! Every edit goes through `DesignerState`'s undo stack. Ported from the GTK
-//! `designer_canvas/editing.rs`, `input.rs` (`create_shape`, `snap_canvas_point`, the marquee)
-//! and `rendering.rs` (`selection_bounds`, `get_resize_handle_at`, `apply_resize`).
+//! Every edit goes through `DesignerState`'s undo stack.
 //!
 //! Dependencies: `egui`, `gcodekit5-designer` (model, undo commands), `gcodekit5-core`
 //! (default work area).
@@ -22,18 +20,18 @@ use super::{CanvasView, DesignerTool, ResizeHandle};
 /// Bounds `(min_x, min_y, max_x, max_y)` in millimetres.
 pub type Bounds = (f64, f64, f64, f64);
 
-/// How far from a shape, in screen points, a click still hits it (GTK's 6 px).
+/// How far from a shape, in screen points, a click still hits it (6).
 pub const HIT_TOLERANCE_PT: f64 = 6.0;
-/// Side of a resize handle, in screen points (GTK's 8 px).
+/// Side of a resize handle, in screen points (8).
 pub const HANDLE_SIZE_PT: f64 = 8.0;
-/// Zoom factor of one Zoom In / Zoom Out step (GTK's 1.2).
+/// Zoom factor of one Zoom In / Zoom Out step (1.2).
 pub const ZOOM_STEP: f64 = 1.2;
-/// Smallest box side (mm) a drag must have to create a shape (GTK's 1 mm).
+/// Smallest box side (mm) a drag must have to create a shape (1 mm).
 const MIN_CREATE_MM: f64 = 1.0;
 /// The zoom range (points per mm). The model's viewport accepts only values strictly inside
 /// 0.1..50 and ignores others, so a zoom past a limit is clamped just inside it.
 pub const ZOOM_LIMITS: (f64, f64) = (0.1 + 1e-6, 50.0 - 1e-6);
-/// Smallest side (mm) a resize may leave (GTK's 5 mm).
+/// Smallest side (mm) a resize may leave (5 mm).
 const MIN_RESIZE_MM: f64 = 5.0;
 
 /// The hit tolerance in millimetres at `zoom` points per millimetre.
@@ -44,7 +42,7 @@ pub fn hit_tolerance_mm(zoom: f64) -> f64 {
     HIT_TOLERANCE_PT / zoom.max(1e-6)
 }
 
-/// Rounds `(x, y)` to the snap step when snapping is on (GTK: the step is
+/// Rounds `(x, y)` to the snap step when snapping is on (the step is
 /// `snap_threshold_mm`, 1 mm by default).
 ///
 /// # Arguments
@@ -157,7 +155,7 @@ pub fn handle_corners(b: Bounds) -> [(f64, f64, ResizeHandle); 4] {
 }
 
 /// The shape `tool` makes from a drag from `start` to `end`, or `None` when the box is too
-/// small (GTK's defaults: a hexagon, a 20-tooth module-2 gear, a 15-tooth ANSI 40 sprocket).
+/// small (defaults: a hexagon, a 20-tooth module-2 gear, a 15-tooth ANSI 40 sprocket).
 ///
 /// # Arguments
 /// * `tool` - A tool that drags a shape.
@@ -211,7 +209,7 @@ pub fn shape_from_drag(tool: DesignerTool, start: (f64, f64), end: (f64, f64)) -
 /// # Arguments
 /// * `state` - The design.
 /// * `tool` - A tool that drags a shape.
-/// * `start`, `end` - The drag ends, world millimetres (snapped again here, as GTK does).
+/// * `start`, `end` - The drag ends, world millimetres (snapped again here).
 ///
 /// # Returns
 /// The new shape's id, when the box was big enough.
@@ -375,7 +373,7 @@ fn scale_point(p: &mut Point, sx: f64, sy: f64, anchor: Point) {
     p.y = anchor.y + (p.y - anchor.y) * sy;
 }
 
-/// Scales `shape` by `(sx, sy)` about `anchor` as GTK's resize does: round shapes scale by the
+/// Scales `shape` by `(sx, sy)` about `anchor` as a resize does: round shapes scale by the
 /// smaller factor, a path is re-placed so its box corner follows the anchor.
 fn scale_shape(shape: &mut Shape, sx: f64, sy: f64, anchor: Point) {
     let s = sx.abs().min(sy.abs());
@@ -483,8 +481,8 @@ pub fn zoom_at(state: &mut DesignerState, view: &CanvasView, p: egui::Pos2, fact
     viewport.set_pan(pan_x, pan_y);
 }
 
-/// Fits every shape into the view (5% padding), or the work area when there are none (GTK:
-/// the device's area).
+/// Fits every shape into the view (5% padding), or the work area when there are none (the
+/// device's area).
 ///
 /// # Arguments
 /// * `state` - The design.
@@ -505,7 +503,7 @@ pub fn zoom_fit(state: &mut DesignerState, area: Bounds) {
     );
 }
 
-/// Fits the work area into the view (GTK's Fit to Device and start-up view).
+/// Fits the work area into the view (Fit to Device and the start-up view).
 ///
 /// # Arguments
 /// * `state` - The design.
@@ -517,7 +515,7 @@ pub fn fit_work_area(state: &mut DesignerState, area: Bounds) {
         .fit_to_bounds(x0, y0, x1, y1, core_constants::VIEW_PADDING);
 }
 
-/// The default work area: GTK's area without a device profile, 250 x 250 mm.
+/// The default work area without a device profile, 250 x 250 mm.
 pub fn default_work_area() -> Bounds {
     (
         0.0,
@@ -527,7 +525,7 @@ pub fn default_work_area() -> Bounds {
     )
 }
 
-/// GTK's Cut: copies the selection to the design's clipboard, then deletes it as one undo
+/// Cut: copies the selection to the design's clipboard, then deletes it as one undo
 /// step.
 ///
 /// # Arguments

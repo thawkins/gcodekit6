@@ -1,8 +1,7 @@
-//! The Properties pane: every property of the selected shape(s) that the GTK
-//! `designer_properties` panel edits.
+//! The Properties pane: every editable property of the selected shape(s).
 //!
 //! The pane shares the Designer's state ([`DesignerPane`]). Sections, top to bottom, shown
-//! as GTK shows them for the selection ([`update::Summary`]):
+//! for the selection ([`update::Summary`]):
 //!
 //! - the "Rotated object" notice, Position, Size, Rotation ([`handlers::dimensions`],
 //!   [`handlers::geometry`]);
@@ -156,7 +155,7 @@ impl PropertiesPane {
         }
     }
 
-    /// The sections for `summary`, in GTK's order.
+    /// The sections for `summary`, in display order.
     fn sections(
         &mut self,
         ui: &mut egui::Ui,

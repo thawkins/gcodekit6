@@ -1,5 +1,5 @@
-//! The Gerber page's presets: GTK's file is the converter's `GerberParameters` as pretty
-//! JSON (with the project folder), so a preset saved by either front end loads in the other.
+//! The Gerber page's presets: the file is the converter's `GerberParameters` as pretty
+//! JSON (with the project folder), so presets saved by earlier releases still load.
 //!
 //! Dependencies: `gcodekit5-camtools` (the parameters), `serde_json`.
 
@@ -12,19 +12,19 @@ use super::GerberParams;
 use crate::panes::cam_tools::common;
 
 impl GerberParams {
-    /// The page's input as GTK's preset file.
+    /// The page's input as a preset file.
     ///
     /// # Arguments
     /// * `tr` - Translator for the current UI language.
     ///
     /// # Errors
-    /// The first field that does not parse (GTK refused to save then too).
+    /// The first field that does not parse (saving is refused then).
     pub fn preset_json(&self, tr: &Translator) -> Result<String, String> {
         common::preset_text(self.build(false).map_err(common::first_error), tr)
     }
 
-    /// Sets the page from a preset file in GTK's format ([`Self::preset_json`]); the preset's
-    /// project folder is taken (and its layers found again) when it still exists, as in GTK;
+    /// Sets the page from a preset file ([`Self::preset_json`]); the preset's
+    /// project folder is taken (and its layers found again) when it still exists;
     /// the axis count is the device's, not the file's.
     ///
     /// # Arguments

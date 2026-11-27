@@ -2,9 +2,9 @@
 //! with their inline errors, the action buttons, and unit conversion of a field's text.
 //!
 //! Lengths are typed in the display units (`gcodekit5_core::units`, the same parse and
-//! format the GTK pages used) and held as text, so a value that does not parse stays on
+//! format as everywhere else) and held as text, so a value that does not parse stays on
 //! screen with its error instead of being replaced. Feeds stay in mm/min and speeds in RPM,
-//! as on the GTK pages.
+//! whatever the display units.
 //!
 //! Dependencies: `egui`, `gcodekit5-core` (units), `gcodekit5-app` (translations).
 
@@ -23,17 +23,16 @@ pub enum CamAction {
     Generate,
     /// Generate the program and replace the editor's program with it.
     SendToEditor,
-    /// Generate the program, hand it to the editor and show it in the visualizer (what the
-    /// GTK pages' Generate did).
+    /// Generate the program, hand it to the editor and show it in the visualizer.
     Preview,
-    /// Load the page's input from a preset file (GTK's Load).
+    /// Load the page's input from a preset file.
     LoadPreset,
-    /// Save the page's input to a preset file (GTK's Save).
+    /// Save the page's input to a preset file.
     SavePreset,
-    /// Generate the page's shapes and add them to the design in the designer (GTK's jigsaw
+    /// Generate the page's shapes and add them to the design in the designer (the jigsaw's
     /// Generate and the tabbed box's Generate Shapes).
     SendToDesigner,
-    /// Choose the Gerber project folder (GTK's Browse).
+    /// Choose the Gerber project folder (Browse).
     ChooseFolder,
     /// Choose the image to engrave (the Laser Image Engraver's Browse).
     ChooseImage,
@@ -205,7 +204,7 @@ pub fn format_len(mm: f64, units: MeasurementSystem) -> String {
 }
 
 /// Rewrites a length field's text from `from` units to `to` units; text that is not a
-/// length is left as it is (as the GTK pages did).
+/// length is left as it is.
 ///
 /// # Arguments
 /// * `text` - The field's text.
@@ -337,8 +336,8 @@ pub fn any(_v: f64) -> Option<&'static str> {
     None
 }
 
-/// A section heading: the bold title of the framed group under it (GTK's
-/// `PreferencesGroup` title).
+/// A section heading: the bold title of the framed group under it (a preferences
+/// group title).
 ///
 /// # Arguments
 /// * `ui` - The page's `Ui`.
@@ -437,7 +436,7 @@ pub fn check_row(ui: &mut egui::Ui, tr: &Translator, label: &'static str, value:
 /// Narrowest a framed group of fields gets, so the groups of a page line up.
 const GROUP_WIDTH: f32 = 460.0;
 
-/// A two-column grid of fields in a framed group (GTK's `PreferencesGroup` card).
+/// A two-column grid of fields in a framed group (a preferences group card).
 ///
 /// # Arguments
 /// * `ui` - The page's `Ui`.
@@ -509,8 +508,8 @@ pub fn action_row(
 ) -> CamAction {
     let mut action = CamAction::None;
     ui.add_space(8.0);
-    // GTK's order: Load and Save, then the page's actions with the main one (the first
-    // given, GTK's suggested-action Generate) at the right end.
+    // The order: Load and Save, then the page's actions with the main one (the first
+    // given, the suggested action Generate) at the right end.
     ui.horizontal_wrapped(|ui| {
         for (icon, msgid, what) in [
             (Icon::Open, n_!("Load"), CamAction::LoadPreset),
@@ -536,7 +535,7 @@ pub fn action_row(
     action
 }
 
-/// Share of a tool page's width its sidebar takes (GTK's paned starts at 40%).
+/// Share of a tool page's width its sidebar takes (40%).
 pub const SIDEBAR_SHARE: f32 = 0.40;
 
 /// The id under which [`cam_page`] leaves the sidebar's unused room, for the pane's own
@@ -545,7 +544,7 @@ pub(super) fn sidebar_rest_id() -> egui::Id {
     egui::Id::unique("gcodekit5-cam-sidebar-rest")
 }
 
-/// Lays a tool page out as GTK does: a sidebar on the left (the page's description), and
+/// Lays a tool page out: a sidebar on the left (the page's description), and
 /// on the right the form, which scrolls, over the action buttons, which stay at the bottom
 /// right. `state` (the page's input) is handed to each part in turn: first the sidebar,
 /// then the form, then the actions.
@@ -606,7 +605,7 @@ pub fn cam_page<S>(
         .show(&mut form_ui, |ui| form(ui, state))
         .inner;
 
-    // Right aligned (GTK's `halign(End)`): the row starts its own width, as measured last
+    // Right aligned: the row starts its own width, as measured last
     // frame, left of the right edge. Its room reaches past that edge, so the measured width
     // is the row's natural one, not one squeezed by the offset.
     let start = (actions_rect.right() - last.x).max(actions_rect.left());

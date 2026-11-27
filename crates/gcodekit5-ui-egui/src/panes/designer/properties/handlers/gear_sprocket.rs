@@ -1,7 +1,7 @@
 //! Gear (module, teeth, pressure angle), Sprocket (pitch, teeth, roller diameter) and
 //! Timing Pulley (pitch, teeth, belt width, hole radius).
 //!
-//! The values are millimetres and degrees, shown unconverted as in GTK. GTK's limits apply:
+//! The values are millimetres and degrees, shown unconverted. These limits apply:
 //! a gear's module above 0, at least 3 teeth and a pressure angle between 0 and 45 degrees;
 //! a sprocket's pitch and roller above 0 and at least 3 teeth (a new pitch also sets the
 //! standard roller diameter for it, in the same step); a pulley's pitch and belt width

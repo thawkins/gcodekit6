@@ -1,11 +1,11 @@
 //! The nav cube: the 3x3 view buttons and the zoom row in the visualizer's top-right corner,
-//! ported from the GTK `ui/gtk/nav_cube.rs`, and under it GTK's floating Top View and Mouse
+//! and under it the floating Top View and Mouse
 //! Controls buttons.
 //!
-//! The layout is GTK's: isometric corners around Top, Left, Front, Right and Bottom, then
+//! The layout: isometric corners around Top, Left, Front, Right and Bottom, then
 //! Zoom Out, Fit and Zoom In. Each button's accessible name is its tooltip. The one-letter
-//! view labels (T, F, L, R, B) stay untranslated, as in GTK; the isometric corners draw an
-//! arrow toward their corner, as GTK's icons do. The floating column under the cube has GTK's
+//! view labels (T, F, L, R, B) stay untranslated; the isometric corners draw an
+//! arrow toward their corner. The floating column under the cube has the
 //! Top View, Fit to Device Working Area and Mouse Controls buttons; its Toggle Scrollbars is
 //! left out (the egui view has no scrollbars).
 //!
@@ -75,7 +75,7 @@ const VIEWS: [[(&str, &str, StdView); 3]; 3] = [
     ],
 ];
 
-/// Side of a nav cube button in points (GTK's 30 px).
+/// Side of a nav cube button in points (30 px).
 const BUTTON: f32 = 30.0;
 /// Gap between buttons in points.
 const GAP: f32 = 2.0;
@@ -84,7 +84,7 @@ const COLUMN_GAP: f32 = 8.0;
 /// Margin from the pane's top-right corner in points.
 const MARGIN: f32 = 10.0;
 
-/// The screen direction of the arrow each isometric corner draws (GTK's arrow icons).
+/// The screen direction of the arrow each isometric corner draws.
 fn corner_arrow(view: StdView) -> Option<egui::Vec2> {
     match view {
         StdView::IsoNw => Some(egui::vec2(-1.0, -1.0)),
@@ -95,7 +95,7 @@ fn corner_arrow(view: StdView) -> Option<egui::Vec2> {
     }
 }
 
-/// A square button at `rect` showing `label` in GTK's small bold type, named `name` for
+/// A square button at `rect` showing `label` in small bold type, named `name` for
 /// accessibility, with `name` as its tooltip.
 fn button(ui: &mut egui::Ui, rect: egui::Rect, label: &str, name: &str) -> egui::Response {
     let text = egui::RichText::new(label).small().strong();
@@ -106,7 +106,7 @@ fn button(ui: &mut egui::Ui, rect: egui::Rect, label: &str, name: &str) -> egui:
     response
 }
 
-/// `button` in GTK's OSD look: a lighter fill and a border, so it stands out on the view,
+/// `button` in the OSD look: a lighter fill and a border, so it stands out on the view,
 /// with its text kept on one line.
 fn framed<'a>(ui: &egui::Ui, button: egui::Button<'a>) -> egui::Button<'a> {
     let visuals = &ui.visuals().widgets;
@@ -134,12 +134,12 @@ fn cell(origin: egui::Pos2, row: usize, col: usize) -> egui::Rect {
 }
 
 /// Draws the nav cube in the top-right corner of `rect`: the 3x3 view grid, the zoom row
-/// and, under its right column, GTK's floating Top View and Mouse Controls buttons.
+/// and, under its right column, the floating Top View and Mouse Controls buttons.
 ///
 /// # Arguments
 /// * `ui` - The visualizer's `Ui`.
 /// * `rect` - The view's rectangle.
-/// * `cube` - Whether to draw the view grid and the zoom row; GTK hides them in the 2D view
+/// * `cube` - Whether to draw the view grid and the zoom row; they are hidden in the 2D view
 ///   mode, leaving the floating column in place.
 /// * `tr` - Translator for the current UI language.
 ///

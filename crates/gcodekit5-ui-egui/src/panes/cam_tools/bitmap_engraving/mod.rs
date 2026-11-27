@@ -1,17 +1,17 @@
 //! The Laser Image Engraver page: a raster image engraved line by line with the laser's
 //! power following the image's darkness.
 //!
-//! GTK's defaults: 100 mm wide at 10 pixels per mm, 1000 / 3000 mm/min, power 0-100 % of
-//! S1000, horizontal bidirectional scans, no transformation, 10 mm offsets. GTK silently
-//! used a default for a field it could not read; here the field shows the problem and the
-//! actions wait. The engraving runs on a worker thread ([`job`]), as GTK's did, so a large
-//! image never stalls the UI. Beyond GTK, an output wider than [`MAX_LINE_PIXELS`] or with
+//! Defaults: 100 mm wide at 10 pixels per mm, 1000 / 3000 mm/min, power 0-100 % of
+//! S1000, horizontal bidirectional scans, no transformation, 10 mm offsets. A field that
+//! cannot be read shows the problem and the
+//! actions wait. The engraving runs on a worker thread ([`job`]), so a large
+//! image never stalls the UI. An output wider than [`MAX_LINE_PIXELS`] or with
 //! more than [`MAX_PIXELS`] pixels in all is refused: the engraver resizes the whole image
 //! to the output size in memory, and its height follows the image's aspect, so a tall
 //! narrow image could ask for gigabytes. The total is checked on the page once the preview
 //! knows the image's size, and again by the worker after decoding, before the resize.
 //!
-//! GTK's page has no laser-mode (`$32`) or connection check, so neither has this one: the
+//! The page has no laser-mode (`$32`) or connection check: the
 //! program goes to the editor, whose send path has its own guards.
 //!
 //! Dependencies: `egui`, `gcodekit5-camtools` (engraver, presets), `gcodekit5-app`
@@ -205,7 +205,7 @@ pub struct BitmapEngravingParams {
 }
 
 impl BitmapEngravingParams {
-    /// GTK's initial values in `units`, with no image chosen.
+    /// The initial values in `units`, with no image chosen.
     ///
     /// # Arguments
     /// * `units` - The display units.
@@ -368,17 +368,17 @@ impl BitmapEngravingParams {
         job::engrave(&image, params, |_| {})
     }
 
-    /// The page's input as GTK's preset file (`BitmapEngravingPreset`, lengths in mm).
+    /// The page's input as a preset file (`BitmapEngravingPreset`, lengths in mm).
     ///
     /// # Arguments
     /// * `tr` - Translator for the current UI language.
     ///
     /// # Errors
-    /// The first field that does not parse (GTK refused to save then too).
+    /// The first field that does not parse (saving is refused then).
     pub fn preset_json(&self, tr: &Translator) -> Result<String, String> {
         let u = self.units;
         let preset = (|| {
-            // GTK parsed these as `f32` directly.
+            // These are parsed as `f32` directly.
             let number = |label: &'static str, text: &str| {
                 text.trim()
                     .parse::<f32>()
@@ -427,8 +427,8 @@ impl BitmapEngravingParams {
         preset.to_json().map_err(|e| e.to_string())
     }
 
-    /// Sets the page from a preset file in GTK's format (any version GTK reads; version 1
-    /// lengths are read in the page's units, as GTK did). Choices GTK did not know leave
+    /// Sets the page from a preset file (any preset version; version 1
+    /// lengths are read in the page's units). Unknown choices leave
     /// their field as it is.
     ///
     /// # Arguments
@@ -437,7 +437,7 @@ impl BitmapEngravingParams {
     /// # Errors
     /// The text is not a bitmap engraving preset; the page is left as it was.
     pub fn apply_preset(&mut self, json: &str) -> Result<(), String> {
-        // GTK read any JSON value as an old preset of defaults; only an object can be one.
+        // Only a JSON object can be a preset; any other value is refused.
         common::preset_object(json)?;
         let loaded =
             BitmapEngravingPreset::from_json(json, self.units).map_err(|e| e.to_string())?;
@@ -484,19 +484,19 @@ fn any(_v: f64) -> Option<&'static str> {
     None
 }
 
-/// GTK's scan direction ids.
+/// The scan direction ids presets hold.
 const SCANS: [(ScanDirection, &str); 2] = [
     (ScanDirection::Horizontal, "0"),
     (ScanDirection::Vertical, "1"),
 ];
-/// GTK's rotation ids.
+/// The rotation ids presets hold.
 const ROTATIONS: [(RotationAngle, &str); 4] = [
     (RotationAngle::Degrees0, "0"),
     (RotationAngle::Degrees90, "90"),
     (RotationAngle::Degrees180, "180"),
     (RotationAngle::Degrees270, "270"),
 ];
-/// GTK's halftone ids.
+/// The halftone ids presets hold.
 const HALFTONES: [(HalftoneMethod, &str); 5] = [
     (HalftoneMethod::None, "none"),
     (HalftoneMethod::Threshold, "threshold"),

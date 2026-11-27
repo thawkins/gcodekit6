@@ -1,25 +1,25 @@
-//! The Device Manager page (GTK's Device Manager): the machine profiles, searched and
+//! The Device Manager page: the machine profiles, searched and
 //! listed by name with the active one marked, and an edit form in four tabs (General,
 //! Connection, Dimensions, Capabilities).
 //!
-//! - Profiles are kept in the GTK build's `devices.json` through `gcodekit5-devicedb`'s
-//!   `DeviceManager`, so a profile written by either build loads in the other. The file is
+//! - Profiles are kept in `devices.json` through `gcodekit5-devicedb`'s
+//!   `DeviceManager`, so profiles from earlier versions load unchanged. The file is
 //!   read when the app starts; without one the default profile is created and made active,
-//!   as GTK does. A file with no valid active profile gets one (the first by name), and an
+//!   A file with no valid active profile gets one (the first by name), and an
 //!   unreadable file is backed up (`devices.json.bak-<time>`, named in the window's
 //!   notice) and replaced by the default profile, so there is always a valid active
 //!   profile.
 //! - **Add Device** stores a new default profile and opens it; **Save** checks the form
-//!   with [`ProfileForm::apply`] (GTK's rules and messages); **Cancel** drops the edits;
+//!   with [`ProfileForm::apply`]; **Cancel** drops the edits;
 //!   **Delete** asks first; **Set Active** makes the profile the active one; **Sync from
 //!   Device** fills the form from the settings the controller reported in Firmware
-//!   Settings (GTK's Sync from Device, `$130`-`$132`, `$30`, `$32`).
-//! - The active profile can never be deleted, nor the only one (GTK cleared it). While a
+//!   Settings (`$130`-`$132`, `$30`, `$32`).
+//! - The active profile can never be deleted, nor the only one. While a
 //!   job runs the active profile cannot be changed or replaced.
 //! - Unsaved form edits (a Sync from Device result included) are asked about on quit, as
 //!   the editor's, the designer's and the library windows' are
 //!   ([`DeviceManagerWindow::has_unsaved_changes`]).
-//! - A GRBL dump retrieved in Firmware Settings is stored in the profile GTK chose
+//! - A GRBL dump retrieved in Firmware Settings is stored in the profile
 //!   ([`device_profiles::dump_target`]) by [`DeviceManagerWindow::store_dump`].
 //!
 //! Dependencies: `egui`, `gcodekit5-app` (form rules, translations), `gcodekit5-devicedb`
@@ -191,7 +191,7 @@ impl DeviceManagerWindow {
     }
 
     /// Keeps a GRBL `$$` dump in the profile of the machine it came from
-    /// ([`dump_target`], GTK's Device Config page rule); the form, if that profile is open,
+    /// ([`dump_target`]); the form, if that profile is open,
     /// takes the stored S value and laser mode so a later Save keeps them.
     ///
     /// # Arguments

@@ -1,6 +1,5 @@
 //! Files embedded in the binary: the help topics (markdown per language), the help images,
-//! the designer icons and the app images (replaces the GTK front end's gresource bundle,
-//! which reads the same files from `resources/` until the GTK crate is removed).
+//! the designer icons and the app images, read from `resources/` at build time.
 //!
 //! Dependencies: none (`include_str!` / `include_bytes!` only).
 

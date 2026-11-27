@@ -1,7 +1,7 @@
 //! CAM Properties (CNC only): use the global values, operation (profile or pocket), step
 //! down, step in, ramp angle, pocket strategy and raster fill.
 //!
-//! As in GTK, the fields are editable only when the shapes use their own values ("Use
+//! The fields are editable only when the shapes use their own values ("Use
 //! global values" off); step in, strategy and raster fill only for a pocket. Several
 //! selected shapes show the first one's values and every change applies to all of them.
 //! Step down and step in are lengths in the display units; the raster fill is a percentage
@@ -49,7 +49,7 @@ fn strategy_index(strategy: PocketStrategy) -> usize {
     }
 }
 
-/// The strategy at drop-down index `i` (GTK's raster is at 0 degrees, bidirectional).
+/// The strategy at drop-down index `i` (raster is at 0 degrees, bidirectional).
 fn strategy_at(i: usize) -> PocketStrategy {
     match i {
         0 => PocketStrategy::Raster {

@@ -2,9 +2,9 @@
 //! bottom-left corner, the empty-state message when no program is loaded, and a note when
 //! the toolpath is too large for the GPU.
 //!
-//! Ported from the GTK `ui/gtk/visualizer/mod.rs`: its inspector's "Bounds X/Y" rows (the
+//! It shows the inspector's "Bounds X/Y" rows (the
 //! cutting moves' bounds, else every move's) and its empty state. The "Mouse Controls" help
-//! button is with the nav cube ([`super::nav_cube`]), where GTK floats it.
+//! button is with the nav cube ([`super::nav_cube`]).
 //! Lengths are in the user's measurement system, two decimals for mm and three for inches,
 //! as the DRO shows them.
 //!

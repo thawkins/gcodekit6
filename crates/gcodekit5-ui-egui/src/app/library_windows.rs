@@ -1,7 +1,7 @@
 //! The app's side of the CNC Tools and Materials pages: the GTC import and
 //! export file dialogs CNC Tools asks for, handing a changed library to the speeds and
 //! feeds calculator at once, and keeping CNC Tools' search and filters in the settings
-//! whenever they change (GTK remembered them).
+//! whenever they change.
 //!
 //! Dependencies: the app's dialogs, settings and windows.
 
@@ -72,7 +72,7 @@ impl GcodeKitApp {
     }
 
     /// Keeps CNC Tools' search, filters and last opened tool in the settings whenever they
-    /// change, as GTK did (a failed write is not retried until they change again).
+    /// change (a failed write is not retried until they change again).
     fn store_tools_ui_state(&mut self) {
         if !self.managers.tools_manager.ui_state_changed() {
             return;

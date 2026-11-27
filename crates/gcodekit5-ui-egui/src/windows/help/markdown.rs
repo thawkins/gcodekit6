@@ -2,7 +2,7 @@
 //!
 //! The topics are not strict CommonMark: they mix markdown with HTML (`<img width>`, `<li>`,
 //! `<p>`) and write sub-items as `-     [x](help:y)`, which CommonMark reads as indented code.
-//! So, like the GTK help browser, this reads them line by line: ATX headings, `-`/`*`/`+`
+//! So this reads them line by line: ATX headings, `-`/`*`/`+`
 //! and numbered list items (nested by indentation), `<li>` items, `<img>` tags, `---` rules
 //! and paragraphs (consecutive lines joined). Inside a line it reads `**strong**`,
 //! `` `code` ``, `[text](help:topic)` and `[text](https://...)` links and bare `http(s)://`
@@ -71,7 +71,7 @@ pub enum Block {
     Rule,
 }
 
-/// The width an `<img>` without a `width` gets (as in GTK).
+/// The width an `<img>` without a `width` gets.
 const DEFAULT_IMAGE_WIDTH: f32 = 300.0;
 
 /// The deepest list nesting kept.
@@ -213,7 +213,7 @@ fn attribute(tag: &str, name: &str) -> Option<String> {
 }
 
 /// The help image file name an `<img src>` names: the last path segment, with `.png`
-/// added when it has no extension (as GTK resolved them).
+/// added when it has no extension.
 pub fn image_name(src: &str) -> String {
     let name = src.rsplit('/').next().unwrap_or(src);
     if name.contains('.') {

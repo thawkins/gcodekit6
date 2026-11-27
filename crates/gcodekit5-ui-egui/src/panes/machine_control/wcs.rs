@@ -10,7 +10,7 @@
 //! does not hold up jogging. It goes out from the pane's per-frame work, which runs whether
 //! or not the Machine Control page is shown.
 //! Only a controller that never reports its parser state falls back to the user's last
-//! selection (G54 at first), as the GTK front end did.
+//! selection (G54 at first).
 //!
 //! A system outside G54-G59 (grblHAL's `G59.1`, a typed `G54.1`) leaves the zero commands
 //! without a `P` that names it, so they stay disabled until a G54-G59 is active again. `$G`
@@ -18,8 +18,6 @@
 //! [`WorkZeroSupport`]: Smoothieware uses the last selection, Repetier zeroes with `G92` (its
 //! connection translates `G10 L20`) and has no selector, and TinyG, g2core and Marlin have no
 //! work zero; the disabled controls say why.
-//!
-//! Ported from the GTK `machine_control` view's Work Coordinates section and zero buttons.
 //!
 //! Dependencies: `egui`, `gcodekit5-app` (work zero commands, controller, translations).
 
@@ -325,7 +323,7 @@ impl WcsPanel {
         let spacing = 6.0;
         let width = ((ui.available_width() - 2.0 * spacing) / 3.0).min(80.0);
         ui.horizontal(|ui| {
-            // Centred, as GTK centres its grid.
+            // Centred.
             ui.add_space((ui.available_width() - 3.0 * width - 2.0 * spacing).max(0.0) / 2.0);
             egui::Grid::new("wcs-selector")
                 .num_columns(3)

@@ -6,9 +6,9 @@
 //! [`Dialogs::poll`] on a later frame, tagged with what it was asked for. No call here waits
 //! for the user, so the window keeps drawing while a dialog is up.
 //!
-//! Ported from the GTK crate's `ui/gtk/file_dialog.rs` (open and save dialogs with file-type
-//! filters) and `ui/gtk/common/dialog.rs` (the Save / Discard / Cancel prompt and Yes / No
-//! confirmations, whose answer is `gcodekit5_app::UnsavedChangesChoice`).
+//! It covers open and save dialogs with file-type filters, the Save / Discard / Cancel
+//! prompt (whose answer is `gcodekit5_app::UnsavedChangesChoice`) and Yes / No
+//! confirmations.
 //!
 //! Dependencies: `craft-dialogs` (the queue and the native dialogs), `gcodekit5-app`
 //! (translations).
@@ -88,7 +88,7 @@ impl FilePurpose {
     }
 
     /// Whether a file chosen for this purpose becomes the folder the next file dialog starts
-    /// in: the editor's and the designer's files, as GTK remembered them; not presets,
+    /// in: the editor's and the designer's files; not presets,
     /// firmware settings, tool catalogs or the Gerber and engraving inputs.
     pub fn remembers_folder(self) -> bool {
         match self {
@@ -131,22 +131,22 @@ impl FilePurpose {
             Self::ImportImage => vec![FileFilter::IMAGE],
             Self::ExportGcode => vec![FileFilter::GCODE_EXPORT],
             Self::ExportSvg => vec![FileFilter::SVG],
-            // GTK's preset dialogs offered no file types.
+            // Preset dialogs offer no file types.
             Self::LoadCamPreset | Self::SaveCamPreset => Vec::new(),
             // A folder has no file types.
             Self::OpenGerberFolder => Vec::new(),
             Self::OpenEngravingImage => vec![FileFilter::ENGRAVING_IMAGE],
-            // GTK's firmware settings dialogs offered no file types.
+            // Firmware settings dialogs offer no file types.
             Self::ExportFirmwareSettings | Self::ImportFirmwareSettings => Vec::new(),
             Self::ImportGtcPackage => open(FileFilter::GTC_PACKAGE),
             Self::ImportGtcJson => open(FileFilter::JSON),
-            // GTK's export offered JSON only.
+            // The export offers JSON only.
             Self::ExportCustomTools => vec![FileFilter::JSON],
         }
     }
 }
 
-/// The file types the designer's Import dialog offers, as GTK's: the supported files, SVG,
+/// The file types the designer's Import dialog offers: the supported files, SVG,
 /// DXF and, when Settings' "STL File Import" is on, STL; then All Files.
 ///
 /// # Arguments
@@ -176,7 +176,7 @@ pub struct FileFilter {
 }
 
 impl FileFilter {
-    /// G-code programs, with the extensions the GTK editor offered.
+    /// G-code programs, by their usual extensions.
     pub const GCODE: Self = Self {
         name_msgid: n_!("G-Code Files"),
         extensions: &["gcode", "nc", "gc", "tap"],
@@ -187,12 +187,12 @@ impl FileFilter {
         extensions: &["gckd", "gck5"],
     };
 
-    /// The vector files the designer imports (GTK's "Supported Files").
+    /// The vector files the designer imports ("Supported Files").
     pub const IMPORT: Self = Self {
         name_msgid: n_!("Supported Files"),
         extensions: &["svg", "dxf"],
     };
-    /// GTK's "Supported Files" with STL import switched on in the settings.
+    /// "Supported Files" with STL import switched on in the settings.
     pub const IMPORT_WITH_STL: Self = Self {
         name_msgid: n_!("Supported Files"),
         extensions: &["svg", "dxf", "stl"],
@@ -212,12 +212,12 @@ impl FileFilter {
         name_msgid: n_!("DXF Files"),
         extensions: &["dxf"],
     };
-    /// The images the raster import reads (GTK's JPEG, PNG, BMP, TIFF and WebP types).
+    /// The images the raster import reads (JPEG, PNG, BMP, TIFF and WebP).
     pub const IMAGE: Self = Self {
         name_msgid: n_!("Image files"),
         extensions: &["png", "jpg", "jpeg", "bmp", "tif", "tiff", "webp"],
     };
-    /// The images the Laser Image Engraver reads (GTK's PNG, JPEG, BMP, GIF and TIFF types).
+    /// The images the Laser Image Engraver reads (PNG, JPEG, BMP, GIF and TIFF).
     pub const ENGRAVING_IMAGE: Self = Self {
         name_msgid: n_!("Image files"),
         extensions: &["png", "jpg", "jpeg", "bmp", "gif", "tif", "tiff"],
@@ -232,7 +232,7 @@ impl FileFilter {
         name_msgid: "JSON",
         extensions: &["json"],
     };
-    /// The G-code types the designer's export offers (GTK's).
+    /// The G-code types the designer's export offers.
     pub const GCODE_EXPORT: Self = Self {
         name_msgid: n_!("G-Code Files"),
         extensions: &["nc", "gcode", "gc"],
@@ -484,7 +484,7 @@ impl Dialogs {
         }
     }
 
-    /// Remembers the folder of `file`, so the next file dialog starts there, as GTK's did.
+    /// Remembers the folder of `file`, so the next file dialog starts there.
     ///
     /// # Arguments
     /// * `file` - A file just opened or saved.

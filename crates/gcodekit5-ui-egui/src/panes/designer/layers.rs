@@ -1,7 +1,7 @@
 //! The Layers pane: the design's shapes in drawing order, with selection, visibility, lock,
 //! rename, z-order and grouping.
 //!
-//! Ported from the GTK `designer_layers.rs`, laid out as GTK's: the "Objects" heading with
+//! Laid out as: the "Objects" heading with
 //! the Group and Ungroup icon buttons, rows of operation icon, position, kind and number,
 //! name and group badge, and the z-order icon buttons under the list. The pane shares the
 //! Designer's state ([`DesignerPane`]): clicking a row selects the shape on the canvas, and
@@ -9,13 +9,13 @@
 //! model's undo commands, one step per action: grouping, ungrouping, deleting, moving up
 //! and down, the position field, and renaming. Each marks the design modified.
 //!
-//! GTK has no visibility or lock; they are added here. They are view state of the Designer
+//! Visibility and lock are view state of the Designer
 //! pane ([`ShapeFlags`](super::canvas::ShapeFlags)): not undoable, not saved, and a hidden or
 //! locked shape cannot be selected (hiding or locking deselects it).
 //!
 //! Rows run bottom to top in drawing order (position 1 is drawn first). A position field
-//! takes a number and Enter, as in GTK; a move that would split a group is refused with a
-//! notice (GTK's dialog). Keys: Delete removes the selection (not during a canvas drag)
+//! takes a number and Enter; a move that would split a group is refused with a
+//! notice. Keys: Delete removes the selection (not during a canvas drag)
 //! while the pointer is over the pane and no text field has focus.
 //!
 //! Dependencies: `egui`, `gcodekit5-designer` (model and commands), `gcodekit5-app`
@@ -38,7 +38,7 @@ use crate::workspace::{Pane, PaneContext, PaneId};
 /// icon.
 type Move = (&'static str, bool, fn(&mut DesignerState) -> bool, MoveIcon);
 
-/// A z-order button's icon: an app SVG (GTK's move-to-top and move-to-bottom) or a Tabler
+/// A z-order button's icon: an app SVG (move-to-top and move-to-bottom) or a Tabler
 /// icon.
 #[derive(Clone, Copy)]
 enum MoveIcon {
@@ -112,7 +112,7 @@ pub fn msgids() -> Vec<&'static str> {
     ]
 }
 
-/// The short type name msgid of `shape`, as GTK's list shows it.
+/// The short type name msgid of `shape`, as the list shows it.
 fn type_msgid(shape: &Shape) -> &'static str {
     match shape {
         Shape::Rectangle(_) => n_!("Rect"),
@@ -201,7 +201,7 @@ impl LayersPane {
     }
 
     /// The header: the "Objects" heading with the Group and Ungroup icon buttons on the
-    /// right, as GTK.
+    /// right.
     fn header(&mut self, ui: &mut egui::Ui, d: &mut DesignerPane, rows: &[Row], tr: &Translator) {
         let selected = rows.iter().filter(|r| r.selected).count();
         let grouped = rows.iter().any(|r| r.selected && r.group.is_some());
@@ -228,7 +228,7 @@ impl LayersPane {
         });
     }
 
-    /// The four z-order icon buttons under the list (GTK's move-to-top SVG, up, down and
+    /// The four z-order icon buttons under the list (the move-to-top SVG, up, down and
     /// the move-to-bottom SVG).
     fn z_order(&mut self, ui: &mut egui::Ui, d: &mut DesignerPane, rows: &[Row], tr: &Translator) {
         let selected: Vec<usize> = rows
@@ -237,7 +237,7 @@ impl LayersPane {
             .map(|r| r.position)
             .collect();
         let (first, last) = (selected.contains(&1), selected.contains(&rows.len()));
-        // GTK: with a single selected row at an end, the moves toward that end are disabled.
+        // With a single selected row at an end, the moves toward that end are disabled.
         let single = selected.len() == 1;
         let start_ok = !selected.is_empty() && !(single && first);
         let end_ok = !selected.is_empty() && !(single && last);
@@ -283,7 +283,7 @@ impl LayersPane {
         });
     }
 
-    /// The refusal notice (GTK's dialog) with a Close button.
+    /// The refusal notice with a Close button.
     fn notice(&mut self, ui: &mut egui::Ui, tr: &Translator) {
         if !self.notice {
             return;

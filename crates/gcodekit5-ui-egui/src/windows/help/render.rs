@@ -1,4 +1,4 @@
-//! Draws a help topic's blocks: scaled bold headings (as GTK's 1.6/1.4/1.2), wrapped
+//! Draws a help topic's blocks: scaled bold headings (1.6/1.4/1.2), wrapped
 //! paragraphs and list items with strong, code and link spans, the help images at the
 //! width the topic asks for (never wider than the page), and rules.
 //!

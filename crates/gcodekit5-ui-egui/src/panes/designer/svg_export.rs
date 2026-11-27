@@ -1,11 +1,11 @@
 //! The design as an SVG document (File > Export SVG).
 //!
-//! Ported from the GTK `designer/file_ops.rs` `export_svg`: the page is the shapes' effective
+//! The page is the shapes' effective
 //! bounds plus 10 mm, in millimetres, with Y flipped (the design's Y points up, SVG's down).
 //! Rectangles, circles, ellipses and lines are SVG elements with their rotation; text is a
-//! `<text>` element (its content XML-escaped, which GTK did not do); a raster image is a grey
-//! box; every other shape is its rendered outline as a `<path>`. GTK added a second rotation
-//! to paths whose rendered outline already carries it; the outline is used as rendered here.
+//! `<text>` element (its content XML-escaped); a raster image is a grey
+//! box; every other shape is its rendered outline as a `<path>`. That outline already
+//! carries the shape's rotation, so paths get no second rotation.
 //!
 //! Dependencies: `gcodekit5-designer` (model), `lyon` (path events).
 

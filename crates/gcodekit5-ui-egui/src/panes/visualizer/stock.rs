@@ -2,8 +2,8 @@
 //! toolpath and meshes what is left, on a worker thread, so neither the allocation, the
 //! cutting nor the meshing blocks the UI or the machine stream.
 //!
-//! Ported from the GTK `ui/gtk/visualizer/mod.rs` (`run_stock_simulation`,
-//! `restart_stock_simulation` and the "Show Stock Removal" toggle). Each run has its own
+//! The stock removal simulation behind the "Show Stock Removal" toggle.
+//! Each run has its own
 //! cancel token: [`StockSimulation::start`] cancels the running one and drops its result, so
 //! a stale run can never overwrite a newer one. The worker sends whole-percent progress and
 //! the mesh, and wakes the UI with a repaint request. The stock and tool are checked on the
@@ -33,7 +33,7 @@ use gcodekit5_visualizer::visualizer::{
     detect_stock_zero_reference, toolpath_from_commands,
 };
 
-/// Cell size of the simulation in mm (GTK's).
+/// Cell size of the simulation in mm.
 pub const RESOLUTION: f32 = 0.19;
 
 /// The msgids the simulation shows, for the translation check.
@@ -64,7 +64,7 @@ pub struct StockSetup {
 }
 
 impl Default for StockSetup {
-    /// GTK's defaults: 200 x 200 x 10 mm stock and a 1/8" (3.175 mm) end mill, zeroed on the
+    /// The defaults: 200 x 200 x 10 mm stock and a 1/8" (3.175 mm) end mill, zeroed on the
     /// stock's top lower-left corner.
     fn default() -> Self {
         Self {
@@ -79,13 +79,13 @@ impl Default for StockSetup {
 }
 
 /// The Designer's stock and tool, handed to the visualizer with each program the Designer
-/// generates (GTK copied them on every G-code apply and page switch).
+/// generates.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct StockSeed {
     /// Changes with every generated program, so each is applied once.
     pub serial: u64,
     /// The Designer's stock size in X, Y and Z (mm), or `None` when it has no stock: the
-    /// visualizer's stock is then kept, as GTK's `sync_stock_from_designer` did.
+    /// visualizer's stock is then kept.
     pub stock: Option<[f32; 3]>,
     /// The Designer's tool diameter (mm).
     pub tool_diameter: f32,
@@ -382,7 +382,7 @@ impl StockSimulation {
         self.notice = None;
     }
 
-    /// Starts simulating `program` on `setup`, cancelling any running simulation (GTK's
+    /// Starts simulating `program` on `setup`, cancelling any running simulation (a
     /// restart). An invalid stock or no program gives a notice instead of a run.
     ///
     /// # Arguments

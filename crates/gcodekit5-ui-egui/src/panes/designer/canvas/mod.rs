@@ -89,7 +89,7 @@ impl DesignerTool {
         DesignerTool::Text,
     ];
 
-    /// The app SVG (in `resources/icons/`) on the tool's toolbox button, as GTK.
+    /// The app SVG (in `resources/icons/`) on the tool's toolbox button.
     pub fn icon(self) -> &'static str {
         match self {
             DesignerTool::Select => "select.svg",
