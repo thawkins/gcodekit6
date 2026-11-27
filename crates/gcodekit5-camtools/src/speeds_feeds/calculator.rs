@@ -304,13 +304,7 @@ impl SpeedsFeedsCalculator {
 
         // Derived values are based on the speeds that will actually be used.
         let mrr = Self::calculate_mrr(final_feed_rate, radial_engagement, input.depth_of_cut);
-        let power_kw = Self::estimate_power(
-            input,
-            final_rpm as f32,
-            final_feed_rate,
-            radial_engagement,
-            input.depth_of_cut,
-        );
+        let power_kw = Self::estimate_power(input, mrr);
         let deflection = Self::estimate_deflection(input, final_rpm as f32, power_kw);
 
         // 9. Generate Sources String
@@ -500,19 +494,12 @@ impl SpeedsFeedsCalculator {
         feed_rate * width_of_cut * depth_of_cut
     }
 
-    /// Estimate power requirement (kW)
-    fn estimate_power(
-        input: &CalculationInput,
-        rpm: f32,
-        feed_rate: f32,
-        width_of_cut: f32,
-        depth_of_cut: f32,
-    ) -> f32 {
-        // Standard formula: P = (Fc × V) / 60000 (kW)
-        // Where:
-        //   Fc = cutting force (Newtons)
-        //   V = cutting speed (m/min)
-
+    /// Estimate power requirement (kW) from the material removal rate.
+    ///
+    /// `P = Kc * MRR / 60_000_000 / 0.85`: the specific cutting force `Kc` (N/mm^2) times the
+    /// removal rate `MRR` (mm^3/min) is the cutting work per minute in N*mm/min; dividing by
+    /// 60 000 000 converts it to kW, and by 0.85 accounts for spindle efficiency.
+    fn estimate_power(input: &CalculationInput, mrr: f32) -> f32 {
         // Get specific cutting force (Kc) from material - typical values:
         // Wood: 10-30 MPa, Aluminum: 100-300 MPa, Steel: 1000-3000 MPa
         let kc = input.material.specific_cutting_force.unwrap_or({
@@ -527,20 +514,8 @@ impl SpeedsFeedsCalculator {
             }
         });
 
-        // Chip cross-sectional area (mm²)
-        // feed_per_tooth (mm) = feed_rate (mm/min) / (rpm × flutes)
-        // chip_area = depth_of_cut × feed_per_tooth
-        let feed_per_tooth = feed_rate / (rpm.max(1.0) * input.tool.flutes.max(1) as f32);
-        let chip_area = depth_of_cut * feed_per_tooth;
-
-        // Cutting force (Newtons) = Kc (MPa = N/mm²) × Area (mm²)
-        let cutting_force = kc * chip_area * (width_of_cut / input.tool.diameter).max(0.1);
-
-        // Cutting speed (m/min) = π × diameter(mm) × rpm / 1000
-        let cutting_speed = (PI * input.tool.diameter * rpm) / 1000.0;
-
-        // Power at tool tip (kW) = (Force(N) × Speed(m/min)) / 60000
-        let power_at_tool = (cutting_force * cutting_speed) / 60000.0;
+        // Power at tool tip (kW) = Kc (N/mm^2) * MRR (mm^3/min) / 60 000 000
+        let power_at_tool = kc * mrr / 60_000_000.0;
 
         // Apply efficiency factor (typically 0.7-0.9)
         power_at_tool / 0.85 // Account for spindle efficiency
