@@ -14,6 +14,21 @@ use cavalier_contours::polyline::{PlineSource, PlineSourceMut, PlineVertex, Poly
 use std::f64::consts::PI;
 use std::panic;
 
+/// The smallest stepover and step-down (mm) the generators use. A smaller (or non-finite)
+/// value would make the offset and Z-pass loops run for millions of iterations, so it is
+/// raised to this; sane inputs are unchanged.
+const MIN_STEP_MM: f64 = 0.01;
+
+/// The Z step of each pass: `step_down` (at least [`MIN_STEP_MM`]), or the whole depth in
+/// one pass when `step_down` is not positive.
+fn z_step(step_down: f64, total_depth: f64) -> f64 {
+    if step_down > 0.0 {
+        step_down.max(MIN_STEP_MM)
+    } else {
+        total_depth
+    }
+}
+
 fn add_center_cleanup(
     toolpath: &mut Toolpath,
     center: Point,
@@ -247,6 +262,11 @@ pub struct PocketGenerator {
 }
 
 impl PocketGenerator {
+    /// The stepover the generators step by: the operation's, at least [`MIN_STEP_MM`].
+    fn stepover(&self) -> f64 {
+        self.operation.stepover.max(MIN_STEP_MM)
+    }
+
     /// Creates a new pocket generator.
     pub fn new(operation: PocketOperation) -> Self {
         Self {
@@ -536,11 +556,7 @@ impl PocketGenerator {
 
             // Calculate Z passes
             let total_depth = self.operation.depth.abs();
-            let z_step = if step_down > 0.0 {
-                step_down
-            } else {
-                total_depth
-            };
+            let z_step = z_step(step_down, total_depth);
             let z_passes = (total_depth / z_step).ceil() as u32;
             let mut prev_z = self.operation.start_depth;
             let mut is_first_z_pass = true;
@@ -620,7 +636,7 @@ impl PocketGenerator {
                         }
                     }
 
-                    current_offset += self.operation.stepover;
+                    current_offset += self.stepover();
                 }
                 toolpaths.push(toolpath);
                 prev_z = current_z;
@@ -662,11 +678,7 @@ impl PocketGenerator {
 
             // Calculate Z passes
             let total_depth = self.operation.depth.abs();
-            let z_step = if step_down > 0.0 {
-                step_down
-            } else {
-                total_depth
-            };
+            let z_step = z_step(step_down, total_depth);
             let z_passes = (total_depth / z_step).ceil() as u32;
             let mut prev_z = self.operation.start_depth;
             let mut is_first_z_pass = true;
@@ -742,7 +754,7 @@ impl PocketGenerator {
                         }
                     }
 
-                    current_offset += self.operation.stepover;
+                    current_offset += self.stepover();
                 }
                 // Final center cleanup to eliminate residual core (only if raster fill enabled)
                 if self.operation.raster_fill_ratio > 0.0 {
@@ -851,11 +863,7 @@ impl PocketGenerator {
 
         // Calculate Z passes
         let total_depth = self.operation.depth.abs();
-        let z_step = if step_down > 0.0 {
-            step_down
-        } else {
-            total_depth
-        };
+        let z_step = z_step(step_down, total_depth);
         let z_passes = (total_depth / z_step).ceil() as u32;
         let tool_radius = self.operation.tool_diameter / 2.0;
         let mut prev_z = self.operation.start_depth;
@@ -933,7 +941,7 @@ impl PocketGenerator {
                     }
                 }
 
-                current_offset += self.operation.stepover;
+                current_offset += self.stepover();
             }
 
             // Final cleanup to remove residual core at the center (only if raster fill enabled)
@@ -975,11 +983,7 @@ impl PocketGenerator {
 
         // Calculate Z passes
         let total_depth = self.operation.depth.abs();
-        let z_step = if step_down > 0.0 {
-            step_down
-        } else {
-            total_depth
-        };
+        let z_step = z_step(step_down, total_depth);
         let z_passes = (total_depth / z_step).ceil() as u32;
         let tool_radius = self.operation.tool_diameter / 2.0;
 
@@ -999,7 +1003,7 @@ impl PocketGenerator {
                 break;
             }
             levels.push(offsets);
-            current_offset += self.operation.stepover;
+            current_offset += self.stepover();
         }
 
         // Reverse levels to go Inside-Out
@@ -1116,19 +1120,6 @@ impl PocketGenerator {
                 );
             }
 
-            if let Some(center_pt) = innermost_centroid
-                && self.operation.raster_fill_ratio > 0.0
-            {
-                add_center_cleanup(
-                    &mut toolpath,
-                    center_pt,
-                    self.operation.tool_diameter,
-                    current_z,
-                    self.operation.feed_rate,
-                    self.operation.spindle_speed,
-                );
-            }
-
             // Push main adaptive toolpath first, then raster cleanup
             toolpaths.push(toolpath);
 
@@ -1195,11 +1186,7 @@ impl PocketGenerator {
 
         // Calculate Z passes
         let total_depth = self.operation.depth.abs();
-        let z_step = if step_down > 0.0 {
-            step_down
-        } else {
-            total_depth
-        };
+        let z_step = z_step(step_down, total_depth);
         let z_passes = (total_depth / z_step).ceil() as u32;
 
         let tool_radius = self.operation.tool_diameter / 2.0;
@@ -1333,7 +1320,7 @@ impl PocketGenerator {
                     }
                 }
 
-                current_y += self.operation.stepover;
+                current_y += self.stepover();
                 forward = !forward;
             }
 
