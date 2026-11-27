@@ -8,28 +8,20 @@
 //! `ControllerType::as_str()` in `gcodekit5-devicedb`) to a `ProtocolProfile`
 //! describing how the app should behave for that protocol:
 //!
-//! - Which line processor (if any) the `SerialCommunicator` should install.
-//! - Which sender (Direct vs FlowControl) to use for streaming.
+//! - Which commands to send right after connecting (`init_commands`).
 //! - Whether the firmware announces its identity (for autodetection).
 //! - Whether it is currently wired up and supported.
+//! - Which banner text identifies it (`detection_signatures`, used by
+//!   [`detect_protocol`]).
+//!
+//! The registry does not pick a line processor or a sender: the Repetier
+//! worker in `gcodekit5-app` owns its own processing.
 //!
 //! ## Design notes
 //!
 //! - All data is `&'static` → zero runtime allocation, zero lookup cost.
-//! - Unknown protocols fall back to a safe GRBL-like default.
-//! - Adding a new protocol is a one-entry change plus a sender/processor
-//!   implementation (if needed).
-
-/// How the streaming sender should behave.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum SenderKind {
-    /// Direct command emission. No flow window, no per-command ack.
-    /// Used by GRBL and GRBL-compatible firmwares.
-    Direct,
-    /// Flow-control window. Waits for `ok` per command before sending
-    /// the next. Used by Repetier.
-    FlowControl,
-}
+//! - Unknown protocols fall back to [`FALLBACK_PROFILE`].
+//! - Adding a new protocol is a one-entry change.
 
 /// Per-protocol behaviour profile.
 ///
@@ -55,9 +47,6 @@ pub struct ProtocolProfile {
     /// controller-type combo.
     pub is_supported: bool,
 
-    /// Which sender to use for streaming.
-    pub sender: SenderKind,
-
     /// Whether the firmware emits an identity banner the app can detect.
     ///
     /// Used by the divergence check to decide whether "no detection"
@@ -81,6 +70,8 @@ pub struct ProtocolProfile {
     /// - Unknown/unsupported: `&[]`
     pub init_commands: &'static [&'static str],
 
+    /// Case-insensitive banner substrings that identify this protocol; the first
+    /// registry entry with a match wins in [`detect_protocol`].
     pub detection_signatures: &'static [&'static str],
 }
 
@@ -92,7 +83,6 @@ pub const PROTOCOLS: &[ProtocolProfile] = &[
         id: "Repetier",
         display_name: "Repetier",
         is_supported: true,
-        sender: SenderKind::FlowControl,
         announces_identity: true,
         init_commands: &["M110", "M115"],
         detection_signatures: &["Free RAM", "FIRMWARE_NAME:Repetier", "Repetier", "Resend:"],
@@ -102,7 +92,6 @@ pub const PROTOCOLS: &[ProtocolProfile] = &[
         id: "grblHAL",
         display_name: "grblHAL",
         is_supported: false,
-        sender: SenderKind::Direct,
         announces_identity: true,
         init_commands: &["$I", "$$"],
         detection_signatures: &["grblHAL", "[FIRMWARE:grblHAL]"],
@@ -112,7 +101,6 @@ pub const PROTOCOLS: &[ProtocolProfile] = &[
         id: "FluidNC",
         display_name: "FluidNC",
         is_supported: false,
-        sender: SenderKind::Direct,
         announces_identity: true,
         init_commands: &["$I", "$$"],
         detection_signatures: &["FluidNC"],
@@ -122,7 +110,6 @@ pub const PROTOCOLS: &[ProtocolProfile] = &[
         id: "GRBL",
         display_name: "GRBL",
         is_supported: true,
-        sender: SenderKind::Direct,
         announces_identity: true,
         init_commands: &["$I", "$$"],
         detection_signatures: &["Grbl"],
@@ -134,7 +121,6 @@ pub const PROTOCOLS: &[ProtocolProfile] = &[
         id: "TinyG",
         display_name: "TinyG",
         is_supported: false,
-        sender: SenderKind::Direct,
         announces_identity: true,
         init_commands: &["{\"fv\":null}"],
         detection_signatures: &["TinyG", "tinyg"],
@@ -143,7 +129,6 @@ pub const PROTOCOLS: &[ProtocolProfile] = &[
         id: "g2core",
         display_name: "g2core",
         is_supported: false,
-        sender: SenderKind::Direct,
         announces_identity: true,
         init_commands: &["{\"fv\":null}"],
         detection_signatures: &["g2core", "G2Core"],
@@ -152,7 +137,6 @@ pub const PROTOCOLS: &[ProtocolProfile] = &[
         id: "Smoothieware",
         display_name: "Smoothieware",
         is_supported: false,
-        sender: SenderKind::Direct,
         announces_identity: true,
         init_commands: &["version"],
         detection_signatures: &["Smoothieware", "Build version:"],
@@ -161,7 +145,6 @@ pub const PROTOCOLS: &[ProtocolProfile] = &[
         id: "Marlin",
         display_name: "Marlin",
         is_supported: false,
-        sender: SenderKind::Direct,
         announces_identity: true,
         init_commands: &["M115"],
         detection_signatures: &["FIRMWARE_NAME:Marlin", "Marlin"],
@@ -173,7 +156,6 @@ pub const FALLBACK_PROFILE: ProtocolProfile = ProtocolProfile {
     id: "Unknown",
     display_name: "Unknown",
     is_supported: false,
-    sender: SenderKind::Direct,
     announces_identity: false,
     init_commands: &[],
     detection_signatures: &[],
@@ -182,13 +164,6 @@ pub const FALLBACK_PROFILE: ProtocolProfile = ProtocolProfile {
 /// Look up the profile for a canonical `controller_type` string.
 ///
 /// Returns [`FALLBACK_PROFILE`] if the string is not in the registry.
-/// This is safe: an unknown protocol behaves like GRBL-compatible
-/// (Direct sender, no processor).
-/// Look up the profile for a canonical `controller_type` string.
-///
-/// Returns [`FALLBACK_PROFILE`] if the string is not in the registry.
-/// This is safe: an unknown protocol behaves like GRBL-compatible
-/// (Direct sender, no processor).
 pub fn protocol_profile(id: &str) -> ProtocolProfile {
     PROTOCOLS
         .iter()
@@ -211,7 +186,3 @@ pub fn detect_protocol(text: &str) -> Option<ControllerProtocol> {
 }
 
 pub use super::ControllerProtocol;
-
-// ────────────────────────────────────────────────────────────────
-// Tests
-// ────────────────────────────────────────────────────────────────
