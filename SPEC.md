@@ -2087,6 +2087,7 @@ See [FIRMWARE_CAPABILITIES_DATABASE.md](docs/FIRMWARE_CAPABILITIES_DATABASE.md) 
   - **Dividers**: Configurable X and Y dividers with slot generation.
   - **Keying**: Options for keying dividers into walls and floor (WallsAndFloor, WallsOnly, FloorOnly, None).
   - **Dimples**: Optional dimples on tabs for friction fit (Drill point or Circle).
+  - **Finger Styles**: The Finger Style menu picks Rectangular (default), Springs (a slit beside each finger side leaves a flexible leaf), Barbs (saw-tooth barbs that slide in and grip) or Snap Fit (relief slits free an arm whose hook catches behind the mating panel), after boxes.py's FingerJoint styles. Only the fingers change; the notches stay plain. Sizes derive from the thickness and finger settings; a joint a style cannot draw is refused (Snap Fit also refuses dividers and a box side of 6 thicknesses or less). Edges that get half-lap divider slots keep plain fingers.
   - **Box Types**: Support for Box with Top, Box without Top, and Tray (separate parts).
   - **Layout Optimization**: 'Pack Paths' feature to minimize material usage.
   - **UI**: Scrollable tabs using `Flickable` for better accessibility on small screens.

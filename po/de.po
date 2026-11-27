@@ -895,6 +895,21 @@ msgstr "Ohne Vorder-/Rückseite"
 msgid "No Left/Right"
 msgstr "Ohne links/rechts"
 
+msgid "Finger Style:"
+msgstr "Fingerstil:"
+
+msgid "Rectangular"
+msgstr "Rechteckig"
+
+msgid "Springs"
+msgstr "Federn"
+
+msgid "Barbs"
+msgstr "Widerhaken"
+
+msgid "Snap Fit"
+msgstr "Schnappverbindung"
+
 msgid "Walls and Floor"
 msgstr "Wände und Boden"
 

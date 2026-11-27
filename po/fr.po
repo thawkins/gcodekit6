@@ -904,6 +904,21 @@ msgstr "Sans avant/arrière"
 msgid "No Left/Right"
 msgstr "Sans gauche/droite"
 
+msgid "Finger Style:"
+msgstr "Style des doigts :"
+
+msgid "Rectangular"
+msgstr "Rectangulaire"
+
+msgid "Springs"
+msgstr "Ressorts"
+
+msgid "Barbs"
+msgstr "Ardillons"
+
+msgid "Snap Fit"
+msgstr "Encliquetage"
+
 msgid "Walls and Floor"
 msgstr "Parois et fond"
 

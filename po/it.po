@@ -898,6 +898,21 @@ msgstr "Senza fronte/retro"
 msgid "No Left/Right"
 msgstr "Senza sinistra/destra"
 
+msgid "Finger Style:"
+msgstr "Stile delle dita:"
+
+msgid "Rectangular"
+msgstr "Rettangolare"
+
+msgid "Springs"
+msgstr "Molle"
+
+msgid "Barbs"
+msgstr "Ardiglioni"
+
+msgid "Snap Fit"
+msgstr "Incastro a scatto"
+
 msgid "Walls and Floor"
 msgstr "Pareti e fondo"
 
