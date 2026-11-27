@@ -63,28 +63,26 @@ impl std::fmt::Display for ControllerType {
     }
 }
 
-/// Protocolo de control, usado tanto para la configuración del usuario
-/// (desde el Device Manager) como para la autodetección (al leer bytes
-/// del dispositivo).
+/// Line protocol a controller speaks: chosen by the user's device profile
+/// and recognised from the controller's start-up banner by
+/// [`protocol_registry::detect_protocol`].
 ///
-/// Es la **fuente de verdad** del modo operativo del `SerialCommunicator`
-/// (cuando se usa como configuración) y el sujeto del chequeo de
-/// divergencia (cuando se compara config vs detección).
+/// The machine layer (`gcodekit5-app`) picks the streaming path from it:
+/// GRBL's character-counting stream or the numbered, checksummed Repetier
+/// link built on [`repetier::processor::RepetierProcessor`].
 ///
-/// ## Añadir un protocolo nuevo
+/// ## Adding a protocol
 ///
-/// 1. Descomentar la variante aquí.
-/// 2. Añadir el match en `as_str()` y `from_str()`.
-/// 3. Añadir una entrada en `PROTOCOLS` (en `protocol_registry.rs`).
-/// 4. Implementar sender y processor si aplica.
-///
-/// El resto del código sigue funcionando sin cambios.
+/// 1. Uncomment the variant here.
+/// 2. Add it to `as_str()` and `from_str()`.
+/// 3. Add an entry to `PROTOCOLS` in `protocol_registry.rs`.
+/// 4. Implement its sender and line processor if it needs them.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum ControllerProtocol {
     Grbl,
     Repetier,
 
-    // ─── Future protocols (uncomment when implementing) ───
+    // Future protocols (uncomment when implementing):
     // Marlin,
     // FluidNC,
     // TinyG,

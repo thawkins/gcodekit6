@@ -41,6 +41,7 @@ mod wcs;
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
+use gcodekit5_app::ControllerProtocol;
 use gcodekit5_app::i18n::Translator;
 use gcodekit5_app::machine::grbl_stream::{GrblResponseLine, classify_response};
 use gcodekit5_app::machine::{
@@ -51,7 +52,6 @@ use gcodekit5_app::work_zero::{
     Wcs, WorkZeroSupport, go_to_work_zero_command, work_zero_mode, work_zero_support,
     zero_axes_command, zero_rotary_command,
 };
-use gcodekit5_communication::firmware::ControllerProtocol;
 use gcodekit5_core::units::{FeedRateUnits, MeasurementSystem};
 use gcodekit5_settings::ConnectionSettings;
 use gcodekit5_settings::config::Config;

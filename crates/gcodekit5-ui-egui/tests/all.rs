@@ -62,6 +62,8 @@ mod test_cam_tools;
 mod test_cam_validation_gaps;
 #[path = "test_commands.rs"]
 mod test_commands;
+#[path = "test_communication_layering.rs"]
+mod test_communication_layering;
 #[path = "test_console_pane.rs"]
 mod test_console_pane;
 #[path = "test_designer_app.rs"]

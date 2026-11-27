@@ -33,3 +33,5 @@ mod test_protocol_registry;
 mod test_repetier;
 #[path = "test_reply_ledger.rs"]
 mod test_reply_ledger;
+#[path = "test_serial_passthrough.rs"]
+mod test_serial_passthrough;
