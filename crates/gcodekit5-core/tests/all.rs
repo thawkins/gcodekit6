@@ -23,6 +23,8 @@ mod audit_regression_tests;
 mod six_axis_position_tests;
 #[path = "test_gcode_words_arc.rs"]
 mod test_gcode_words_arc;
+#[path = "test_gcode_words_comments.rs"]
+mod test_gcode_words_comments;
 #[path = "test_type_aliases.rs"]
 mod test_type_aliases;
 #[path = "test_units.rs"]
