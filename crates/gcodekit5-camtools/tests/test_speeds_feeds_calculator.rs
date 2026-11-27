@@ -98,3 +98,38 @@ fn test_speeds_feeds_floor_raise_is_recorded() {
     assert_eq!(result.rpm, 1000);
     assert!(result.unclamped_rpm.is_some_and(|rpm| rpm < 1000));
 }
+
+/// Power is `Kc * MRR / 60e6 / 0.85` kW. Worked example (the GTK default page): aluminium's
+/// default Kc of 200 N/mm^2 and an MRR of 7383.3 mm^3/min give
+/// 200 * 7383.3 / 60e6 / 0.85 = 0.028954 kW (29 W).
+#[test]
+fn test_speeds_feeds_power_is_kc_times_mrr() {
+    let worked = 200.0_f32 * 7383.3 / 60_000_000.0 / 0.85;
+    assert!((worked - 0.028_954).abs() < 1e-6, "{worked}");
+
+    let result = SpeedsFeedsCalculator::calculate(&aluminium_input(24_000));
+    let expected = 200.0 * result.material_removal_rate / 60_000_000.0 / 0.85;
+    assert!(
+        (result.power_required_kw - expected).abs() < 1e-7,
+        "{} != {expected}",
+        result.power_required_kw
+    );
+}
+
+/// Power depends on the removal rate only, not on the flute count or the stepover ratio.
+#[test]
+fn test_speeds_feeds_power_ignores_flutes_and_stepover_floor() {
+    for (flutes, woc) in [(2, 1.0), (4, 1.0), (2, 0.1)] {
+        let mut input = aluminium_input(24_000);
+        input.tool.flutes = flutes;
+        input.width_of_cut = Some(woc);
+        input.material = input.material.with_specific_cutting_force(1000.0);
+        let result = SpeedsFeedsCalculator::calculate(&input);
+        let expected = 1000.0 * result.material_removal_rate / 60_000_000.0 / 0.85;
+        assert!(
+            (result.power_required_kw - expected).abs() < 1e-7,
+            "flutes {flutes}, woc {woc}: {} != {expected}",
+            result.power_required_kw
+        );
+    }
+}

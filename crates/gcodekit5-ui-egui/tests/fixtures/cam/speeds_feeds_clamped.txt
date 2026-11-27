@@ -4,4 +4,4 @@ surface_speed=300.0
 chip_load=0.0547
 mrr=164.1
 power=1
-deflection=0.0006
+deflection=0.0004
