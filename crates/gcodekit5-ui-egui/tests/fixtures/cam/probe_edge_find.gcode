@@ -11,4 +11,5 @@ G0 X2.000 ; Back off by 2.00 mm
 G38.2 X-2.500 F25.0 ; Slow re-probe
 G0 X2.000 ; Move clear of the edge
 G0 Z3.000 ; Raise back to start height
+G21 ; Restore millimetres
 G90 ; Restore absolute moves

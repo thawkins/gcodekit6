@@ -19,4 +19,5 @@ G38.2 Y2.500 F25.0 ; Slow re-probe
 G10 L20 P1 Y-0.500 ; Work Y0 at the Y edge
 G0 Y-2.000 ; Move clear of the Y edge
 G0 Z3.000 ; Raise back to start height
+G21 ; Restore millimetres
 G90 ; Restore absolute moves

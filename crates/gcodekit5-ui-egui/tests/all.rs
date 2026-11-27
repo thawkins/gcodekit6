@@ -40,6 +40,8 @@ mod test_cam_output_staleness;
 mod test_cam_presets;
 #[path = "test_cam_probe_backstop.rs"]
 mod test_cam_probe_backstop;
+#[path = "test_cam_probe_mode_restore.rs"]
+mod test_cam_probe_mode_restore;
 #[path = "test_cam_probe_review.rs"]
 mod test_cam_probe_review;
 #[path = "test_cam_probe_routines.rs"]

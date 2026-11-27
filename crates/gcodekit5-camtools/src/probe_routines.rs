@@ -31,6 +31,16 @@
 //!   routine does not travel to the setter itself; `plate_xy` is only written into the
 //!   header as a reminder of where the setter is.
 //!
+//! ## Modal state
+//!
+//! The routines switch the controller to `G21` (mm) and `G91` (incremental). GRBL has no
+//! modal push/pop and the program cannot read the parser state back, so the end of every
+//! program states the mode to return to explicitly: the units in
+//! [`ProbeOptions::restore_units`] (`G21` for metric, `G20` for imperial), then `G90`
+//! (absolute, the mode every program and MDI line in the session assumes). The caller
+//! sets `restore_units` to the units the user works in, so a program run after probing
+//! on an inch machine is not silently read in millimetres.
+//!
 //! ### Tool-setter reference
 //!
 //! For tool length, `plate_z` is the reference: the **machine** Z at which the reference
@@ -70,6 +80,7 @@
 //! Depends on `gcodekit5-core` for the routine, report and position types.
 
 use anyhow::{Result, anyhow};
+use gcodekit5_core::units::MeasurementSystem;
 use gcodekit5_core::{Corner, Position, ProbeReport, ProbeResult, ProbeRoutine};
 use gcodekit5_core::{ProbeAxis as Axis, ProbeDirection as Direction};
 use serde::{Deserialize, Serialize};
@@ -127,6 +138,9 @@ pub struct ProbeOptions {
     /// boss centres must be computed from the reports with
     /// [`ProbeRoutineEngine::compute_result_with`].
     pub set_wcs: Option<u8>,
+    /// Units the program restores at its end (`G21` for metric, `G20` for imperial), after
+    /// the routine itself ran in `G21`. Set it to the units the user works in.
+    pub restore_units: MeasurementSystem,
 }
 
 impl Default for ProbeOptions {
@@ -136,6 +150,7 @@ impl Default for ProbeOptions {
             tip_radius: 0.0,
             plate_thickness: 0.0,
             set_wcs: None,
+            restore_units: MeasurementSystem::Metric,
         }
     }
 }
@@ -518,6 +533,16 @@ impl ProbeRoutineEngine {
         program.line("G91 ; Incremental moves from the current position");
     }
 
+    /// Footer shared by every routine: restores absolute moves and the caller's units
+    /// ([`ProbeOptions::restore_units`]); GRBL has no modal push/pop, so both are stated.
+    fn footer(&self, program: &mut ProbeProgram) {
+        program.line(match self.options.restore_units {
+            MeasurementSystem::Metric => "G21 ; Restore millimetres",
+            MeasurementSystem::Imperial => "G20 ; Restore inches",
+        });
+        program.line("G90 ; Restore absolute moves");
+    }
+
     /// `G10 L20` line writing `words` into the configured WCS, if any.
     fn set_wcs_line(&self, program: &mut ProbeProgram, words: &str, comment: &str) {
         if let Some(p) = self.options.set_wcs.and_then(wcs_p_number) {
@@ -570,7 +595,7 @@ impl ProbeRoutineEngine {
             &format!("Z{:.3}", safe_height),
             "Retract to safe height above the surface",
         );
-        p.line("G90 ; Restore absolute moves");
+        self.footer(&mut p);
 
         Ok((
             p,
@@ -648,7 +673,7 @@ impl ProbeRoutineEngine {
             "Move clear of the edge",
         );
         p.raise(depth, "Raise back to start height");
-        p.line("G90 ; Restore absolute moves");
+        self.footer(&mut p);
 
         Ok((
             p,
@@ -747,7 +772,7 @@ impl ProbeRoutineEngine {
         );
 
         p.raise(depth, "Raise back to start height");
-        p.line("G90 ; Restore absolute moves");
+        self.footer(&mut p);
 
         Ok((p, format!("Corner find at {} corner", corner_name)))
     }
@@ -798,7 +823,7 @@ impl ProbeRoutineEngine {
         p.probe(Axis::Y, reach, *fast_feed, "Probe back wall");
         p.rapid(&format!("Y{:.3}", -to_center), "Back to nominal centre");
         p.raise(depth, "Raise back to start height");
-        p.line("G90 ; Restore absolute moves");
+        self.footer(&mut p);
         if self.options.set_wcs.is_some() {
             p.line("; The centre is computed from the probe reports; it is not set here");
         }
@@ -913,7 +938,7 @@ impl ProbeRoutineEngine {
         p.raise(depth, "Raise above the boss");
 
         p.rapid(&format!("Y{:.3}", -to_center), "Return to nominal centre");
-        p.line("G90 ; Restore absolute moves");
+        self.footer(&mut p);
         if self.options.set_wcs.is_some() {
             p.line("; The centre is computed from the probe reports; it is not set here");
         }
@@ -965,7 +990,7 @@ impl ProbeRoutineEngine {
             &format!("Z{:.3}", safe_height),
             "Retract to safe height above the setter",
         );
-        p.line("G90 ; Restore absolute moves");
+        self.footer(&mut p);
 
         Ok((p, "Tool length measurement at setter plate".to_string()))
     }

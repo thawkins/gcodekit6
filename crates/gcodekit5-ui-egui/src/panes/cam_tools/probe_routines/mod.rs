@@ -372,6 +372,7 @@ impl ProbeParams {
             tip_radius,
             plate_thickness,
             set_wcs: self.auto_update.then_some(self.wcs),
+            restore_units: u,
         };
         Ok((routine, options))
     }

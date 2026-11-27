@@ -10,4 +10,5 @@ G0 Z1.250 ; Back off by 1.25 mm
 G38.2 Z-1.750 F25.0 ; Slow re-probe
 G10 L20 P2 Z1.500 ; Work Z0 at the surface under the plate
 G0 Z5.000 ; Retract to safe height above the surface
+G21 ; Restore millimetres
 G90 ; Restore absolute moves

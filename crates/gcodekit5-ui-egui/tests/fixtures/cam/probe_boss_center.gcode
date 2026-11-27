@@ -27,4 +27,5 @@ G38.2 Y-12.000 F100.0 ; Probe back side toward centre
 G0 Y1.000 ; Move clear of the boss
 G0 Z3.000 ; Raise above the boss
 G0 Y-11.000 ; Return to nominal centre
+G21 ; Restore millimetres
 G90 ; Restore absolute moves

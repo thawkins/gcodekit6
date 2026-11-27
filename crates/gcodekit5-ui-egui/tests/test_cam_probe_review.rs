@@ -136,8 +136,20 @@ fn test_cam_probe_values_follow_the_measurement_system() {
     inch.max_depth = "1".into();
     inch.backoff = "0.1".into();
     inch.plate_thickness = "0.05".into();
-    assert_eq!(inch.run_lines(start()), metric.run_lines(start()));
+    // The same lines, apart from the units each page restores at the end (D-12).
     let lines = inch.run_lines(start()).expect("lines");
+    let metric_lines = metric.run_lines(start()).expect("lines");
+    let without_units = |l: &[String]| -> Vec<String> {
+        l.iter()
+            .filter(|l| *l != "G20" && *l != "G21")
+            .cloned()
+            .collect()
+    };
+    assert_eq!(without_units(&lines), without_units(&metric_lines));
+    assert!(
+        lines.ends_with(&["G20".to_string(), "G90".to_string()]),
+        "{lines:?}"
+    );
     assert!(
         lines.iter().any(|l| l == "G38.2 Z-25.400 F100.0"),
         "{lines:?}"
@@ -145,7 +157,9 @@ fn test_cam_probe_values_follow_the_measurement_system() {
     assert!(lines.iter().any(|l| l == "G0 Z6.350"), "{lines:?}");
     // Generate's program too.
     assert_eq!(
-        inch.generate(start()).map(|o| o.gcode),
+        inch.generate(start()).map(|o| o
+            .gcode
+            .replace("G20 ; Restore inches", "G21 ; Restore millimetres")),
         metric.generate(start()).map(|o| o.gcode)
     );
 }
@@ -173,6 +187,7 @@ fn test_cam_probe_inch_page_shows_inches_and_sends_mm_lines() {
         "G0 Z2.540",
         "G38.2 Z-3.040 F25.0",
         "G0 Z6.350",
+        "G20",
         "G90",
     ]
     .map(String::from)

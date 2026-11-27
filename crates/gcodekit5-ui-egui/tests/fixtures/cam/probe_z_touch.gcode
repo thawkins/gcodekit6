@@ -9,4 +9,5 @@ G38.2 Z-20.000 F100.0 ; Fast probe down
 G0 Z2.000 ; Back off by 2.00 mm
 G38.2 Z-2.500 F25.0 ; Slow re-probe
 G0 Z5.000 ; Retract to safe height above the surface
+G21 ; Restore millimetres
 G90 ; Restore absolute moves
