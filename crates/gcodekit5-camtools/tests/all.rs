@@ -37,6 +37,8 @@ mod test_excellon_drill;
 mod test_gerber_input_safety;
 #[path = "test_gerber_outline_compensation.rs"]
 mod test_gerber_outline_compensation;
+#[path = "test_gerber_regions_macros.rs"]
+mod test_gerber_regions_macros;
 #[path = "test_job_preamble_modal_header.rs"]
 mod test_job_preamble_modal_header;
 #[path = "test_laser_engraver_overscan.rs"]
@@ -47,3 +49,5 @@ mod test_probe_mode_restore;
 mod test_speeds_feeds_calculator;
 #[path = "test_speeds_feeds_service.rs"]
 mod test_speeds_feeds_service;
+#[path = "test_tabbed_box_finger_styles.rs"]
+mod test_tabbed_box_finger_styles;

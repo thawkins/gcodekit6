@@ -4,6 +4,13 @@
 **Last Updated**: 2026-11-27
 **Status**: Alpha Release
 
+### Unreleased (2026-11-28) - Gerber Regions, Aperture Macros and Clear Polarity
+- ✅ **Gerber to G-Code**
+  - G36/G37 regions (copper pours) are filled, with linear and circular (G74/G75) contour edges and cut-in holes.
+  - Aperture macros (`%AM`) are flashed: primitives 1, 4, 5, 7, 20 and 21, comments, `$n` variables and arithmetic expressions.
+  - Clear polarity (`%LPC`) cuts its objects out of the dark copper before it, in file order.
+  - The page still warns about what is not drawn: macros with moire (6) or unreadable content, and step and repeat (`%SR`).
+
 ### Unreleased (2026-11-28) - Excellon Drilling
 - ✅ **CAM Tools**
   - Gerber page Drill Holes layer: `gcodekit5_camtools::excellon` parses Excellon drill files (M48 header, METRIC/INCH, LZ/TZ, `000.000` pattern or `FILE_FORMAT`/`FORMAT={a:b}` comment, default 3.3 metric / 2.4 inch TZ, tool table, G90/G91, modal coordinates, G85 and M15/G01/M16 routed slots) and drills them in one program: tools smallest first, each after `M5` + `M0` tool-change pause and `M3`; one plain `G1` plunge per hole to the Drill Depth (Z) field (`alignment_hole_depth`), slots routed; the Gerber X/Y offset applies.
@@ -2081,6 +2088,7 @@ See [FIRMWARE_CAPABILITIES_DATABASE.md](docs/FIRMWARE_CAPABILITIES_DATABASE.md) 
   - **Dividers**: Configurable X and Y dividers with slot generation.
   - **Keying**: Options for keying dividers into walls and floor (WallsAndFloor, WallsOnly, FloorOnly, None).
   - **Dimples**: Optional dimples on tabs for friction fit (Drill point or Circle).
+  - **Finger Styles**: The Finger Style menu picks Rectangular (default), Springs (a slit beside each finger side leaves a flexible leaf), Barbs (saw-tooth barbs that slide in and grip) or Snap Fit (relief slits free an arm whose hook catches behind the mating panel), after boxes.py's FingerJoint styles. Only the fingers change; the notches stay plain. Sizes derive from the thickness and finger settings; a joint a style cannot draw is refused (Snap Fit also refuses dividers and a box side of 6 thicknesses or less). Edges that get half-lap divider slots keep plain fingers.
   - **Box Types**: Support for Box with Top, Box without Top, and Tray (separate parts).
   - **Layout Optimization**: 'Pack Paths' feature to minimize material usage.
   - **UI**: Scrollable tabs using `Flickable` for better accessibility on small screens.

@@ -863,6 +863,21 @@ msgstr ""
 msgid "No Left/Right"
 msgstr ""
 
+msgid "Finger Style:"
+msgstr ""
+
+msgid "Rectangular"
+msgstr ""
+
+msgid "Springs"
+msgstr ""
+
+msgid "Barbs"
+msgstr ""
+
+msgid "Snap Fit"
+msgstr ""
+
 msgid "Walls and Floor"
 msgstr ""
 

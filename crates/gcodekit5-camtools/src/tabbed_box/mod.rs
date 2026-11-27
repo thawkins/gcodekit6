@@ -3,6 +3,7 @@
 //! Based on the superior algorithm from <https://github.com/florianfesti/boxes>
 //! Uses finger/space multiples of thickness for automatic finger calculation
 
+mod finger_styles;
 mod types;
 
 pub use types::*;
@@ -76,7 +77,7 @@ impl TabbedBoxMaker {
             h = Self::adjust_size(h, t);
         }
 
-        Ok(Self {
+        let maker = Self {
             params,
             x,
             y,
@@ -86,7 +87,88 @@ impl TabbedBoxMaker {
             path_labels: Vec::new(),
             path_groups: Vec::new(),
             current_group_name: String::new(),
-        })
+        };
+        maker.validate_finger_style()?;
+        Ok(maker)
+    }
+
+    /// Checks that the Springs, Barbs or Snap fingers fit the joint: a shape that does not
+    /// fit would run into the next finger, the panel corner or the opposite edge.
+    fn validate_finger_style(&self) -> Result<(), String> {
+        let t = self.t;
+        let p = &self.params;
+        let kerf = p.burn;
+        let finger = p.finger_joint.finger * t + kerf;
+        let space = p.finger_joint.space * t - kerf;
+        let finger_h = t + p.finger_joint.extra_length * t;
+        let sides = [self.x, self.y, self.h];
+        // Half the leftover beside the end fingers of every edge length, as drawn.
+        let margins = sides.map(|side| {
+            let (fingers, leftover) = self.calc_fingers(side);
+            (fingers, (leftover - kerf) / 2.0)
+        });
+        match p.finger_joint.style {
+            FingerStyle::Rectangular | FingerStyle::Dogbone => Ok(()),
+            FingerStyle::Springs => {
+                if finger <= finger_styles::springs_min_finger(finger_h, t) {
+                    return Err("Fingers are too narrow for the Springs style".to_string());
+                }
+                Ok(())
+            }
+            FingerStyle::Barbs => {
+                let barb = finger_styles::BARB_DEPTH * t;
+                if finger_styles::barb_count(finger_h, t) == 0 {
+                    return Err("Fingers are too short for the Barbs style".to_string());
+                }
+                if space <= 2.0 * barb || margins.iter().any(|&(n, m)| n > 0 && m <= barb) {
+                    return Err("Spaces are too narrow for the Barbs style".to_string());
+                }
+                Ok(())
+            }
+            FingerStyle::Snap => {
+                if p.dividers_x > 0 || p.dividers_y > 0 {
+                    return Err("The Snap style cannot be used with dividers".to_string());
+                }
+                if finger <= finger_styles::SNAP_MIN_FINGER * t {
+                    return Err("Fingers are too narrow for the Snap style".to_string());
+                }
+                // Two facing hooks stand out half a thickness each, beyond their slits.
+                let slits = 2.0 * finger_styles::SNAP_OUTER_SLIT * t;
+                if space <= t + slits {
+                    return Err("Spaces are too narrow for the Snap style".to_string());
+                }
+                // The relief slits of two opposite edges must not meet.
+                let relief = finger_styles::SNAP_RELIEF * t;
+                if sides.iter().any(|&side| side <= 2.0 * (relief + t)) {
+                    return Err("The box is too small for the Snap style".to_string());
+                }
+                // Nor may they reach the slits of the edge round the corner.
+                let clear = relief + 2.0 * finger_styles::SNAP_OUTER_SLIT * t;
+                let too_close = margins.iter().any(|&(n, m)| {
+                    let nearest = match n {
+                        0 => f32::INFINITY,
+                        1 => m - finger_styles::SNAP_OUTER_SLIT * t,
+                        _ => m + finger - finger_styles::SNAP_SLIT_WALL * t,
+                    };
+                    nearest <= clear
+                });
+                if too_close {
+                    return Err(
+                        "The end fingers are too close to the corners for the Snap style"
+                            .to_string(),
+                    );
+                }
+                Ok(())
+            }
+        }
+    }
+
+    /// One finger-joint edge of `length` in the edge's own frame (x along the edge, y
+    /// negative outside the panel), as the panels use it: `positive` for fingers, else
+    /// notches. For tests that compare mating edges.
+    #[doc(hidden)]
+    pub fn finger_edge(&self, length: f32, positive: bool) -> Vec<Point> {
+        self.draw_finger_edge(length, positive, true)
     }
 
     fn validate_parameters(params: &BoxParameters) -> Result<(), String> {
@@ -204,8 +286,11 @@ impl TabbedBoxMaker {
         (fingers, leftover)
     }
 
-    /// Draw finger joint edge
-    fn draw_finger_edge(&self, length: f32, positive: bool) -> Vec<Point> {
+    /// Draw finger joint edge.
+    ///
+    /// `styled` false draws plain fingers whatever the style (an edge that gets half-lap
+    /// slots cut into it afterwards).
+    fn draw_finger_edge(&self, length: f32, positive: bool, styled: bool) -> Vec<Point> {
         let mut path = Vec::new();
         let settings = &self.params.finger_joint;
         let t = self.t;
@@ -248,6 +333,27 @@ impl TabbedBoxMaker {
             // Notches in
             // Notch width decreases by kerf
             (finger - kerf, space + kerf, leftover + kerf, t - half_kerf)
+        };
+
+        // Springs, Barbs and Snap reshape the fingers only; the notches stay plain.
+        let finger_h = base_y - tip_y;
+        let shape = |i: usize| -> Option<Vec<(f32, f32)>> {
+            if !positive || !styled {
+                return None;
+            }
+            match settings.style {
+                FingerStyle::Springs => Some(finger_styles::springs(finger_draw, finger_h, t)),
+                FingerStyle::Barbs => Some(finger_styles::barbs(finger_draw, finger_h, t)),
+                // As boxes.py: hooks on the first half face right, on the second half left,
+                // so every hook faces the middle of the edge.
+                FingerStyle::Snap => Some(finger_styles::snap(
+                    finger_draw,
+                    finger_h,
+                    t,
+                    i < fingers / 2,
+                )),
+                FingerStyle::Rectangular | FingerStyle::Dogbone => None,
+            }
         };
 
         // Helper for dimpled side
@@ -332,7 +438,22 @@ impl TabbedBoxMaker {
 
         // Draw fingers
         for i in 0..fingers {
-            if positive {
+            if let Some(points) = shape(i) {
+                // The shape starts on the panel edge itself (a snap outer slit starts before
+                // `x`), so drop the edge point just placed at the finger's root.
+                if path
+                    .last()
+                    .is_some_and(|p: &Point| p.x == x && p.y == base_y)
+                {
+                    path.pop();
+                }
+                path.extend(
+                    points
+                        .into_iter()
+                        .map(|(u, v)| Point::new(x + u, base_y - v)),
+                );
+                x += finger_draw;
+            } else if positive {
                 // Finger protrudes
                 // Left side: base -> tip
                 draw_side(&mut path, x, base_y, tip_y);
@@ -403,7 +524,7 @@ impl TabbedBoxMaker {
         // Bottom edge: left to right (0,0) -> (width,0)
         if let Some(&c) = edge_chars.first() {
             if c == 'f' || c == 'F' {
-                let base_path = self.draw_finger_edge(width, c == 'f');
+                let base_path = self.draw_finger_edge(width, c == 'f', true);
                 for p in &base_path {
                     push_unique_point(&mut path, Point::new(start_x + p.x, start_y + p.y));
                 }
@@ -428,7 +549,7 @@ impl TabbedBoxMaker {
         // Right edge: bottom to top (width,0) -> (width,height)
         if let Some(&c) = edge_chars.get(1) {
             if c == 'f' || c == 'F' {
-                let base_path = self.draw_finger_edge(height, c == 'f');
+                let base_path = self.draw_finger_edge(height, c == 'f', true);
                 for p in &base_path {
                     push_unique_point(&mut path, Point::new(start_x + width - p.y, start_y + p.x));
                 }
@@ -453,7 +574,7 @@ impl TabbedBoxMaker {
         // Top edge: right to left (width,height) -> (0,height)
         if let Some(&c) = edge_chars.get(2) {
             if c == 'F' || c == 'f' {
-                let base_path = self.draw_finger_edge(width, c == 'f');
+                let base_path = self.draw_finger_edge(width, c == 'f', true);
                 for p in &base_path {
                     push_unique_point(
                         &mut path,
@@ -481,7 +602,7 @@ impl TabbedBoxMaker {
         // Left edge: top to bottom (0,height) -> (0,0)
         if let Some(&c) = edge_chars.get(3) {
             if c == 'f' || c == 'F' {
-                let base_path = self.draw_finger_edge(height, c == 'f');
+                let base_path = self.draw_finger_edge(height, c == 'f', true);
                 for p in &base_path {
                     push_unique_point(&mut path, Point::new(start_x + p.y, start_y + height - p.x));
                 }
@@ -789,7 +910,7 @@ impl TabbedBoxMaker {
         // Bottom edge (0)
         if let Some(&c) = edge_chars.first() {
             let mut base_path = if c == 'f' || c == 'F' {
-                self.draw_finger_edge(width, c == 'f')
+                self.draw_finger_edge(width, c == 'f', slot_from_top || slots.is_empty())
             } else {
                 vec![Point::new(0.0, -half_kerf), Point::new(width, -half_kerf)]
             };
@@ -810,7 +931,7 @@ impl TabbedBoxMaker {
         // Right edge (1)
         if let Some(&c) = edge_chars.get(1) {
             let base_path = if c == 'f' || c == 'F' {
-                self.draw_finger_edge(height, c == 'f')
+                self.draw_finger_edge(height, c == 'f', true)
             } else {
                 vec![Point::new(0.0, -half_kerf), Point::new(height, -half_kerf)]
             };
@@ -826,7 +947,7 @@ impl TabbedBoxMaker {
         // Top edge (2)
         if let Some(&c) = edge_chars.get(2) {
             let mut base_path = if c == 'F' || c == 'f' {
-                self.draw_finger_edge(width, c == 'f')
+                self.draw_finger_edge(width, c == 'f', !slot_from_top || slots.is_empty())
             } else {
                 vec![Point::new(0.0, -half_kerf), Point::new(width, -half_kerf)]
             };
@@ -852,7 +973,7 @@ impl TabbedBoxMaker {
         // Left edge (3)
         if let Some(&c) = edge_chars.get(3) {
             let base_path = if c == 'f' || c == 'F' {
-                self.draw_finger_edge(height, c == 'f')
+                self.draw_finger_edge(height, c == 'f', true)
             } else {
                 vec![Point::new(0.0, -half_kerf), Point::new(height, -half_kerf)]
             };
