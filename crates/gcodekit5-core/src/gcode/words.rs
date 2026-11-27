@@ -28,6 +28,8 @@ pub struct Word {
 /// Text inside `( ... )` is replaced by a single space so that adjacent words
 /// stay separated (`G1(c)X10` -> `G1 X10`). Everything after a `;` outside of a
 /// parenthesised comment is dropped, as is everything after an unclosed `(`.
+/// Nested parentheses are tracked, so `(a(b)c) G1` keeps only `G1`; a `)`
+/// outside any comment is kept as text.
 ///
 /// # Arguments
 /// * `line` - Raw G-code line.
@@ -40,17 +42,25 @@ pub fn strip_comments(line: &str) -> Cow<'_, str> {
     }
 
     let mut out = String::with_capacity(line.len());
-    let mut in_paren = false;
+    // Nesting depth of `( ... )`: nested comments are not valid RS274, but a
+    // comment must still end at its matching `)` so its tail is not read as code.
+    let mut depth = 0usize;
     for ch in line.chars() {
-        if in_paren {
-            if ch == ')' {
-                in_paren = false;
-                out.push(' ');
+        if depth > 0 {
+            match ch {
+                '(' => depth += 1,
+                ')' => {
+                    depth -= 1;
+                    if depth == 0 {
+                        out.push(' ');
+                    }
+                }
+                _ => {}
             }
             continue;
         }
         match ch {
-            '(' => in_paren = true,
+            '(' => depth = 1,
             ';' => break,
             _ => out.push(ch),
         }
