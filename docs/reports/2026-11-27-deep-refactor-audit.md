@@ -34,7 +34,7 @@ Counts per class, after merging duplicates and applying controller corrections:
 | camtools services: `speeds_feeds/service.rs` beyond line 300, `speeds_feeds/mod.rs`, `wcs_service.rs`, `cam_presets.rs`, `validator.rs`, `optimizer.rs`, `stats.rs`, `drill_press.rs` 1-60 and 330+ | Medium |
 | ui-egui shell: `windows/{settings.rs, firmware_settings, device_info.rs, help/*}`, `panes/visualizer/*`, `panes/editor/*`, `panes/console.rs`, `machine_control/{jog,wcs,overrides,dro,stream,direct_sender,quick_probe,connection}.rs`, `menu.rs`, `shortcuts.rs`, `dialogs.rs`, `app/*.rs` | Medium |
 | Designer model: `model/{circle,line,polygon,triangle}.rs`, `parametric_shapes.rs` (sprocket), `model3d.rs`, `tool_library.rs`, `spatial_index.rs`, `selection_manager.rs`, `commands.rs`, `shape_store.rs` | Low |
-| core data: `data/{materials,materials_mpi_static,tools,gtc_import}.rs` (logic), `probe.rs`; settings `config.rs` defaults, `build.rs`, i18n plurals; devicedb `model.rs`, `manager.rs` 1-120 | Low |
+| core data: `data/{materials,materials_mpi_static,tools,gtc_import}.rs` (logic), `probe.rs`; settings `config.rs` defaults; `crates/gcodekit5-app/build.rs` and i18n plurals (moved from settings by T54); devicedb `model.rs`, `manager.rs` 1-120 | Low |
 | visualizer `stock_removal_3d.rs` mesh / greedy-rect internals, `camera.rs`, `update_bounds_with_arc` | Low |
 | `.github/workflows/{release,mutation-testing}.yml` bodies, `scripts/*`, `flatpak/`, `wix/` | Low |
 
@@ -262,7 +262,7 @@ Common rules for every ticket:
 
 ### Phase 1: bug batches (each fix adds a locking test; existing tests and fixtures frozen)
 
-**T01 - Feed device state to CAM tools instead of the `device_status` global** (Effort M, Proposed)
+**T01 - Feed device state to CAM tools instead of the `device_status` global** (Effort M, Done (#17))
 - Ledger: APP-1 (= UISHELL-1, UIPANES-1).
 - Preserves: 3-axis, non-laser output byte-equal; refusal msgids; `DrillPressParams::with_center`.
 - In scope:
@@ -280,7 +280,7 @@ Common rules for every ticket:
 - STOP if: any `fixtures/cam/*.gcode` diff appears, or a test other than `test_cam_drill_press` needs editing.
 - Prevention: Ownership recorded (doc comment on `Pane::set_device`: device facts flow through panes, never statics).
 
-**T02 - Design file round trip: no silent shape loss, keep metadata** (Effort S-M, Proposed)
+**T02 - Design file round trip: no silent shape loss, keep metadata** (Effort S-M, Done (#27))
 - Ledger: DESIGNER-2, P2DES-7.
 - Preserves: known shapes load unchanged; file format 1.1 loads; `load_from_file` signature (add `load_from_file_report`).
 - In scope: `crates/gcodekit5-designer/src/designer_state/{file_io,mod}.rs`, `serialization.rs`, `crates/gcodekit5-ui-egui/src/panes/designer/file_ops.rs`.
@@ -295,7 +295,7 @@ Common rules for every ticket:
 - STOP if: an existing test asserts that unknown shapes vanish silently.
 - Prevention: Guard added (locking test).
 
-**T03 - Pocket generator: single centre cleanup, bounded offset loops** (Effort S, Proposed)
+**T03 - Pocket generator: single centre cleanup, bounded offset loops** (Effort S, Done (#18))
 - Ledger: DESIGNER-1, DESIGNER-5.
 - Preserves: cuts for normal inputs.
 - In scope: `crates/gcodekit5-designer/src/pocket_operations.rs`, `pocket_operations/holes.rs` (share `MAX_OFFSET_LEVELS`).
@@ -307,7 +307,7 @@ Common rules for every ticket:
 - STOP if: a RapidMove count assertion fails. That count encodes the duplicate; move the edit to phase 2 with the line enumerated.
 - Prevention: Guard added.
 
-**T04 - Path and raster rotation honoured by painter, SVG export and hit-testing** (Effort M, Proposed)
+**T04 - Path and raster rotation honoured by painter, SVG export and hit-testing** (Effort M, Done (#19))
 - Ledger: P2DES-2.
 - Preserves: G-code output; `Path::render()` unchanged (the generator and `ops::perform_offset` rotate it themselves).
 - In scope: `crates/gcodekit5-designer/src/model/{path,mod}.rs` (add `rotated_render`, raster bounds), `crates/gcodekit5-ui-egui/src/panes/designer/{canvas/rendering.rs,svg_export.rs}`.
@@ -319,7 +319,7 @@ Common rules for every ticket:
 - STOP if: a snapshot under `crates/gcodekit5-ui-egui/tests/snapshots` changes for an unrotated shape.
 - Prevention: Guard added.
 
-**T05 - One text layout for canvas, bounds and G-code** (Effort M, Proposed)
+**T05 - One text layout for canvas, bounds and G-code** (Effort M, Done (#25))
 - Ledger: P2DES-3.
 - Preserves: unrotated, descender-free, single-line text with `line_gap = 0`.
 - In scope: `crates/gcodekit5-designer/src/{toolpath/generator.rs (text section),model/text.rs,font_manager.rs}`, `crates/gcodekit5-ui-egui/src/panes/designer/canvas/text_outline.rs`.
@@ -331,7 +331,7 @@ Common rules for every ticket:
 - STOP if: a fixture contains text G-code.
 - Prevention: Guard added.
 
-**T06 - SVG export: lines not double-rotated, text anchored, raster box filled** (Effort S, Proposed)
+**T06 - SVG export: lines not double-rotated, text anchored, raster box filled** (Effort S, Done (#20))
 - Ledger: P2DES-1, P2DES-8.
 - Preserves: rect, ellipse and text rotation transforms.
 - In scope: `crates/gcodekit5-ui-egui/src/panes/designer/svg_export.rs`; new `crates/gcodekit5-ui-egui/tests/test_designer_svg_export.rs`.
@@ -343,7 +343,7 @@ Common rules for every ticket:
 - STOP if: none expected.
 - Prevention: Guard added.
 
-**T07 - DXF import: POLYLINE bulges, unsupported-entity report, non-UTF-8, true arcs** (Effort M, Proposed)
+**T07 - DXF import: POLYLINE bulges, unsupported-entity report, non-UTF-8, true arcs** (Effort M, Done (#35))
 - Ledger: P2DES-4, P2DES-6, P2DES-9.
 - Preserves: spline-fit/3D polylines; LWPOLYLINE handling.
 - In scope: `crates/gcodekit5-designer/src/{dxf_parser.rs,import.rs}`, `crates/gcodekit5-ui-egui/src/panes/designer/file_ops.rs` (notice), `po/*`.
@@ -361,7 +361,7 @@ Common rules for every ticket:
 - STOP if: an existing DXF test's vertex count changes.
 - Prevention: Guard added.
 
-**T08 - SVG import: rect corner radii and no-viewBox units** (Effort S, Proposed)
+**T08 - SVG import: rect corner radii and no-viewBox units** (Effort S, Done (#26))
 - Ledger: P2DES-5, P2DES-10.
 - Preserves: viewBox files; unitless = mm (documented).
 - In scope: `crates/gcodekit5-designer/src/{import.rs,import/svg_parse.rs}`.
@@ -373,7 +373,7 @@ Common rules for every ticket:
 - STOP if: an existing assertion relies on cm/in-per-user-unit scaling.
 - Prevention: Guard added.
 
-**T09 - Laser merge deviation bound, point filter, arc-length ramp** (Effort S-M, Proposed)
+**T09 - Laser merge deviation bound, point filter, arc-length ramp** (Effort S-M, Done (#34))
 - Ledger: DESIGNER-4, P2DES-11, DESIGNER-3.
 - Preserves: straight laser geometry; linear-only ramps.
 - In scope: `crates/gcodekit5-designer/src/{gcode_gen.rs,toolpath/generator.rs,toolpath/segment.rs}`.
@@ -386,7 +386,7 @@ Common rules for every ticket:
 - STOP if: the segment count asserted at `:234` changes. That assertion encodes the bug; enumerate it and move the edit to phase 2.
 - Prevention: Guard added; CHANGELOG notes the curved-laser output change.
 
-**T10 - Gerber input safety: warn on unsupported constructs, no empty drill programs, deterministic outline** (Effort M, Proposed)
+**T10 - Gerber input safety: warn on unsupported constructs, no empty drill programs, deterministic outline** (Effort M, Done (#24))
 - Ledger: P2CAM-1a, P2CAM-2a, CAMVIS-6.
 - Preserves: every `fixtures/cam/gerber_*.gcode` byte-equal.
 - In scope: `crates/gcodekit5-camtools/src/gerber.rs`, `crates/gcodekit5-ui-egui/src/panes/cam_tools/gerber/mod.rs` (show the warning).
@@ -402,7 +402,7 @@ Common rules for every ticket:
 - STOP if: any gerber fixture diff.
 - Prevention: Guard added.
 
-**T11 - camtools parameter validation gaps** (Effort S, Proposed)
+**T11 - camtools parameter validation gaps** (Effort S, Done (#28))
 - Ledger: P2CAM-5, P2CAM-4, P2CAM-6a, UIPANES-2b.
 - Preserves: all fixtures; existing error strings; seeds < 2^24 output.
 - In scope: `crates/gcodekit5-camtools/src/{tabbed_box/mod.rs,jigsaw_puzzle.rs,probe_routines.rs,drill_press.rs}`; ui pages `cam_tools/{tabbed_box/mod.rs,jigsaw.rs,probe_routines/*,drill_press.rs}`.
@@ -418,7 +418,7 @@ Common rules for every ticket:
 - STOP if: a fixture or preset JSON diff appears.
 - Prevention: Guard added.
 
-**T12 - Firmware settings and form rules** (Effort S, Proposed)
+**T12 - Firmware settings and form rules** (Effort S, Done (#22))
 - Ledger: P2FW-5, P2FW-9.
 - Preserves: `$0=10 (step pulse, usec)` -> `10`; `$22` bitmask rule.
 - In scope: `crates/gcodekit5-app/src/{device_identity.rs,firmware_settings/mod.rs,material_form.rs}`, `crates/gcodekit5-communication/src/firmware/grbl/settings.rs`.
@@ -434,7 +434,7 @@ Common rules for every ticket:
 - STOP if: a test asserts the Homing category for `$30`.
 - Prevention: Guard added.
 
-**T13 - Transport robustness: serial write timeout, Repetier translation** (Effort S, Proposed)
+**T13 - Transport robustness: serial write timeout, Repetier translation** (Effort S, Done (#23))
 - Ledger: APP-7, P2FW-6.
 - Preserves: TCP path; the Repetier idle `wait` ack; `acks_due` resend rule.
 - In scope: `crates/gcodekit5-communication/src/communication/serial.rs`, `firmware/repetier/processor.rs`.
@@ -450,7 +450,7 @@ Common rules for every ticket:
 - STOP if: a Repetier test asserts `G1` insertion for bare axis lines.
 - Prevention: Guard added.
 
-**T14 - Root logging on Windows** (Effort S, Proposed)
+**T14 - Root logging on Windows** (Effort S, Done (#21))
 - Ledger: COREBUILD-9.
 - Preserves: stdout pretty logging; `RUST_LOG` precedence.
 - In scope: `src/lib.rs`, root `Cargo.toml` (`tracing-subscriber` features).
@@ -462,38 +462,38 @@ Common rules for every ticket:
 - STOP if: the Windows arm cannot be compiled anywhere; then ship behind review with that stated.
 - Prevention: No guard justified (platform-gated init code, no test harness).
 
-**T15 - Tool number persistence** (Effort S, Blocked - owner decision D-1)
+**T15 - Tool number persistence** (Effort S, Done (#46))
 - Ledger: P2FW-1. In scope: `crates/gcodekit5-app/src/{tools_manager_backend.rs,tool_form.rs}`, `crates/gcodekit5-ui-egui/src/windows/tools_manager/view.rs`. Pins: `app/tests/test_tools_manager_backend.rs`. Locking test: edited number survives save/load (option a) or the field is not editable (b). Commands: G + `cargo nextest run -p gcodekit5-app -E 'test(test_tools_manager_backend::)'`. Prevention: Guard added.
 
-**T16 - WebSocket and Auto Reconnect** (Effort S remove / L implement, Blocked - owner decision D-2)
+**T16 - WebSocket and Auto Reconnect** (Effort S remove / L implement, Done (#82))
 - Ledger: APP-6. In scope: `crates/gcodekit5-app/src/{device_profiles.rs,machine.rs}`, `crates/gcodekit5-communication/src/communication/{mod.rs,tcp.rs}`, `crates/gcodekit5-ui-egui/src/windows/device_manager/view.rs`, `po/*`. Preserves: old profile/config files load (serde fields kept). Pins: `rg 'WebSocket|auto_reconnect' crates/*/tests`. Commands: G + `cargo nextest run -p gcodekit5-app -E 'test(test_device_profiles_model::)'`; `cargo nextest run -p gcodekit5-ui-egui -E 'test(test_device_manager::) + test(test_translations::)'`. Prevention: Guard added (test that each offered connection type connects or is absent).
 
-**T17 - Arc Segment Length preference** (Effort S, Blocked - owner decision D-6)
+**T17 - Arc Segment Length preference** (Effort S, Done (#43))
 - Ledger: CAMVIS-1. In scope: `crates/gcodekit5-ui-egui/src/{panes/visualizer/toolpath.rs,windows/settings.rs}`. Pins: `ui/tests/test_settings_window.rs:264,313` (kept for option a; sanctioned edit for option b). Visualizer field/setter removal belongs to T51. Commands: G + `cargo nextest run -p gcodekit5-ui-egui -E 'test(test_settings_window::) + test(test_visualizer::)'`. Prevention: Guard added.
 
-**T18 - grblHAL error/alarm tables** (Effort S, Blocked - characterization required)
+**T18 - grblHAL error/alarm tables** (Effort S, Done (#75))
 - Ledger: P2FW-2. Prerequisite: compare `error_decoder.rs:44-81,100-111` with upstream grblHAL `status_code_t`/`alarm_code_t` and cite the source revision in the PR. Then either correct the arms or return "Unknown code" for 39+ / 10+, and wire the GRBL 1.1 texts into console formatting (`ui/src/panes/console.rs:127`). Pins: `com/tests/test_error_decoder.rs` (edit only the extended-code assertions, enumerated in the PR). Commands: G + `cargo nextest run -p gcodekit5-communication -E 'test(test_error_decoder::)'`. STOP if: no authoritative upstream source is available. Prevention: Guard added.
 
 ### Phase 2: correctness fixes whose fixtures encode the bug (each fixture edit enumerated)
 
-**T19 - Drill press emits G17** (Effort S, Blocked - owner decision D-7; after T37)
+**T19 - Drill press emits G17** (Effort S, Done (#45); after T37)
 - Ledger: CAMVIS-4. In scope: `crates/gcodekit5-camtools/src/drill_press.rs`. **Fixture edits (exactly):** `crates/gcodekit5-ui-egui/tests/fixtures/cam/drill_press_default.gcode` and `drill_press_custom.gcode`, each gaining one `G17 ; XY plane selection` line after `G90`; no other byte changes (`git diff --stat` shows 2 files, +1 line each). Commands: G + `cargo nextest run -p gcodekit5-ui-egui -E 'test(test_cam_drill_press::) + test(test_cam_presets::)'`. STOP if: any other fixture changes. Prevention: Guard added (the fixture itself).
 
-**T20 - Gerber board outline with tool compensation** (Effort M, Blocked - owner decision D-5)
+**T20 - Gerber board outline with tool compensation** (Effort M, Done (#48))
 - Ledger: P2CAM-3. In scope: `crates/gcodekit5-camtools/src/gerber.rs` (`generate_simple_trace_from_sketches`). **Fixture edit:** `fixtures/cam/gerber_outline.gcode` regenerated; the PR shows the old two-loop body vs the new single offset loop with step-down passes. **Test edit:** `test_cam_gerber.rs:137-139` if it asserts loop count. Commands: G + `cargo nextest run -p gcodekit5-ui-egui -E 'test(test_cam_gerber::)'`. STOP if: `gerber_default` or `gerber_custom` change. Prevention: Guard added (fixture plus a geometry assertion: the loop is offset by `tool_diameter/2`).
 
-**T21 - Speeds-and-feeds limit order and power formula** (Effort S, Blocked - owner decision D-13)
+**T21 - Speeds-and-feeds limit order and power formula** (Effort S, Done (#47, #50))
 - Ledger: P2CAM-7. In scope: `crates/gcodekit5-camtools/src/speeds_feeds/calculator.rs`. **Fixture edits:** `fixtures/cam/speeds_feeds_clamped.txt`, `speeds_feeds_custom.txt`; the PR lists every changed number with its formula. Pins: `cam/tests/test_speeds_feeds_calculator.rs`, `ui/tests/test_cam_speeds_feeds.rs`. Commands: G + `cargo nextest run -p gcodekit5-camtools -E 'test(test_speeds_feeds_calculator::)'`; `cargo nextest run -p gcodekit5-ui-egui -E 'test(test_cam_speeds_feeds::)'`. Prevention: Guard added (max RPM never exceeded).
 
-**T22 - Probe programs restore the modal state** (Effort S, Blocked - owner decision D-12)
+**T22 - Probe programs restore the modal state** (Effort S, Done (#44))
 - Ledger: P2CAM-6b. In scope: `crates/gcodekit5-camtools/src/probe_routines.rs` header/footer. **Fixture edits:** every `fixtures/cam/probe_*.gcode` (list them with `ls crates/gcodekit5-ui-egui/tests/fixtures/cam/probe_*.gcode` at the base commit), with only the header/footer lines changed. Commands: G + `cargo nextest run -p gcodekit5-ui-egui -E 'test(test_cam_probe_)'`; `cargo nextest run -p gcodekit5-camtools -E 'test(probe_routines::)'`. STOP if: any body line changes. Prevention: Guard added.
 
-**T23 - One image engraver** (Effort L, Blocked - owner decision D-8)
+**T23 - One image engraver** (Effort L, Done (#49))
 - Ledger: UIPANES-4. In scope: `crates/gcodekit5-camtools/src/laser_engraver.rs`, `crates/gcodekit5-designer/src/engraving/image_engraver.rs`, designer callers. **Fixture edits:** per the option chosen, either the designer raster expectations or `fixtures/cam/bitmap_engraving_*.gcode`, enumerated in the PR. Pins: `cam/tests/{generator_fixes,homing_safety}.rs`, `ui/tests/test_cam_bitmap_engraving.rs`. Commands: G + `cargo nextest run -p gcodekit5-ui-egui -E 'test(test_cam_bitmap_engraving::) + test(test_designer_)'`; `cargo nextest run -p gcodekit5-camtools`. Prevention: Ownership recorded (single engraver module).
 
 ### Phase 3: infra and dependency diet
 
-**T24 - Remove unused dependencies, finish workspace inheritance** (Effort S, Proposed)
+**T24 - Remove unused dependencies, finish workspace inheritance** (Effort S, Done (#32))
 - Ledger: COREBUILD-6.
 - Preserves: one resolved version per crate in `Cargo.lock`.
 - In scope: every `Cargo.toml`.
@@ -508,7 +508,7 @@ Common rules for every ticket:
 - STOP if: a removal breaks a feature-gated build.
 - Prevention: Guard added (`cargo machete` step in `.github/workflows/code-quality.yml`).
 
-**T25 - CI: remove no-op and duplicate jobs** (Effort S, Proposed)
+**T25 - CI: remove no-op and duplicate jobs** (Effort S, Done (#51))
 - Ledger: COREBUILD-7.
 - Preserves: the `check-no-gtk` step, nextest `gpu` group, release dry-run gating, test coverage executed.
 - In scope: `.github/workflows/{code-quality,msrv,test-coverage}.yml`, a new composite action for the apt step.
@@ -522,66 +522,66 @@ Common rules for every ticket:
 - STOP if: a removed job is a required status check in branch protection (ask the owner).
 - Prevention: No guard justified (workflow files).
 
-**T26 - Delete `legacy/`** (Effort S, Proposed)
+**T26 - Delete `legacy/`** (Effort S, Done (#29))
 - Ledger: COREBUILD-8a. In scope: `git rm -r legacy`. Out of scope: `EEPROM.DAT` (owner instruction), `LEGACY_CODE.md` (doc pass), D-11 files. Commands: G + `cargo build --workspace`; `rg -l legacy --glob '*.toml' --glob '*.rs' .` -> no build reference. Prevention: No guard justified.
 
-**T27 - Delete stale root files** (Effort S, Blocked - owner decision D-11)
+**T27 - Delete stale root files** (Effort S, Done (#37))
 - Ledger: COREBUILD-8b. In scope: whichever of `package.json`, `package-lock.json`, `devices.json`, `flatpak/com.github.feveal.*` the owner approves. Commands: G. Prevention: No guard justified.
 
 ### Phase 4: behaviour-preserving refactors (suite passes unchanged; no test edits)
 
-**T28 - Delete unused core error enums and zero-reference aliases** (Effort S, Proposed)
+**T28 - Delete unused core error enums and zero-reference aliases** (Effort S, Done (#31))
 - Ledger: COREBUILD-2, COREBUILD-4a. Preserves: `core::{Error, Result}`, `Error::other`, `Error::Io` Display. In scope: `crates/gcodekit5-core/src/{error.rs,lib.rs,types/aliases.rs}`. Out of scope: Rc aliases and test-only aliases (T54). Verify each name with `rg -nw <name> --glob '*.rs' crates src` -> definition only. Commands: G + `cargo nextest run -p gcodekit5-core`; `cargo build --workspace --all-targets`. STOP if: any test references a removed name. Prevention: No guard justified.
 
-**T29 - One `MM_PER_INCH` and feed-rate conversion** (Effort S-M, Proposed)
+**T29 - One `MM_PER_INCH` and feed-rate conversion** (Effort S-M, Done (#33))
 - Ledger: COREBUILD-5. Preserves: byte-identical output; display precision. In scope: `crates/gcodekit5-core/src/units.rs`, the 5 private consts (`rg -n 'const MM_PER_INCH' crates`), `ui/src/panes/machine_control/jog.rs:177-193`. Out of scope: length formatting call sites. Commands: G + `cargo nextest run -p gcodekit5-core -E 'test(test_units::)'`; `cargo nextest run -p gcodekit5-ui-egui -E 'test(test_machine_jog::)'`; `cargo nextest run -p gcodekit5-communication -E 'test(grbl_protocol_tests::)'`. Prevention: Ownership recorded (doc on `core::units`).
 
-**T30 - camtools exports validation limits; UI pages import them** (Effort S, Proposed; after T11)
+**T30 - camtools exports validation limits; UI pages import them** (Effort S, Done (#55); after T11)
 - Ledger: UIPANES-2. Preserves: accept/reject sets and msgids. In scope: `crates/gcodekit5-camtools/src/{drill_press,jigsaw_puzzle,tabbed_box/mod,spoilboard_surfacing}.rs` (`pub const`), the four UI pages. Out of scope: moving msgids into the domain. Commands: G + `cargo nextest run -p gcodekit5-ui-egui -E 'test(test_cam_input_bounds::) + test(test_cam_jigsaw::) + test(test_cam_tabbed_box::) + test(test_cam_drill_press::)'`. Prevention: Ownership recorded.
 
-**T31 - Designer pane uses domain export check and engraving params** (Effort S-M, Proposed)
+**T31 - Designer pane uses domain export check and engraving params** (Effort S-M, Done (#58))
 - Ledger: UIPANES-3. Preserves: refusals and program text. In scope: `crates/gcodekit5-ui-egui/src/panes/designer/export.rs`, `crates/gcodekit5-designer/src/designer_state/gcode.rs`, `model` (`RasterImage::engraving_params`). Pins: `ui/tests/test_designer_files.rs:300-352`. STOP if: the item-3 differential G-code run (copy export with and without the pane's setters) differs. Commands: G + `cargo nextest run -p gcodekit5-ui-egui -E 'test(test_designer_files::) + test(test_designer_editor_handoff::) + test(test_designer_properties_cam::)'`. Prevention: Ownership recorded.
 
-**T32 - CAM dispatch owned by the designer crate** (Effort M, Proposed)
+**T32 - CAM dispatch owned by the designer crate** (Effort M, Done (#67))
 - Ledger: DESIGNER-11. Preserves: G-code byte-identical; preview test hooks (`panic_builds`, `build_delay`, `started`) stay in egui. In scope: `crates/gcodekit5-designer/src/designer_state/gcode.rs`, `crates/gcodekit5-ui-egui/src/panes/designer/canvas/toolpath_preview.rs`. Note: adopting `laser_params.use_global` in the preview changes preview feed/power only. Commands: G + `cargo nextest run -p gcodekit5-designer`; `cargo nextest run -p gcodekit5-ui-egui -E 'test(test_designer_toolpath::) + test(test_designer_properties_cam::)'`. STOP if: any G-code assertion changes. Prevention: Ownership recorded.
 
-**T33 - Shared library notice and custom-library file handling** (Effort S, Proposed)
+**T33 - Shared library notice and custom-library file handling** (Effort S, Done (#40))
 - Ledger: UISHELL-2, P2FW-8a. Preserves: every `n_!` msgid literal; notice text. In scope: `crates/gcodekit5-ui-egui/src/windows/{manager_ui.rs,tools_manager/mod.rs,materials_manager/mod.rs,device_manager/mod.rs}`, `crates/gcodekit5-app/src/{tools,materials}_manager_backend.rs` (delete only fns with 0 `rg -nw` hits incl. tests; share `CustomLibraryFile`). Out of scope: test-only fns (T52). Commands: G + `cargo nextest run -p gcodekit5-ui-egui -E 'test(test_tools_manager::) + test(test_materials_manager::) + test(test_device_manager::) + test(test_translations::)'`; `cargo nextest run -p gcodekit5-app -E 'test(test_tools_manager_backend::) + test(test_materials_manager_backend::)'`. Prevention: No guard justified.
 
-**T34 - Per-frame work in CAM output key and designer summary** (Effort S, Proposed; after T01)
+**T34 - Per-frame work in CAM output key and designer summary** (Effort S, Done (#36); after T01)
 - Ledger: UIPANES-5, UIPANES-6. Preserves: output hides on any input change; panel content. In scope: `crates/gcodekit5-ui-egui/src/panes/cam_tools/mod.rs`, `panes/designer/properties/{update,mod}.rs`, `properties/handlers/*` (mechanical `summary.single` edits). Commands: G + `cargo nextest run -p gcodekit5-ui-egui -E 'test(test_cam_tools::) + test(test_cam_drill_press::) + test(test_designer_properties)'`. Prevention: No guard justified (unmeasured; structure only).
 
-**T35 - Designer hygiene: debug loops, dead block, constructor dedupe, logged offset** (Effort S, Proposed)
+**T35 - Designer hygiene: debug loops, dead block, constructor dedupe, logged offset** (Effort S, Done (#54))
 - Ledger: DESIGNER-6, P2DES-12, DESIGNER-8a, DESIGNER-10. Preserves: identical output; empty result on an offset panic (now logged at warn). In scope: `crates/gcodekit5-designer/src/{model/path.rs,pocket_operations.rs,gcode_gen.rs,ops.rs,pocket_operations/holes.rs,dxf_parser.rs,model/gear.rs}`. Out of scope: dropping `_units` (T56). Commands: G + `cargo nextest run -p gcodekit5-designer`; `cargo nextest run -p gcodekit5-ui-egui -E 'test(test_designer_)'`. Prevention: No guard justified.
 
-**T36 - Designer geometry helpers** (Effort M, Proposed)
+**T36 - Designer geometry helpers** (Effort M, Done (#57))
 - Ledger: DESIGNER-9. Preserves: per-call-site tolerances (0.005 vs 0.01). In scope: new `crates/gcodekit5-designer/src/geometry.rs`; point-in-polygon, point-segment distance, `prepare_polygon`/`to_pline`. Out of scope: unifying flattener tolerances. Commands: G + `cargo nextest run -p gcodekit5-designer -E 'test(test_pocket_holes::) + test(test_audit_regressions::) + test(test_chamfer_dimensions::)'`. STOP if: any vertex-count assertion changes. Prevention: Ownership recorded.
 
-**T37 - camtools shared modal header and emitter hygiene** (Effort S, Proposed)
+**T37 - camtools shared modal header and emitter hygiene** (Effort S, Done (#41))
 - Ledger: CAMVIS-5, CAMVIS-9, CAMVIS-7a, P2CAM-8a. Preserves: exact bytes of every `fixtures/cam/*` file; end-of-program and precision drift kept as parameters. In scope: `crates/gcodekit5-camtools/src/{job_preamble,spoilboard_grid,spoilboard_surfacing,laser_engraver,drill_press,tabbed_box/mod,gerber,arc_expander,comment_processor,speeds_feeds/service,jigsaw_puzzle}.rs`. Out of scope: gerber/probe adopting `job_preamble` (deliberate). Commands: G + `cargo nextest run -p gcodekit5-ui-egui -E 'test(test_cam_)'`; `cargo nextest run -p gcodekit5-camtools`. STOP if: any fixture diff. Prevention: Ownership recorded (`job_preamble` doc lists its real users).
 
-**T38 - Visualizer dead source** (Effort S, Proposed)
+**T38 - Visualizer dead source** (Effort S, Done (#30))
 - Ledger: CAMVIS-3a. In scope: `crates/gcodekit5-visualizer/src/visualizer/visualizer.rs` (underscore consts, commented blocks, `safe_to_i32` if only referenced from them). Commands: G + `cargo nextest run -p gcodekit5-visualizer`. Prevention: No guard justified.
 
-**T39 - Communication: remove the dead Repetier mode, fix the layering leak** (Effort S-M, Proposed)
+**T39 - Communication: remove the dead Repetier mode, fix the layering leak** (Effort S-M, Done (#53))
 - Ledger: P2FW-3, APP-9. Preserves: the GRBL `send`/`receive` path and `reply_ledger`; `RepetierProcessor`. In scope: `crates/gcodekit5-communication/src/communication/mod.rs`, `firmware/mod.rs` docs, `crates/gcodekit5-app/src/lib.rs` (re-export `ControllerProtocol`, status types, `list_ports`), the 4 ui files. Remove the ui -> communication edge only if `rg 'gcodekit5_communication' crates/gcodekit5-ui-egui/tests` is empty; otherwise keep it and note why. Commands: G + `cargo nextest run -p gcodekit5-communication`; `cargo nextest run -p gcodekit5-app -E 'test(test_machine_repetier::) + test(test_machine_controller::)'`; `cargo nextest run -p gcodekit5-ui-egui -E 'test(test_machine_) + test(test_firmware_settings::)'`. Prevention: Ownership recorded.
 
-**T40 - Comments that lie, GTK references and Spanish** (Effort S, Proposed)
+**T40 - Comments that lie, GTK references and Spanish** (Effort S, Done (#77))
 - Ledger: UISHELL-5 (comment part), APP-9 (comment part), P2FW-10a, DESIGNER-13a. Preserves: code. In scope: comment lines only, in the files named by those findings. Rewrite parity notes as the rule ("matches the original behaviour: X") and drop references to deleted files. Out of scope: msgids, identifiers. Commands: G + `cargo build --workspace`; `git diff -U0 | rg '^[+-]' | rg -v '^\+\+\+|^---' | rg -v '^\s*[+-]\s*(//|///|//!)'` -> empty (comment-only diff). Prevention: No guard justified.
 
-**T41 - Split Machine Control `show_controls`** (Effort S, Proposed)
+**T41 - Split Machine Control `show_controls`** (Effort S, Done (#38))
 - Ledger: UISHELL-4. Preserves: frame order (jog_allowed read after Home/Unlock), `jog.begin_frame/end_frame` bracket, the exhaustive `run` list. In scope: `crates/gcodekit5-ui-egui/src/panes/machine_control/mod.rs`. Commands: G + `cargo nextest run -p gcodekit5-ui-egui -E 'test(test_machine_) + test(test_hidpi::)'`. Prevention: No guard justified.
 
-**T42 - `GcodeKitApp`: extract `Managers`** (Effort M, Proposed) and **T43 - `GcodeKitApp`: extract `Flows` and text-field focus** (Effort M, Proposed; after T42)
+**T42 - `GcodeKitApp`: extract `Managers`** (Effort M, Done (#61)) and **T43 - `GcodeKitApp`: extract `Flows` and text-field focus** (Effort M, Done (#66); after T42)
 - Ledger: UISHELL-3. Preserves: dispatch order (`dispatch_design` first); `handle_answer` precedence; the flat exhaustive `match cmd` (no `_ =>`). In scope: `crates/gcodekit5-ui-egui/src/app.rs`, `app/*.rs`. Out of scope: public accessors used by tests. Commands: G + `cargo nextest run -p gcodekit5-ui-egui`. Prevention: No guard justified.
 
-**T44 - Split `app/src/machine.rs` into a module directory** (Effort M, Proposed; before T47)
+**T44 - Split `app/src/machine.rs` into a module directory** (Effort M, Done (#42); before T47)
 - Ledger: APP-8. Preserves: every `gcodekit5_app::machine::*` path, event order, `worker_text::ALL`. In scope: `crates/gcodekit5-app/src/machine.rs` -> `machine/{mod,types,controller,worker,status_tracker,repetier}.rs` (`grbl_stream.rs` already exists). Commands: G + `cargo nextest run -p gcodekit5-app`; `cargo nextest run -p gcodekit5-ui-egui -E 'test(test_machine_)'`. STOP if: a test needs an import change. Prevention: No guard justified.
 
-**T45 - Decompose pocket generators** (Effort M, Proposed; after T03)
+**T45 - Decompose pocket generators** (Effort M, Done (#63); after T03)
 - Ledger: DESIGNER-12 (pocket part). In scope: `crates/gcodekit5-designer/src/pocket_operations.rs` (the shared Z-pass/loop helper for adaptive and contour-parallel; `generate_raster_pocket`). Commands: G + `cargo nextest run -p gcodekit5-designer`. Prevention: No guard justified.
 
-**T46 - Decompose designer generator and serializer monsters** (Effort L, Proposed; after T32)
+**T46 - Decompose designer generator and serializer monsters** (Effort L, Done (#70); after T32)
 - Ledger: DESIGNER-12 (rest). In scope: `crates/gcodekit5-designer/src/{gcode_gen.rs (generate_body_continuing),toolpath/generator.rs (generate_rectangle_contour, create_multipass_toolpaths),designer_state/gcode.rs (emit_shapes_gcode),serialization.rs (from_drawing_object),import.rs (convert_entities_to_shapes),dxf_parser.rs (parse_polyline)}`. Commands: G + `cargo nextest run -p gcodekit5-designer`; `cargo nextest run -p gcodekit5-ui-egui -E 'test(test_designer_)'`. Prevention: No guard justified.
 
 ### Phase 5: structural (dead-subsystem deletions that edit tests; file splits last)
@@ -593,7 +593,7 @@ Rules for every phase-5 ticket:
 - Before deleting a symbol, prove it is dead with `rg -nw <symbol> --glob '*.rs' crates src` and also search for trait-impl and serde reach (`rg 'impl .* for|#\[serde'` on the defining type).
 - Where a guard test is rewritten rather than deleted, show non-vacuity: revert the guarded fix locally, show the rewritten test fails, and paste that output in the PR.
 
-**T47 - Retire `device_status.rs`** (Effort S; after T01 and T44)
+**T47 - Retire `device_status.rs`** (Effort S, Done (#52); after T01 and T44)
 - Ledger: APP-2.
 - Preserves: `parse_numeric_prefix`, moved to `device_profiles.rs`.
 - Sanctioned test edits:
@@ -603,18 +603,18 @@ Rules for every phase-5 ticket:
 - Commands: G + `cargo nextest run -p gcodekit5-app`; `rg -n device_status crates src` -> no code hits.
 - Prevention: Guard added (`rg -n 'static .*(RwLock|Mutex|Atomic|Lazy|OnceLock)' crates/gcodekit5-app/src` reviewed in the PR; record the rule "no process-global device state" in the app crate docs).
 
-**T48 - Remove `device_console_manager`, listener plumbing and dead `ConsolePanel` members** (Effort M)
+**T48 - Remove `device_console_manager`, listener plumbing and dead `ConsolePanel` members** (Effort M, Done (#56))
 - Ledger: APP-3, P2FW-7.
 - Sanctioned test edits: delete `crates/gcodekit5-app/tests/test_device_console_manager.rs` and its `all.rs` line; trim `app/src/test_support.rs:304-306` listener methods.
 - Removes: `Communicator::add_listener`/`remove_listener`, `CommunicatorEvent`, `notify_listeners`, the `com/src/lib.rs:12` re-exports.
 - Commands: G + `cargo nextest run -p gcodekit5-app`; `cargo nextest run -p gcodekit5-communication`; `cargo nextest run -p gcodekit5-ui-egui -E 'test(test_console_pane::)'`.
 
-**T49 - Remove the devicedb UI controller** (Effort S)
+**T49 - Remove the devicedb UI controller** (Effort S, Done (#59))
 - Ledger: APP-4.
 - Sanctioned test edits: delete `crates/gcodekit5-devicedb/tests/ui_integration_tests.rs` (2 tests). Move any assertion not already covered to `crates/gcodekit5-app/tests/test_device_profiles_model.rs`, with a non-vacuity proof. If `tests/all.rs` would become empty, keep it with a placeholder module only if `cargo nextest` requires it.
 - Commands: G + `cargo nextest run -p gcodekit5-devicedb`; `cargo nextest run -p gcodekit5-app -E 'test(test_device_profiles_model::)'`.
 
-**T50 - Delete visualizer pipeline (cluster A) and the core command lifecycle** (Effort M)
+**T50 - Delete visualizer pipeline (cluster A) and the core command lifecycle** (Effort M, Done (#65))
 - Ledger: CAMVIS-2 (cluster A), COREBUILD-3.
 - Preserves: `core::gcode::{words,arc}`, `GcodeCommand::{new,with_sequence}`, `CommandNumberGenerator`.
 - Sanctioned test edits:
@@ -626,12 +626,12 @@ Rules for every phase-5 ticket:
 - Commands: G + `cargo nextest run -p gcodekit5-visualizer`; `cargo nextest run -p gcodekit5-core`; `cargo bench --no-run --workspace`.
 - STOP if: a moved case fails.
 
-**T51 - Delete visualizer scene graph (cluster B) and GTK view state** (Effort M; after T50)
+**T51 - Delete visualizer scene graph (cluster B) and GTK view state** (Effort M, Done (#68); after T50)
 - Ledger: CAMVIS-2 (cluster B), CAMVIS-3b, CAMVIS-1 field/setter (only once D-6 is decided).
 - Sanctioned test edits: remove assertions on `get_cutting_bounds`, `clear_dirty`, `is_dirty`, `set_arc_segment_length` and `ToolpathCache` in `vis/tests/{gcode_parsing_regressions,audit_followup_regressions}.rs` (including `:237-248`); keep every `parse_gcode`/`commands()` assertion.
 - Commands: G + `cargo nextest run -p gcodekit5-visualizer`; `cargo nextest run -p gcodekit5-ui-egui -E 'test(test_visualizer)'`.
 
-**T52 - Remove test-only exports in app and camtools** (Effort S)
+**T52 - Remove test-only exports in app and camtools** (Effort S, Done (#62))
 - Ledger: APP-5, P2FW-8b, P2FW-10b, CAMVIS-7b, P2CAM-8b; `QuitSource::Os` and `last_dialog_answer` from UISHELL-5 if `rg -n 'QuitSource::Os|last_dialog_answer' crates` shows only tests.
 - Sanctioned test edits:
   - `app/tests/test_grbl_stream.rs:5-8` imports and the cases for the 6 removed fns;
@@ -643,13 +643,13 @@ Rules for every phase-5 ticket:
   - `ui/tests/test_commands.rs:645` if `last_dialog_answer` goes.
 - Commands: G + `cargo nextest run -p gcodekit5-app`; `cargo nextest run -p gcodekit5-camtools`; `cargo nextest run -p gcodekit5-ui-egui -E 'test(test_commands::)'`.
 
-**T53 - Shrink the protocol registry** (Effort S-M)
+**T53 - Shrink the protocol registry** (Effort S-M, Done (#60))
 - Ledger: P2FW-4.
 - Preserves: `detect_protocol` order and `announces_identity`.
 - Sanctioned test edits: rewrite `crates/gcodekit5-communication/tests/test_protocol_registry.rs` to cover the kept fields only, with a non-vacuity proof (break the detection order locally and show the failure); `grbl_protocol_tests.rs:56-70` unchanged.
 - Commands: G + `cargo nextest run -p gcodekit5-communication -E 'test(test_protocol_registry::) + test(grbl_protocol_tests::)'`.
 
-**T54 - Delete the GTK settings-dialog stack; move i18n to app** (Effort M)
+**T54 - Delete the GTK settings-dialog stack; move i18n to app** (Effort M, Done (#69))
 - Ledger: COREBUILD-1 (a, b, c, e), COREBUILD-4b.
 - Preserves: egui Preferences; `SettingsManager` API; `migrate.rs`; `Config` serde shape.
 - Sanctioned test edits:
@@ -659,22 +659,28 @@ Rules for every phase-5 ticket:
   - delete the matching cases in `crates/gcodekit5-core/tests/test_type_aliases.rs`.
 - Commands: G + `cargo nextest run -p gcodekit5-settings`; `cargo nextest run -p gcodekit5-core -E 'test(test_type_aliases::)'`; `cargo nextest run -p gcodekit5-app -E 'test(test_i18n::) + test(test_translation_catalogs::)'`; `cargo nextest run -p gcodekit5-ui-egui -E 'test(test_settings_window::) + test(test_translations::)'`.
 
-**T55 - Drop unread `Config` fields** (Effort S; Blocked - owner decision D-10; after T54)
+**T55 - Drop unread `Config` fields** (Effort S, Done (#73); after T54)
 - Ledger: COREBUILD-1d. Preserves: old `config.toml` and imported `config.json` files still load. Sanctioned test edit: `set/tests/test_settings_migrate.rs:68` if it reads `recent_files`. Commands: G + `cargo nextest run -p gcodekit5-settings`.
 
-**T56 - Delete uncalled designer `pub` items; drop `ToolpathToGcode` `_units`** (Effort M)
+**T56 - Delete uncalled designer `pub` items; drop `ToolpathToGcode` `_units`** (Effort M, Done (#72))
 - Ledger: DESIGNER-7, DESIGNER-8b.
 - Before deleting each item: `rg -w <name> crates src` shows the definition only, and trait-impl/serde reach is excluded. `font_manager::get_font` stays (pinned).
 - Sanctioned test edits: `crates/gcodekit5-designer/tests/test_cam_depth_and_gcode.rs:142,158,165,208,255` (drop the units argument) and every other `ToolpathToGcode::(new|with_line_numbers)` call (`rg -n 'ToolpathToGcode::(new|with_line_numbers)\(' crates` at the base commit).
 - Commands: G + `cargo nextest run -p gcodekit5-designer`; `cargo build --workspace --all-targets`.
 
-**T57 - Split visualizer `parse_gcode` and `stock_removal_3d.rs`** (Effort M, Proposed; after T50, T51)
+**T57 - Split visualizer `parse_gcode` and `stock_removal_3d.rs`** (Effort M, Done (#71); after T50, T51)
 - Ledger: CAMVIS-8. Behaviour-preserving split, placed last because it depends on T50 and T51. No test edits; the module path `visualizer::stock_removal_3d` is kept via `pub use`. Commands: G + `cargo nextest run -p gcodekit5-visualizer`; `cargo nextest run -p gcodekit5-ui-egui -E 'test(test_visualizer_stock::) + test(test_visualizer)'`. STOP if: any test import changes. Prevention: No guard justified.
 
-**T58 - Repetier comment stripping via core** (Effort S, Blocked - characterization required)
+**T58 - Repetier comment stripping via core** (Effort S, Done (#74))
 - Ledger: CAMVIS-10. First add characterization tests in `com/tests/test_repetier.rs` for `G1(c)X10` and `(a;b) G1` on the current behaviour, then decide whether the core semantics are acceptable on Repetier/Marlin firmware. Commands: G + `cargo nextest run -p gcodekit5-communication -E 'test(test_repetier::)'`. Prevention: Guard added (characterization tests).
 
-Tickets: 58 (T01-T58; T42 and T43 are separate PRs). Proposed: 37. Blocked - owner decision: 19. Blocked - characterization required: 2.
+Tickets: 58 (T01-T58; T42 and T43 are separate PRs). Status counts are not kept as literals; recount them with:
+
+```bash
+grep -oE '\*\*T[0-9]+ - [^*]*\*\* \(Effort [^,]*, (Proposed|Blocked|Approved|Done)' docs/reports/2026-11-27-deep-refactor-audit.md | grep -oE '(Proposed|Blocked|Approved|Done)$' | sort | uniq -c
+```
+
+Output on 2026-11-28 (base `b0bac4c1`): `58 Done`. The PR that lands a ticket updates that ticket's status line here.
 
 ## 7. Deliberate - do not fix
 

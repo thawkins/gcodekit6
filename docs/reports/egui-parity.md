@@ -10,6 +10,12 @@ pending before release.
 Counts (table rows above Gaps, recounted after the M6 final fixes): 146 Ported, 23 Not
 applicable, 13 Manual check needed, 0 Gap; 182 rows.
 
+Recount them with:
+
+```bash
+awk '/^## Gaps/{exit} /^\| /' docs/reports/egui-parity.md | grep -v '^| Feature\|^| ---' | awk -F'|' '{gsub(/^ +| +$/,"",$4);print $4}' | sort | uniq -c
+```
+
 G7 sweep: every user-visible string of `crates/gcodekit5-ui/src/ui/gtk/` and `gtk_app.rs`
 (`t!(...)`, 1066 strings) was looked up in the egui and app sources, and each one missing was
 traced to its widget; every key handler (`EventControllerKey`), right-click and double-click
@@ -136,7 +142,7 @@ Status values:
 | --- | --- | --- | --- |
 | Send the editor's program | 80-streaming | Ported | `test_editor::stream_start_not_routed_when_editor_sync_cannot_run`, `app/test_machine_controller::stream_does_not_block_caller` |
 | Pause / resume (feed hold / cycle start) | 80-streaming | Ported | `app/test_machine_controller::pause_stops_feeding_and_resume_restarts`, `test_machine_pane::safety_chords_work_in_text_field` |
-| Stop (soft reset, clear queue) | 80-streaming | Ported | `app/test_machine_controller::stop_soft_resets_and_clears_buffers`, `app/test_machine_busy_guard::stop_resets_only_once_the_machine_has_stopped` |
+| Stop (soft reset, clear queue) | 80-streaming | Ported | `app/test_machine_controller::test_stop_soft_resets_and_clears_buffers` (the `test_machine_busy_guard` Stop test was removed in #52 with the `device_status` global it pinned) |
 | Progress in status bar and editor | 80-streaming | Ported | `test_machine_pane::stream_progress_updates_while_dialog_open`, `test_editor::current_line_follows_stream` |
 | Alarm ends the stream | 80-streaming | Ported | `app/test_machine_controller::alarm_ends_stream` |
 | Elapsed / remaining time | 80-streaming | Ported | `test_status_bar::test_status_bar_time_format`, `test_status_bar::test_status_bar_job_times_estimate`, `test_status_bar::test_status_bar_summary_times_while_streaming`, `test_status_bar::test_status_bar_stream_start_time_follows_stream` (GTK's `HH:MM:SS` and its per-line estimate) |
@@ -274,8 +280,8 @@ The two rules differ on purpose; both are pinned by tests
 | Device type CNC / Laser ($32) | 70-settings | Ported | `test_device_info::device_info_laser_type_writes_32_and_refresh_asks_again` |
 | DRO decimals | 70-settings | Ported | Fixed: 2 for mm, 3 for inches, as GTK (`test_machine_pane::dro_shows_two_decimals`) |
 | Auto-connect on startup | 70-settings | Not applicable | Not in the GTK source |
-| Preferences "Controller" page | *(GTK)* | Not applicable | `settings/test_settings_dialog_pages::test_gtk_controller_page_has_no_rows` (GTK's Controller tab is empty: no setting is in that category since the connection rows moved to the Device Manager, so egui adds no empty page) |
-| Keyboard shortcut editor | 70-settings | Ported | `test_settings_shortcuts::test_change_records_a_key_and_apply_hands_it_to_the_app`, `test_settings_shortcuts::test_applied_shortcut_runs_at_once_and_shows_in_the_menu`, `test_settings_shortcuts::test_refused_key_says_why_and_keeps_the_old_key`, `test_settings_shortcuts::test_safety_rows_cannot_be_changed`, `test_settings_shortcuts::test_only_the_safety_keys_run_while_a_key_is_recorded`, `test_settings_shortcuts::test_reset_and_reset_all_restore_defaults_and_cancel_drops_edits`, `test_shortcut_rules::test_no_command_takes_a_safety_key_in_any_scope`, `test_shortcut_rules::test_jog_keys_are_plain_character_keys`, `test_shortcut_rules::test_alt_keys_never_open_a_menu_in_any_language`, `test_shortcut_rules::test_a_key_in_use_where_both_could_run_is_refused`, `test_motion_keys_typing::test_motion_keys_never_run_while_a_text_field_has_the_keyboard`, `test_motion_keys_typing::test_in_window_menu_keys_never_run_home_while_typing`, `test_motion_keys_typing::test_may_run_holds_back_only_motion_while_typing`, `test_shortcut_rules::test_motion_commands_need_a_modifier_outside_machine_control`, `test_shortcut_rules::test_reset_refused_when_a_default_key_is_now_taken`, `test_settings_shortcuts::test_change_replaces_one_key_and_add_adds_one`, `test_settings_shortcuts::test_shortcuts_page_snapshot_german_at_minimum_size`, `test_settings_shortcuts::test_apply_saves_the_shortcuts_and_the_app_starts_with_them`, `test_settings_shortcuts::test_saved_shortcuts_breaking_a_rule_load_as_defaults`, `test_settings_shortcuts::test_valid_saved_shortcuts_start_without_a_notice`, `settings/test_settings_keyboard_shortcuts::test_gtk_save_keeps_the_shortcuts` and 9 more (saved in the settings' `ui.keyboard_shortcuts`, which the GTK build loads and saves unchanged; GTK's Shortcuts tab was empty: its list was never shown or saved; egui's page, built on craft-keymap, is what `70-settings` documents. The E-STOP and feed hold keys are fixed, motion commands stay off their letters, jog keys are plain keys that never jog while typing, no Alt key takes a menu mnemonic in any language, and two commands never share a key where both run) |
+| Preferences "Controller" page | *(GTK)* | Not applicable | test removed in #69 with the GTK settings-dialog stack (GTK's Controller tab is empty: no setting is in that category since the connection rows moved to the Device Manager, so egui adds no empty page) |
+| Keyboard shortcut editor | 70-settings | Ported | `test_settings_shortcuts::test_change_records_a_key_and_apply_hands_it_to_the_app`, `test_settings_shortcuts::test_applied_shortcut_runs_at_once_and_shows_in_the_menu`, `test_settings_shortcuts::test_refused_key_says_why_and_keeps_the_old_key`, `test_settings_shortcuts::test_safety_rows_cannot_be_changed`, `test_settings_shortcuts::test_only_the_safety_keys_run_while_a_key_is_recorded`, `test_settings_shortcuts::test_reset_and_reset_all_restore_defaults_and_cancel_drops_edits`, `test_shortcut_rules::test_no_command_takes_a_safety_key_in_any_scope`, `test_shortcut_rules::test_jog_keys_are_plain_character_keys`, `test_shortcut_rules::test_alt_keys_never_open_a_menu_in_any_language`, `test_shortcut_rules::test_a_key_in_use_where_both_could_run_is_refused`, `test_motion_keys_typing::test_motion_keys_never_run_while_a_text_field_has_the_keyboard`, `test_motion_keys_typing::test_in_window_menu_keys_never_run_home_while_typing`, `test_motion_keys_typing::test_may_run_holds_back_only_motion_while_typing`, `test_shortcut_rules::test_motion_commands_need_a_modifier_outside_machine_control`, `test_shortcut_rules::test_reset_refused_when_a_default_key_is_now_taken`, `test_settings_shortcuts::test_change_replaces_one_key_and_add_adds_one`, `test_settings_shortcuts::test_shortcuts_page_snapshot_german_at_minimum_size`, `test_settings_shortcuts::test_apply_saves_the_shortcuts_and_the_app_starts_with_them`, `test_settings_shortcuts::test_saved_shortcuts_breaking_a_rule_load_as_defaults`, `test_settings_shortcuts::test_valid_saved_shortcuts_start_without_a_notice`, `settings/test_settings_keyboard_shortcuts::test_other_settings_save_keeps_the_shortcuts` and 9 more (saved in the settings' `ui.keyboard_shortcuts`, which the GTK build loads and saves unchanged; GTK's Shortcuts tab was empty: its list was never shown or saved; egui's page, built on craft-keymap, is what `70-settings` documents. The E-STOP and feed hold keys are fixed, motion commands stay off their letters, jog keys are plain keys that never jog while typing, no Alt key takes a menu mnemonic in any language, and two commands never share a key where both run) |
 | Firmware settings: retrieve, filter, write | 70-settings | Ported | `test_firmware_settings::firmware_settings_retrieve_sends_dump_and_identity_queries`, `test_firmware_settings::firmware_settings_write_sends_exactly_the_line` |
 | Firmware settings: export / import to file | 70-settings | Manual check needed | Save/Load buttons exist; no test |
 
@@ -312,7 +318,8 @@ firmware/profile mismatch) were ported by gap-closure Task G8.
 
 Things only a person with the hardware or the operating system can check. None has been run
 for this report, and the GTK front end has since been deleted (`26740e3`); they are still
-pending and must be run before release.
+pending and must be run before release. The step-by-step user acceptance script is
+[HOWTO.UAT.md](../howto/HOWTO.UAT.md).
 
 Connection and firmware:
 
