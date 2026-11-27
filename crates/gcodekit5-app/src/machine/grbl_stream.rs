@@ -19,15 +19,13 @@ use std::collections::VecDeque;
 use gcodekit5_communication::ConnectionDriver;
 use gcodekit5_communication::firmware::grbl::status_parser::MachinePosition;
 use gcodekit5_core::units::{
-    FeedRateUnits, MeasurementSystem, format_feed_rate, get_unit_label, parse_feed_rate,
+    FeedRateUnits, MM_PER_INCH_F32, MeasurementSystem, format_feed_rate, get_unit_label,
+    parse_feed_rate,
 };
 
 /// Usable size of GRBL's serial RX buffer in bytes (the buffer is 128 bytes; one slot is
 /// kept free by the ring buffer, so at most 127 bytes may be outstanding).
 pub const GRBL_RX_BUFFER_BYTES: usize = 127;
-
-/// Millimetres per inch.
-const MM_PER_INCH: f32 = 25.4;
 
 /// Returns the number of RX-buffer bytes a G-code line occupies once sent
 /// (its bytes plus the terminating newline).
@@ -281,7 +279,7 @@ pub fn jog_step_presets(units: MeasurementSystem) -> Vec<JogStepPreset> {
     let label = get_unit_label(units);
     let (values, factor): (&[f32], f32) = match units {
         MeasurementSystem::Metric => (&[0.001, 0.01, 0.1, 1.0, 10.0, 100.0], 1.0),
-        MeasurementSystem::Imperial => (&[0.0001, 0.001, 0.01, 0.1, 1.0], MM_PER_INCH),
+        MeasurementSystem::Imperial => (&[0.0001, 0.001, 0.01, 0.1, 1.0], MM_PER_INCH_F32),
     };
     values
         .iter()
@@ -315,7 +313,7 @@ pub fn jog_step_choices(units: MeasurementSystem, step_mm: f32) -> (Vec<JogStepP
     }
     let display = match units {
         MeasurementSystem::Metric => step_mm,
-        MeasurementSystem::Imperial => step_mm / MM_PER_INCH,
+        MeasurementSystem::Imperial => step_mm / MM_PER_INCH_F32,
     };
     let custom = JogStepPreset {
         mm: step_mm,
@@ -385,7 +383,7 @@ pub fn format_probe_move(
     let (axis, distance_mm) = axis_move;
     let distance = match units {
         MeasurementSystem::Metric => distance_mm,
-        MeasurementSystem::Imperial => distance_mm / MM_PER_INCH,
+        MeasurementSystem::Imperial => distance_mm / MM_PER_INCH_F32,
     };
     let feed: f32 = format_feed_rate(feed_mm_per_min, feed_units)
         .parse()

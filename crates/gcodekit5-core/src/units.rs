@@ -2,10 +2,20 @@
 //!
 //! Handles conversion between Metric (mm) and Imperial (inch) systems.
 //! Supports decimal and fractional inch parsing and formatting.
+//!
+//! This module owns the millimetres-per-inch constants ([`MM_PER_INCH`],
+//! [`MM_PER_INCH_F32`]) and the feed-rate conversions ([`feed_rate_from_mm_per_min`],
+//! [`feed_rate_to_mm_per_min`]); other crates must use these instead of private copies.
 
 use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::str::FromStr;
+
+/// Millimetres per inch (exact by definition), for `f64` arithmetic.
+pub const MM_PER_INCH: f64 = 25.4;
+
+/// Millimetres per inch for `f32` arithmetic (the literal, not a cast of the `f64`).
+pub const MM_PER_INCH_F32: f32 = 25.4;
 
 /// Measurement system for dimensional values.
 ///
@@ -101,7 +111,7 @@ pub fn format_length(value_mm: f32, system: MeasurementSystem) -> String {
             format!("{:.3}", value_mm)
         }
         MeasurementSystem::Imperial => {
-            let inches = value_mm / 25.4;
+            let inches = value_mm / MM_PER_INCH_F32;
             // Format to 3 decimal places
             format!("{:.3}", inches)
         }
@@ -113,13 +123,33 @@ pub fn format_length(value_mm: f32, system: MeasurementSystem) -> String {
 /// * `value_mm_per_min` - Feed rate in mm/min
 /// * `units` - Target feed rate units
 pub fn format_feed_rate(value_mm_per_min: f32, units: FeedRateUnits) -> String {
-    let value = match units {
+    format!("{:.3}", feed_rate_from_mm_per_min(value_mm_per_min, units))
+}
+
+/// Convert a feed rate in mm/min to `units`.
+///
+/// * `value_mm_per_min` - Feed rate in mm/min
+/// * `units` - Target feed rate units
+pub fn feed_rate_from_mm_per_min(value_mm_per_min: f32, units: FeedRateUnits) -> f32 {
+    match units {
         FeedRateUnits::MmPerMin => value_mm_per_min,
         FeedRateUnits::MmPerSec => value_mm_per_min / 60.0,
-        FeedRateUnits::InPerMin => value_mm_per_min / 25.4,
-        FeedRateUnits::InPerSec => (value_mm_per_min / 25.4) / 60.0,
-    };
-    format!("{:.3}", value)
+        FeedRateUnits::InPerMin => value_mm_per_min / MM_PER_INCH_F32,
+        FeedRateUnits::InPerSec => (value_mm_per_min / MM_PER_INCH_F32) / 60.0,
+    }
+}
+
+/// Convert a feed rate expressed in `units` to mm/min.
+///
+/// * `value` - Feed rate in `units`
+/// * `units` - Units of `value`
+pub fn feed_rate_to_mm_per_min(value: f32, units: FeedRateUnits) -> f32 {
+    match units {
+        FeedRateUnits::MmPerMin => value,
+        FeedRateUnits::MmPerSec => value * 60.0,
+        FeedRateUnits::InPerMin => value * MM_PER_INCH_F32,
+        FeedRateUnits::InPerSec => value * MM_PER_INCH_F32 * 60.0,
+    }
 }
 
 /// Parse length string to millimeters.
@@ -178,11 +208,11 @@ pub fn parse_length(input: &str, system: MeasurementSystem) -> Result<f32, Strin
                         total_inches += part.parse::<f32>().map_err(|_| "Invalid number part")?;
                     }
                 }
-                Ok(sign * total_inches * 25.4)
+                Ok(sign * total_inches * MM_PER_INCH_F32)
             } else {
                 // Decimal inches
                 let inches = input.parse::<f32>().map_err(|e| e.to_string())?;
-                Ok(inches * 25.4)
+                Ok(inches * MM_PER_INCH_F32)
             }
         }
     }
@@ -207,14 +237,7 @@ pub fn parse_feed_rate(input: &str, units: FeedRateUnits) -> Result<f32, String>
 
     let value = input.parse::<f32>().map_err(|e| e.to_string())?;
 
-    let mm_per_min = match units {
-        FeedRateUnits::MmPerMin => value,
-        FeedRateUnits::MmPerSec => value * 60.0,
-        FeedRateUnits::InPerMin => value * 25.4,
-        FeedRateUnits::InPerSec => value * 25.4 * 60.0,
-    };
-
-    Ok(mm_per_min)
+    Ok(feed_rate_to_mm_per_min(value, units))
 }
 
 /// Get the unit label for the given system ("mm" or "in")
