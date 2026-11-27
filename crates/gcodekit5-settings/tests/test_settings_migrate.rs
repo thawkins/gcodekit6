@@ -64,13 +64,6 @@ fn test_import_gtk_config() {
     assert!(!load.has_problems(), "{load:?}");
     assert_eq!(store.get(), &legacy_config);
     assert_eq!(store.get().ui.language, "fr");
-    assert_eq!(
-        store.get().recent_files,
-        vec![
-            PathBuf::from("/home/user/gcode/tabbedbox.gcode"),
-            PathBuf::from("/home/user/gcode/spoilboard.nc"),
-        ]
-    );
     assert_eq!(store.get().machine.x_limit, 420.0);
 
     // Machine profiles, tool library, materials, command history: unchanged.

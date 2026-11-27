@@ -10,7 +10,7 @@ pub mod manager;
 pub mod migrate;
 
 pub use config::{
-    Config, ConnectionSettings, ConnectionType, FileProcessingSettings, MachineSettings,
-    ProbeSettings, Theme, UiSettings,
+    Config, ConnectionSettings, ConnectionType, FileProcessingSettings, MachineSettings, Theme,
+    UiSettings,
 };
 pub use manager::SettingsManager;

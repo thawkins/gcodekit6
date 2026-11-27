@@ -173,10 +173,9 @@ fn test_apply_keeps_changes_made_while_open() {
     let mut harness = harness(dirs.clone(), true);
 
     // Settings the window does not edit change elsewhere while it is open.
-    let recent = PathBuf::from("/work/recent.nc");
     let mut config = harness.state().settings.config().clone();
-    config.recent_files = vec![recent.clone()];
-    config.last_opened_path = Some("/work".to_string());
+    config.ui.tools_manager_search = "endmill".to_string();
+    config.connection.port = "/dev/ttyUSB3".to_string();
     harness
         .state_mut()
         .settings
@@ -193,8 +192,8 @@ fn test_apply_keeps_changes_made_while_open() {
     let (reloaded, problem) = SettingsManager::open(dirs);
     assert!(problem.is_none(), "{problem:?}");
     let config = reloaded.config();
-    assert_eq!(config.recent_files, [recent]);
-    assert_eq!(config.last_opened_path.as_deref(), Some("/work"));
+    assert_eq!(config.ui.tools_manager_search, "endmill");
+    assert_eq!(config.connection.port, "/dev/ttyUSB3");
     assert_eq!(config.ui.measurement_system, MeasurementSystem::Imperial);
 }
 

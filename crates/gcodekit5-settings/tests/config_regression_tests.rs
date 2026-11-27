@@ -17,35 +17,6 @@ fn test_config_load_partial_json_uses_defaults() {
     config.validate().expect("defaults should validate");
 }
 
-#[test]
-fn test_config_merge_keeps_ui_settings_with_system_theme() {
-    let mut base = Config::default();
-    let mut other = Config::default();
-    other.ui.theme = gcodekit5_settings::Theme::System;
-    other.ui.window_width = 1920;
-    other.ui.font_size = 16;
-    other.ui.language = "es".to_string();
-
-    base.merge(&other);
-
-    assert_eq!(base.ui.window_width, 1920);
-    assert_eq!(base.ui.font_size, 16);
-    assert_eq!(base.ui.language, "es");
-}
-
-#[test]
-fn test_config_merge_ignores_unpopulated_ui_section() {
-    let mut base = Config::default();
-    base.ui.window_width = 1024;
-    let mut other = Config::default();
-    other.ui.window_width = 0;
-    other.ui.window_height = 0;
-
-    base.merge(&other);
-
-    assert_eq!(base.ui.window_width, 1024);
-}
-
 /// Fresh settings folders under `target/temp/config_regression/<test>-<pid>`.
 fn scratch(test: &str) -> ConfigDirs {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
