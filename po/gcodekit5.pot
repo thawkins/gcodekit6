@@ -1224,12 +1224,12 @@ msgstr ""
 msgid "Object with depth: Switching to CNC 3D mode."
 msgstr ""
 
-msgid "Unsupported 3D solids discarded"
+msgid "Unsupported DXF entities discarded"
 msgstr ""
 
 msgid ""
-"This DXF file contains ACIS solid entities (3D solids) that are not "
-"supported and were discarded:"
+"This DXF file contains entity types that are not supported and were "
+"discarded:"
 msgstr ""
 
 msgid "Invalid numbers replaced"
