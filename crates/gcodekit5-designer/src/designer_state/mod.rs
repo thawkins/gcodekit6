@@ -20,6 +20,8 @@ mod shapes;
 mod transforms;
 mod viewport;
 
+pub use file_io::{LoadReport, ShapeLoadIssue};
+
 use crate::commands::DesignerCommand;
 use crate::stock_removal::StockMaterial;
 use crate::{Canvas, ToolpathGenerator};
@@ -85,6 +87,9 @@ pub struct DesignerState {
     pub show_stock_removal: bool,
     /// Number of axes on the active device (default 3).
     pub num_axes: u8,
+    /// Metadata of the file the design was loaded from, kept so a save does not reset its
+    /// creation time, author and description.
+    pub(crate) file_metadata: Option<crate::serialization::DesignMetadata>,
 }
 
 impl DesignerState {
@@ -133,6 +138,7 @@ impl DesignerState {
             }),
             show_stock_removal: false,
             num_axes: 3,
+            file_metadata: None,
         }
     }
 

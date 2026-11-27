@@ -1219,6 +1219,12 @@ msgstr "Todos los archivos"
 msgid "Loaded:"
 msgstr "Cargado:"
 
+msgid "Shapes not loaded (a save removes them):"
+msgstr "Formas no cargadas (al guardar se eliminan):"
+
+msgid "Images whose file is missing:"
+msgstr "Imágenes sin su archivo:"
+
 msgid "Open Failed"
 msgstr "Error al abrir"
 

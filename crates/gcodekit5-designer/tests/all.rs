@@ -25,6 +25,8 @@ mod test_cam_depth_and_gcode;
 mod test_chamfer_dimensions;
 #[path = "test_default_properties_inheritance.rs"]
 mod test_default_properties_inheritance;
+#[path = "test_design_file_round_trip.rs"]
+mod test_design_file_round_trip;
 #[path = "test_dxf_polyline_splinefit.rs"]
 mod test_dxf_polyline_splinefit;
 #[path = "test_dxf_spline_import.rs"]

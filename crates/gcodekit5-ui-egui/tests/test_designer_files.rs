@@ -236,6 +236,35 @@ fn test_open_failure_keeps_the_design() -> std::io::Result<()> {
 }
 
 #[test]
+fn test_open_names_the_shapes_it_could_not_load() -> anyhow::Result<()> {
+    let path = scratch("open_skipped")?.join("newer.gckd");
+    let mut pane = pane_with_rects(&[(10.0, 10.0, 10.0, 10.0)]);
+    assert!(pane.save_design(&path, &en()));
+    let mut design = gcodekit5_designer::serialization::DesignFile::load_from_file(&path)?;
+    let mut unknown = design.shapes[0].clone();
+    unknown.id = 42;
+    unknown.name = "Spiral".into();
+    unknown.shape_type = "spiral_v9".into();
+    let mut raster = design.shapes[0].clone();
+    raster.id = 43;
+    raster.name = "Photo".into();
+    raster.shape_type = "raster_image".into();
+    raster.original_path = Some("/no/such/dir/photo.png".into());
+    design.shapes.push(unknown);
+    design.shapes.push(raster);
+    design.save_to_file(&path)?;
+
+    let mut other = DesignerPane::new();
+    assert!(other.open_design(&path, &en()));
+    let notice = other.notice().unwrap_or_default();
+    assert!(notice.starts_with("Loaded:"), "{notice}");
+    assert!(notice.contains("Spiral (spiral_v9)"), "{notice}");
+    assert!(notice.contains("Photo (raster_image)"), "{notice}");
+    assert_eq!(ids(&other).len(), 2, "the known shapes still load");
+    Ok(())
+}
+
+#[test]
 fn test_save_refuses_a_read_only_target_and_stays_modified() -> std::io::Result<()> {
     let path = scratch("read_only")?.join("locked.gckd");
     std::fs::write(&path, "old")?;
