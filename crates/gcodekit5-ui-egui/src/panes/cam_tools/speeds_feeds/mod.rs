@@ -375,22 +375,15 @@ impl SpeedsFeedsParams {
     /// The input's problems ([`SpeedsFeedsParams::input`]).
     pub fn calculate(&self) -> Result<SpeedsFeedsResults, Vec<FieldError>> {
         let input = self.input()?;
-        let max_rpm = input.device.max_spindle_speed_rpm;
         let result = SpeedsFeedsCalculator::calculate(&input);
-        // Clamp the RPM to the spindle's maximum and scale the feed with it.
-        let clamped_rpm = result.rpm.min(max_rpm);
-        let rpm_ratio = if result.rpm > 0 {
-            clamped_rpm as f32 / result.rpm as f32
-        } else {
-            1.0
-        };
-        let (spindle_speed, feed_rate) = if clamped_rpm != result.rpm {
-            (
-                format!("{} (clamped from {})", clamped_rpm, result.rpm),
-                format!("{:.1} (adjusted)", result.feed_rate * rpm_ratio),
-            )
-        } else {
-            (clamped_rpm.to_string(), format!("{:.1}", result.feed_rate))
+        // The calculator keeps the RPM within the spindle's and tool's limits and scales the
+        // feed with it; show the RPM it calculated before a limit changed it.
+        let (spindle_speed, feed_rate) = match result.unclamped_rpm {
+            Some(unclamped) => (
+                format!("{} (clamped from {})", result.rpm, unclamped),
+                format!("{:.1} (adjusted)", result.feed_rate),
+            ),
+            None => (result.rpm.to_string(), format!("{:.1}", result.feed_rate)),
         };
         Ok(SpeedsFeedsResults {
             spindle_speed,

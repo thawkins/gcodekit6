@@ -614,21 +614,12 @@ impl SpeedsFeedsCalculator {
     ) -> (u32, f32, Option<u32>, Option<f32>) {
         let mut final_rpm = rpm as u32;
         let mut final_feed = feed_rate;
-        let mut unclamped_rpm = None;
         let mut unclamped_feed = None;
 
-        // RPM limits
+        // RPM limits. The floor is applied first so the machine and tool maximums always
+        // win: a spindle whose maximum is below the floor runs at its maximum, never above it.
         let min_rpm = 1000u32;
         let max_rpm = input.device.max_spindle_speed_rpm;
-
-        if final_rpm > max_rpm {
-            warnings.push(format!(
-                "RPM {} exceeds machine maximum {}, clamped",
-                final_rpm, max_rpm
-            ));
-            unclamped_rpm = Some(final_rpm);
-            final_rpm = max_rpm;
-        }
 
         if final_rpm < min_rpm {
             warnings.push(format!(
@@ -636,6 +627,14 @@ impl SpeedsFeedsCalculator {
                 final_rpm, min_rpm, min_rpm
             ));
             final_rpm = min_rpm;
+        }
+
+        if final_rpm > max_rpm {
+            warnings.push(format!(
+                "RPM {} exceeds machine maximum {}, clamped",
+                final_rpm, max_rpm
+            ));
+            final_rpm = max_rpm;
         }
 
         // Tool RPM limit
@@ -646,11 +645,11 @@ impl SpeedsFeedsCalculator {
                 "RPM {} exceeds tool rating {}, clamped",
                 final_rpm, tool_max_rpm
             ));
-            if unclamped_rpm.is_none() {
-                unclamped_rpm = Some(final_rpm);
-            }
             final_rpm = tool_max_rpm;
         }
+
+        // Record the calculated RPM whenever a limit changed it.
+        let unclamped_rpm = (final_rpm != rpm as u32).then_some(rpm as u32);
 
         // Keep the chip load constant when the spindle speed was changed by a limit:
         // feed = rpm * chip_load * flutes, so the feed scales with the final RPM.

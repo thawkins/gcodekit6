@@ -1,5 +1,5 @@
-spindle_speed=6000
-feed_rate=272.3
+spindle_speed=6000 (clamped from 49500)
+feed_rate=272.3 (adjusted)
 surface_speed=179.5
 chip_load=0.0151
 mrr=1037.4
