@@ -308,3 +308,28 @@ fn test_device_profiles_ensure_active_profile() {
         Some("z")
     );
 }
+
+/// Moved from devicedb's `ui_integration_tests` (the removed `DeviceUiController`):
+/// a grblHAL profile survives the form, and a TCP host is trimmed, parsed and checked.
+#[test]
+fn test_device_profiles_form_keeps_grblhal_and_trims_tcp_host() {
+    let profile = DeviceProfile {
+        controller_type: ControllerType::GrblHal,
+        ..DeviceProfile::default()
+    };
+    let mut form = ProfileForm::from_profile(&profile, MM, MM_MIN);
+    assert_eq!(form.tcp_host, "192.168.1.100");
+    let saved = form.apply(&profile, MM, MM_MIN).expect("grblHAL saves");
+    assert_eq!(saved.controller_type, ControllerType::GrblHal);
+
+    form.connection_type = "TCP/IP".to_string();
+    form.tcp_host = "  cnc.local ".to_string();
+    form.tcp_port = "8080".to_string();
+    let saved = form.apply(&profile, MM, MM_MIN).expect("tcp saves");
+    assert_eq!(saved.tcp_host, "cnc.local");
+    assert_eq!(saved.tcp_port, 8080);
+
+    form.tcp_host = String::new();
+    let error = form.apply(&profile, MM, MM_MIN).expect_err("empty host");
+    assert_eq!(error.title, "Invalid TCP Host");
+}
