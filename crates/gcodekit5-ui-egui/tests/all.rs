@@ -20,6 +20,8 @@ pub fn global_env_lock() -> std::sync::MutexGuard<'static, ()> {
 mod machine_support;
 #[path = "test_app_managers_quit_order.rs"]
 mod test_app_managers_quit_order;
+#[path = "test_app_text_focus_menu.rs"]
+mod test_app_text_focus_menu;
 #[path = "test_cam_bitmap_engraving.rs"]
 mod test_cam_bitmap_engraving;
 #[path = "test_cam_device_state.rs"]

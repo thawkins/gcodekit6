@@ -116,9 +116,9 @@ impl GcodeKitApp {
             }
             UnsavedChangesChoice::Discard => {
                 if tools {
-                    self.quit.discarded_tool = true;
+                    self.flows.quit.discarded_tool = true;
                 } else {
-                    self.quit.discarded_material = true;
+                    self.flows.quit.discarded_material = true;
                 }
                 self.continue_quit();
             }

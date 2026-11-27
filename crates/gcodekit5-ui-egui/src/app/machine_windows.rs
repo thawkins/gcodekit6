@@ -99,7 +99,7 @@ impl GcodeKitApp {
                 }
             }
             UnsavedChangesChoice::Discard => {
-                self.quit.discarded_device = true;
+                self.flows.quit.discarded_device = true;
                 self.continue_quit();
             }
             UnsavedChangesChoice::Cancel => {
