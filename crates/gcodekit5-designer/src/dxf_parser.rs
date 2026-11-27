@@ -582,6 +582,8 @@ impl DxfParser {
 
         let mut i = 0;
         let mut in_entities = false;
+        let mut extents_min: Option<Point> = None;
+        let mut extents_max: Option<Point> = None;
 
         while i < lines.len() {
             let line = lines[i].trim();
@@ -603,6 +605,19 @@ impl DxfParser {
                     ),
                 }
                 i += 3;
+                continue;
+            }
+
+            // Drawing extents from the HEADER section:
+            // `9 / $EXTMIN|$EXTMAX / 10 / <x> / 20 / <y> [/ 30 / <z>]`.
+            if !in_entities && (line == "$EXTMIN" || line == "$EXTMAX") {
+                let point = Self::parse_header_point(&lines, i + 1);
+                match (line, point) {
+                    ("$EXTMIN", Some(p)) => extents_min = Some(p),
+                    (_, Some(p)) => extents_max = Some(p),
+                    (_, None) => {}
+                }
+                i += 1;
                 continue;
             }
 
@@ -717,7 +732,43 @@ impl DxfParser {
             tracing::warn!(count = bad, "DXF values that are not numbers were replaced");
         }
         file.replaced_numbers = bad;
+
+        // Keep the default extents unless the header gives a real box (an empty
+        // drawing stores EXTMIN = +1e20 and EXTMAX = -1e20).
+        if let (Some(min), Some(max)) = (extents_min, extents_max)
+            && min.x <= max.x
+            && min.y <= max.y
+        {
+            file.header.extents_min = min;
+            file.header.extents_max = max;
+        }
         Ok(file)
+    }
+
+    /// Reads the X (code 10) and Y (code 20) of a HEADER point variable.
+    ///
+    /// # Arguments
+    /// * `lines` - The DXF lines.
+    /// * `start` - Index of the first group code after the variable name.
+    ///
+    /// # Returns
+    /// The point, or `None` when either coordinate is missing or not a finite
+    /// number.
+    fn parse_header_point(lines: &[&str], start: usize) -> Option<Point> {
+        let mut x = None;
+        let mut y = None;
+        let mut index = start;
+        while let (Some(code), Some(value)) = (lines.get(index), lines.get(index + 1)) {
+            let value = value.trim().parse::<f64>().ok().filter(|v| v.is_finite());
+            match code.trim() {
+                "10" => x = value,
+                "20" => y = value,
+                "30" => {}
+                _ => break,
+            }
+            index += 2;
+        }
+        Some(Point::new(x?, y?))
     }
 
     /// Parse a LINE entity

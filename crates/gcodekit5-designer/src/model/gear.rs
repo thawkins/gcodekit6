@@ -4,12 +4,6 @@
 //! and pressure angle. Generates accurate involute tooth profiles
 //! for CNC cutting.
 
-//! # Involute Gear Shape
-//!
-//! A parametric involute spur gear defined by module, tooth count,
-//! and pressure angle. Generates accurate involute tooth profiles
-//! for CNC cutting.
-
 use lyon::math::{Transform, point};
 use lyon::path::Path;
 use serde::{Deserialize, Serialize};
