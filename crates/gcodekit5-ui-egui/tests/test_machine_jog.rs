@@ -301,7 +301,7 @@ fn test_hold_refused_without_position() {
     assert_eq!(settled_cancels(&shared), 0);
 }
 
-/// C2: Preferences > Machine > Invert reverses an axis for step and hold jogs alike.
+/// C2: `axis_direction_invert` (settings file) reverses an axis for step and hold jogs alike.
 #[test]
 fn test_inverted_z_jogs_negative() {
     let mut config = loopback_config();

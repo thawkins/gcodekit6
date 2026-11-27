@@ -218,7 +218,8 @@ pub(super) fn show_state(
 }
 
 /// The configured travel the Machine Limits section falls back to: X, Y, Z in mm and A, B,
-/// C in degrees (Preferences > Machine).
+/// C in degrees (`x_limit` .. `z_limit` are on the Preferences Machine page; `a_limit` ..
+/// `c_limit` only in the `[machine]` section of the settings file, `config.toml`).
 pub(super) type ConfiguredLimits = [f32; 6];
 
 /// The Machine Limits rows as `(axis, text)`: X, Y and Z from the controller's max travel
