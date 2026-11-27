@@ -7,7 +7,7 @@
 //! [`crate::optimizer`]) use [`strip_comments`] and [`words`] so that letters inside comments
 //! are never mistaken for commands or coordinates, and so `M5` does not match `M50`.
 //!
-//! Depends only on `std`.
+//! Depends on `gcodekit5_core::gcode::words` for the shared `Word` type and tokenizer.
 
 /// Comment processing mode
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

@@ -5,18 +5,13 @@
 /// Arc expansion configuration
 #[derive(Debug, Clone)]
 pub struct ArcExpanderConfig {
-    /// Maximum segment length
-    pub segment_length: f64,
     /// Number of segments
     pub num_segments: usize,
 }
 
 impl Default for ArcExpanderConfig {
     fn default() -> Self {
-        Self {
-            segment_length: 0.5,
-            num_segments: 20,
-        }
+        Self { num_segments: 20 }
     }
 }
 

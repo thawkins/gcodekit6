@@ -139,16 +139,12 @@ impl JigsawPuzzleMaker {
         let piece_width = self.params.width / self.params.pieces_across as f32;
         let piece_height = self.params.height / self.params.pieces_down as f32;
 
-        // Use tab_size_percent parameter
-        let tab_width = piece_width * (self.params.tab_size_percent / 100.0);
-        let tab_height = piece_height * (self.params.tab_size_percent / 200.0);
-
         // Generate vertical cuts with jitter
         for col in 1..self.params.pieces_across {
             let base_x = col as f32 * piece_width;
             let jitter_range = piece_width * (self.params.jitter_percent / 100.0);
             let x = base_x + self.uniform(-jitter_range, jitter_range);
-            self.generate_vertical_cut(x, piece_height, tab_width, tab_height);
+            self.generate_vertical_cut(x, piece_height);
         }
 
         // Generate horizontal cuts with jitter
@@ -156,7 +152,7 @@ impl JigsawPuzzleMaker {
             let base_y = row as f32 * piece_height;
             let jitter_range = piece_height * (self.params.jitter_percent / 100.0);
             let y = base_y + self.uniform(-jitter_range, jitter_range);
-            self.generate_horizontal_cut(y, piece_width, tab_width, tab_height);
+            self.generate_horizontal_cut(y, piece_width);
         }
 
         // Generate outer border with corner radius last
@@ -228,13 +224,7 @@ impl JigsawPuzzleMaker {
         self.paths.push(path);
     }
 
-    fn generate_vertical_cut(
-        &mut self,
-        x: f32,
-        piece_height: f32,
-        _tab_width: f32,
-        _tab_height: f32,
-    ) {
+    fn generate_vertical_cut(&mut self, x: f32, piece_height: f32) {
         let mut path = Vec::new();
         let num_tabs = self.params.pieces_down;
         let piece_width = self.params.width / self.params.pieces_across as f32;
@@ -263,13 +253,7 @@ impl JigsawPuzzleMaker {
         self.paths.push(path);
     }
 
-    fn generate_horizontal_cut(
-        &mut self,
-        y: f32,
-        piece_width: f32,
-        _tab_width: f32,
-        _tab_height: f32,
-    ) {
+    fn generate_horizontal_cut(&mut self, y: f32, piece_width: f32) {
         let mut path = Vec::new();
         let num_tabs = self.params.pieces_across;
         let piece_height = self.params.height / self.params.pieces_down as f32;

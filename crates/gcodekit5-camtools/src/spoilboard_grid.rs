@@ -48,9 +48,8 @@ impl SpoilboardGridGenerator {
         gcode.push_str(&format!("; Laser Power: {:.1}\n", p.laser_power));
 
         // Initialization sequence
-        gcode.push_str("G21 ; Set units to millimeters\n");
-        gcode.push_str("G90 ; Absolute positioning\n");
-        gcode.push_str("G17 ; XY plane selection\n\n");
+        crate::job_preamble::push_modal_header(&mut gcode, true);
+        gcode.push('\n');
 
         crate::job_preamble::push_work_setup(&mut gcode, p.home_before_job);
 

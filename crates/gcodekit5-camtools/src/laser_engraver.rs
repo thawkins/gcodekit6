@@ -501,9 +501,7 @@ impl BitmapImageEngraver {
         ));
         gcode.push_str(";\n");
 
-        gcode.push_str("G21 ; Set units to millimeters\n");
-        gcode.push_str("G90 ; Absolute positioning\n");
-        gcode.push_str("G17 ; XY plane selection\n");
+        crate::job_preamble::push_modal_header(&mut gcode, true);
         gcode.push('\n');
 
         // The engraver never moves Z: the user's focus height is kept, so homing cannot lead
@@ -521,26 +519,13 @@ impl BitmapImageEngraver {
         let line_spacing = 1.0 / self.params.pixels_per_mm * self.params.line_spacing;
         let pixel_width = 1.0 / self.params.pixels_per_mm;
 
-        match self.params.scan_direction {
-            ScanDirection::Horizontal => {
-                self.generate_horizontal_scan_with_progress(
-                    &mut gcode,
-                    &self.image,
-                    pixel_width,
-                    line_spacing,
-                    &mut progress_callback,
-                )?;
-            }
-            ScanDirection::Vertical => {
-                self.generate_vertical_scan_with_progress(
-                    &mut gcode,
-                    &self.image,
-                    pixel_width,
-                    line_spacing,
-                    &mut progress_callback,
-                )?;
-            }
-        }
+        self.generate_scan_with_progress(
+            &mut gcode,
+            &self.image,
+            pixel_width,
+            line_spacing,
+            &mut progress_callback,
+        )?;
 
         progress_callback(0.9);
 
@@ -568,7 +553,13 @@ impl BitmapImageEngraver {
         (lines, step_px)
     }
 
-    fn generate_horizontal_scan_with_progress<F>(
+    /// Emit every raster line of `image` along the configured scan direction.
+    ///
+    /// Horizontal lines run along X from the bottom row up; vertical lines run along Y from
+    /// the left column. The two directions keep their historical laser-off spelling before
+    /// each line's rapid: `M5 ; Laser off` plus a blank line (horizontal) or a bare `M5`
+    /// (vertical).
+    fn generate_scan_with_progress<F>(
         &self,
         gcode: &mut String,
         image: &GrayImage,
@@ -581,47 +572,68 @@ impl BitmapImageEngraver {
     {
         let height = image.height();
         let width = image.width();
-        let (num_lines, step_px) = self.scan_line_layout(height);
+        let direction = self.params.scan_direction;
+        // Pixels across the lines (one line per sampled row/column) and along each line.
+        let (across_px, along_px) = match direction {
+            ScanDirection::Horizontal => (height, width),
+            ScanDirection::Vertical => (width, height),
+        };
+        let (num_lines, step_px) = self.scan_line_layout(across_px);
         let mut forward = true;
 
-        // Render from bottom to top
         for line in 0..num_lines {
             if line % 10 == 0 || line == num_lines - 1 {
                 let progress = 0.1 + (line as f32 / num_lines as f32) * 0.8;
                 progress_callback(progress);
             }
 
-            let row_from_bottom = ((line as f32 * step_px) as u32).min(height - 1);
-            let y = height - 1 - row_from_bottom;
-            let y_pos = line as f32 * line_spacing;
-
-            // Turn off laser before rapid movement
-            gcode.push_str("M5 ; Laser off\n");
-            gcode.push('\n');
-
-            let start_x = if forward {
+            let sampled_px = ((line as f32 * step_px) as u32).min(across_px - 1);
+            let across_pos = line as f32 * line_spacing;
+            let start_along = if forward {
                 0.0
             } else {
-                width as f32 * pixel_width
+                along_px as f32 * pixel_width
             };
-            gcode.push_str(&format!(
-                "G0 X{:.3} Y{:.3}\n",
-                start_x + self.params.offset_x,
-                y_pos + self.params.offset_y
-            ));
 
-            let powers: Vec<u32> = (0..width)
-                .map(|x| self.pixel_power(image.get_pixel(x, y).0[0]))
-                .collect();
-            self.scan_line(
-                gcode,
-                &powers,
-                ScanAxes::X {
-                    y: y_pos + self.params.offset_y,
-                },
-                pixel_width,
-                forward,
-            );
+            // Turn off laser before rapid movement
+            let (powers, axes): (Vec<u32>, ScanAxes) = match direction {
+                ScanDirection::Horizontal => {
+                    gcode.push_str("M5 ; Laser off\n");
+                    gcode.push('\n');
+                    gcode.push_str(&format!(
+                        "G0 X{:.3} Y{:.3}\n",
+                        start_along + self.params.offset_x,
+                        across_pos + self.params.offset_y
+                    ));
+                    // Rows are rendered from bottom to top.
+                    let y = height - 1 - sampled_px;
+                    let powers = (0..width)
+                        .map(|x| self.pixel_power(image.get_pixel(x, y).0[0]))
+                        .collect();
+                    let axes = ScanAxes::X {
+                        y: across_pos + self.params.offset_y,
+                    };
+                    (powers, axes)
+                }
+                ScanDirection::Vertical => {
+                    gcode.push_str("M5\n");
+                    gcode.push_str(&format!(
+                        "G0 X{:.3} Y{:.3}\n",
+                        across_pos + self.params.offset_x,
+                        start_along + self.params.offset_y
+                    ));
+                    // Pixel k along the line counts from the bottom of the image (device Y up).
+                    let x = sampled_px;
+                    let powers = (0..height)
+                        .map(|k| self.pixel_power(image.get_pixel(x, height - 1 - k).0[0]))
+                        .collect();
+                    let axes = ScanAxes::Y {
+                        x: across_pos + self.params.offset_x,
+                    };
+                    (powers, axes)
+                }
+            };
+            self.scan_line(gcode, &powers, axes, pixel_width, forward);
 
             // Alternate direction if it is bidirectional
             if self.params.bidirectional {
@@ -747,65 +759,6 @@ impl BitmapImageEngraver {
             // Continuation of the burst at a new power level
             gcode.push_str(&format!("G1 {}{:.3} S{}\n", scan_axis, end, power));
         }
-    }
-
-    fn generate_vertical_scan_with_progress<F>(
-        &self,
-        gcode: &mut String,
-        image: &GrayImage,
-        pixel_width: f32,
-        line_spacing: f32,
-        progress_callback: &mut F,
-    ) -> Result<()>
-    where
-        F: FnMut(f32),
-    {
-        let height = image.height();
-        let width = image.width();
-        let (num_lines, step_px) = self.scan_line_layout(width);
-        let mut forward = true;
-
-        for line in 0..num_lines {
-            if line % 10 == 0 || line == num_lines - 1 {
-                let progress = 0.1 + (line as f32 / num_lines as f32) * 0.8;
-                progress_callback(progress);
-            }
-
-            let x = ((line as f32 * step_px) as u32).min(width - 1);
-            let x_pos = line as f32 * line_spacing;
-
-            gcode.push_str("M5\n");
-            let start_y = if forward {
-                0.0
-            } else {
-                height as f32 * pixel_width
-            };
-            gcode.push_str(&format!(
-                "G0 X{:.3} Y{:.3}\n",
-                x_pos + self.params.offset_x,
-                start_y + self.params.offset_y
-            ));
-
-            // Pixel k along the line counts from the bottom of the image (device Y up).
-            let powers: Vec<u32> = (0..height)
-                .map(|k| self.pixel_power(image.get_pixel(x, height - 1 - k).0[0]))
-                .collect();
-            self.scan_line(
-                gcode,
-                &powers,
-                ScanAxes::Y {
-                    x: x_pos + self.params.offset_x,
-                },
-                pixel_width,
-                forward,
-            );
-
-            if self.params.bidirectional {
-                forward = !forward;
-            }
-        }
-
-        Ok(())
     }
 
     /// Convert a pixel intensity to a quantized S value (0 = laser off).

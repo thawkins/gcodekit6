@@ -56,9 +56,8 @@ impl SpoilboardSurfacingGenerator {
         gcode.push_str(&format!("; Cut Depth: {:.1} mm\n", p.cut_depth));
 
         // Initialization sequence
-        gcode.push_str("G21 ; Set units to millimeters\n");
-        gcode.push_str("G90 ; Absolute positioning\n");
-        gcode.push_str("G17 ; XY plane selection\n\n");
+        crate::job_preamble::push_modal_header(&mut gcode, true);
+        gcode.push('\n');
 
         // Only X/Y are re-zeroed when homing: the Z work offset (spoilboard surface) is kept,
         // so the cut depth is measured from the surface, not from the homed position.

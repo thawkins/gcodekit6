@@ -29,6 +29,8 @@ mod probe_routines;
 mod test_camtools_validation_gaps;
 #[path = "test_gerber_input_safety.rs"]
 mod test_gerber_input_safety;
+#[path = "test_job_preamble_modal_header.rs"]
+mod test_job_preamble_modal_header;
 #[path = "test_speeds_feeds_calculator.rs"]
 mod test_speeds_feeds_calculator;
 #[path = "test_speeds_feeds_service.rs"]

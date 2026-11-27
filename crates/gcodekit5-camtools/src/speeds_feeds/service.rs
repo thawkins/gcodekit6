@@ -217,13 +217,6 @@ impl SpeedsFeedsToolService {
             ));
         }
 
-        // Check stick-out (if limits available)
-        if let Some(max_stick) = tool.limits.stick_out_max {
-            // This would need actual stick-out value from caller
-            // For now, just a placeholder
-            let _ = max_stick;
-        }
-
         // Check material compatibility
         if !self.is_compatible(tool, material) {
             errors.push(format!(

@@ -1269,9 +1269,7 @@ impl TabbedBoxMaker {
         gcode.push_str(";\n");
 
         gcode.push_str("; Initialization\n");
-        gcode.push_str("G21 ; Set units to millimeters\n");
-        gcode.push_str("G90 ; Absolute positioning\n");
-        gcode.push_str("G17 ; XY plane selection\n");
+        crate::job_preamble::push_modal_header(&mut gcode, true);
         gcode.push('\n');
 
         crate::job_preamble::push_work_setup(&mut gcode, self.params.home_before_job);
