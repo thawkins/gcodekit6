@@ -30,7 +30,7 @@ pub use probe::{
     ProbeResult, ProbeRoutine, ProbeType,
 };
 
-pub use error::{ConnectionError, ControllerError, Error, FirmwareError, GcodeError, Result};
+pub use error::{Error, Result};
 
 pub use gcode::{
     CommandId, CommandListener, CommandListenerHandle, CommandNumberGenerator, CommandResponse,
@@ -39,9 +39,8 @@ pub use gcode::{
 
 // Re-export type aliases for convenience
 pub use types::{
-    Callback, CellCallback, CellDataCallback, CellDataCallback2, DataCallback, ProgressCallback,
-    ResultCallback, Shared, SharedHashMap, SharedOption, SharedVec, ThreadSafe, ThreadSafeDeque,
-    ThreadSafeMap, ThreadSafeOption, ThreadSafeRw, ThreadSafeRwMap, ThreadSafeVec, UiCallback,
-    UiDataCallback, shared, shared_none, shared_some, thread_safe, thread_safe_deque,
-    thread_safe_map, thread_safe_none, thread_safe_rw, thread_safe_some, thread_safe_vec,
+    Callback, DataCallback, Shared, SharedHashMap, SharedOption, SharedVec, ThreadSafe,
+    ThreadSafeDeque, ThreadSafeMap, ThreadSafeOption, ThreadSafeRw, ThreadSafeRwMap, ThreadSafeVec,
+    UiCallback, UiDataCallback, shared, shared_none, shared_some, thread_safe, thread_safe_deque,
+    thread_safe_map, thread_safe_rw, thread_safe_vec,
 };
