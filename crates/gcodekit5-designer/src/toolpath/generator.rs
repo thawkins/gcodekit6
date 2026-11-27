@@ -175,115 +175,64 @@ impl ToolpathGenerator {
 
             let mut current_pt = start_pt;
 
-            let p1_raw = Point::new(x + w - r, y);
-            let p1 = transform_point(p1_raw);
-            if current_pt.distance_to(&p1) > 0.001 {
-                segments.push(ToolpathSegment::new(
-                    ToolpathSegmentType::LinearMove,
+            let sides = Self::rounded_rect_sides(x, y, w, h, r);
+            for (line_end_raw, arc_end_raw, arc_center_raw) in sides {
+                let line_end = transform_point(line_end_raw);
+                if current_pt.distance_to(&line_end) > 0.001 {
+                    segments.push(ToolpathSegment::new(
+                        ToolpathSegmentType::LinearMove,
+                        current_pt,
+                        line_end,
+                        feed_rate,
+                        spindle_speed,
+                    ));
+                    current_pt = line_end;
+                }
+
+                let arc_end = transform_point(arc_end_raw);
+                let arc_center = transform_point(arc_center_raw);
+                segments.push(ToolpathSegment::new_arc(
+                    ToolpathSegmentType::ArcCCW,
                     current_pt,
-                    p1,
+                    arc_end,
+                    arc_center,
                     feed_rate,
                     spindle_speed,
                 ));
-                current_pt = p1;
+                current_pt = arc_end;
             }
-
-            let p_br_end_raw = Point::new(x + w, y + r);
-            let center_br_raw = Point::new(x + w - r, y + r);
-            let p_br_end = transform_point(p_br_end_raw);
-            let center_br = transform_point(center_br_raw);
-            segments.push(ToolpathSegment::new_arc(
-                ToolpathSegmentType::ArcCCW,
-                current_pt,
-                p_br_end,
-                center_br,
-                feed_rate,
-                spindle_speed,
-            ));
-            current_pt = p_br_end;
-
-            let p2_raw = Point::new(x + w, y + h - r);
-            let p2 = transform_point(p2_raw);
-            if current_pt.distance_to(&p2) > 0.001 {
-                segments.push(ToolpathSegment::new(
-                    ToolpathSegmentType::LinearMove,
-                    current_pt,
-                    p2,
-                    feed_rate,
-                    spindle_speed,
-                ));
-                current_pt = p2;
-            }
-
-            let p_tr_end_raw = Point::new(x + w - r, y + h);
-            let center_tr_raw = Point::new(x + w - r, y + h - r);
-            let p_tr_end = transform_point(p_tr_end_raw);
-            let center_tr = transform_point(center_tr_raw);
-            segments.push(ToolpathSegment::new_arc(
-                ToolpathSegmentType::ArcCCW,
-                current_pt,
-                p_tr_end,
-                center_tr,
-                feed_rate,
-                spindle_speed,
-            ));
-            current_pt = p_tr_end;
-
-            let p3_raw = Point::new(x + r, y + h);
-            let p3 = transform_point(p3_raw);
-            if current_pt.distance_to(&p3) > 0.001 {
-                segments.push(ToolpathSegment::new(
-                    ToolpathSegmentType::LinearMove,
-                    current_pt,
-                    p3,
-                    feed_rate,
-                    spindle_speed,
-                ));
-                current_pt = p3;
-            }
-
-            let p_tl_end_raw = Point::new(x, y + h - r);
-            let center_tl_raw = Point::new(x + r, y + h - r);
-            let p_tl_end = transform_point(p_tl_end_raw);
-            let center_tl = transform_point(center_tl_raw);
-            segments.push(ToolpathSegment::new_arc(
-                ToolpathSegmentType::ArcCCW,
-                current_pt,
-                p_tl_end,
-                center_tl,
-                feed_rate,
-                spindle_speed,
-            ));
-            current_pt = p_tl_end;
-
-            let p4_raw = Point::new(x, y + r);
-            let p4 = transform_point(p4_raw);
-            if current_pt.distance_to(&p4) > 0.001 {
-                segments.push(ToolpathSegment::new(
-                    ToolpathSegmentType::LinearMove,
-                    current_pt,
-                    p4,
-                    feed_rate,
-                    spindle_speed,
-                ));
-                current_pt = p4;
-            }
-
-            let p_bl_end_raw = Point::new(x + r, y);
-            let center_bl_raw = Point::new(x + r, y + r);
-            let p_bl_end = transform_point(p_bl_end_raw);
-            let center_bl = transform_point(center_bl_raw);
-            segments.push(ToolpathSegment::new_arc(
-                ToolpathSegmentType::ArcCCW,
-                current_pt,
-                p_bl_end,
-                center_bl,
-                feed_rate,
-                spindle_speed,
-            ));
         }
 
         self.create_multipass_toolpaths(segments, step_down)
+    }
+
+    /// The four sides of a rounded rectangle with lower-left corner `(x, y)`,
+    /// counter-clockwise from the bottom edge: for each, the end of the
+    /// straight run to the next corner, then that corner's quarter arc as
+    /// (end, centre). Points are unrotated.
+    fn rounded_rect_sides(x: f64, y: f64, w: f64, h: f64, r: f64) -> [(Point, Point, Point); 4] {
+        [
+            (
+                Point::new(x + w - r, y),
+                Point::new(x + w, y + r),
+                Point::new(x + w - r, y + r),
+            ),
+            (
+                Point::new(x + w, y + h - r),
+                Point::new(x + w - r, y + h),
+                Point::new(x + w - r, y + h - r),
+            ),
+            (
+                Point::new(x + r, y + h),
+                Point::new(x, y + h - r),
+                Point::new(x + r, y + h - r),
+            ),
+            (
+                Point::new(x, y + r),
+                Point::new(x + r, y),
+                Point::new(x + r, y + r),
+            ),
+        ]
     }
 
     pub fn generate_circle_contour(&self, circle: &Circle, step_down: f64) -> Vec<Toolpath> {
@@ -786,128 +735,7 @@ impl ToolpathGenerator {
             let contour_length: f64 = segments.iter().map(ToolpathSegment::arc_length).sum();
 
             if contour_length > 0.001 {
-                // Each lap descends at most `lap_step` (the step-down). The ramp runs at
-                // the requested angle only over the distance needed to reach the lap's
-                // floor, after which the rest of the lap is cut flat at that floor.
-                let lap_step = if step_down > 0.001 {
-                    step_down
-                } else {
-                    total_dist
-                };
-                let tan_angle = self.ramp_angle.to_radians().tan();
-                let mut current_z = start_z;
-                let mut loop_guard = 0usize;
-                let max_segments = 20000;
-                let path_segment_count = segments.len();
-
-                while current_z - target_z > 0.001 {
-                    loop_guard += 1;
-
-                    // Past the size cap, finish with flat laps one step-down apart
-                    // instead of ramping, so no lap ever drops more than `lap_step`.
-                    if loop_guard * path_segment_count > max_segments || loop_guard > 1000 {
-                        while current_z - target_z > 0.001 {
-                            let lap_floor = (current_z - lap_step).max(target_z);
-                            let mut tp = Toolpath::new(self.tool_diameter, lap_floor);
-                            tp.segments = segments
-                                .iter()
-                                .map(|s| {
-                                    let mut ns = s.clone();
-                                    ns.start_z = Some(lap_floor);
-                                    ns.z_depth = Some(lap_floor);
-                                    ns
-                                })
-                                .collect();
-                            toolpaths.push(tp);
-                            current_z = lap_floor;
-                        }
-                        break;
-                    }
-
-                    let lap_floor = (current_z - lap_step).max(target_z);
-                    let mut pass_segments = Vec::with_capacity(segments.len() + 1);
-                    let mut z = current_z;
-
-                    for seg in &segments {
-                        if seg.segment_type == ToolpathSegmentType::RapidMove
-                            || z - lap_floor <= 1e-9
-                        {
-                            let mut new_seg = seg.clone();
-                            new_seg.start_z = Some(z);
-                            new_seg.z_depth = Some(z);
-                            pass_segments.push(new_seg);
-                            continue;
-                        }
-
-                        // Ramp along the travelled path: arcs use their arc length,
-                        // not the chord, so the slope matches the requested angle.
-                        let seg_len = seg.arc_length();
-                        let z_drop = seg_len * tan_angle;
-
-                        if z - z_drop >= lap_floor {
-                            let mut new_seg = seg.clone();
-                            new_seg.start_z = Some(z);
-                            new_seg.z_depth = Some(z - z_drop);
-                            pass_segments.push(new_seg);
-                            z -= z_drop;
-                            continue;
-                        }
-
-                        // The ramp reaches the lap floor part-way along this segment.
-                        let remaining_drop = z - lap_floor;
-                        if seg.segment_type == ToolpathSegmentType::LinearMove
-                            && tan_angle > 1e-12
-                            && seg_len > 1e-9
-                        {
-                            let t = (remaining_drop / tan_angle / seg_len).clamp(0.0, 1.0);
-                            let split = Point::new(
-                                seg.start.x + (seg.end.x - seg.start.x) * t,
-                                seg.start.y + (seg.end.y - seg.start.y) * t,
-                            );
-                            let mut ramp_seg = seg.clone();
-                            ramp_seg.end = split;
-                            ramp_seg.start_z = Some(z);
-                            ramp_seg.z_depth = Some(lap_floor);
-                            pass_segments.push(ramp_seg);
-
-                            let mut flat_seg = seg.clone();
-                            flat_seg.start = split;
-                            flat_seg.start_z = Some(lap_floor);
-                            flat_seg.z_depth = Some(lap_floor);
-                            pass_segments.push(flat_seg);
-                        } else {
-                            // Arcs are not split: descending to the floor over the whole
-                            // arc is shallower than the requested ramp angle.
-                            let mut new_seg = seg.clone();
-                            new_seg.start_z = Some(z);
-                            new_seg.z_depth = Some(lap_floor);
-                            pass_segments.push(new_seg);
-                        }
-                        z = lap_floor;
-                    }
-
-                    let mut tp = Toolpath::new(self.tool_diameter, z);
-                    tp.segments = pass_segments;
-                    toolpaths.push(tp);
-
-                    // A lap must always make progress; with a near-zero angle fall back
-                    // to dropping a full step so the loop terminates.
-                    current_z = if current_z - z < 1e-6 { lap_floor } else { z };
-                }
-
-                let mut final_pass = Toolpath::new(self.tool_diameter, target_z);
-                final_pass.segments = segments
-                    .iter()
-                    .map(|s| {
-                        let mut ns = s.clone();
-                        ns.start_z = Some(target_z);
-                        ns.z_depth = Some(target_z);
-                        ns
-                    })
-                    .collect();
-                toolpaths.push(final_pass);
-
-                return toolpaths;
+                return self.ramped_multipass_toolpaths(&segments, step_down, target_z, total_dist);
             }
         }
 
@@ -931,6 +759,148 @@ impl ToolpathGenerator {
         }
 
         toolpaths
+    }
+
+    /// Multipass phase for a ramped entry: laps that ramp down from the start
+    /// depth at `ramp_angle`, each descending at most one step-down, then a
+    /// flat finishing lap at `target_z`.
+    fn ramped_multipass_toolpaths(
+        &self,
+        segments: &[ToolpathSegment],
+        step_down: f64,
+        target_z: f64,
+        total_dist: f64,
+    ) -> Vec<Toolpath> {
+        let mut toolpaths = Vec::new();
+        // Each lap descends at most `lap_step` (the step-down). The ramp runs at
+        // the requested angle only over the distance needed to reach the lap's
+        // floor, after which the rest of the lap is cut flat at that floor.
+        let lap_step = if step_down > 0.001 {
+            step_down
+        } else {
+            total_dist
+        };
+        let tan_angle = self.ramp_angle.to_radians().tan();
+        let mut current_z = self.start_depth;
+        let mut loop_guard = 0usize;
+        let max_segments = 20000;
+        let path_segment_count = segments.len();
+
+        while current_z - target_z > 0.001 {
+            loop_guard += 1;
+
+            // Past the size cap, finish with flat laps one step-down apart
+            // instead of ramping, so no lap ever drops more than `lap_step`.
+            if loop_guard * path_segment_count > max_segments || loop_guard > 1000 {
+                while current_z - target_z > 0.001 {
+                    let lap_floor = (current_z - lap_step).max(target_z);
+                    toolpaths.push(self.flat_lap(segments, lap_floor));
+                    current_z = lap_floor;
+                }
+                break;
+            }
+
+            let lap_floor = (current_z - lap_step).max(target_z);
+            let (pass_segments, z) = Self::ramp_lap(segments, current_z, lap_floor, tan_angle);
+
+            let mut tp = Toolpath::new(self.tool_diameter, z);
+            tp.segments = pass_segments;
+            toolpaths.push(tp);
+
+            // A lap must always make progress; with a near-zero angle fall back
+            // to dropping a full step so the loop terminates.
+            current_z = if current_z - z < 1e-6 { lap_floor } else { z };
+        }
+
+        toolpaths.push(self.flat_lap(segments, target_z));
+        toolpaths
+    }
+
+    /// One lap of `segments` cut flat at `z`.
+    fn flat_lap(&self, segments: &[ToolpathSegment], z: f64) -> Toolpath {
+        let mut tp = Toolpath::new(self.tool_diameter, z);
+        tp.segments = segments
+            .iter()
+            .map(|s| {
+                let mut ns = s.clone();
+                ns.start_z = Some(z);
+                ns.z_depth = Some(z);
+                ns
+            })
+            .collect();
+        tp
+    }
+
+    /// One ramped lap of `segments` starting at `start_z`: descends along the
+    /// path at `tan_angle` until `lap_floor`, splitting the linear segment where
+    /// the floor is reached, and cuts the rest flat. Returns the lap's segments
+    /// and the Z it ends at.
+    fn ramp_lap(
+        segments: &[ToolpathSegment],
+        start_z: f64,
+        lap_floor: f64,
+        tan_angle: f64,
+    ) -> (Vec<ToolpathSegment>, f64) {
+        let mut pass_segments = Vec::with_capacity(segments.len() + 1);
+        let mut z = start_z;
+
+        for seg in segments {
+            if seg.segment_type == ToolpathSegmentType::RapidMove || z - lap_floor <= 1e-9 {
+                let mut new_seg = seg.clone();
+                new_seg.start_z = Some(z);
+                new_seg.z_depth = Some(z);
+                pass_segments.push(new_seg);
+                continue;
+            }
+
+            // Ramp along the travelled path: arcs use their arc length,
+            // not the chord, so the slope matches the requested angle.
+            let seg_len = seg.arc_length();
+            let z_drop = seg_len * tan_angle;
+
+            if z - z_drop >= lap_floor {
+                let mut new_seg = seg.clone();
+                new_seg.start_z = Some(z);
+                new_seg.z_depth = Some(z - z_drop);
+                pass_segments.push(new_seg);
+                z -= z_drop;
+                continue;
+            }
+
+            // The ramp reaches the lap floor part-way along this segment.
+            let remaining_drop = z - lap_floor;
+            if seg.segment_type == ToolpathSegmentType::LinearMove
+                && tan_angle > 1e-12
+                && seg_len > 1e-9
+            {
+                let t = (remaining_drop / tan_angle / seg_len).clamp(0.0, 1.0);
+                let split = Point::new(
+                    seg.start.x + (seg.end.x - seg.start.x) * t,
+                    seg.start.y + (seg.end.y - seg.start.y) * t,
+                );
+                let mut ramp_seg = seg.clone();
+                ramp_seg.end = split;
+                ramp_seg.start_z = Some(z);
+                ramp_seg.z_depth = Some(lap_floor);
+                pass_segments.push(ramp_seg);
+
+                let mut flat_seg = seg.clone();
+                flat_seg.start = split;
+                flat_seg.start_z = Some(lap_floor);
+                flat_seg.z_depth = Some(lap_floor);
+                pass_segments.push(flat_seg);
+            } else {
+                // Arcs are not split: descending to the floor over the whole
+                // arc is shallower than the requested ramp angle.
+                let mut new_seg = seg.clone();
+                new_seg.start_z = Some(z);
+                new_seg.z_depth = Some(lap_floor);
+                pass_segments.push(new_seg);
+            }
+            z = lap_floor;
+        }
+
+        (pass_segments, z)
     }
 
     fn build_text_outline_segments_with_params(

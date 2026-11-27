@@ -37,6 +37,26 @@ pub struct ToolpathToGcode {
     pub z_min_limit: Option<f64>,
 }
 
+/// Modal state carried across the segments of one
+/// [`ToolpathToGcode::generate_body_continuing`] call.
+struct BodyState {
+    gcode: String,
+    line_number: u32,
+    current_z: f64,
+    laser_on: bool,
+    /// Laser power (S) currently in effect; re-emitted whenever a segment's power differs.
+    laser_power: Option<u32>,
+    last_feed_rate: Option<f64>,
+    /// Reference point of the laser point filter.
+    last_point: Option<(f64, f64)>,
+    /// Whether the next linear move must restate `G01`.
+    line_g01: bool,
+    initial_safe_z_emitted: bool,
+    current_xy: Option<(f64, f64)>,
+    has_z: bool,
+    cnc_speed: Option<u32>,
+}
+
 impl ToolpathToGcode {
     /// Creates a new G-code generator.
     ///
@@ -305,371 +325,317 @@ impl ToolpathToGcode {
         start_line_number: u32,
         initial_z: f64,
     ) -> (String, f64) {
-        let mut gcode = String::new();
-        let mut line_number = start_line_number;
-        let mut current_z = initial_z;
-        // State tracking to avoid redundant commands
-        let mut laser_on = false; // Initially OFF
-        // Laser power (S) currently in effect; re-emitted whenever a segment's power differs.
-        let mut laser_power: Option<u32> = None;
-        let mut last_feed_rate: Option<f64> = None;
-        let mut last_point: Option<(f64, f64)> = None;
-        let mut line_g01 = true;
-        let mut initial_safe_z_emitted = false;
-        let mut current_xy: Option<(f64, f64)> = None;
-
-        let has_z = self.num_axes >= 3 && !self.is_laser_2d;
-        // CNC spindle speed in effect: the header (or the caller) started the
-        // spindle at the first segment's speed; a later change gets an `S`.
-        let mut cnc_speed = toolpath.segments.first().map(|s| s.spindle_speed);
+        let mut st = BodyState {
+            gcode: String::new(),
+            line_number: start_line_number,
+            current_z: initial_z,
+            laser_on: false,
+            laser_power: None,
+            last_feed_rate: None,
+            last_point: None,
+            line_g01: true,
+            initial_safe_z_emitted: false,
+            current_xy: None,
+            has_z: self.num_axes >= 3 && !self.is_laser_2d,
+            // CNC spindle speed in effect: the header (or the caller) started the
+            // spindle at the first segment's speed; a later change gets an `S`.
+            cnc_speed: toolpath.segments.first().map(|s| s.spindle_speed),
+        };
 
         for (index, segment) in toolpath.segments.iter().enumerate() {
             if !self.is_laser_2d
                 && segment.segment_type != ToolpathSegmentType::RapidMove
-                && cnc_speed != Some(segment.spindle_speed)
+                && st.cnc_speed != Some(segment.spindle_speed)
             {
-                gcode.push_str(&format!(
+                st.gcode.push_str(&format!(
                     "S{}        ; Spindle speed\n",
                     segment.spindle_speed
                 ));
-                cnc_speed = Some(segment.spindle_speed);
+                st.cnc_speed = Some(segment.spindle_speed);
             }
             match segment.segment_type {
-                ToolpathSegmentType::RapidMove => {
-                    // Always turn off the laser before rapid movement
-                    if self.is_laser_2d && laser_on {
-                        let line_prefix = self.get_line_prefix(line_number);
-                        gcode.push_str(&format!("{}M5          ; Laser OFF\n", line_prefix));
-                        laser_on = false;
-                        line_number += 10;
-                    }
-
-                    let same_xy = current_xy.is_some_and(|(x, y)| {
-                        (x - segment.end.x).abs() <= 0.001 && (y - segment.end.y).abs() <= 0.001
-                    });
-
-                    // In CNC mode emit safe-Z before first XY rapid. For next rapids,
-                    // keep Z continuous only when explicitly enabled and XY does not change.
-                    let should_retract = has_z
-                        && (!initial_safe_z_emitted
-                            || (!self.continuous_z_between_passes || !same_xy)
-                                && (current_z - self.safe_z).abs() > 0.01);
-
-                    if should_retract {
-                        let line_prefix = self.get_line_prefix(line_number);
-                        gcode.push_str(&format!(
-                            "{}G00 Z{}   ; Retract to safe Z\n",
-                            line_prefix,
-                            self.fmt_coord(self.safe_z)
-                        ));
-                        current_z = self.safe_z;
-                        initial_safe_z_emitted = true;
-                        line_number += 10;
-                    }
-
-                    let line_prefix = self.get_line_prefix(line_number);
-                    gcode.push_str(&format!(
-                        "{}G00 X{} Y{}   ; Rapid move\n",
-                        line_prefix,
-                        self.fmt_coord(segment.end.x),
-                        self.fmt_coord(segment.end.y)
-                    ));
-
-                    line_g01 = true;
-                    last_point = None;
-                    current_xy = Some((segment.end.x, segment.end.y));
-                    line_number += 10;
-                }
-
+                ToolpathSegmentType::RapidMove => self.emit_rapid(&mut st, segment),
                 ToolpathSegmentType::LinearMove => {
-                    // Handle start Z plunge if needed
-                    if has_z {
-                        if let Some(sz) = segment.start_z {
-                            if (current_z - sz).abs() > 0.01 {
-                                let line_prefix = self.get_line_prefix(line_number);
-                                gcode.push_str(&format!(
-                                    "{}G01 Z{} F{:.0}\n",
-                                    line_prefix,
-                                    self.fmt_coord(sz),
-                                    segment.feed_rate
-                                ));
-                                line_number += 10;
-                                current_z = sz;
-                            }
-                        } else if segment.z_depth.is_none()
-                            && (current_z - toolpath.depth).abs() > 0.01
-                        {
-                            let line_prefix = self.get_line_prefix(line_number);
-                            gcode.push_str(&format!(
-                                "{}G01 Z{} F{:.0}\n",
-                                line_prefix,
-                                self.fmt_coord(toolpath.depth),
-                                segment.feed_rate
-                            ));
-                            line_number += 10;
-                            current_z = toolpath.depth;
-                        }
-                    }
-                    let target_z = segment.z_depth.unwrap_or(if segment.start_z.is_some() {
-                        current_z
-                    } else {
-                        toolpath.depth
-                    });
-
-                    // Laser filtering: skip points that are too close, but never the
-                    // last point of a run of linear moves.
-                    if self.is_laser_2d {
-                        let ends_run = toolpath.segments.get(index + 1).is_none_or(|next| {
-                            next.segment_type != ToolpathSegmentType::LinearMove
-                        });
-                        if let Some((last_x, last_y)) = last_point
-                            && !ends_run
-                        {
-                            let dx = segment.end.x - last_x;
-                            let dy = segment.end.y - last_y;
-                            let dist_sq = dx * dx + dy * dy;
-
-                            if dist_sq < self.min_point_distance * self.min_point_distance {
-                                continue;
-                            }
-                        }
-                        last_point = Some((segment.end.x, segment.end.y));
-                    }
-
-                    if self.is_laser_2d {
-                        let was_on = laser_on;
-                        self.emit_laser_power(
-                            &mut gcode,
-                            &mut line_number,
-                            &mut laser_on,
-                            &mut laser_power,
-                            segment.spindle_speed,
-                        );
-                        if !was_on {
-                            line_g01 = true;
-                        }
-                    }
-
-                    // Determine whether to write "G01" or nothing.
-                    let cmd = if line_g01 {
-                        line_g01 = false; // Marked it as used
-                        "G01 "
-                    } else {
-                        ""
-                    };
-
-                    // Only send feed rate if it changed
-                    let feed_rate_cmd =
-                        if last_feed_rate.is_none_or(|fr| (fr - segment.feed_rate).abs() > 0.1) {
-                            last_feed_rate = Some(segment.feed_rate);
-                            format!(" F{:.0}", segment.feed_rate)
-                        } else {
-                            String::new()
-                        };
-
-                    let coords = if has_z && (target_z - current_z).abs() > 0.001 {
-                        current_z = target_z;
-                        format!(
-                            "X{} Y{} Z{}",
-                            self.fmt_coord(segment.end.x),
-                            self.fmt_coord(segment.end.y),
-                            self.fmt_coord(target_z)
-                        )
-                    } else {
-                        format!(
-                            "X{} Y{}",
-                            self.fmt_coord(segment.end.x),
-                            self.fmt_coord(segment.end.y)
-                        )
-                    };
-
-                    gcode.push_str(&format!(
-                        "{}{}{}{}\n",
-                        self.get_line_prefix(line_number),
-                        cmd,
-                        coords,
-                        feed_rate_cmd
-                    ));
-
-                    current_xy = Some((segment.end.x, segment.end.y));
-
-                    line_number += 10;
+                    self.emit_linear(&mut st, toolpath, index, segment)
                 }
-
                 ToolpathSegmentType::ArcCW | ToolpathSegmentType::ArcCCW => {
-                    // Handle Z plunge if needed
-                    if has_z {
-                        if let Some(sz) = segment.start_z {
-                            if (current_z - sz).abs() > 0.01 {
-                                let line_prefix = self.get_line_prefix(line_number);
-                                gcode.push_str(&format!(
-                                    "{}G01 Z{} F{:.0}\n",
-                                    line_prefix,
-                                    self.fmt_coord(sz),
-                                    segment.feed_rate
-                                ));
-                                line_number += 10;
-                                current_z = sz;
-                            }
-                        } else if segment.z_depth.is_none()
-                            && (current_z - toolpath.depth).abs() > 0.01
-                        {
-                            let line_prefix = self.get_line_prefix(line_number);
-                            gcode.push_str(&format!(
-                                "{}G01 Z{} F{:.0}\n",
-                                line_prefix,
-                                self.fmt_coord(toolpath.depth),
-                                segment.feed_rate
-                            ));
-                            line_number += 10;
-                            current_z = toolpath.depth;
-                        }
-                    }
-
-                    if self.is_laser_2d {
-                        self.emit_laser_power(
-                            &mut gcode,
-                            &mut line_number,
-                            &mut laser_on,
-                            &mut laser_power,
-                            segment.spindle_speed,
-                        );
-                    }
-
-                    let target_z = segment.z_depth.unwrap_or(if segment.start_z.is_some() {
-                        current_z
-                    } else {
-                        toolpath.depth
-                    });
-
-                    let line_prefix = self.get_line_prefix(line_number);
-
-                    let min_radius_mm = 0.25; // Limite de radio mas pequeño
-
-                    let is_small_arc = if let Some(center) = segment.center {
-                        let i = center.x - segment.start.x;
-                        let j = center.y - segment.start.y;
-                        let radius = (i * i + j * j).sqrt();
-                        radius < min_radius_mm
-                    } else {
-                        true // Sin centro, tratar como pequeño
-                    };
-
-                    let feed_rate_cmd =
-                        if last_feed_rate.is_none_or(|fr| (fr - segment.feed_rate).abs() > 0.1) {
-                            last_feed_rate = Some(segment.feed_rate);
-                            format!(" F{:.0}", segment.feed_rate)
-                        } else {
-                            String::new()
-                        };
-
-                    if is_small_arc {
-                        // Arco pequeño → convertir a línea recta
-                        if has_z && (target_z - current_z).abs() > 0.001 {
-                            gcode.push_str(&format!(
-                                "{}{} X{} Y{} Z{}{}\n",
-                                line_prefix,
-                                "G01",
-                                self.fmt_coord(segment.end.x),
-                                self.fmt_coord(segment.end.y),
-                                self.fmt_coord(target_z),
-                                feed_rate_cmd
-                            ));
-                            current_z = target_z;
-                        } else {
-                            gcode.push_str(&format!(
-                                "{}{} X{} Y{}{}\n",
-                                line_prefix,
-                                "G01",
-                                self.fmt_coord(segment.end.x),
-                                self.fmt_coord(segment.end.y),
-                                feed_rate_cmd
-                            ));
-                        }
-                    } else {
-                        // Arco normal → usar G02/G03
-                        if let Some(center) = segment.center {
-                            // I/J are relative to the arc start as the controller
-                            // knows it: the previous endpoint as printed (rounded).
-                            let i = center.x - Self::round_coord(segment.start.x);
-                            let j = center.y - Self::round_coord(segment.start.y);
-                            let cmd = if segment.segment_type == ToolpathSegmentType::ArcCW {
-                                "G02"
-                            } else {
-                                "G03"
-                            };
-                            // G02/G03 are modal: the next linear move must restate G01,
-                            // otherwise it would be interpreted as another arc.
-                            line_g01 = true;
-
-                            if has_z && (target_z - current_z).abs() > 0.001 {
-                                gcode.push_str(&format!(
-                                    "{}{} X{} Y{} Z{} I{} J{}{}\n",
-                                    line_prefix,
-                                    cmd,
-                                    self.fmt_coord(segment.end.x),
-                                    self.fmt_coord(segment.end.y),
-                                    self.fmt_coord(target_z),
-                                    self.fmt_coord(i),
-                                    self.fmt_coord(j),
-                                    feed_rate_cmd
-                                ));
-                                current_z = target_z;
-                            } else {
-                                gcode.push_str(&format!(
-                                    "{}{} X{} Y{} I{} J{}{}\n",
-                                    line_prefix,
-                                    cmd,
-                                    self.fmt_coord(segment.end.x),
-                                    self.fmt_coord(segment.end.y),
-                                    self.fmt_coord(i),
-                                    self.fmt_coord(j),
-                                    feed_rate_cmd
-                                ));
-                            }
-                        } else {
-                            // Sin centro → fallback a línea
-                            if has_z && (target_z - current_z).abs() > 0.001 {
-                                gcode.push_str(&format!(
-                                    "{}{} X{} Y{} Z{}{}\n",
-                                    line_prefix,
-                                    "G01",
-                                    self.fmt_coord(segment.end.x),
-                                    self.fmt_coord(segment.end.y),
-                                    self.fmt_coord(target_z),
-                                    feed_rate_cmd
-                                ));
-                                current_z = target_z;
-                            } else {
-                                gcode.push_str(&format!(
-                                    "{}{} X{} Y{}{}\n",
-                                    line_prefix,
-                                    "G01",
-                                    self.fmt_coord(segment.end.x),
-                                    self.fmt_coord(segment.end.y),
-                                    feed_rate_cmd
-                                ));
-                            }
-                        }
-                    }
-
-                    line_number += 10;
-                    current_xy = Some((segment.end.x, segment.end.y));
-                    // The laser point filter measures from where the arc ended.
-                    if self.is_laser_2d {
-                        last_point = Some((segment.end.x, segment.end.y));
-                    }
+                    self.emit_arc(&mut st, toolpath, segment)
                 }
             }
         }
 
         // Turn off laser at the end of the toolpath if it was on
-        if self.is_laser_2d && laser_on {
-            let line_prefix = self.get_line_prefix(line_number);
-            gcode.push_str(&format!("{}M5          ; Laser OFF\n", line_prefix));
+        if self.is_laser_2d && st.laser_on {
+            let line_prefix = self.get_line_prefix(st.line_number);
+            st.gcode
+                .push_str(&format!("{}M5          ; Laser OFF\n", line_prefix));
         }
 
-        (gcode, current_z)
+        (st.gcode, st.current_z)
+    }
+
+    /// Body phase for a rapid move: laser off, safe-Z retract when needed,
+    /// then the `G00` XY move.
+    fn emit_rapid(&self, st: &mut BodyState, segment: &ToolpathSegment) {
+        // Always turn off the laser before rapid movement
+        if self.is_laser_2d && st.laser_on {
+            let line_prefix = self.get_line_prefix(st.line_number);
+            st.gcode
+                .push_str(&format!("{}M5          ; Laser OFF\n", line_prefix));
+            st.laser_on = false;
+            st.line_number += 10;
+        }
+
+        let same_xy = st.current_xy.is_some_and(|(x, y)| {
+            (x - segment.end.x).abs() <= 0.001 && (y - segment.end.y).abs() <= 0.001
+        });
+
+        // In CNC mode emit safe-Z before first XY rapid. For next rapids,
+        // keep Z continuous only when explicitly enabled and XY does not change.
+        let should_retract = st.has_z
+            && (!st.initial_safe_z_emitted
+                || (!self.continuous_z_between_passes || !same_xy)
+                    && (st.current_z - self.safe_z).abs() > 0.01);
+
+        if should_retract {
+            let line_prefix = self.get_line_prefix(st.line_number);
+            st.gcode.push_str(&format!(
+                "{}G00 Z{}   ; Retract to safe Z\n",
+                line_prefix,
+                self.fmt_coord(self.safe_z)
+            ));
+            st.current_z = self.safe_z;
+            st.initial_safe_z_emitted = true;
+            st.line_number += 10;
+        }
+
+        let line_prefix = self.get_line_prefix(st.line_number);
+        st.gcode.push_str(&format!(
+            "{}G00 X{} Y{}   ; Rapid move\n",
+            line_prefix,
+            self.fmt_coord(segment.end.x),
+            self.fmt_coord(segment.end.y)
+        ));
+
+        st.line_g01 = true;
+        st.last_point = None;
+        st.current_xy = Some((segment.end.x, segment.end.y));
+        st.line_number += 10;
+    }
+
+    /// Body phase shared by linear and arc moves: plunges to the segment's
+    /// start Z (or the toolpath depth) when the tool is not already there,
+    /// and returns the Z the move itself should end at.
+    fn emit_start_plunge(
+        &self,
+        st: &mut BodyState,
+        toolpath: &Toolpath,
+        segment: &ToolpathSegment,
+    ) -> f64 {
+        if st.has_z {
+            let plunge_to = match segment.start_z {
+                Some(sz) => Some(sz).filter(|sz| (st.current_z - sz).abs() > 0.01),
+                None => Some(toolpath.depth).filter(|depth| {
+                    segment.z_depth.is_none() && (st.current_z - depth).abs() > 0.01
+                }),
+            };
+            if let Some(z) = plunge_to {
+                let line_prefix = self.get_line_prefix(st.line_number);
+                st.gcode.push_str(&format!(
+                    "{}G01 Z{} F{:.0}\n",
+                    line_prefix,
+                    self.fmt_coord(z),
+                    segment.feed_rate
+                ));
+                st.line_number += 10;
+                st.current_z = z;
+            }
+        }
+        segment.z_depth.unwrap_or(if segment.start_z.is_some() {
+            st.current_z
+        } else {
+            toolpath.depth
+        })
+    }
+
+    /// The ` F..` word for `feed_rate`, or nothing when that feed is already
+    /// in effect.
+    fn feed_rate_word(st: &mut BodyState, feed_rate: f64) -> String {
+        if st
+            .last_feed_rate
+            .is_none_or(|fr| (fr - feed_rate).abs() > 0.1)
+        {
+            st.last_feed_rate = Some(feed_rate);
+            format!(" F{:.0}", feed_rate)
+        } else {
+            String::new()
+        }
+    }
+
+    /// Body phase for a linear move: Z plunge, the laser point filter and
+    /// power, then the (modal) `G01` line.
+    fn emit_linear(
+        &self,
+        st: &mut BodyState,
+        toolpath: &Toolpath,
+        index: usize,
+        segment: &ToolpathSegment,
+    ) {
+        let target_z = self.emit_start_plunge(st, toolpath, segment);
+
+        // Laser filtering: skip points that are too close, but never the
+        // last point of a run of linear moves.
+        if self.is_laser_2d {
+            let ends_run = toolpath
+                .segments
+                .get(index + 1)
+                .is_none_or(|next| next.segment_type != ToolpathSegmentType::LinearMove);
+            if let Some((last_x, last_y)) = st.last_point
+                && !ends_run
+            {
+                let dx = segment.end.x - last_x;
+                let dy = segment.end.y - last_y;
+                let dist_sq = dx * dx + dy * dy;
+
+                if dist_sq < self.min_point_distance * self.min_point_distance {
+                    return;
+                }
+            }
+            st.last_point = Some((segment.end.x, segment.end.y));
+        }
+
+        if self.is_laser_2d {
+            let was_on = st.laser_on;
+            self.emit_laser_power(
+                &mut st.gcode,
+                &mut st.line_number,
+                &mut st.laser_on,
+                &mut st.laser_power,
+                segment.spindle_speed,
+            );
+            if !was_on {
+                st.line_g01 = true;
+            }
+        }
+
+        // Determine whether to write "G01" or nothing.
+        let cmd = if st.line_g01 {
+            st.line_g01 = false; // Marked it as used
+            "G01 "
+        } else {
+            ""
+        };
+
+        // Only send feed rate if it changed
+        let feed_rate_cmd = Self::feed_rate_word(st, segment.feed_rate);
+
+        let coords = if st.has_z && (target_z - st.current_z).abs() > 0.001 {
+            st.current_z = target_z;
+            format!(
+                "X{} Y{} Z{}",
+                self.fmt_coord(segment.end.x),
+                self.fmt_coord(segment.end.y),
+                self.fmt_coord(target_z)
+            )
+        } else {
+            format!(
+                "X{} Y{}",
+                self.fmt_coord(segment.end.x),
+                self.fmt_coord(segment.end.y)
+            )
+        };
+
+        st.gcode.push_str(&format!(
+            "{}{}{}{}\n",
+            self.get_line_prefix(st.line_number),
+            cmd,
+            coords,
+            feed_rate_cmd
+        ));
+
+        st.current_xy = Some((segment.end.x, segment.end.y));
+
+        st.line_number += 10;
+    }
+
+    /// Body phase for an arc: Z plunge and laser power, then `G02`/`G03`, or
+    /// a `G01` to the end point when the arc is tiny or has no centre.
+    fn emit_arc(&self, st: &mut BodyState, toolpath: &Toolpath, segment: &ToolpathSegment) {
+        let target_z = self.emit_start_plunge(st, toolpath, segment);
+
+        if self.is_laser_2d {
+            self.emit_laser_power(
+                &mut st.gcode,
+                &mut st.line_number,
+                &mut st.laser_on,
+                &mut st.laser_power,
+                segment.spindle_speed,
+            );
+        }
+
+        let line_prefix = self.get_line_prefix(st.line_number);
+
+        let min_radius_mm = 0.25; // Limite de radio mas pequeño
+
+        // A tiny arc, or one without a centre, is cut as a straight line.
+        let is_small_arc = segment.center.is_none_or(|center| {
+            let i = center.x - segment.start.x;
+            let j = center.y - segment.start.y;
+            let radius = (i * i + j * j).sqrt();
+            radius < min_radius_mm
+        });
+        let arc_center = segment.center.filter(|_| !is_small_arc);
+
+        let feed_rate_cmd = Self::feed_rate_word(st, segment.feed_rate);
+        let z_word = if st.has_z && (target_z - st.current_z).abs() > 0.001 {
+            st.current_z = target_z;
+            format!(" Z{}", self.fmt_coord(target_z))
+        } else {
+            String::new()
+        };
+
+        if let Some(center) = arc_center {
+            // I/J are relative to the arc start as the controller
+            // knows it: the previous endpoint as printed (rounded).
+            let i = center.x - Self::round_coord(segment.start.x);
+            let j = center.y - Self::round_coord(segment.start.y);
+            let cmd = if segment.segment_type == ToolpathSegmentType::ArcCW {
+                "G02"
+            } else {
+                "G03"
+            };
+            // G02/G03 are modal: the next linear move must restate G01,
+            // otherwise it would be interpreted as another arc.
+            st.line_g01 = true;
+
+            st.gcode.push_str(&format!(
+                "{}{} X{} Y{}{} I{} J{}{}\n",
+                line_prefix,
+                cmd,
+                self.fmt_coord(segment.end.x),
+                self.fmt_coord(segment.end.y),
+                z_word,
+                self.fmt_coord(i),
+                self.fmt_coord(j),
+                feed_rate_cmd
+            ));
+        } else {
+            st.gcode.push_str(&format!(
+                "{}G01 X{} Y{}{}{}\n",
+                line_prefix,
+                self.fmt_coord(segment.end.x),
+                self.fmt_coord(segment.end.y),
+                z_word,
+                feed_rate_cmd
+            ));
+        }
+
+        st.line_number += 10;
+        st.current_xy = Some((segment.end.x, segment.end.y));
+        // The laser point filter measures from where the arc ended.
+        if self.is_laser_2d {
+            st.last_point = Some((segment.end.x, segment.end.y));
+        }
     }
 
     /// Turns the laser on (`M4 S..`) or updates its power (`S..`) so that `power`

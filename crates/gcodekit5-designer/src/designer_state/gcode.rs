@@ -192,178 +192,224 @@ impl DesignerState {
 
             // Aplicar override si estamos en modo láser
             if gcode_gen.is_laser_2d {
-                if let Some(params) = &effective_params {
-                    self.toolpath_generator.set_feed_rate(params.feed_rate);
-                    self.toolpath_generator
-                        .set_spindle_speed((params.power_percent * 10.0) as u32);
-                } else {
-                    self.toolpath_generator
-                        .set_feed_rate(self.tool_settings.feed_rate);
-                    self.toolpath_generator
-                        .set_spindle_speed(self.tool_settings.spindle_speed);
-                }
+                self.apply_laser_generator_params(effective_params.as_ref());
             }
 
             if let crate::model::Shape::RasterImage(raster) = &shape.shape {
-                // Generar G-code para raster
-                use crate::engraving::ImageEngraver;
-
-                if raster.image_data.is_empty() && raster.original_path.is_none() {
-                    tracing::warn!(
-                        shape_id = shape.id,
-                        "RasterImage has no image data; skipping"
-                    );
-                    continue;
-                }
-
-                // Calcular esquina inferior izquierda
-                let start_x = raster.center.x - raster.width_mm / 2.0;
-                let start_y = raster.center.y - raster.height_mm / 2.0;
-
-                // Añadir comentarios
-                gcode.push_str(&format!("\n; Raster Image ID={}\n", shape.id));
-                gcode.push_str(&format!("; Name: {}\n", shape.name));
-                gcode.push_str(&format!("; Position: ({:.3}, {:.3})\n", start_x, start_y));
-                gcode.push_str(&format!(
-                    "; Size: {:.2} x {:.2} mm\n",
-                    raster.width_mm, raster.height_mm
-                ));
-
-                // Crear parámetros y generar G-code
-                let params = raster.engraving_params();
-
-                let engraver_result = if let Some(path) = &raster.original_path {
-                    ImageEngraver::from_file(path, params)
-                } else if !raster.image_data.is_empty() {
-                    match image::load_from_memory(&raster.image_data) {
-                        Ok(img) => ImageEngraver::from_image(img, params),
-                        Err(e) => {
-                            tracing::error!(shape_id = shape.id, error = %e, "Failed to load raster image from memory");
-                            continue;
-                        }
-                    }
-                } else {
-                    continue;
-                };
-
-                match engraver_result {
-                    Ok(engraver) => match engraver.generate_gcode() {
-                        Ok(image_gcode) => {
-                            gcode.push_str(&image_gcode);
-                            gcode.push('\n');
-                        }
-                        Err(e) => {
-                            tracing::error!(shape_id = shape.id, error = %e, "Failed to generate raster G-code");
-                        }
-                    },
-                    Err(e) => {
-                        tracing::error!(
-                            shape_id = shape.id,
-                            error = %e,
-                            "Failed to create raster image engraver"
-                        );
-                    }
-                }
-
+                Self::emit_raster_gcode(gcode, shape, raster);
                 continue; // Saltar el procesamiento normal para este shape
             }
 
-            // Add shape metadata as comments
-            gcode.push_str(&format!(
-                "\n; Shape ID={}, Type={:?}\n",
-                shape.id,
-                shape.shape.shape_type()
-            ));
-            gcode.push_str(&format!("; Name: {}\n", shape.name));
-            gcode.push_str(&format!("; Operation: {:?}\n", shape.operation_type));
-            if *pocket_fallback_to_profile {
-                gcode.push_str("; NOTE: Text pocketing produced no valid pocket area for the current tool/text size; fell back to profile toolpath.\n");
-            }
-
-            // Add shape-specific data
-            Self::append_shape_metadata(gcode, shape);
-
-            if shape.operation_type == OperationType::Pocket {
-                gcode.push_str(&format!(
-                    "; Pocket depth: {:.3}mm, Step down: {:.3}mm, Step in: {:.3}mm\n",
-                    shape.effective_pocket_depth(),
-                    shape.step_down,
-                    shape.step_in
-                ));
-                gcode.push_str(&format!("; Strategy: {:?}\n", shape.pocket_strategy));
-            } else {
-                if gcode_gen.is_laser_2d {
-                } else {
-                    let cnc_effective_depth = if self.machine_mode() == MachineMode::Cnc3D {
-                        let stock_top_z = self
-                            .stock_material
-                            .as_ref()
-                            .map(|s| s.thickness as f64)
-                            .unwrap_or(10.0);
-                        let object_final_z = self.effective_cnc_start_depth_from_shape(shape);
-                        (stock_top_z - object_final_z).max(0.0)
-                    } else {
-                        shape.pocket_depth
-                    };
-                    gcode.push_str(&format!(
-                        "; Cut depth: {:.3}mm, Step down: {:.3}mm\n",
-                        cnc_effective_depth, shape.step_down
-                    ));
-                }
-            }
+            self.emit_shape_comments(gcode, gcode_gen, shape, *pocket_fallback_to_profile);
 
             // Generate G-code for all toolpaths associated with this shape
-            let mut current_z = gcode_gen.safe_z;
-            // Init
-            let global_step_down = self.tool_settings.step_down;
-
             let num_passes = if gcode_gen.is_laser_2d {
                 if let Some(params) = &effective_params {
                     params.passes.max(1) as usize
                 } else {
-                    global_step_down.max(1.0) as usize
+                    self.tool_settings.step_down.max(1.0) as usize
                 }
             } else {
                 // CNC MODE: toolpaths already include multipass depth logic.
                 1
             };
 
-            for pass in 0..num_passes {
-                if pass > 0 {
-                    // Reposition to the start for subsequent passes
-                    gcode.push_str(&format!("; Reposition for pass {}\n", pass + 1));
-                }
+            Self::emit_shape_passes(
+                gcode,
+                gcode_gen,
+                toolpaths,
+                num_passes,
+                &mut line_number,
+                &mut spindle_speed,
+            );
+        } // for (shape, toolpaths, pocket_fallback_to_profile)
+    }
 
-                if gcode_gen.is_laser_2d {
-                    for toolpath in toolpaths {
-                        // Optimizes curves and joins collinear segments
-                        let optimized = gcode_gen.optimize_toolpath_for_laser(toolpath);
+    /// Shape phase (laser mode): points the toolpath generator's feed and
+    /// power at the shape's effective laser parameters, or the global tool
+    /// settings when it has none.
+    fn apply_laser_generator_params(&mut self, effective_params: Option<&LaserParams>) {
+        if let Some(params) = effective_params {
+            self.toolpath_generator.set_feed_rate(params.feed_rate);
+            self.toolpath_generator
+                .set_spindle_speed((params.power_percent * 10.0) as u32);
+        } else {
+            self.toolpath_generator
+                .set_feed_rate(self.tool_settings.feed_rate);
+            self.toolpath_generator
+                .set_spindle_speed(self.tool_settings.spindle_speed);
+        }
+    }
 
-                        let (body_gcode, final_z) =
-                            gcode_gen.generate_body_continuing(&optimized, line_number, current_z);
+    /// Shape phase for a raster image: its comment header and the engraver's
+    /// G-code. Problems are logged and the image is skipped.
+    fn emit_raster_gcode(
+        gcode: &mut String,
+        shape: &DrawingObject,
+        raster: &crate::model::RasterImage,
+    ) {
+        // Generar G-code para raster
+        use crate::engraving::ImageEngraver;
 
-                        gcode.push_str(&body_gcode);
-                        line_number += (optimized.segments.len() as u32) * 10;
-                        current_z = final_z;
-                    }
-                } else {
-                    // CNC mode without optimization
-                    for toolpath in toolpaths {
-                        if let Some(speed) = toolpath.segments.first().map(|s| s.spindle_speed)
-                            && speed != spindle_speed
-                        {
-                            gcode.push_str(&format!("S{}        ; Spindle speed\n", speed));
-                            spindle_speed = speed;
-                        }
-                        let (body_gcode, final_z) =
-                            gcode_gen.generate_body_continuing(toolpath, line_number, current_z);
-                        gcode.push_str(&body_gcode);
-                        line_number += (toolpath.segments.len() as u32) * 10;
-                        current_z = final_z;
-                    }
+        if raster.image_data.is_empty() && raster.original_path.is_none() {
+            tracing::warn!(
+                shape_id = shape.id,
+                "RasterImage has no image data; skipping"
+            );
+            return;
+        }
+
+        // Calcular esquina inferior izquierda
+        let start_x = raster.center.x - raster.width_mm / 2.0;
+        let start_y = raster.center.y - raster.height_mm / 2.0;
+
+        // Añadir comentarios
+        gcode.push_str(&format!("\n; Raster Image ID={}\n", shape.id));
+        gcode.push_str(&format!("; Name: {}\n", shape.name));
+        gcode.push_str(&format!("; Position: ({:.3}, {:.3})\n", start_x, start_y));
+        gcode.push_str(&format!(
+            "; Size: {:.2} x {:.2} mm\n",
+            raster.width_mm, raster.height_mm
+        ));
+
+        // Crear parámetros y generar G-code
+        let params = raster.engraving_params();
+
+        let engraver_result = if let Some(path) = &raster.original_path {
+            ImageEngraver::from_file(path, params)
+        } else if !raster.image_data.is_empty() {
+            match image::load_from_memory(&raster.image_data) {
+                Ok(img) => ImageEngraver::from_image(img, params),
+                Err(e) => {
+                    tracing::error!(shape_id = shape.id, error = %e, "Failed to load raster image from memory");
+                    return;
                 }
             }
-        } // for (shape, toolpaths, pocket_fallback_to_profile)
+        } else {
+            return;
+        };
+
+        match engraver_result {
+            Ok(engraver) => match engraver.generate_gcode() {
+                Ok(image_gcode) => {
+                    gcode.push_str(&image_gcode);
+                    gcode.push('\n');
+                }
+                Err(e) => {
+                    tracing::error!(shape_id = shape.id, error = %e, "Failed to generate raster G-code");
+                }
+            },
+            Err(e) => {
+                tracing::error!(
+                    shape_id = shape.id,
+                    error = %e,
+                    "Failed to create raster image engraver"
+                );
+            }
+        }
+    }
+
+    /// Shape phase: the comment block naming the shape, its operation,
+    /// geometry and depths.
+    fn emit_shape_comments(
+        &self,
+        gcode: &mut String,
+        gcode_gen: &ToolpathToGcode,
+        shape: &DrawingObject,
+        pocket_fallback_to_profile: bool,
+    ) {
+        // Add shape metadata as comments
+        gcode.push_str(&format!(
+            "\n; Shape ID={}, Type={:?}\n",
+            shape.id,
+            shape.shape.shape_type()
+        ));
+        gcode.push_str(&format!("; Name: {}\n", shape.name));
+        gcode.push_str(&format!("; Operation: {:?}\n", shape.operation_type));
+        if pocket_fallback_to_profile {
+            gcode.push_str("; NOTE: Text pocketing produced no valid pocket area for the current tool/text size; fell back to profile toolpath.\n");
+        }
+
+        // Add shape-specific data
+        Self::append_shape_metadata(gcode, shape);
+
+        if shape.operation_type == OperationType::Pocket {
+            gcode.push_str(&format!(
+                "; Pocket depth: {:.3}mm, Step down: {:.3}mm, Step in: {:.3}mm\n",
+                shape.effective_pocket_depth(),
+                shape.step_down,
+                shape.step_in
+            ));
+            gcode.push_str(&format!("; Strategy: {:?}\n", shape.pocket_strategy));
+        } else {
+            if gcode_gen.is_laser_2d {
+            } else {
+                let cnc_effective_depth = if self.machine_mode() == MachineMode::Cnc3D {
+                    let stock_top_z = self
+                        .stock_material
+                        .as_ref()
+                        .map(|s| s.thickness as f64)
+                        .unwrap_or(10.0);
+                    let object_final_z = self.effective_cnc_start_depth_from_shape(shape);
+                    (stock_top_z - object_final_z).max(0.0)
+                } else {
+                    shape.pocket_depth
+                };
+                gcode.push_str(&format!(
+                    "; Cut depth: {:.3}mm, Step down: {:.3}mm\n",
+                    cnc_effective_depth, shape.step_down
+                ));
+            }
+        }
+    }
+
+    /// Shape phase: `num_passes` runs over the shape's toolpaths (laser
+    /// toolpaths are optimised first), continuing the line numbering and the
+    /// CNC spindle speed in effect.
+    fn emit_shape_passes(
+        gcode: &mut String,
+        gcode_gen: &ToolpathToGcode,
+        toolpaths: &[crate::Toolpath],
+        num_passes: usize,
+        line_number: &mut u32,
+        spindle_speed: &mut u32,
+    ) {
+        let mut current_z = gcode_gen.safe_z;
+        for pass in 0..num_passes {
+            if pass > 0 {
+                // Reposition to the start for subsequent passes
+                gcode.push_str(&format!("; Reposition for pass {}\n", pass + 1));
+            }
+
+            if gcode_gen.is_laser_2d {
+                for toolpath in toolpaths {
+                    // Optimizes curves and joins collinear segments
+                    let optimized = gcode_gen.optimize_toolpath_for_laser(toolpath);
+
+                    let (body_gcode, final_z) =
+                        gcode_gen.generate_body_continuing(&optimized, *line_number, current_z);
+
+                    gcode.push_str(&body_gcode);
+                    *line_number += (optimized.segments.len() as u32) * 10;
+                    current_z = final_z;
+                }
+            } else {
+                // CNC mode without optimization
+                for toolpath in toolpaths {
+                    if let Some(speed) = toolpath.segments.first().map(|s| s.spindle_speed)
+                        && speed != *spindle_speed
+                    {
+                        gcode.push_str(&format!("S{}        ; Spindle speed\n", speed));
+                        *spindle_speed = speed;
+                    }
+                    let (body_gcode, final_z) =
+                        gcode_gen.generate_body_continuing(toolpath, *line_number, current_z);
+                    gcode.push_str(&body_gcode);
+                    *line_number += (toolpath.segments.len() as u32) * 10;
+                    current_z = final_z;
+                }
+            }
+        }
     }
 
     /// Generates G-code from the current design and reports whether any toolpath

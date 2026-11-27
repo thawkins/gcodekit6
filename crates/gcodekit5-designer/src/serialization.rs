@@ -428,12 +428,86 @@ impl DesignFile {
     }
 
     pub fn from_drawing_object(obj: &DrawingObject) -> ShapeData {
-        // 1. Use the shape's own centre where it has one: `to_drawing_object`
-        // restores (x, y) as that centre, and for rotated or asymmetric shapes
-        // (triangles, odd-sided polygons, gears) the bounds centre differs, which
-        // would shift the shape on every save/load round-trip.
-        let (x1, y1, x2, y2) = obj.shape.bounds();
-        let (cx, cy) = match &obj.shape {
+        let (cx, cy, real_width, real_height) = Self::shape_placement(&obj.shape);
+
+        let mut data = ShapeData {
+            id: obj.id as i32,
+            shape_type: Self::shape_type_name(obj.shape.shape_type()).to_string(),
+            name: obj.name.clone(),
+            x: cx,
+            y: cy,
+            width: real_width,
+            height: real_height,
+            right_angle_corner: 0,
+            points: Vec::new(),
+            selected: obj.selected,
+            use_custom_values: obj.use_custom_values,
+            operation_type: match obj.operation_type {
+                OperationType::Profile => "profile".to_string(),
+                OperationType::Pocket => "pocket".to_string(),
+            },
+            pocket_depth: obj.pocket_depth,
+            start_depth: obj.start_depth,
+            step_down: obj.step_down,
+            step_in: obj.step_in,
+            text_content: String::new(),
+            font_size: 0.0,
+            font_family: String::new(),
+            font_bold: false,
+            font_italic: false,
+            path_data: String::new(),
+            parametric_source: None,
+            group_id: obj.group_id,
+            corner_radius: 0.0,
+            is_slot: false,
+            rotation: obj.shape.rotation(),
+            ramp_angle: obj.ramp_angle,
+            pocket_strategy: obj.pocket_strategy,
+            raster_fill_ratio: obj.raster_fill_ratio,
+            sides: 0,
+            teeth: 0,
+            module: 0.0,
+            pressure_angle: 0.0,
+            pitch: 0.0,
+            roller_diameter: 0.0,
+            hole_radius: 0.0,
+            mirrored: false,
+            thickness: 0.0,
+            depth: obj.pocket_depth,
+            tab_size: 0.0,
+            offset: obj.offset,
+            fillet: obj.fillet,
+            chamfer: obj.chamfer,
+            lock_aspect_ratio: obj.lock_aspect_ratio,
+            original_path: None,
+            use_global_laser: obj.use_global_laser,
+            // ========== PARÁMETROS LÁSER ==========
+            feed_rate: default_feed_rate(),
+            travel_rate: default_travel_rate(),
+            min_power: default_min_power(),
+            max_power: default_max_power(),
+            ppi: default_ppi(),
+            bidirectional: default_bidirectional(),
+            invert: default_invert(),
+            scan_direction: default_scan_direction(),
+            dithering: default_dithering(),
+            halftone_threshold: default_halftone_threshold(),
+            laser_params: obj.laser_params,
+        };
+        Self::fill_shape_specific_data(&mut data, &obj.shape);
+        data
+    }
+
+    /// Save phase: the `(x, y, width, height)` a shape is stored with.
+    ///
+    /// Uses the shape's own centre where it has one: `to_drawing_object`
+    /// restores (x, y) as that centre, and for rotated or asymmetric shapes
+    /// (triangles, odd-sided polygons, gears) the bounds centre differs, which
+    /// would shift the shape on every save/load round-trip. The size is the
+    /// shape's own parameters where it has them, else its bounds.
+    fn shape_placement(shape: &Shape) -> (f64, f64, f64, f64) {
+        let (x1, y1, x2, y2) = shape.bounds();
+        let (cx, cy) = match shape {
             Shape::Rectangle(r) => (r.center.x, r.center.y),
             Shape::Circle(c) => (c.center.x, c.center.y),
             Shape::Ellipse(e) => (e.center.x, e.center.y),
@@ -446,8 +520,7 @@ impl DesignFile {
             _ => ((x1 + x2) / 2.0, (y1 + y2) / 2.0),
         };
 
-        // 2. We obtain the actual width and height of the object using shape-specific parameters
-        let (real_width, real_height) = match &obj.shape {
+        let (real_width, real_height) = match shape {
             Shape::Rectangle(r) => (r.width, r.height),
             Shape::Circle(c) => (c.radius * 2.0, c.radius * 2.0),
             Shape::Ellipse(e) => (e.rx * 2.0, e.ry * 2.0),
@@ -456,13 +529,12 @@ impl DesignFile {
             Shape::RasterImage(r) => (r.width_mm, r.height_mm),
             _ => (x2 - x1, y2 - y1),
         };
+        (cx, cy, real_width, real_height)
+    }
 
-        let shape_points = match &obj.shape {
-            Shape::Line(line) => vec![(line.start.x, line.start.y), (line.end.x, line.end.y)],
-            _ => Vec::new(),
-        };
-
-        let shape_type = match obj.shape.shape_type() {
+    /// Save phase: the `shape_type` string stored for a shape type.
+    fn shape_type_name(shape_type: ShapeType) -> &'static str {
+        match shape_type {
             ShapeType::Rectangle => "rectangle",
             ShapeType::Circle => "circle",
             ShapeType::Line => "line",
@@ -474,190 +546,66 @@ impl DesignFile {
             ShapeType::Gear => "gear",
             ShapeType::Sprocket => "sprocket",
             ShapeType::RasterImage => "raster_image",
-        };
+        }
+    }
 
-        let rotation = obj.shape.rotation();
-
-        let (text_content, font_size, font_family, font_bold, font_italic) =
-            if let Shape::Text(text_shape) = &obj.shape {
-                (
-                    text_shape.text.clone(),
-                    text_shape.font_size,
-                    text_shape.font_family.clone(),
-                    text_shape.bold,
-                    text_shape.italic,
-                )
-            } else {
-                (String::new(), 0.0, String::new(), false, false)
-            };
-
-        let (path_data, parametric_source) = if let Shape::Path(path_shape) = &obj.shape {
-            (
-                path_shape.to_svg_path(),
-                path_shape.parametric_source.clone(),
-            )
-        } else {
-            (String::new(), None)
-        };
-
-        let (corner_radius, is_slot) = if let Shape::Rectangle(r) = &obj.shape {
-            (r.corner_radius, r.is_slot)
-        } else {
-            (0.0, false)
-        };
-
-        let sides = if let Shape::Polygon(p) = &obj.shape {
-            p.sides
-        } else {
-            0
-        };
-
-        let mut teeth = 0;
-        let mut module = 0.0;
-        let mut pressure_angle = 0.0;
-        let mut pitch = 0.0;
-        let mut roller_diameter = 0.0;
-        let mut hole_radius = 0.0;
-        let mut mirrored = false;
-
-        match &obj.shape {
+    /// Save phase: overwrites the defaults in `data` with the fields only
+    /// this kind of shape carries (line points, text, path data, corner
+    /// radius, sides, gear and sprocket teeth, raster settings, ...).
+    fn fill_shape_specific_data(data: &mut ShapeData, shape: &Shape) {
+        match shape {
+            Shape::Line(line) => {
+                data.points = vec![(line.start.x, line.start.y), (line.end.x, line.end.y)];
+            }
+            Shape::Text(text_shape) => {
+                data.text_content = text_shape.text.clone();
+                data.font_size = text_shape.font_size;
+                data.font_family = text_shape.font_family.clone();
+                data.font_bold = text_shape.bold;
+                data.font_italic = text_shape.italic;
+            }
+            Shape::Path(path_shape) => {
+                data.path_data = path_shape.to_svg_path();
+                data.parametric_source = path_shape.parametric_source.clone();
+            }
+            Shape::Rectangle(r) => {
+                data.corner_radius = r.corner_radius;
+                data.is_slot = r.is_slot;
+            }
+            Shape::Polygon(p) => data.sides = p.sides,
             Shape::Gear(g) => {
-                mirrored = g.mirrored;
-                teeth = g.teeth;
-                module = g.module;
-                pressure_angle = g.pressure_angle_deg;
-                hole_radius = g.hole_radius;
+                data.mirrored = g.mirrored;
+                data.teeth = g.teeth;
+                data.module = g.module;
+                data.pressure_angle = g.pressure_angle_deg;
+                data.hole_radius = g.hole_radius;
             }
             Shape::Sprocket(s) => {
-                mirrored = s.mirrored;
-                teeth = s.teeth;
-                pitch = s.pitch;
-                roller_diameter = s.roller_diameter;
-                hole_radius = s.hole_radius;
+                data.mirrored = s.mirrored;
+                data.teeth = s.teeth;
+                data.pitch = s.pitch;
+                data.roller_diameter = s.roller_diameter;
+                data.hole_radius = s.hole_radius;
             }
-            _ => {}
-        }
-
-        let original_path = if let Shape::RasterImage(raster) = &obj.shape {
-            raster
-                .original_path
-                .clone()
-                .map(|p| p.display().to_string())
-        } else {
-            None
-        };
-
-        // ========== EXTRAER PARÁMETROS LÁSER ==========
-        let (
-            feed_rate,
-            travel_rate,
-            min_power,
-            max_power,
-            ppi,
-            bidirectional,
-            invert,
-            scan_direction,
-            dithering,
-            halftone_threshold,
-        ) = if let Shape::RasterImage(raster) = &obj.shape {
-            (
-                raster.feed_rate,
-                raster.travel_rate,
-                raster.min_power,
-                raster.max_power,
-                raster.ppi,
-                raster.bidirectional,
-                raster.invert,
-                raster.scan_direction.clone(),
-                raster.dithering.clone(),
-                raster.halftone_threshold,
-            )
-        } else {
-            (
-                default_feed_rate(),
-                default_travel_rate(),
-                default_min_power(),
-                default_max_power(),
-                default_ppi(),
-                default_bidirectional(),
-                default_invert(),
-                default_scan_direction(),
-                default_dithering(),
-                default_halftone_threshold(),
-            )
-        };
-
-        let right_angle_corner = if let Shape::Triangle(t) = &obj.shape {
-            t.right_angle_corner
-        } else {
-            0
-        };
-
-        let laser_params = obj.laser_params;
-
-        ShapeData {
-            id: obj.id as i32,
-            shape_type: shape_type.to_string(),
-            name: obj.name.clone(),
-            x: cx,
-            y: cy,
-            width: real_width,
-            height: real_height,
-            right_angle_corner,
-            points: shape_points,
-            selected: obj.selected,
-            use_custom_values: obj.use_custom_values,
-            operation_type: match obj.operation_type {
-                OperationType::Profile => "profile".to_string(),
-                OperationType::Pocket => "pocket".to_string(),
-            },
-            pocket_depth: obj.pocket_depth,
-            start_depth: obj.start_depth,
-            step_down: obj.step_down,
-            step_in: obj.step_in,
-            text_content,
-            font_size,
-            font_family,
-            font_bold,
-            font_italic,
-            path_data,
-            parametric_source,
-            group_id: obj.group_id,
-            corner_radius,
-            is_slot,
-            rotation,
-            ramp_angle: obj.ramp_angle,
-            pocket_strategy: obj.pocket_strategy,
-            raster_fill_ratio: obj.raster_fill_ratio,
-            sides,
-            teeth,
-            module,
-            pressure_angle,
-            pitch,
-            roller_diameter,
-            hole_radius,
-            mirrored,
-            thickness: 0.0,
-            depth: obj.pocket_depth,
-            tab_size: 0.0,
-            offset: obj.offset,
-            fillet: obj.fillet,
-            chamfer: obj.chamfer,
-            lock_aspect_ratio: obj.lock_aspect_ratio,
-            original_path,
-            use_global_laser: obj.use_global_laser,
-            // ========== PARÁMETROS LÁSER ==========
-            feed_rate,
-            travel_rate,
-            min_power,
-            max_power,
-            ppi,
-            bidirectional,
-            invert,
-            scan_direction,
-            dithering,
-            halftone_threshold,
-            laser_params,
+            Shape::RasterImage(raster) => {
+                data.original_path = raster
+                    .original_path
+                    .clone()
+                    .map(|p| p.display().to_string());
+                // ========== EXTRAER PARÁMETROS LÁSER ==========
+                data.feed_rate = raster.feed_rate;
+                data.travel_rate = raster.travel_rate;
+                data.min_power = raster.min_power;
+                data.max_power = raster.max_power;
+                data.ppi = raster.ppi;
+                data.bidirectional = raster.bidirectional;
+                data.invert = raster.invert;
+                data.scan_direction = raster.scan_direction.clone();
+                data.dithering = raster.dithering.clone();
+                data.halftone_threshold = raster.halftone_threshold;
+            }
+            Shape::Triangle(t) => data.right_angle_corner = t.right_angle_corner,
+            Shape::Circle(_) | Shape::Ellipse(_) => {}
         }
     }
 
