@@ -936,20 +936,41 @@ impl MachineControlPane {
         // A Repetier connection has no real-time commands: no overrides, no jog cancel (so no
         // continuous jog), no probing, and the emergency stop is `M112`.
         let repetier = status.connected && self.with_controller(|c| c.is_repetier());
-        let estop_label = tr.tr("E-STOP");
-        let estop_msgid = if repetier {
-            ESTOP_REPETIER
-        } else {
-            "Emergency stop (soft reset, {shortcut})"
-        };
-        let estop_hint = tr.tr(estop_msgid).replace("{shortcut}", SOFT_RESET_CHORD);
+        let estop_view = EstopView::new(tr, texture, repetier, status.connected);
         let mut estop = false;
         if estop_on_top {
-            estop = estop_button(ui, &estop_label, texture.as_ref(), status.connected)
-                .on_hover_text(&estop_hint)
-                .clicked();
+            estop = estop_view.show(ui);
             ui.add_space(SECTION_GAP);
         }
+        self.show_overrides(ui, tr, status, stacked, repetier);
+        ui.add_space(SECTION_GAP);
+        self.jog.begin_frame();
+        self.show_work_block(ui, tr, machine, status, stacked, repetier);
+        ui.add_space(SECTION_GAP);
+        dro::show_machine(ui, tr, status, self.units);
+        ui.add_space(SECTION_GAP);
+        let beside = (!estop_on_top).then_some(&estop_view);
+        let (actions, estop_beside) = self.show_jog_block(ui, tr, machine, status, beside);
+        estop |= estop_beside;
+        if self.jog.end_frame() {
+            self.with_controller(|c| c.realtime(RealtimeCommand::JogCancel));
+        }
+        if estop {
+            self.emergency_stop();
+        }
+        self.apply_jog_actions(actions, tr);
+    }
+
+    /// The override sliders (disabled on Repetier, with a note why), then the slider's action:
+    /// a real-time command sent at once, or a target the frames step towards.
+    fn show_overrides(
+        &mut self,
+        ui: &mut egui::Ui,
+        tr: &Translator,
+        status: &MachineStatus,
+        stacked: bool,
+        repetier: bool,
+    ) {
         self.targets.busy = self.override_target.is_some();
         let overrides = ui
             .add_enabled_ui(!repetier, |ui| {
@@ -969,7 +990,21 @@ impl MachineControlPane {
             }
             None => {}
         }
-        ui.add_space(SECTION_GAP);
+    }
+
+    /// The work position readout (with its rotary jog buttons) and, beside it or below it,
+    /// the zero actions and quick probes; then the actions those rows asked for. Runs inside
+    /// the jog panel's `begin_frame`/`end_frame` bracket, because the rotary buttons are jog
+    /// buttons.
+    fn show_work_block(
+        &mut self,
+        ui: &mut egui::Ui,
+        tr: &Translator,
+        machine: Option<&Machine>,
+        status: &MachineStatus,
+        stacked: bool,
+        repetier: bool,
+    ) {
         crate::theme::section_heading(ui, &dro::work_title(tr, self.units));
         let blocked = self.wcs.blocked(status);
         let reason = blocked.map(|msgid| tr.tr(msgid));
@@ -988,7 +1023,6 @@ impl MachineControlPane {
             && !machine.is_some_and(Machine::job_running);
         let probe_refusal = repetier.then(|| tr.tr(probe_run::PROBE_NOT_ON_REPETIER));
         let probe_text = probe_refusal.as_deref().or(self.probe_text.as_deref());
-        self.jog.begin_frame();
         // Rotary jog buttons in the readout rows: the pad's guards (read after this frame's
         // Home/Unlock buttons) and rules.
         let rotary_enabled =
@@ -998,12 +1032,15 @@ impl MachineControlPane {
         let mut rotary_jog = |ui: &mut egui::Ui, axis: Axis| {
             jog.rotary_buttons(ui, tr, axis, rotary_enabled, &mut rotary_actions);
         };
-        let (zeroed, wcs_action, quick) = if stacked {
-            let zeroed = dro::show_work(ui, status, units, &zero, &mut rotary_jog);
-            ui.add_space(6.0);
+        let mut zero_and_probe = |ui: &mut egui::Ui| {
             let action = wcs.show_zero_actions(ui, tr, status);
             let quick = quick_probe::show(ui, tr, probe_enabled, probe_text);
-            (zeroed, action, quick)
+            (action, quick)
+        };
+        let (zeroed, (wcs_action, quick)) = if stacked {
+            let zeroed = dro::show_work(ui, status, units, &zero, &mut rotary_jog);
+            ui.add_space(6.0);
+            (zeroed, zero_and_probe(ui))
         } else {
             ui.horizontal(|ui| {
                 let zeroed = ui
@@ -1016,20 +1053,13 @@ impl MachineControlPane {
                     // than the readout beside it.
                     ui.spacing_mut().item_spacing.y = 4.0;
                     ui.add_space(4.0);
-                    let action = wcs.show_zero_actions(ui, tr, status);
-                    let quick = quick_probe::show(ui, tr, probe_enabled, probe_text);
-                    (zeroed, action, quick)
+                    (zeroed, zero_and_probe(ui))
                 })
                 .inner
             })
             .inner
         };
-        for action in rotary_actions {
-            if !matches!(action, jog::Action::Refused(_)) {
-                self.notice = None;
-            }
-            self.jog_action(action, tr);
-        }
+        self.apply_jog_actions(rotary_actions, tr);
         if let Some(quick) = quick {
             self.start_quick_probe(machine, tr, quick);
         }
@@ -1043,33 +1073,83 @@ impl MachineControlPane {
             }
             Some(wcs::Action::Select(_)) | None => {}
         }
-        ui.add_space(SECTION_GAP);
-        dro::show_machine(ui, tr, status, self.units);
-        ui.add_space(SECTION_GAP);
+    }
+
+    /// The jog pad, with the emergency stop beside it when `estop_beside` is given.
+    ///
+    /// # Returns
+    /// The pad's actions, and whether the emergency stop beside it was clicked.
+    fn show_jog_block(
+        &mut self,
+        ui: &mut egui::Ui,
+        tr: &Translator,
+        machine: Option<&Machine>,
+        status: &MachineStatus,
+        estop_beside: Option<&EstopView>,
+    ) -> (Vec<jog::Action>, bool) {
+        let mut estop = false;
         // Read now, after this frame's Home/Unlock buttons: a line they sent blocks it.
         let jog_allowed = machine.is_some_and(|m| m.jog_allowed());
         let actions = self.jog.show(ui, tr, status, jog_allowed, |ui| {
-            if !estop_on_top {
+            if let Some(view) = estop_beside {
                 ui.vertical(|ui| {
                     ui.add_space(((3.0 * 56.0 + 10.0) - ESTOP_SIZE.y).max(0.0) / 2.0);
-                    estop |= estop_button(ui, &estop_label, texture.as_ref(), status.connected)
-                        .on_hover_text(&estop_hint)
-                        .clicked();
+                    estop = view.show(ui);
                 });
             }
         });
-        if self.jog.end_frame() {
-            self.with_controller(|c| c.realtime(RealtimeCommand::JogCancel));
-        }
-        if estop {
-            self.emergency_stop();
-        }
+        (actions, estop)
+    }
+
+    /// Carries out the jog buttons' actions in order; any but a refusal clears the notice.
+    fn apply_jog_actions(&mut self, actions: Vec<jog::Action>, tr: &Translator) {
         for action in actions {
             if !matches!(action, jog::Action::Refused(_)) {
                 self.notice = None;
             }
             self.jog_action(action, tr);
         }
+    }
+}
+
+/// What the emergency stop button shows this frame: its label, hover text and picture, and
+/// whether it is enabled. Built once so the top and beside-the-pad placements match.
+struct EstopView {
+    label: String,
+    hint: String,
+    texture: Option<egui::TextureHandle>,
+    enabled: bool,
+}
+
+impl EstopView {
+    /// The button for this frame; Repetier's stop is `M112`, not a soft reset, and says so.
+    fn new(
+        tr: &Translator,
+        texture: Option<egui::TextureHandle>,
+        repetier: bool,
+        connected: bool,
+    ) -> Self {
+        let msgid = if repetier {
+            ESTOP_REPETIER
+        } else {
+            "Emergency stop (soft reset, {shortcut})"
+        };
+        Self {
+            label: tr.tr("E-STOP").into_owned(),
+            hint: tr.tr(msgid).replace("{shortcut}", SOFT_RESET_CHORD),
+            texture,
+            enabled: connected,
+        }
+    }
+
+    /// Draws the button with its hover text.
+    ///
+    /// # Returns
+    /// Whether it was clicked.
+    fn show(&self, ui: &mut egui::Ui) -> bool {
+        estop_button(ui, &self.label, self.texture.as_ref(), self.enabled)
+            .on_hover_text(&self.hint)
+            .clicked()
     }
 }
 
