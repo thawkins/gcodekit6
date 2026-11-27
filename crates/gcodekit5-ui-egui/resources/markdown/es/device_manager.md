@@ -6,7 +6,7 @@ Un *perfil de dispositivo* es independiente de la conexión activa de la máquin
 
 ## Panel izquierdo: lista de dispositivos
 - **Buscar** filtra los perfiles por nombre/descripción.
-- El perfil que coincide con la conexión actual muestra un distintivo de **Conectado**.
+- El perfil activo (el elegido con **Establecer como activo**) muestra un distintivo **Activo**.
 - **Agregar dispositivo** crea un nuevo perfil.
 
 ## Panel derecho: editar pestañas

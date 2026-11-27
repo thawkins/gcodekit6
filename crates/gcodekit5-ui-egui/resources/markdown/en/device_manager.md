@@ -6,7 +6,7 @@ A *device profile* is separate from the live machine connection: it’s a saved 
 
 ## Left panel: devices list
 - **Search** filters profiles by name/description.
-- The profile matching the current connection shows a **Connected** badge.
+- The active profile (the one chosen with **Set Active**) shows an **Active** badge.
 - **Add Device** creates a new profile.
 
 ## Right panel: edit tabs
