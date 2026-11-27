@@ -3474,6 +3474,9 @@ msgstr "Imposta i giri massimi e la potenza del mandrino nel Gestore dispositivi
 msgid "Must not be larger than the hole"
 msgstr "Non deve essere più grande del foro"
 
+msgid "Too small: the hole would take more than 10000 pecks"
+msgstr "Troppo piccolo: il foro richiederebbe più di 10000 affondamenti"
+
 msgid "The device is in laser mode ($32=1). Switch it to CNC mode to use the Drill Press."
 msgstr "Il dispositivo è in modalità laser ($32=1). Passa alla modalità CNC per usare il trapano."
 

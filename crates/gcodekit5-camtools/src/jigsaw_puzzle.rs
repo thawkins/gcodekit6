@@ -44,6 +44,9 @@ impl Point {
     }
 }
 
+/// The largest integer an `f32` holds exactly (2^24); the RNG state must not pass it.
+const RNG_EXACT_LIMIT: u64 = 1 << 24;
+
 pub struct JigsawPuzzleMaker {
     params: PuzzleParameters,
     paths: Vec<Vec<Point>>,
@@ -107,7 +110,24 @@ impl JigsawPuzzleMaker {
             return Err("Corner radius must be between 0 and 10mm".to_string());
         }
 
+        // The f32 RNG state stops advancing past 2^24 (`x + 1.0 == x`), so every value it
+        // hands out from there on is the same. Each state the puzzle reads must stay exact.
+        let max_seed = RNG_EXACT_LIMIT + 1 - Self::rng_draws(params);
+        if u64::from(params.seed) > max_seed {
+            return Err(format!(
+                "Random seed must be at most {max_seed} for this many pieces"
+            ));
+        }
+
         Ok(())
+    }
+
+    /// How many random values `generate` reads: one jitter per inner cut and, per tab,
+    /// one flip plus five shape values.
+    fn rng_draws(params: &PuzzleParameters) -> u64 {
+        let across = u64::try_from(params.pieces_across).unwrap_or(0);
+        let down = u64::try_from(params.pieces_down).unwrap_or(0);
+        across.saturating_sub(1) * (1 + 6 * down) + down.saturating_sub(1) * (1 + 6 * across)
     }
 
     pub fn generate(&mut self) -> Result<(), String> {

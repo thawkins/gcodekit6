@@ -493,6 +493,12 @@ impl ProbeRoutineEngine {
         if safe_height <= 0.0 {
             return Err(anyhow!("Safe height must be positive"));
         }
+        Self::validate_feeds(fast_feed, slow_feed)
+    }
+
+    /// Feed checks for the routines that never move to `safe_height` (edge, corner,
+    /// bore, boss): requiring a positive safe height there refused input it never used.
+    fn validate_feeds(fast_feed: f64, slow_feed: f64) -> Result<()> {
         if fast_feed <= 0.0 || slow_feed <= 0.0 {
             return Err(anyhow!("Feed rates must be positive"));
         }
@@ -580,7 +586,7 @@ impl ProbeRoutineEngine {
         let ProbeRoutine::EdgeFind {
             axis,
             direction,
-            safe_height,
+            safe_height: _,
             probe_distance,
             fast_feed,
             slow_feed,
@@ -590,7 +596,7 @@ impl ProbeRoutineEngine {
             return Err(anyhow!("Expected EdgeFind routine"));
         };
 
-        Self::validate_common(*safe_height, *fast_feed, *slow_feed)?;
+        Self::validate_feeds(*fast_feed, *slow_feed)?;
         if *probe_distance <= 0.0 {
             return Err(anyhow!("Probe distance must be positive"));
         }
@@ -663,7 +669,7 @@ impl ProbeRoutineEngine {
     fn generate_corner_find(&self, current_pos: Position) -> Result<(ProbeProgram, String)> {
         let ProbeRoutine::CornerFind {
             corner,
-            safe_height,
+            safe_height: _,
             probe_distance,
             fast_feed,
             slow_feed,
@@ -673,7 +679,7 @@ impl ProbeRoutineEngine {
             return Err(anyhow!("Expected CornerFind routine"));
         };
 
-        Self::validate_common(*safe_height, *fast_feed, *slow_feed)?;
+        Self::validate_feeds(*fast_feed, *slow_feed)?;
         if *probe_distance <= 0.0 {
             return Err(anyhow!("Probe distance must be positive"));
         }
@@ -750,7 +756,7 @@ impl ProbeRoutineEngine {
     fn generate_bore_center(&self, current_pos: Position) -> Result<(ProbeProgram, String)> {
         let ProbeRoutine::BoreCenter {
             diameter,
-            safe_height,
+            safe_height: _,
             fast_feed,
             slow_feed,
         } = &self.routine
@@ -761,7 +767,7 @@ impl ProbeRoutineEngine {
         if *diameter <= 0.0 {
             return Err(anyhow!("Bore diameter must be positive"));
         }
-        Self::validate_common(*safe_height, *fast_feed, *slow_feed)?;
+        Self::validate_feeds(*fast_feed, *slow_feed)?;
 
         let radius = diameter / 2.0;
         let r = self.options.tip_radius;
@@ -804,7 +810,7 @@ impl ProbeRoutineEngine {
     fn generate_boss_center(&self, current_pos: Position) -> Result<(ProbeProgram, String)> {
         let ProbeRoutine::BossCenter {
             diameter,
-            safe_height,
+            safe_height: _,
             fast_feed,
             slow_feed,
         } = &self.routine
@@ -815,7 +821,7 @@ impl ProbeRoutineEngine {
         if *diameter <= 0.0 {
             return Err(anyhow!("Boss diameter must be positive"));
         }
-        Self::validate_common(*safe_height, *fast_feed, *slow_feed)?;
+        Self::validate_feeds(*fast_feed, *slow_feed)?;
         let depth = self.options.probe_depth;
         if depth <= 0.0 {
             return Err(anyhow!(

@@ -31,6 +31,7 @@ const SAFE_Z: &str = n_!("Safe Z:");
 const BELOW_TOP: &str = n_!("Must be below Top Z");
 const ABOVE_TOP: &str = n_!("Must be above Top Z");
 const LARGER_THAN_HOLE: &str = n_!("Must not be larger than the hole");
+const TOO_MANY_PECKS: &str = n_!("Too small: the hole would take more than 10000 pecks");
 const LASER_MODE: &str =
     n_!("The device is in laser mode ($32=1). Switch it to CNC mode to use the Drill Press.");
 const DESCRIPTION: &str = n_!(
@@ -54,6 +55,7 @@ pub fn msgids() -> Vec<&'static str> {
         BELOW_TOP,
         ABOVE_TOP,
         LARGER_THAN_HOLE,
+        TOO_MANY_PECKS,
         LASER_MODE,
         DESCRIPTION,
         n_!("Hole Geometry"),
@@ -162,7 +164,7 @@ impl DrillPressParams {
     /// # Errors
     /// The fields that do not parse or break the generator's rules (positive diameters and
     /// rates, a bottom below the top, a safe Z above it, a peck depth that is not
-    /// negative), and a device with fewer than 3 axes.
+    /// negative and needs at most `MAX_PECKS` pecks), and a device with fewer than 3 axes.
     pub fn parameters(&self) -> Result<DrillPressParameters, Vec<FieldError>> {
         let mut errors = Vec::new();
         let u = self.units;
@@ -186,11 +188,20 @@ impl DrillPressParams {
         let parsed = |label| !errors.iter().any(|e: &FieldError| e.field == Some(label));
         let (top_ok, bottom_ok, safe_ok) = (parsed(TOP_Z), parsed(BOTTOM_Z), parsed(SAFE_Z));
         let (hole_ok, tool_ok) = (parsed(HOLE_DIAMETER), parsed(TOOL_DIAMETER));
+        let peck_ok = parsed(PECK_DEPTH);
         if hole_ok && tool_ok && tool_diameter > hole_diameter {
             errors.push(FieldError::field(TOOL_DIAMETER, LARGER_THAN_HOLE));
         }
         if top_ok && bottom_ok && bottom_z >= top_z {
             errors.push(FieldError::field(BOTTOM_Z, BELOW_TOP));
+        }
+        if top_ok
+            && bottom_ok
+            && peck_ok
+            && peck_depth > 0.0
+            && (top_z - bottom_z) / peck_depth > DrillPressGenerator::MAX_PECKS
+        {
+            errors.push(FieldError::field(PECK_DEPTH, TOO_MANY_PECKS));
         }
         if top_ok && safe_ok && safe_z <= top_z {
             errors.push(FieldError::field(SAFE_Z, ABOVE_TOP));

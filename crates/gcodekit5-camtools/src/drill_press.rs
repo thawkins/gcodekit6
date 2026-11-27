@@ -58,8 +58,9 @@ impl DrillPressGenerator {
     }
 
     /// Most pecks a hole may take; a smaller peck is almost certainly a typo
-    /// and would produce an enormous program.
-    const MAX_PECKS: f64 = 10_000.0;
+    /// and would produce an enormous program. The UI page checks the same limit at the
+    /// peck-depth field.
+    pub const MAX_PECKS: f64 = 10_000.0;
 
     /// Rejects parameters that would produce unsafe or broken G-code.
     fn validate(p: &DrillPressParameters) -> Result<()> {

@@ -286,7 +286,8 @@ impl ProbeParams {
     ///
     /// # Errors
     /// The fields that are not numbers or that the routine engine would refuse: a safe
-    /// height, feed, depth, distance or diameter that is not above 0, a negative backoff,
+    /// height (Z touch and tool length only), feed, depth, distance or diameter that is
+    /// not above 0, a negative backoff,
     /// probe depth, tip radius or plate thickness.
     pub fn parameters(&self) -> Result<(ProbeRoutine, ProbeOptions), Vec<FieldError>> {
         let mut errors = Vec::new();
@@ -306,7 +307,11 @@ impl ProbeParams {
         let mut num = |label, text: &str, rule: fn(f64) -> Option<&'static str>| {
             check(&mut errors, label, parse_len(text, u), rule)
         };
-        let safe_height = num(SAFE_HEIGHT, &self.safe_height, positive);
+        // Only Z touch and tool length move to the safe height; the others ignore it.
+        let uses_safe_height =
+            matches!(self.routine, RoutineKind::ZTouch | RoutineKind::ToolLength);
+        let safe_rule = if uses_safe_height { positive } else { any };
+        let safe_height = num(SAFE_HEIGHT, &self.safe_height, safe_rule);
         let backoff = num(BACKOFF, &self.backoff, not_negative);
         let probe_depth = num(PROBE_DEPTH, &self.probe_depth, not_negative);
         let tip_radius = num(TIP_RADIUS, &self.tip_radius, not_negative);
