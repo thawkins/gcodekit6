@@ -108,17 +108,6 @@ pub type Callback = Box<dyn Fn() + Send + Sync>;
 /// Thread-safe, suitable for cross-thread data notification.
 pub type DataCallback<T> = Box<dyn Fn(T) + Send + Sync>;
 
-/// A callback that receives two parameters.
-pub type DataCallback2<T, U> = Box<dyn Fn(T, U) + Send + Sync>;
-
-/// A progress callback receiving (current, total) values.
-///
-/// Common for file operations, downloads, and long-running tasks.
-pub type ProgressCallback = Box<dyn Fn(u64, u64) + Send + Sync>;
-
-/// A result callback receiving a Result type.
-pub type ResultCallback<T, E> = Box<dyn Fn(Result<T, E>) + Send + Sync>;
-
 /// A UI callback stored in RefCell for GTK signal handlers.
 ///
 /// Single-threaded, suitable for GTK callbacks that capture UI state.
@@ -129,23 +118,6 @@ pub type UiDataCallback<T> = Rc<RefCell<Option<Box<dyn Fn(T)>>>>;
 
 /// A UI callback with two parameters.
 pub type UiDataCallback2<T, U> = Rc<RefCell<Option<Box<dyn Fn(T, U)>>>>;
-
-// =============================================================================
-// CELL-EMBEDDED CALLBACK TYPES (RefCell<Option<Box<dyn Fn(...)>>>)
-// =============================================================================
-// For struct fields that don't need Rc wrapping (the struct itself provides ownership).
-
-/// A callback stored directly in a struct field with interior mutability.
-///
-/// Unlike `UiCallback`, this does not wrap in `Rc` — use when the callback
-/// is owned by a single struct.
-pub type CellCallback = RefCell<Option<Box<dyn Fn()>>>;
-
-/// A cell-embedded callback with a single parameter.
-pub type CellDataCallback<T> = RefCell<Option<Box<dyn Fn(T)>>>;
-
-/// A cell-embedded callback with two parameters.
-pub type CellDataCallback2<T, U> = RefCell<Option<Box<dyn Fn(T, U)>>>;
 
 // =============================================================================
 // LISTENER/HANDLER TYPES
@@ -242,18 +214,6 @@ pub fn shared_some<T>(value: T) -> SharedOption<T> {
 #[inline]
 pub fn thread_safe<T>(value: T) -> ThreadSafe<T> {
     Arc::new(Mutex::new(value))
-}
-
-/// Create a new `ThreadSafeOption<T>` initialized to `None`.
-#[inline]
-pub fn thread_safe_none<T>() -> ThreadSafeOption<T> {
-    Arc::new(Mutex::new(None))
-}
-
-/// Create a new `ThreadSafeOption<T>` initialized to `Some(value)`.
-#[inline]
-pub fn thread_safe_some<T>(value: T) -> ThreadSafeOption<T> {
-    Arc::new(Mutex::new(Some(value)))
 }
 
 /// Create a new empty `ThreadSafeVec<T>`.
