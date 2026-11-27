@@ -71,9 +71,6 @@ pub(super) const KEY_HOLD_DEAD_MAN: Duration = Duration::from_millis(250);
 pub(super) const KEY_HOLD_FRAME: Duration = Duration::from_millis(50);
 /// The smallest rotary step a jog line can write (3 decimals).
 const MIN_ROTARY_STEP_DEG: f32 = 0.001;
-/// Millimetres per inch.
-const MM_PER_INCH: f32 = 25.4;
-
 /// What the section asks the controller to do.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub(super) enum Action {
@@ -173,24 +170,10 @@ pub(super) fn remaining_travel(mpos_mm: f32, travel_mm: f32, direction: f32) -> 
 }
 
 /// mm/min to `units`.
-pub(crate) fn feed_to_display(mm_min: f32, units: FeedRateUnits) -> f32 {
-    match units {
-        FeedRateUnits::MmPerMin => mm_min,
-        FeedRateUnits::MmPerSec => mm_min / 60.0,
-        FeedRateUnits::InPerMin => mm_min / MM_PER_INCH,
-        FeedRateUnits::InPerSec => mm_min / MM_PER_INCH / 60.0,
-    }
-}
+pub(crate) use gcodekit5_core::units::feed_rate_from_mm_per_min as feed_to_display;
 
 /// `units` to mm/min.
-fn feed_from_display(value: f32, units: FeedRateUnits) -> f32 {
-    match units {
-        FeedRateUnits::MmPerMin => value,
-        FeedRateUnits::MmPerSec => value * 60.0,
-        FeedRateUnits::InPerMin => value * MM_PER_INCH,
-        FeedRateUnits::InPerSec => value * MM_PER_INCH * 60.0,
-    }
-}
+use gcodekit5_core::units::feed_rate_to_mm_per_min as feed_from_display;
 
 /// The jog settings and the hold in progress.
 #[derive(Debug)]

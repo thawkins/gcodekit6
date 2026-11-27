@@ -423,8 +423,7 @@ pub struct FullStatus {
     pub probe_pin: Option<bool>,
 }
 
-/// Millimetres per inch, for converting `$13=1` (inch) reports.
-const MM_PER_INCH: f64 = 25.4;
+use gcodekit5_core::units::MM_PER_INCH;
 
 impl FullStatus {
     /// Converts a report sent in inches (`$13=1`) to millimetres, the unit

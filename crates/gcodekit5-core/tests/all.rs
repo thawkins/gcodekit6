@@ -25,3 +25,5 @@ mod six_axis_position_tests;
 mod test_type_aliases;
 #[path = "test_units.rs"]
 mod test_units;
+#[path = "test_units_feed_rate.rs"]
+mod test_units_feed_rate;

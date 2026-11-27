@@ -10,13 +10,11 @@
 //! (units).
 
 use gcodekit5_app::i18n::Translator;
-use gcodekit5_core::units::MeasurementSystem;
+use gcodekit5_core::units::{MM_PER_INCH, MeasurementSystem};
 use gcodekit5_designer::DesignerState;
 use gcodekit5_designer::designer_state::MachineMode;
 use gcodekit5_designer::stock_removal::StockMaterial;
 
-/// Millimetres per inch.
-const MM_PER_INCH: f64 = 25.4;
 /// Largest value a field accepts.
 const MAX_VALUE: f64 = 1.0e6;
 

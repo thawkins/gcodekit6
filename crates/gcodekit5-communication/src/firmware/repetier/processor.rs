@@ -5,6 +5,7 @@
 //! into lines, and synthesises a GRBL status report so the UI's DROs keep
 //! working while a Repetier machine is connected.
 
+use gcodekit5_core::units::MM_PER_INCH_F32;
 use std::collections::BTreeMap;
 
 /// Structured event extracted from a firmware response
@@ -26,9 +27,6 @@ pub struct IncomingResult {
 /// is not a protocol reply, so it is passed through as-is instead of
 /// growing without bound.
 const MAX_PARTIAL_LINE: usize = 4096;
-
-/// Millimetres per inch, for tracking positions commanded in G20.
-const MM_PER_INCH: f32 = 25.4;
 
 /// Numbered lines kept for `Resend:N` replays. The firmware only asks for
 /// lines it has not accepted yet, which is never more than its receive
@@ -285,7 +283,11 @@ impl RepetierProcessor {
             }
         }
 
-        let scale = if self.inch_units { MM_PER_INCH } else { 1.0 };
+        let scale = if self.inch_units {
+            MM_PER_INCH_F32
+        } else {
+            1.0
+        };
 
         if homing {
             // Marlin homes to machine zero and clears the G92 offset.
