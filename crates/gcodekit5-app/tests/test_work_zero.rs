@@ -2,8 +2,8 @@
 
 use gcodekit5_app::machine::Axis;
 use gcodekit5_app::work_zero::{
-    PARSER_STATE_QUERY, Wcs, WcsWord, go_to_work_zero_command, parser_state_wcs,
-    reports_grbl_parser_state, wcs_in_line, zero_axes_command, zero_rotary_command,
+    PARSER_STATE_QUERY, Wcs, WcsWord, go_to_work_zero_command, parser_state_wcs, wcs_in_line,
+    zero_axes_command, zero_rotary_command,
 };
 
 #[test]
@@ -119,14 +119,16 @@ fn test_wcs_in_line_outside_g54_g59_is_other() {
 
 #[test]
 fn test_only_grbl_family_is_asked_for_parser_state() {
+    use gcodekit5_app::work_zero::{WorkZeroSupport, work_zero_support};
     use gcodekit5_devicedb::ControllerType;
-    assert!(reports_grbl_parser_state(None));
+    let reports = |c: Option<&ControllerType>| work_zero_support(c) == WorkZeroSupport::Reported;
+    assert!(reports(None));
     for grbl in [
         ControllerType::Grbl,
         ControllerType::GrblHal,
         ControllerType::FluidNC,
     ] {
-        assert!(reports_grbl_parser_state(Some(&grbl)), "{grbl:?}");
+        assert!(reports(Some(&grbl)), "{grbl:?}");
     }
     for other in [
         ControllerType::TinyG,
@@ -135,7 +137,7 @@ fn test_only_grbl_family_is_asked_for_parser_state() {
         ControllerType::Marlin,
         ControllerType::Repetier,
     ] {
-        assert!(!reports_grbl_parser_state(Some(&other)), "{other:?}");
+        assert!(!reports(Some(&other)), "{other:?}");
     }
 }
 

@@ -15,27 +15,6 @@ use crate::machine::Axis;
 /// The line that asks GRBL for its G-code parser state; it answers `[GC:...]`, then `ok`.
 pub const PARSER_STATE_QUERY: &str = "$G";
 
-/// Whether a controller of the device profile's `controller` type answers `$G` with a GRBL
-/// `[GC:...]` parser state (Grbl, grblHAL, FluidNC). Without a profile GRBL is assumed, the
-/// app's default controller.
-///
-/// # Arguments
-/// * `controller` - The active device profile's controller type, if a profile is active.
-pub fn reports_grbl_parser_state(controller: Option<&ControllerType>) -> bool {
-    match controller {
-        None | Some(ControllerType::Grbl | ControllerType::GrblHal | ControllerType::FluidNC) => {
-            true
-        }
-        Some(
-            ControllerType::TinyG
-            | ControllerType::G2Core
-            | ControllerType::Smoothieware
-            | ControllerType::Marlin
-            | ControllerType::Repetier,
-        ) => false,
-    }
-}
-
 /// How the work zero commands work on a controller type, as the GTK front end sent them
 /// (`G10 L20 P<n>` for Zero, `G54`-`G59` for the selector, `G90 G0 X0 Y0` for Go to Work Zero,
 /// whatever the firmware) where the firmware takes them.

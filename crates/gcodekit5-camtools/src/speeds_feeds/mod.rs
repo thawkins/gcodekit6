@@ -2,7 +2,7 @@
 //!
 //! Provides comprehensive feeds and speeds calculation with database integration:
 //! - **Calculator**: Advanced calculation engine with formulas and adjustments
-//! - **Services**: Database integration layers for Tools, Materials, and Devices
+//! - **Services**: Database integration layer for Devices
 //!
 //! ## Usage Example
 //!
@@ -20,7 +20,7 @@
 //!     selected_tool: Tool,
 //!     device_profile: DeviceProfile,
 //! ) -> CalculationResult {
-//!     // Data context giving access to the tool, material and device databases
+//!     // Data context giving access to the device database
 //!     let _context = SpeedsFeedsDataContext::new(Some(device_profile.clone()));
 //!
 //!     // Build calculation input
@@ -54,5 +54,5 @@ pub use calculator::{
 // Re-export service types
 pub use service::{
     DeviceLimits, DeviceRecommendations, FeedsSpeedsLookupTable, SpeedsFeedsDataContext,
-    SpeedsFeedsDeviceService, SpeedsFeedsMaterialService, SpeedsFeedsToolService,
+    SpeedsFeedsDeviceService,
 };

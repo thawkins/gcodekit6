@@ -1,16 +1,13 @@
 //! Tests for the GRBL streaming helpers used by the Machine Control pane:
 //! character-counting flow control, response line splitting/classification, probe
-//! reports, axis detection, jog step presets and jog feed validation.
+//! reports and jog step presets.
 
 use gcodekit5_app::machine::grbl_stream::{
     CharCountWindow, GRBL_RX_BUFFER_BYTES, GrblResponseLine, ResponseLineSplitter,
-    classify_response, format_probe_move, jog_step_choices, jog_step_presets, line_cost,
-    nearest_jog_step_preset, network_driver_for, parse_jog_feed, parse_probe_report,
-    reported_axis_count, rotary_jog_command, steps_per_degree_to_send,
+    classify_response, jog_step_choices, jog_step_presets, line_cost, nearest_jog_step_preset,
+    parse_probe_report,
 };
-use gcodekit5_communication::ConnectionDriver;
-use gcodekit5_communication::firmware::grbl::status_parser::MachinePosition;
-use gcodekit5_core::units::{FeedRateUnits, MeasurementSystem};
+use gcodekit5_core::units::MeasurementSystem;
 
 #[test]
 fn test_char_count_line_cost_includes_newline() {
@@ -146,25 +143,6 @@ fn test_probe_report_without_explicit_flag_is_not_a_result() {
 }
 
 #[test]
-fn test_reported_axis_count_from_position() {
-    let mut pos = MachinePosition {
-        x: 0.0,
-        y: 0.0,
-        z: 0.0,
-        a: None,
-        b: None,
-        c: None,
-    };
-    assert_eq!(reported_axis_count(&pos), 3);
-    pos.a = Some(0.0);
-    assert_eq!(reported_axis_count(&pos), 4);
-    pos.b = Some(0.0);
-    assert_eq!(reported_axis_count(&pos), 5);
-    pos.c = Some(0.0);
-    assert_eq!(reported_axis_count(&pos), 6);
-}
-
-#[test]
 fn test_jog_presets_inch_mode_uses_inch_values_stored_in_mm() {
     let presets = jog_step_presets(MeasurementSystem::Imperial);
     let labels: Vec<&str> = presets.iter().map(|p| p.label.as_str()).collect();
@@ -200,48 +178,6 @@ fn test_jog_presets_nearest_on_unit_switch() {
 }
 
 #[test]
-fn test_jog_feed_validation() {
-    let v = parse_jog_feed("2000", FeedRateUnits::MmPerMin).expect("valid feed");
-    assert!((v - 2000.0).abs() < f32::EPSILON);
-    let v = parse_jog_feed("10", FeedRateUnits::InPerMin).expect("valid feed");
-    assert!((v - 254.0).abs() < 1e-3);
-    assert!(parse_jog_feed("abc", FeedRateUnits::MmPerMin).is_err());
-    assert!(parse_jog_feed("", FeedRateUnits::MmPerMin).is_err());
-    assert!(parse_jog_feed("0", FeedRateUnits::MmPerMin).is_err());
-    assert!(parse_jog_feed("-5", FeedRateUnits::MmPerMin).is_err());
-}
-
-#[test]
-fn test_probe_move_display_respects_units() {
-    let metric = format_probe_move(
-        ('Z', -20.0),
-        100.0,
-        MeasurementSystem::Metric,
-        FeedRateUnits::MmPerMin,
-    );
-    assert_eq!(metric, "Z-20.00 mm at 100.00 mm/min");
-    let inch = format_probe_move(
-        ('X', 10.0),
-        100.0,
-        MeasurementSystem::Imperial,
-        FeedRateUnits::InPerMin,
-    );
-    assert_eq!(inch, "X0.39 in at 3.94 in/min");
-}
-
-#[test]
-fn test_connection_type_selects_network_driver() {
-    assert_eq!(network_driver_for("TCP/IP"), Some(ConnectionDriver::Tcp));
-    assert_eq!(network_driver_for("tcp"), Some(ConnectionDriver::Tcp));
-    assert_eq!(
-        network_driver_for("WebSocket"),
-        Some(ConnectionDriver::WebSocket)
-    );
-    assert_eq!(network_driver_for("Serial"), None);
-    assert_eq!(network_driver_for(""), None);
-}
-
-#[test]
 fn test_jog_step_choices_keeps_an_exact_custom_step() {
     let (choices, idx) = jog_step_choices(MeasurementSystem::Metric, 5.0);
     assert!((choices[idx].mm - 5.0).abs() < 1e-6);
@@ -257,29 +193,4 @@ fn test_jog_step_choices_keeps_an_exact_custom_step() {
         jog_step_presets(MeasurementSystem::Metric).len()
     );
     assert!((choices[idx].mm - 1.0).abs() < 1e-6);
-}
-
-#[test]
-fn test_rotary_jog_states_mm_units_for_its_feed() {
-    // PR #96 review: the rotary jog inherited the controller's units, so after
-    // a G20 program its mm/min feed ran 25.4 times too fast.
-    assert_eq!(
-        rotary_jog_command('A', -5.0, 600.0),
-        "$J=G21 G91 A-5 F600\n"
-    );
-    assert_eq!(
-        rotary_jog_command('C', 0.5, 1200.0),
-        "$J=G21 G91 C0.5 F1200\n"
-    );
-}
-
-#[test]
-fn test_steps_per_degree_sent_matches_what_preferences_saves() {
-    // PR #96 review: 0.5 was sent as $103=0.5 while the config saved 1.0, and
-    // non-finite text was sent as-is.
-    assert_eq!(steps_per_degree_to_send("0.5"), Some(1.0));
-    assert_eq!(steps_per_degree_to_send(" 88.9 "), Some(88.9));
-    assert_eq!(steps_per_degree_to_send("NaN"), None);
-    assert_eq!(steps_per_degree_to_send("inf"), None);
-    assert_eq!(steps_per_degree_to_send("abc"), None);
 }

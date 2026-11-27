@@ -5,13 +5,12 @@
 //! settings folder, written through the shared atomic writer, and bounded to
 //! [`MAX_HISTORY`] commands. The file is the GTK front end's, so its history carries over.
 //!
-//! Dependencies: `serde`/`serde_json` (file format), `gcodekit5-core` (atomic write),
-//! `dirs` (the settings folder).
+//! Dependencies: `serde`/`serde_json` (file format), `gcodekit5-core` (atomic write).
 
 use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 use std::fs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 /// Most commands kept; older ones are dropped.
 pub const MAX_HISTORY: usize = 250;
@@ -129,20 +128,6 @@ impl CommandHistory {
         self.temp_input.clear();
     }
 
-    fn get_config_path() -> PathBuf {
-        let config_dir = dirs::config_dir()
-            .unwrap_or_else(|| PathBuf::from("."))
-            .join("gcodekit5");
-
-        fs::create_dir_all(&config_dir).ok();
-        config_dir.join(HISTORY_FILE)
-    }
-
-    /// The history saved in the settings folder, or an empty one.
-    pub fn load() -> Self {
-        Self::load_from(&Self::get_config_path())
-    }
-
     /// The history saved in `path`; empty when the file is missing or cannot be parsed. A
     /// file holding more than [`MAX_HISTORY`] commands keeps the newest.
     ///
@@ -163,14 +148,6 @@ impl CommandHistory {
                 tracing::warn!(path = %path.display(), %error, "command history unreadable");
                 Self::new()
             }
-        }
-    }
-
-    /// Saves the history in the settings folder; a failure is logged.
-    pub fn save(&self) {
-        let path = Self::get_config_path();
-        if let Err(error) = self.save_to(&path) {
-            tracing::warn!(path = %path.display(), %error, "command history not saved");
         }
     }
 

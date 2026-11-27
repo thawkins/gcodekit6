@@ -174,16 +174,6 @@ impl ToolsManagerBackend {
         self.file.save(&json)
     }
 
-    /// Adds `tool` (replacing one with the same id) and writes the custom tools file; a
-    /// write error is only logged. Prefer [`ToolsManagerBackend::save_tool`].
-    pub fn add_tool(&mut self, tool: Tool) {
-        self.library.add_tool(tool);
-        // Save custom tools to disk
-        if let Err(e) = self.save_to_file() {
-            tracing::warn!("Failed to save tools: {}", e);
-        }
-    }
-
     /// Adds `tool`, replacing any tool with the same id, and writes the custom
     /// tools file.
     ///
@@ -236,15 +226,6 @@ impl ToolsManagerBackend {
     /// The tool with `id`, if the library has one.
     pub fn get_tool(&self, id: &ToolId) -> Option<&Tool> {
         self.library.get_tool(id)
-    }
-
-    /// The tools whose name matches `query` (every tool for an empty query).
-    pub fn search_tools(&self, query: &str) -> Vec<&Tool> {
-        if query.is_empty() {
-            self.library.get_all_tools()
-        } else {
-            self.library.search_by_name(query)
-        }
     }
 
     /// Every tool, standard and custom (unordered).
@@ -332,11 +313,6 @@ impl Default for ToolsManagerBackend {
     fn default() -> Self {
         Self::new()
     }
-}
-
-/// The tool type whose name is `s`, if any.
-pub fn string_to_tool_type(s: &str) -> Option<ToolType> {
-    ToolType::all().iter().find(|t| t.to_string() == s).cloned()
 }
 
 /// The GTK build's settings folder, or `~/gcodekit5` without a platform config folder.

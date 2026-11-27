@@ -9,7 +9,6 @@
 //! - **Tabbed Box Maker**: Create finger-jointed box designs with customizable parameters
 //! - **Drill Press**: Specialized drilling cycles including peck drilling and helical interpolation
 //! - **Laser Engraver**: Specialized processing for laser cutting and engraving
-//! - **Arc Expander**: Arc interpolation and expansion
 //! - **Probe Routines**: Touch probe operations for work coordinate setup
 //! - **WCS Service**: Work coordinate system offset management from probe results
 //!
@@ -23,7 +22,6 @@
 //! - **Statistics**: G-Code statistics and analysis
 #![deny(unsafe_code)]
 
-pub mod arc_expander;
 pub mod cam_presets;
 pub mod comment_processor;
 pub mod drill_press;
@@ -45,8 +43,6 @@ pub mod wcs_service;
 // UI module
 
 // Re-export commonly used items
-pub use arc_expander::ArcExpander;
-pub use comment_processor::CommentProcessor;
 pub use drill_press::{DrillPressGenerator, DrillPressParameters};
 pub use gerber::{GerberConverter, GerberLayerType, GerberParameters};
 pub use jigsaw_puzzle::{JigsawPuzzleMaker, PuzzleParameters};
@@ -62,7 +58,7 @@ pub use speeds_feeds::{
     CalculationInput, CalculationResult, DeviceLimits, DeviceRecommendations,
     FeedsSpeedsLookupTable, GeometryAdjustments, MaterialSpeedFactors, OperationType,
     SpeedsFeedsCalculator, SpeedsFeedsDataContext, SpeedsFeedsDeviceService,
-    SpeedsFeedsMaterialService, SpeedsFeedsToolService, calculate_speeds_feeds,
+    calculate_speeds_feeds,
 };
 pub use spoilboard_grid::{SpoilboardGridGenerator, SpoilboardGridParameters};
 pub use spoilboard_surfacing::{SpoilboardSurfacingGenerator, SpoilboardSurfacingParameters};

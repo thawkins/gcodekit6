@@ -23,23 +23,6 @@ fn test_backend_creation() {
 }
 
 #[test]
-fn test_tool_type_conversion() {
-    assert_eq!(
-        string_to_tool_type("Flat End Mill"),
-        Some(ToolType::EndMillFlat)
-    );
-    assert_eq!(string_to_tool_type("Drill Bit"), Some(ToolType::DrillBit));
-}
-
-#[test]
-fn test_search_tools() {
-    let storage = test_storage("test_search_tools");
-    let backend = ToolsManagerBackend::with_storage_path(storage.clone());
-    let results = backend.search_tools("end");
-    assert!(!results.is_empty());
-}
-
-#[test]
 fn test_persistence() {
     let storage = test_storage("test_persistence");
     // Create a test tool
@@ -57,7 +40,7 @@ fn test_persistence() {
         let mut backend = ToolsManagerBackend::with_storage_path(storage.clone());
         let mut tool = test_tool.clone();
         tool.custom = true;
-        backend.add_tool(tool);
+        backend.save_tool(tool).expect("save");
     }
 
     assert!(
