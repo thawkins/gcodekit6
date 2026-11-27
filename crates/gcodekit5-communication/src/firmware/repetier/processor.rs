@@ -297,8 +297,9 @@ impl RepetierProcessor {
                 }
             }
         } else if set_position && axes.is_empty() {
-            // A bare `G92` resets the offset of every axis.
-            self.offset = [0.0; 3];
+            // A bare `G92` sets every axis to 0 here (RepRap/Repetier convention), as
+            // `G92 X0 Y0 Z0` would: the offset becomes the machine position.
+            self.offset = self.machine;
         } else if set_position {
             for (axis, value) in axes {
                 self.offset[axis] = self.machine[axis] - value * scale;

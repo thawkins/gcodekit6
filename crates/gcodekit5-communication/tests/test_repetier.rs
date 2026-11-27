@@ -325,10 +325,11 @@ fn test_waiting_message_is_not_an_ack() {
 fn test_bare_g92_resets_wco() {
     let mut p = RepetierProcessor::new();
     translate(&mut p, "G1 X10 Y4");
-    translate(&mut p, "G92 X0 Y0");
-    assert!(status(&mut p).contains("WCO:10.000,4.000,0.000"));
+    translate(&mut p, "G92 X3");
+    assert!(status(&mut p).contains("WCO:7.000,0.000,0.000"));
+    // A bare `G92` zeroes every axis here, like `G92 X0 Y0 Z0`.
     translate(&mut p, "G92");
     let s = status(&mut p);
-    assert!(s.contains("WCO:0.000,0.000,0.000"), "got {s:?}");
+    assert!(s.contains("WCO:10.000,4.000,0.000"), "got {s:?}");
     assert!(s.contains("MPos:10.000,4.000,0.000"), "got {s:?}");
 }
