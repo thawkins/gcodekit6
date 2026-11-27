@@ -24,7 +24,9 @@ use std::panic;
 use cavalier_contours::polyline::{Polyline, seg_arc_radius_and_center};
 use cavalier_contours::shape_algorithms::{Shape, ShapeOffsetOptions};
 
-use super::{PocketGenerator, PocketStrategy, add_center_cleanup, polygon_centroid};
+use super::{
+    MAX_OFFSET_LEVELS, PocketGenerator, PocketStrategy, add_center_cleanup, polygon_centroid,
+};
 use crate::geometry::{point_segment_distance, ray_crosses_edge, to_pline};
 use crate::model::Point;
 use crate::toolpath::{Toolpath, ToolpathSegment, ToolpathSegmentType};
@@ -40,8 +42,6 @@ const ARC_TOLERANCE: f64 = 0.005;
 const DUPLICATE_TOLERANCE: f64 = 0.01;
 /// Squared length (mm^2) below which a boundary edge is treated as a single point.
 const DEGENERATE_SEGMENT_LEN_SQ: f64 = 1e-18;
-/// Safety cap on the number of offset levels generated for one region.
-const MAX_OFFSET_LEVELS: usize = 100_000;
 
 /// Offsets `shape` inwards (shrinking filled area, growing holes) by `distance`.
 ///

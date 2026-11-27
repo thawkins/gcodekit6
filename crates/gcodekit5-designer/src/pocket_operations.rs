@@ -8,7 +8,7 @@
 mod holes;
 
 use super::toolpath::{Toolpath, ToolpathSegment, ToolpathSegmentType};
-use crate::geometry::{prepare_polygon, safe_parallel_offset};
+use crate::geometry::{prepare_polygon, safe_parallel_offset, to_pline};
 use crate::model::{DesignCircle as Circle, DesignRectangle as Rectangle, Point};
 use crate::ops::clean_polyline;
 use cavalier_contours::polyline::Polyline;
@@ -21,6 +21,9 @@ const MIN_STEP_MM: f64 = 0.01;
 
 /// Duplicate-vertex tolerance (mm) when preparing a polygon pocket boundary.
 const POLYGON_DUPLICATE_TOLERANCE: f64 = 0.01;
+/// Safety cap on the number of offset levels generated for one region (shared with the
+/// with-holes generator).
+const MAX_OFFSET_LEVELS: usize = 100_000;
 
 /// The Z step of each pass: `step_down` (at least [`MIN_STEP_MM`]), or the whole depth in
 /// one pass when `step_down` is not positive.
@@ -864,10 +867,15 @@ impl PocketGenerator {
     /// Generates successive inward offsets of a polygon boundary, starting one tool radius
     /// in and stepping by the stepover, until an offset vanishes (outermost level first).
     fn polygon_offset_levels(&self, vertices: &[Point]) -> Vec<Vec<Polyline>> {
+        // A polygon with fewer than 3 distinct vertices or no area has nothing to pocket. Its
+        // inward offset never comes back empty, so without this the loop below never ended.
+        if to_pline(vertices, true, POLYGON_DUPLICATE_TOLERANCE).is_none() {
+            return Vec::new();
+        }
         let polyline = clean_polyline(prepare_polygon(vertices, POLYGON_DUPLICATE_TOLERANCE));
         let mut levels = Vec::new();
         let mut current_offset = self.operation.tool_diameter / 2.0;
-        loop {
+        while levels.len() < MAX_OFFSET_LEVELS {
             let offsets = safe_parallel_offset(&polyline, -current_offset);
             if offsets.is_empty() {
                 return levels;
@@ -875,6 +883,7 @@ impl PocketGenerator {
             levels.push(offsets);
             current_offset += self.stepover();
         }
+        levels
     }
 
     /// Moves the tool onto `start` at the pass depth: a helical ramp when ramping is enabled,
