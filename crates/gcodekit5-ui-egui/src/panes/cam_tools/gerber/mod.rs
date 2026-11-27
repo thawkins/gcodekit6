@@ -94,6 +94,7 @@ pub fn msgids() -> Vec<&'static str> {
         FEED_RATE,
         SPINDLE_SPEED,
         CUT_DEPTH,
+        OUTLINE_STEP_DOWN,
         SAFE_Z,
         TOOL_DIAMETER,
         ISOLATION_WIDTH,

@@ -143,7 +143,7 @@ pub fn zero_axes_command(wcs: Wcs, axes: &[Axis]) -> String {
 }
 
 /// The line that sets the rotary `axis` of `wcs` so its current position reads
-/// `calibration_deg` (Preferences > Machine > rotary calibration; 0 for a plain zero):
+/// `calibration_deg` (`rotary_calibration` in the settings file; 0 for a plain zero):
 /// `G10 L20 P2 A12.5`, as the A/B/C Zero buttons send it. The value is rounded to 3
 /// decimals, with trailing zeros dropped (`0.30000000000000004` is sent as `0.3`).
 ///
