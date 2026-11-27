@@ -77,6 +77,9 @@ pub struct MachineStatus {
     /// Whether the controller reports positions in inches (`$13=1`). Until a `$$` line says
     /// so, reports are taken as mm, GRBL's default (as the GTK front end does).
     pub report_inches: bool,
+    /// Whether the controller is in laser mode (GRBL `$32=1`), once a `$$` line said so.
+    /// The CAM pages that plunge with `M3` refuse to generate while it is set.
+    pub laser_mode: bool,
     /// The active work coordinate system: from the controller's parser state (`[GC:...]`)
     /// or a G54-G59 line sent since. `None` until known, and again after a controller reset
     /// (which restores the default) until the controller reports it. A stream's program may
@@ -103,6 +106,17 @@ pub type Xyz = [f32; 3];
 pub fn parse_report_inches(line: &str) -> Option<bool> {
     let (key, value) = line.trim().split_once('=')?;
     (key == "$13").then_some(())?;
+    let value: f32 = value.trim().parse().ok()?;
+    Some(value >= 1.0)
+}
+
+/// The `$32` laser-mode setting a `$$` line reports, if the line is one.
+///
+/// # Arguments
+/// * `line` - One line received from the controller.
+pub fn parse_laser_mode(line: &str) -> Option<bool> {
+    let (key, value) = line.trim().split_once('=')?;
+    (key == "$32").then_some(())?;
     let value: f32 = value.trim().parse().ok()?;
     Some(value >= 1.0)
 }
@@ -259,6 +273,7 @@ impl MachineStatus {
                     self.overrides = None;
                     self.grbl_travel = [None; 3];
                     self.report_inches = false;
+                    self.laser_mode = false;
                     self.active_wcs = None;
                     self.wcs_reported = false;
                     self.wcs_outside = false;
@@ -291,6 +306,9 @@ impl MachineStatus {
                     }
                     if let Some((index, travel)) = parse_travel(line) {
                         self.grbl_travel[index] = Some(travel);
+                    }
+                    if let Some(laser) = parse_laser_mode(line) {
+                        self.laser_mode = laser;
                     }
                     if let Some(inches) = parse_report_inches(line)
                         && inches != self.report_inches

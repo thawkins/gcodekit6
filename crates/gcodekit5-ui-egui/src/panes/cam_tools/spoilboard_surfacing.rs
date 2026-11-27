@@ -7,7 +7,6 @@
 //! Dependencies: `egui`, `gcodekit5-camtools` (generator), `gcodekit5-app` (translations,
 //! device status), `gcodekit5-core` (units).
 
-use gcodekit5_app::device_status;
 use gcodekit5_app::i18n::Translator;
 use gcodekit5_camtools::spoilboard_surfacing::{
     SpoilboardSurfacingGenerator, SpoilboardSurfacingParameters,
@@ -78,7 +77,7 @@ pub struct SpoilboardSurfacingParams {
     pub safe_z: String,
     /// Home the machine before surfacing.
     pub home_before: bool,
-    /// The active device's axis count (the pane refreshes it from the device status).
+    /// The active device's axis count (the pane refreshes it from the device profile).
     pub num_axes: u8,
 }
 
@@ -100,7 +99,7 @@ impl SpoilboardSurfacingParams {
             stepover_percent: "40".into(),
             safe_z: len(5.0),
             home_before: false,
-            num_axes: device_status::get_active_num_axes(),
+            num_axes: 3,
         }
     }
 
