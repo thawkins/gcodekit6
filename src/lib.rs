@@ -1,8 +1,60 @@
 //! # GCodeKit5
 //!
-//! The application binary's library: logging set-up. The application itself
-//! is in the workspace crates (`gcodekit5-ui-egui` runs the egui front end).
+//! The application binary's library: command-line parsing and logging set-up.
+//! The application itself is in the workspace crates (`gcodekit5-ui-egui` runs
+//! the egui front end).
 #![deny(unsafe_code)]
+
+use std::ffi::OsString;
+
+/// The usage text printed for `--help` / `-h`.
+pub const HELP_TEXT: &str = "\
+Usage: gcodekit5 [FILE...]
+
+Opens the GCodeKit5 window and loads each FILE (G-code or design file).
+
+Options:
+  -h, --help     Print this help and exit
+  --version      Print the version and exit
+";
+
+/// What the binary does with its command-line arguments.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CliAction {
+    /// Start the GUI and open these files.
+    Run(Vec<OsString>),
+    /// Print [`version_line`] and exit.
+    PrintVersion,
+    /// Print [`HELP_TEXT`] and exit.
+    PrintHelp,
+}
+
+/// Decides what to do with the command-line arguments (program name excluded).
+///
+/// `--help` or `-h` anywhere asks for the usage text and `--version` for the
+/// version; the first such flag wins. Every other argument is a file to open.
+///
+/// # Arguments
+/// * `args` - the arguments after the program name, as from `std::env::args_os().skip(1)`.
+///
+/// # Returns
+/// The [`CliAction`] to take.
+pub fn parse_args<I: IntoIterator<Item = OsString>>(args: I) -> CliAction {
+    let mut files = Vec::new();
+    for arg in args {
+        match arg.to_str() {
+            Some("--help" | "-h") => return CliAction::PrintHelp,
+            Some("--version") => return CliAction::PrintVersion,
+            _ => files.push(arg),
+        }
+    }
+    CliAction::Run(files)
+}
+
+/// The line printed for `--version`, for example `gcodekit5 2.0.0`.
+pub fn version_line() -> String {
+    format!("gcodekit5 {}", env!("CARGO_PKG_VERSION"))
+}
 
 /// Initialize logging with the default configuration
 ///

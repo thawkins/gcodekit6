@@ -117,7 +117,8 @@ cargo build --release
 cargo run --release
 ```
 
-The binary takes no flags: every command-line argument is opened as a file.
+The binary takes two flags, `--version` and `--help` (or `-h`), which print and exit
+before the window opens; every other command-line argument is opened as a file.
 
 ## Running the Application
 

@@ -24,4 +24,4 @@
 - [Preferencias](help:settings) — Preferencias y funciones experimentales.
 
 ## Enlaces
-- Sitio web del proyecto: https://github.com/feveal/gcodekit5-design
+- Sitio web del proyecto: https://github.com/thawkins/gcodekit6

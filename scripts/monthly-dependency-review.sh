@@ -145,7 +145,7 @@ cargo update
 
 3. Run tests:
    ```bash
-   cargo test
+   cargo nextest run --workspace
    cargo clippy
    ```
 
@@ -172,7 +172,7 @@ if [ "$1" == "--update" ]; then
     echo ""
     echo "🔄 Applying safe updates (minor/patch)..."
     cargo update
-    echo "✅ Updates applied. Run 'cargo test' to verify."
+    echo "✅ Updates applied. Run 'cargo nextest run --workspace' to verify."
 fi
 
 echo ""
@@ -188,7 +188,7 @@ echo "  1a. Check storytold/craft-libs for a new rev; bump rev and egui-family t
 echo "  2. Address any security vulnerabilities immediately"
 echo "  3. Evaluate major version updates"
 echo "  4. Run: $0 --update (to apply safe updates)"
-echo "  5. Run: cargo test (to verify changes)"
+echo "  5. Run: cargo nextest run --workspace (to verify changes)"
 echo "  6. Update CHANGELOG.md"
 echo "  7. Create PR for review"
 echo ""

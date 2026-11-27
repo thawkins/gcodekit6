@@ -141,9 +141,10 @@ const GO_TO_ZERO_NOT_IDLE: &str = n_!("Go to Work Zero refused: the machine is n
 const ZERO_NOT_IDLE: &str = n_!("Zero refused: the machine is not idle.");
 /// Zero All Axes refused at Yes: the active system is no longer the one the question named.
 const WCS_CHANGED: &str = n_!("Zero All refused: the work coordinate system changed.");
-/// A rotary Zero refused: Preferences hold a calibration that is not a number.
-const CALIBRATION_NOT_A_NUMBER: &str =
-    n_!("Rotary calibration is not a number: check Preferences > Machine.");
+/// A rotary Zero refused: the settings file holds a calibration that is not a number.
+const CALIBRATION_NOT_A_NUMBER: &str = n_!(
+    "Rotary calibration is not a number: check rotary_calibration under [machine] in config.toml."
+);
 /// A Set % target ended without the controller confirming a step.
 const OVERRIDE_NOT_CONFIRMED: &str = n_!("The controller did not confirm the override change.");
 
@@ -162,8 +163,8 @@ pub struct MachineControlPane {
     feed_units: FeedRateUnits,
     /// The configured travel the Machine Limits section falls back to.
     limits: dro::ConfiguredLimits,
-    /// The rotary calibration of A, B and C in degrees (Preferences > Machine): the value a
-    /// rotary Zero gives the current position.
+    /// The rotary calibration of A, B and C in degrees (`rotary_calibration` in the settings
+    /// file, `config.toml`): the value a rotary Zero gives the current position.
     rotary_calibration: [f64; 3],
     /// A refusal of the pane's own (not the controller's), shown until the next action.
     notice: Option<String>,

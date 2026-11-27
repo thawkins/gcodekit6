@@ -233,7 +233,7 @@ fn test_help_external_link_opens_in_browser() {
             (window, Vec::new()),
         );
     h.run_steps(3);
-    let url = "https://github.com/feveal/gcodekit5-design";
+    let url = "https://github.com/thawkins/gcodekit6";
     h.get_by_role_and_label(Role::Link, url).scroll_to_me();
     h.run_steps(2);
     h.get_by_role_and_label(Role::Link, url).click();

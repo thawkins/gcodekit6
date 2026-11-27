@@ -182,11 +182,14 @@ impl ConnectionParams {
     }
 }
 
-/// Abstract communicator trait for pluggable communication backends
+/// Abstract communicator trait for the connection to a CNC controller
 ///
-/// Provides a unified interface for different communication protocols
-/// (Serial, TCP, WebSocket). Implementations handle protocol-specific
-/// connection and data transmission details.
+/// The production implementor is [`SerialCommunicator`], which carries every
+/// [`ConnectionDriver`]: serial ports directly, and TCP and WebSocket
+/// connections as port backends ([`tcp::RealTcpPort`] and
+/// [`websocket::RealWebSocketPort`]) behind the same byte-stream interface.
+/// [`NoOpCommunicator`] is the do-nothing implementor used when no connection
+/// exists; the app crate's test support adds an in-memory loopback.
 pub trait Communicator: Send + Sync {
     /// Connect to the device/server using the provided parameters
     fn connect(&mut self, params: &ConnectionParams) -> gcodekit5_core::Result<()>;

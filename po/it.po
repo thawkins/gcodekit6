@@ -3451,6 +3451,9 @@ msgstr "Impostazioni macchina"
 msgid "Cut Depth:"
 msgstr "Profondità di taglio:"
 
+msgid "Outline Step Down:"
+msgstr "Profondità di passata del contorno:"
+
 msgid "Stepover (%):"
 msgstr "Passo laterale (%):"
 
@@ -4651,8 +4654,8 @@ msgstr "Rimozione del materiale troppo grande per essere visualizzata su questa 
 msgid "The controller did not confirm the override change."
 msgstr "Il controller non ha confermato la modifica dell'override."
 
-msgid "Rotary calibration is not a number: check Preferences > Machine."
-msgstr "La calibrazione dell'asse rotativo non è un numero: controllare Preferenze > Macchina."
+msgid "Rotary calibration is not a number: check rotary_calibration under [machine] in config.toml."
+msgstr "La calibrazione dell'asse rotativo non è un numero: controllare rotary_calibration in [machine] nel file config.toml."
 
 msgid "not sent: the controller was reset"
 msgstr "non inviato: il controller è stato reimpostato"
