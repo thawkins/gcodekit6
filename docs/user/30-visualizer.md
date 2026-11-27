@@ -2,14 +2,14 @@
 
 ## Overview
 
-The 3D Visualizer renders your G-code toolpath and provides stock removal simulation. It uses OpenGL for hardware-accelerated rendering.
+The 3D Visualizer renders your G-code toolpath and provides stock removal simulation. It draws with wgpu for hardware-accelerated rendering.
 
 ## Toolpath Display
 
 When a G-code file is loaded, the visualizer shows:
 
-- **Rapid moves (G0)** — Displayed in a distinct color (typically red/orange)
-- **Feed moves (G1)** — Displayed in a different color (typically green/blue)
+- **Rapid moves (G0)** — Drawn in grey, as are moves with the spindle or laser off
+- **Cutting moves (G1)** — Coloured by spindle or laser power
 - **Arc moves (G2/G3)** — Rendered as smooth curves
 - **Current tool position** — Shown as a marker during connection or streaming
 
@@ -19,9 +19,9 @@ When a G-code file is loaded, the visualizer shows:
 
 | Action | Control |
 |--------|---------|
-| **Rotate** | Click and drag |
+| **Orbit** | Left button + drag |
+| **Pan** | Shift + left button + drag |
 | **Zoom** | Scroll wheel |
-| **Pan** | Middle-click and drag |
 
 ### NavCube
 
@@ -29,20 +29,22 @@ The NavCube in the corner of the visualizer provides quick access to standard vi
 
 | View | Description |
 |------|-------------|
-| **Top** | Camera above, looking down (XY plane) |
-| **Front** | Camera in front, looking at XZ plane |
-| **Right** | Camera at right, looking at YZ plane |
-| **Isometric** | Camera at 45° angle showing all axes |
+| **Top** / **Bottom** | Camera above or below, looking at the XY plane |
+| **Front** | Camera in front, looking at the XZ plane |
+| **Left** / **Right** | Camera at the side, looking at the YZ plane |
+| **Isometric** | Four corner views (NW, NE, SW, SE) showing all axes |
 
 Click any face of the NavCube to snap to that view.
 
 ### Keyboard Controls
 
+These keys work while the Visualizer has the keyboard.
+
 | Key | Action |
 |-----|--------|
+| **F** | Zoom to fit |
 | **+** / **-** | Zoom in / out |
-| **0** | Fit toolpath to window |
-| **Arrow keys** | Pan the view |
+| **Ctrl+0** (Cmd+0 on macOS) | Reset view |
 
 ## Display Options
 
@@ -50,13 +52,14 @@ Toggle visibility of visual elements:
 
 | Option | Description |
 |--------|-------------|
-| **Grid** | Reference grid on the XY plane |
-| **Axes** | X (red), Y (green), Z (blue) axis indicators |
-| **Stock material** | 3D representation of the workpiece |
-| **Toolpath** | The G-code path lines |
-| **Tool marker** | Current tool/laser position indicator |
+| **Show Rapid Moves** | Rapids and moves with the spindle or laser off |
+| **Show Cutting Moves** | Cutting moves |
+| **Show Laser/Spindle** | The tool position marker |
+| **Show Grid** | Reference grid on the XY plane |
+| **Show Machine Bounds** | The active device's work area |
+| **Show Stock Removal** | The stock removal simulation (see below) |
 
-Grid spacing is configurable in [Settings](70-settings.md).
+Grid spacing is set with **Grid spacing** in the same sidebar.
 
 ## Stock Removal Simulation
 
