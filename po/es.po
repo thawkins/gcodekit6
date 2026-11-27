@@ -3570,6 +3570,9 @@ msgstr "Debe estar por debajo de la superficie (negativo)"
 msgid "Failed to read file"
 msgstr "No se pudo leer el archivo"
 
+msgid "Unsupported Gerber content is left out of the program"
+msgstr "El contenido Gerber no compatible se omite del programa"
+
 msgid "Top Copper"
 msgstr "Cobre superior"
 

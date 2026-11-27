@@ -3567,6 +3567,9 @@ msgstr "Muss unter der Oberfläche liegen (negativ)"
 msgid "Failed to read file"
 msgstr "Datei konnte nicht gelesen werden"
 
+msgid "Unsupported Gerber content is left out of the program"
+msgstr "Nicht unterstützte Gerber-Inhalte fehlen im Programm"
+
 msgid "Top Copper"
 msgstr "Kupfer oben"
 
