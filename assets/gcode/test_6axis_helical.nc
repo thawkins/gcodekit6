@@ -1,7 +1,7 @@
 ; 6-Axis Helical Interpolation Test
 ; Tests helical arcs with simultaneous rotary axis motion
 ; 
-; GCodeKit5 Test File - Helical Arcs
+; GCodeKit6 Test File - Helical Arcs
 ; Machine: 6-Axis CNC with Rotary Table
 
 G21              ; Metric units

@@ -70,7 +70,7 @@ or make the right profile active with **Set Active**. See
 ## Diagnostic Steps
 
 1. Open the **Console** panel and observe messages during connection
-2. Enable debug logging: `RUST_LOG=debug ./target/release/gcodekit5`
+2. Enable debug logging: `RUST_LOG=debug ./target/release/gcodekit6`
 3. Verify the firmware responds to manual commands (type `$$` in the console for GRBL)
 
 ## Still Having Issues?

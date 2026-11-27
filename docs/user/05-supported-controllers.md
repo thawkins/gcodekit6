@@ -1,6 +1,6 @@
 # Supported Controllers
 
-GCodeKit5 speaks two controller protocols: **GRBL** and **Repetier**. You choose the
+GCodeKit6 speaks two controller protocols: **GRBL** and **Repetier**. You choose the
 controller in the **Controller** field of the device profile (Device Manager, **General**
 tab). The app does not pick the protocol for you.
 

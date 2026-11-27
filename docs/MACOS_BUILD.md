@@ -2,7 +2,7 @@
 
 ## Overview
 
-GCodeKit5 builds on macOS 11 or later. The release workflow builds the Apple Silicon (ARM64) app. You can also build for Intel Macs locally.
+GCodeKit6 builds on macOS 11 or later. The release workflow builds the Apple Silicon (ARM64) app. You can also build for Intel Macs locally.
 
 The egui front end uses only system frameworks. There is nothing to install with Homebrew and nothing to bundle into the app.
 
@@ -58,7 +58,7 @@ The release workflow builds the bundle in this layout:
 GCodeKit.app/
 └── Contents/
     ├── MacOS/
-    │   └── gcodekit5 (executable)
+    │   └── gcodekit6 (executable)
     ├── Resources/
     │   └── AppIcon.icns
     └── Info.plist
@@ -72,7 +72,7 @@ cargo build --release --target aarch64-apple-darwin
 
 # 2. Create the bundle folders and copy the binary
 mkdir -p "GCodeKit.app/Contents/MacOS" "GCodeKit.app/Contents/Resources"
-cp target/aarch64-apple-darwin/release/gcodekit5 "GCodeKit.app/Contents/MacOS/"
+cp target/aarch64-apple-darwin/release/gcodekit6 "GCodeKit.app/Contents/MacOS/"
 
 # 3. Add AppIcon.icns and Info.plist (see the "Build (macOS)" step in release.yml)
 
@@ -86,7 +86,7 @@ The `scripts/macos-create-dmg.sh` script creates a DMG that:
 
 - Is created with `hdiutil create ... -format UDZO -imagekey zlib-level=9` from a
   staging folder holding the app and an `/Applications` link
-- Creates files matching the pattern: `gcodekit5-<version>-<arch>.dmg`
+- Creates files matching the pattern: `gcodekit6-<version>-<arch>.dmg`
 
 Run it from the folder that holds `GCodeKit.app`. It takes two arguments:
 `VERSION` (default `1.0.0`) and `ARCH` (default `macos-arm64`).
@@ -111,7 +111,7 @@ For production releases, consider adding:
 Check that the binary links only system libraries:
 
 ```bash
-otool -L "GCodeKit.app/Contents/MacOS/gcodekit5"
+otool -L "GCodeKit.app/Contents/MacOS/gcodekit6"
 ```
 
 Every entry should be under `/usr/lib` or `/System/Library`.

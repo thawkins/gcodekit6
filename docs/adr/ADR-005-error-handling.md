@@ -7,7 +7,7 @@ Amended 2026-11-28: replaced example types that never existed with the real erro
 
 ## Context
 
-GCodeKit5 handles errors from many sources:
+GCodeKit6 handles errors from many sources:
 
 - Serial port communication failures
 - G-code parsing errors
@@ -30,12 +30,12 @@ We adopt a **layered error handling strategy**:
 
 The real typed errors include:
 
-- `gcodekit5_core::Error` (`crates/gcodekit5-core/src/error.rs`), with `Result<T>` as its alias.
-- `SettingsError` (`crates/gcodekit5-settings/src/migrate.rs`).
-- `MachineError` (`crates/gcodekit5-app/src/machine/types.rs`).
+- `gcodekit6_core::Error` (`crates/gcodekit6-core/src/error.rs`), with `Result<T>` as its alias.
+- `SettingsError` (`crates/gcodekit6-settings/src/migrate.rs`).
+- `MachineError` (`crates/gcodekit6-app/src/machine/types.rs`).
 
 ```rust
-// crates/gcodekit5-core/src/error.rs
+// crates/gcodekit6-core/src/error.rs
 #[derive(Error, Debug)]
 pub enum Error {
     /// Standard I/O error
@@ -53,7 +53,7 @@ pub enum Error {
 `anyhow` is a dependency of the communication, devicedb, camtools, designer, app and ui-egui crates and of the root binary. Add context where an error crosses a boundary:
 
 ```rust
-// crates/gcodekit5-ui-egui/src/panes/editor/buffer.rs
+// crates/gcodekit6-ui-egui/src/panes/editor/buffer.rs
 pub fn load(path: &Path) -> anyhow::Result<Self> {
     let text = std::fs::read_to_string(path)
         .with_context(|| format!("cannot read {}", path.display()))?;
@@ -63,7 +63,7 @@ pub fn load(path: &Path) -> anyhow::Result<Self> {
 
 ### 3. UI Layer: Convert to User-Friendly Messages
 
-The front end shows a translated prefix followed by the error's `Display` text in a notice or status message, for example `format!("{}: {e}", tr.tr("Save Error"))` in `crates/gcodekit5-ui-egui/src/panes/cam_tools/requests.rs`.
+The front end shows a translated prefix followed by the error's `Display` text in a notice or status message, for example `format!("{}: {e}", tr.tr("Save Error"))` in `crates/gcodekit6-ui-egui/src/panes/cam_tools/requests.rs`.
 
 ### Guidelines
 

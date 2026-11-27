@@ -1,5 +1,5 @@
 #!/bin/bash
-# GCodeKit5 Pre-commit Hook
+# GCodeKit6 Pre-commit Hook
 # Runs formatting, linting, and the nextest suite before commit
 # Skip with: git commit --no-verify
 # Install with: git config core.hooksPath .githooks

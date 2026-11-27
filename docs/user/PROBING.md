@@ -2,7 +2,7 @@
 
 ## Overview
 
-GCodeKit5 includes touch probe routines for work coordinate setup and tool length measurement. This guide covers the hardware requirements, safety procedures, and step-by-step instructions for each probing routine.
+GCodeKit6 includes touch probe routines for work coordinate setup and tool length measurement. This guide covers the hardware requirements, safety procedures, and step-by-step instructions for each probing routine.
 
 ## Table of Contents
 

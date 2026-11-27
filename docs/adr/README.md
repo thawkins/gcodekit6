@@ -1,6 +1,6 @@
 # Architecture Decision Records (ADRs)
 
-This directory contains Architecture Decision Records (ADRs) for GCodeKit5. ADRs document significant architectural decisions made during development, including the context, decision, and consequences.
+This directory contains Architecture Decision Records (ADRs) for GCodeKit6. ADRs document significant architectural decisions made during development, including the context, decision, and consequences.
 
 ## Index
 

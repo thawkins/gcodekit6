@@ -1,11 +1,11 @@
 # Quick Start Guide
 
-Get up and running with GCodeKit5 in 5 minutes.
+Get up and running with GCodeKit6 in 5 minutes.
 
 ## Step 1: Launch the Application
 
 ```bash
-./target/release/gcodekit5
+./target/release/gcodekit6
 # or during development:
 cargo run --release
 ```
@@ -16,7 +16,7 @@ cargo run --release
 2. Select your CNC controller's port from the dropdown
 3. Click **Connect**
 
-GCodeKit5 auto-detects the firmware type (GRBL, grblHAL, FluidNC, TinyG, g2core, or Smoothieware) and configures itself accordingly.
+GCodeKit6 auto-detects the firmware type (GRBL, grblHAL, FluidNC, TinyG, g2core, or Smoothieware) and configures itself accordingly.
 
 > **Tip**: For network-connected controllers (FluidNC WiFi), switch to TCP/IP or WebSocket connection mode in the connection panel. See [Device Setup](04-device-setup.md) for details.
 

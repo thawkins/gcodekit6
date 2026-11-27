@@ -1,6 +1,6 @@
 # Build Scripts
 
-This directory contains platform-specific build and packaging scripts for GCodeKit5.
+This directory contains platform-specific build and packaging scripts for GCodeKit6.
 
 ## Windows Scripts
 
@@ -15,14 +15,14 @@ runtime or MSYS2 is required.
 
 **What it does:**
 1. Builds the release binary (`cargo build --release --target x86_64-pc-windows-msvc`)
-2. Builds the MSI with `cargo wix --package gcodekit5-design --no-build`
-3. Zips `gcodekit5.exe` and `License.rtf` into the portable archive
+2. Builds the MSI with `cargo wix --package gcodekit6-design --no-build`
+3. Zips `gcodekit6.exe` and `License.rtf` into the portable archive
 
 **Options:**
 - `-SkipBuild` - Skip cargo build, use the existing binary
 
-**Output:** `target\wix\gcodekit5-<version>-x64.msi` and
-`target\gcodekit5-<version>-windows-x86_64-portable.zip`
+**Output:** `target\wix\gcodekit6-<version>-x64.msi` and
+`target\gcodekit6-<version>-windows-x86_64-portable.zip`
 
 Prerequisites and details: [docs/WINDOWS_BUILD.md](../docs/WINDOWS_BUILD.md).
 
@@ -42,7 +42,7 @@ Creates a DMG installer for macOS. Run it from the folder that holds
 - `VERSION` - default `1.0.0`
 - `ARCH` - default `macos-arm64`
 
-**Output:** `gcodekit5-<VERSION>-<ARCH>.dmg` in the current folder. See
+**Output:** `gcodekit6-<VERSION>-<ARCH>.dmg` in the current folder. See
 [docs/MACOS_BUILD.md](../docs/MACOS_BUILD.md).
 
 ---
@@ -172,4 +172,4 @@ A tag push fails at this step when `CHANGELOG.md` has no section for its version
 
 ## License
 
-All scripts in this directory are part of GCodeKit5 and licensed under MIT OR Apache-2.0.
+All scripts in this directory are part of GCodeKit6 and licensed under MIT OR Apache-2.0.

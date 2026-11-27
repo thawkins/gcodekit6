@@ -2,7 +2,7 @@
 
 ## Overview
 
-GCodeKit5 includes a built-in help system with documentation for all features, accessible directly from the application.
+GCodeKit6 includes a built-in help system with documentation for all features, accessible directly from the application.
 
 ## Accessing Help
 

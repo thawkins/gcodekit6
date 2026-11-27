@@ -1,6 +1,6 @@
 # Coordinate System Documentation
 
-How GCodeKit5 maps CNC coordinates to the screen.
+How GCodeKit6 maps CNC coordinates to the screen.
 
 ## Conventions
 
@@ -14,9 +14,9 @@ Store and compute in world coordinates. Convert to screen coordinates only when 
 ## Designer Canvas (2D)
 
 The designer canvas converts with `CanvasView`
-(`crates/gcodekit5-ui-egui/src/panes/designer/canvas/mod.rs`). `zoom` is points per millimetre;
+(`crates/gcodekit6-ui-egui/src/panes/designer/canvas/mod.rs`). `zoom` is points per millimetre;
 `pan` is the offset in points from the canvas's bottom-left corner to world (0, 0), Y up. The
-zoom and pan come from the designer model's `Viewport` (`crates/gcodekit5-designer/src/viewport.rs`).
+zoom and pan come from the designer model's `Viewport` (`crates/gcodekit6-designer/src/viewport.rs`).
 
 ```
 screen.x = rect.left + world.x * zoom + pan.x
@@ -29,11 +29,11 @@ The subtraction from `rect.bottom` is the Y-flip: world +Y draws upwards on scre
 ## Visualizer (3D)
 
 The G-code visualizer uses a 3D orbit camera, `Camera`
-(`crates/gcodekit5-visualizer/src/visualizer/camera.rs`), with Z up. It has a target, distance,
+(`crates/gcodekit6-visualizer/src/visualizer/camera.rs`), with Z up. It has a target, distance,
 yaw and pitch, and preset views (top, front, side, isometric). There is no 2D Y-flip in the
 visualizer; the camera's view and projection matrices map world coordinates to the screen.
 
 ## Related Documentation
 
 - [ADR-002: Coordinate System](adr/ADR-002-coordinate-system.md) - Architecture decision record
-- `crates/gcodekit5-visualizer/src/visualizer/viewport.rs` - `Bounds`, the toolpath bounding box
+- `crates/gcodekit6-visualizer/src/visualizer/viewport.rs` - `Bounds`, the toolpath bounding box

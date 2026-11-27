@@ -1,0 +1,38 @@
+[package]
+name = "gcodekit6-camtools"
+autotests = false
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+description = "CAM (Computer-Aided Manufacturing) tools and special processing for GCodeKit6"
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[dependencies]
+gcodekit6-core = { path = "../gcodekit6-core" }
+gcodekit6-devicedb = { path = "../gcodekit6-devicedb" }
+
+serde = { workspace = true }
+image = "0.25"
+chrono = { workspace = true }
+anyhow = { workspace = true }
+regex = "1.10"
+lyon = "1.0"
+gerber-types = "0.7.0"
+cavalier_contours = "0.9.0"
+tracing.workspace = true
+gerber_parser = "0.5.0"
+serde_json.workspace = true
+csgrs = "0.20.1"
+nalgebra = "0.33.3"
+
+[dev-dependencies]
+tracing-subscriber = { version = "0.3", features = ["fmt"] }
+
+[[test]]
+name = "all"
+path = "tests/all.rs"
+
+[lints]
+workspace = true

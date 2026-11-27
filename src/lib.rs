@@ -1,7 +1,7 @@
-//! # GCodeKit5
+//! # GCodeKit6
 //!
 //! The application binary's library: command-line parsing and logging set-up.
-//! The application itself is in the workspace crates (`gcodekit5-ui-egui` runs
+//! The application itself is in the workspace crates (`gcodekit6-ui-egui` runs
 //! the egui front end).
 #![deny(unsafe_code)]
 
@@ -9,9 +9,9 @@ use std::ffi::OsString;
 
 /// The usage text printed for `--help` / `-h`.
 pub const HELP_TEXT: &str = "\
-Usage: gcodekit5 [FILE...]
+Usage: gcodekit6 [FILE...]
 
-Opens the GCodeKit5 window and loads each FILE (G-code or design file).
+Opens the GCodeKit6 window and loads each FILE (G-code or design file).
 
 Options:
   -h, --help     Print this help and exit
@@ -51,9 +51,9 @@ pub fn parse_args<I: IntoIterator<Item = OsString>>(args: I) -> CliAction {
     CliAction::Run(files)
 }
 
-/// The line printed for `--version`, for example `gcodekit5 2.0.0`.
+/// The line printed for `--version`, for example `gcodekit6 2.0.0`.
 pub fn version_line() -> String {
-    format!("gcodekit5 {}", env!("CARGO_PKG_VERSION"))
+    format!("gcodekit6 {}", env!("CARGO_PKG_VERSION"))
 }
 
 /// Initialize logging with the default configuration
@@ -124,7 +124,7 @@ pub fn init_logging() -> anyhow::Result<()> {
 }
 
 /// Opens (creating it and any missing directories) the append-only log file
-/// `<base>/gcodekit5/gcodekit5.log`.
+/// `<base>/gcodekit6/gcodekit6.log`.
 ///
 /// # Arguments
 /// * `base` - the per-user data directory, for example `%LOCALAPPDATA%` on Windows.
@@ -132,10 +132,10 @@ pub fn init_logging() -> anyhow::Result<()> {
 /// # Errors
 /// Returns the I/O error if the directory or the file cannot be created.
 pub fn open_log_file(base: &std::path::Path) -> std::io::Result<std::fs::File> {
-    let dir = base.join("gcodekit5");
+    let dir = base.join("gcodekit6");
     std::fs::create_dir_all(&dir)?;
     std::fs::OpenOptions::new()
         .create(true)
         .append(true)
-        .open(dir.join("gcodekit5.log"))
+        .open(dir.join("gcodekit6.log"))
 }

@@ -25,12 +25,12 @@ This builds the release binary, the MSI and the portable zip. Use `-SkipBuild` t
 cargo build --release --target x86_64-pc-windows-msvc
 ```
 
-This creates `target\x86_64-pc-windows-msvc\release\gcodekit5.exe`.
+This creates `target\x86_64-pc-windows-msvc\release\gcodekit6.exe`.
 
 ### Step 2: Test the Binary Locally
 
 ```powershell
-.\target\x86_64-pc-windows-msvc\release\gcodekit5.exe
+.\target\x86_64-pc-windows-msvc\release\gcodekit6.exe
 ```
 
 ### Step 3: Create the MSI Installer
@@ -38,15 +38,15 @@ This creates `target\x86_64-pc-windows-msvc\release\gcodekit5.exe`.
 WiX needs a numeric `x.y.z` version, so a prerelease such as `1.2.0-beta.2` is installed as `1.2.0`:
 
 ```powershell
-cargo wix --package gcodekit5-design --target x86_64-pc-windows-msvc --no-build --nocapture `
-    --install-version 1.2.0 -o target\wix\gcodekit5-1.2.0-beta.2-x64.msi
+cargo wix --package gcodekit6-design --target x86_64-pc-windows-msvc --no-build --nocapture `
+    --install-version 1.2.0 -o target\wix\gcodekit6-1.2.0-beta.2-x64.msi
 ```
 
-The MSI installs `gcodekit5.exe` and `License.rtf`. `wix\main.wxs` is the installer definition.
+The MSI installs `gcodekit6.exe` and `License.rtf`. `wix\main.wxs` is the installer definition.
 
 ### Step 4: Create the Portable Zip
 
-The portable zip holds `gcodekit5.exe` and `License.rtf` only. `build-windows-release.ps1` writes it to `target\gcodekit5-<version>-windows-x86_64-portable.zip`.
+The portable zip holds `gcodekit6.exe` and `License.rtf` only. `build-windows-release.ps1` writes it to `target\gcodekit6-<version>-windows-x86_64-portable.zip`.
 
 ## Troubleshooting
 

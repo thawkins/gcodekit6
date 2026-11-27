@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Generate simple STL test files for GCodeKit5 3D integration testing.
+Generate simple STL test files for GCodeKit6 3D integration testing.
 Creates basic geometric shapes as STL files.
 """
 
@@ -11,7 +11,7 @@ def write_stl_binary(filename, triangles):
     """Write triangles to a binary STL file."""
     with open(filename, 'wb') as f:
         # Header (80 bytes)
-        f.write(b'STL test file generated for GCodeKit5' + b' ' * 42)
+        f.write(b'STL test file generated for GCodeKit6' + b' ' * 42)
         
         # Number of triangles (4 bytes)
         f.write(struct.pack('<I', len(triangles)))
@@ -128,7 +128,7 @@ def generate_test_stl_files():
     print(f"✅ Created test_pyramid_8x6mm.stl ({len(pyramid_triangles)} triangles)")
     
     print(f"\nTest STL files created in: {stl_dir}")
-    print("Files ready for GCodeKit5 3D integration testing!")
+    print("Files ready for GCodeKit6 3D integration testing!")
 
 if __name__ == "__main__":
     generate_test_stl_files()

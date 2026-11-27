@@ -1,7 +1,7 @@
 ; 5-Axis Simultaneous Machining Test
 ; Tests full 5-axis simultaneous motion (XYZ + AB rotary)
 ;
-; GCodeKit5 Test File - 5-Axis
+; GCodeKit6 Test File - 5-Axis
 ; Machine: XYZAB (5-Axis with Trunnion Table)
 
 G21              ; Metric

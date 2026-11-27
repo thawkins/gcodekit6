@@ -1,6 +1,6 @@
 # CAM Tools
 
-GCodeKit5 includes a suite of specialized CAM tools for generating G-code directly, without needing external CAM software.
+GCodeKit6 includes a suite of specialized CAM tools for generating G-code directly, without needing external CAM software.
 
 ## Using CAM Tools
 

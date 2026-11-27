@@ -1,0 +1,808 @@
+//! Serialization and deserialization for designer files
+//!
+//! Implements save/load functionality for GCodeKit6 design files: JSON with
+//! complete design state preservation. The app writes `.gckd` files and also
+//! accepts `.gck5` files on open; the format is the same JSON either way.
+
+use crate::model::{
+    DesignCircle as Circle, DesignEllipse as Ellipse, DesignLine as Line, DesignPath as PathShape,
+    DesignPolygon as Polygon, DesignRectangle as Rectangle, DesignText as TextShape,
+    DesignTriangle as Triangle, RasterImage,
+};
+use crate::shapes::OperationType;
+use anyhow::{Context, Result};
+use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
+use std::path::Path;
+
+use super::canvas::DrawingObject;
+use super::pocket_operations::PocketStrategy;
+use crate::model::*;
+
+/// Design file format version
+const FILE_FORMAT_VERSION: &str = "1.1";
+
+/// Document mode stored in design files.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+pub enum DesignMode {
+    #[default]
+    #[serde(rename = "2d")]
+    TwoD,
+    #[serde(rename = "3d")]
+    ThreeD,
+}
+
+/// Complete design file structure
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DesignFile {
+    pub version: String,
+    #[serde(default)]
+    pub design_mode: DesignMode,
+    pub metadata: DesignMetadata,
+    pub viewport: ViewportState,
+    pub shapes: Vec<ShapeData>,
+    #[serde(default)]
+    pub default_properties: Option<ShapeData>,
+    #[serde(default)]
+    pub toolpath_params: ToolpathParameters,
+}
+
+/// Design metadata
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DesignMetadata {
+    pub name: String,
+    pub created: DateTime<Utc>,
+    pub modified: DateTime<Utc>,
+    #[serde(default)]
+    pub author: String,
+    #[serde(default)]
+    pub description: String,
+}
+
+/// Viewport state
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ViewportState {
+    pub zoom: f64,
+    pub pan_x: f64,
+    pub pan_y: f64,
+}
+
+/// Serialized shape data
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ShapeData {
+    pub id: i32,
+    pub shape_type: String,
+    #[serde(default)]
+    pub name: String,
+    pub x: f64,
+    pub y: f64,
+    pub width: f64,
+    pub height: f64,
+    #[serde(default)]
+    pub right_angle_corner: u8,
+    #[serde(default)]
+    pub points: Vec<(f64, f64)>,
+    pub selected: bool,
+    #[serde(default)]
+    pub use_custom_values: bool,
+    #[serde(default)]
+    pub operation_type: String,
+    #[serde(default)]
+    pub pocket_depth: f64,
+    #[serde(default)]
+    pub start_depth: f64,
+    #[serde(default)]
+    pub step_down: f32,
+    #[serde(default)]
+    pub step_in: f32,
+    #[serde(default)]
+    pub text_content: String,
+    #[serde(default)]
+    pub font_size: f64,
+    #[serde(default)]
+    pub font_family: String,
+    #[serde(default)]
+    pub font_bold: bool,
+    #[serde(default)]
+    pub font_italic: bool,
+    #[serde(default)]
+    pub path_data: String,
+    /// Parametric generator a path was built from (e.g. a timing pulley), so it
+    /// stays editable after a save/load round-trip. Absent in older files.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub parametric_source: Option<ParametricPathSource>,
+    #[serde(default)]
+    pub group_id: Option<u64>,
+    #[serde(default)]
+    pub corner_radius: f64,
+    #[serde(default)]
+    pub is_slot: bool,
+    #[serde(default)]
+    pub rotation: f64,
+    #[serde(default)]
+    pub ramp_angle: f32,
+    #[serde(default)]
+    pub pocket_strategy: PocketStrategy,
+    #[serde(default = "default_raster_fill_ratio")]
+    pub raster_fill_ratio: f64,
+    #[serde(default)]
+    pub sides: u32,
+    #[serde(default)]
+    pub teeth: usize,
+    #[serde(default)]
+    pub module: f64,
+    #[serde(default)]
+    pub pressure_angle: f64,
+    #[serde(default)]
+    pub pitch: f64,
+    #[serde(default)]
+    pub roller_diameter: f64,
+    #[serde(default)]
+    pub hole_radius: f64,
+    /// Gear/sprocket reflection flag (see `DesignGear::mirrored`).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub mirrored: bool,
+    #[serde(default)]
+    pub thickness: f64,
+    #[serde(default)]
+    pub depth: f64,
+    #[serde(default)]
+    pub tab_size: f64,
+    #[serde(default)]
+    pub offset: f64,
+    #[serde(default)]
+    pub fillet: f64,
+    #[serde(default)]
+    pub chamfer: f64,
+    #[serde(default = "default_lock_aspect_ratio")]
+    pub lock_aspect_ratio: bool,
+    #[serde(default)]
+    pub original_path: Option<String>,
+    #[serde(default = "default_true")]
+    pub use_global_laser: bool,
+    #[serde(default)]
+    pub laser_params: LaserParams,
+    // ========== LASER PARAMETERS FOR RASTER IMAGES ==========
+    #[serde(default = "default_feed_rate")]
+    pub feed_rate: f64,
+    #[serde(default = "default_travel_rate")]
+    pub travel_rate: f64,
+    #[serde(default = "default_min_power")]
+    pub min_power: f64,
+    #[serde(default = "default_max_power")]
+    pub max_power: f64,
+    #[serde(default = "default_ppi")]
+    pub ppi: f64,
+    #[serde(default = "default_bidirectional")]
+    pub bidirectional: bool,
+    #[serde(default = "default_invert")]
+    pub invert: bool,
+    #[serde(default = "default_scan_direction")]
+    pub scan_direction: String,
+    #[serde(default = "default_dithering")]
+    pub dithering: String,
+    #[serde(default = "default_halftone_threshold")]
+    pub halftone_threshold: u8,
+}
+
+fn default_true() -> bool {
+    true
+}
+
+fn default_lock_aspect_ratio() -> bool {
+    false
+}
+
+fn default_raster_fill_ratio() -> f64 {
+    0.5
+}
+
+// ========== DEFAULT FUNCTIONS FOR LASER PARAMETERS ==========
+fn default_travel_rate() -> f64 {
+    3000.0
+}
+
+fn default_min_power() -> f64 {
+    0.0
+}
+
+fn default_max_power() -> f64 {
+    20.0
+}
+
+fn default_ppi() -> f64 {
+    254.0
+}
+
+fn default_bidirectional() -> bool {
+    true
+}
+
+fn default_invert() -> bool {
+    true
+}
+
+fn default_scan_direction() -> String {
+    "horizontal".to_string()
+}
+
+fn default_dithering() -> String {
+    "none".to_string()
+}
+
+fn default_halftone_threshold() -> u8 {
+    127
+}
+
+/// Toolpath generation parameters
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ToolpathParameters {
+    #[serde(default = "default_feed_rate")]
+    pub feed_rate: f64,
+    #[serde(default = "default_spindle_speed")]
+    pub spindle_speed: f64,
+    #[serde(default = "default_tool_diameter")]
+    pub tool_diameter: f64,
+    #[serde(default = "default_cut_depth")]
+    pub cut_depth: f64,
+    #[serde(default = "default_step_down")]
+    pub step_down: f64,
+    #[serde(default = "default_continuous_z_between_passes")]
+    pub continuous_z_between_passes: bool,
+    #[serde(default = "default_stock_width")]
+    pub stock_width: f32,
+    #[serde(default = "default_stock_height")]
+    pub stock_height: f32,
+    #[serde(default = "default_stock_thickness")]
+    pub stock_thickness: f32,
+    #[serde(default = "default_safe_z_height")]
+    pub safe_z_height: f32,
+    /// Depth below the stock top where cutting starts, in mm (0 for files before it was saved).
+    #[serde(default)]
+    pub start_depth: f64,
+    /// Stock origin X in mm (0 for files before it was saved).
+    #[serde(default)]
+    pub stock_origin_x: f32,
+    /// Stock origin Y in mm (0 for files before it was saved).
+    #[serde(default)]
+    pub stock_origin_y: f32,
+    /// Stock origin Z in mm (0 for files before it was saved).
+    #[serde(default)]
+    pub stock_origin_z: f32,
+}
+
+fn default_feed_rate() -> f64 {
+    1000.0
+}
+fn default_spindle_speed() -> f64 {
+    3000.0
+}
+fn default_tool_diameter() -> f64 {
+    3.175
+}
+fn default_cut_depth() -> f64 {
+    -5.0
+}
+fn default_step_down() -> f64 {
+    1.0
+}
+fn default_continuous_z_between_passes() -> bool {
+    false
+}
+fn default_stock_width() -> f32 {
+    200.0
+}
+fn default_stock_height() -> f32 {
+    200.0
+}
+fn default_stock_thickness() -> f32 {
+    10.0
+}
+fn default_safe_z_height() -> f32 {
+    default_stock_thickness() + 5.0
+}
+
+impl Default for ToolpathParameters {
+    fn default() -> Self {
+        Self {
+            feed_rate: default_feed_rate(),
+            spindle_speed: default_spindle_speed(),
+            tool_diameter: default_tool_diameter(),
+            cut_depth: default_cut_depth(),
+            step_down: default_step_down(),
+            continuous_z_between_passes: default_continuous_z_between_passes(),
+            stock_width: default_stock_width(),
+            stock_height: default_stock_height(),
+            stock_thickness: default_stock_thickness(),
+            safe_z_height: default_safe_z_height(),
+            start_depth: 0.0,
+            stock_origin_x: 0.0,
+            stock_origin_y: 0.0,
+            stock_origin_z: 0.0,
+        }
+    }
+}
+
+impl ToolpathParameters {
+    /// Builder method to set feed rate in mm/min.
+    pub fn with_feed_rate(mut self, rate: f64) -> Self {
+        self.feed_rate = rate;
+        self
+    }
+
+    /// Builder method to set spindle speed in RPM.
+    pub fn with_spindle_speed(mut self, speed: f64) -> Self {
+        self.spindle_speed = speed;
+        self
+    }
+
+    /// Builder method to enable/disable continuous Z between passes.
+    pub fn with_continuous_z_between_passes(mut self, enabled: bool) -> Self {
+        self.continuous_z_between_passes = enabled;
+        self
+    }
+}
+
+impl DesignFile {
+    /// Create a new design file with default values
+    pub fn new(name: impl Into<String>) -> Self {
+        let now = Utc::now();
+        Self {
+            version: FILE_FORMAT_VERSION.to_string(),
+            design_mode: DesignMode::default(),
+            metadata: DesignMetadata {
+                name: name.into(),
+                created: now,
+                modified: now,
+                author: String::new(),
+                description: String::new(),
+            },
+            viewport: ViewportState {
+                zoom: 1.0,
+                pan_x: 0.0,
+                pan_y: 0.0,
+            },
+            shapes: Vec::new(),
+            default_properties: None,
+            toolpath_params: ToolpathParameters::default(),
+        }
+    }
+
+    /// Save design to file
+    pub fn save_to_file(&self, path: impl AsRef<Path>) -> Result<()> {
+        let json = serde_json::to_string_pretty(self).context("Failed to serialize design")?;
+        std::fs::write(path.as_ref(), json).context("Failed to write design file")?;
+        Ok(())
+    }
+
+    /// Load design from file
+    pub fn load_from_file(path: impl AsRef<Path>) -> Result<Self> {
+        let content =
+            std::fs::read_to_string(path.as_ref()).context("Failed to read design file")?;
+        let mut design: DesignFile =
+            serde_json::from_str(&content).context("Failed to parse design file")?;
+        // Update modified timestamp
+        design.metadata.modified = Utc::now();
+        Ok(design)
+    }
+
+    pub fn from_drawing_object(obj: &DrawingObject) -> ShapeData {
+        let (cx, cy, real_width, real_height) = Self::shape_placement(&obj.shape);
+
+        let mut data = ShapeData {
+            id: obj.id as i32,
+            shape_type: Self::shape_type_name(obj.shape.shape_type()).to_string(),
+            name: obj.name.clone(),
+            x: cx,
+            y: cy,
+            width: real_width,
+            height: real_height,
+            right_angle_corner: 0,
+            points: Vec::new(),
+            selected: obj.selected,
+            use_custom_values: obj.use_custom_values,
+            operation_type: match obj.operation_type {
+                OperationType::Profile => "profile".to_string(),
+                OperationType::Pocket => "pocket".to_string(),
+            },
+            pocket_depth: obj.pocket_depth,
+            start_depth: obj.start_depth,
+            step_down: obj.step_down,
+            step_in: obj.step_in,
+            text_content: String::new(),
+            font_size: 0.0,
+            font_family: String::new(),
+            font_bold: false,
+            font_italic: false,
+            path_data: String::new(),
+            parametric_source: None,
+            group_id: obj.group_id,
+            corner_radius: 0.0,
+            is_slot: false,
+            rotation: obj.shape.rotation(),
+            ramp_angle: obj.ramp_angle,
+            pocket_strategy: obj.pocket_strategy,
+            raster_fill_ratio: obj.raster_fill_ratio,
+            sides: 0,
+            teeth: 0,
+            module: 0.0,
+            pressure_angle: 0.0,
+            pitch: 0.0,
+            roller_diameter: 0.0,
+            hole_radius: 0.0,
+            mirrored: false,
+            thickness: 0.0,
+            depth: obj.pocket_depth,
+            tab_size: 0.0,
+            offset: obj.offset,
+            fillet: obj.fillet,
+            chamfer: obj.chamfer,
+            lock_aspect_ratio: obj.lock_aspect_ratio,
+            original_path: None,
+            use_global_laser: obj.use_global_laser,
+            // ========== LASER PARAMETERS ==========
+            feed_rate: default_feed_rate(),
+            travel_rate: default_travel_rate(),
+            min_power: default_min_power(),
+            max_power: default_max_power(),
+            ppi: default_ppi(),
+            bidirectional: default_bidirectional(),
+            invert: default_invert(),
+            scan_direction: default_scan_direction(),
+            dithering: default_dithering(),
+            halftone_threshold: default_halftone_threshold(),
+            laser_params: obj.laser_params,
+        };
+        Self::fill_shape_specific_data(&mut data, &obj.shape);
+        data
+    }
+
+    /// Save phase: the `(x, y, width, height)` a shape is stored with.
+    ///
+    /// Uses the shape's own centre where it has one: `to_drawing_object`
+    /// restores (x, y) as that centre, and for rotated or asymmetric shapes
+    /// (triangles, odd-sided polygons, gears) the bounds centre differs, which
+    /// would shift the shape on every save/load round-trip. The size is the
+    /// shape's own parameters where it has them, else its bounds.
+    fn shape_placement(shape: &Shape) -> (f64, f64, f64, f64) {
+        let (x1, y1, x2, y2) = shape.bounds();
+        let (cx, cy) = match shape {
+            Shape::Rectangle(r) => (r.center.x, r.center.y),
+            Shape::Circle(c) => (c.center.x, c.center.y),
+            Shape::Ellipse(e) => (e.center.x, e.center.y),
+            Shape::Triangle(t) => (t.center.x, t.center.y),
+            Shape::Polygon(p) => (p.center.x, p.center.y),
+            Shape::Gear(g) => (g.center.x, g.center.y),
+            Shape::Sprocket(s) => (s.center.x, s.center.y),
+            Shape::RasterImage(r) => (r.center.x, r.center.y),
+            Shape::Text(t) => (t.x, t.y),
+            _ => ((x1 + x2) / 2.0, (y1 + y2) / 2.0),
+        };
+
+        let (real_width, real_height) = match shape {
+            Shape::Rectangle(r) => (r.width, r.height),
+            Shape::Circle(c) => (c.radius * 2.0, c.radius * 2.0),
+            Shape::Ellipse(e) => (e.rx * 2.0, e.ry * 2.0),
+            Shape::Triangle(t) => (t.width, t.height),
+            Shape::Polygon(p) => (p.radius * 2.0, p.radius * 2.0),
+            Shape::RasterImage(r) => (r.width_mm, r.height_mm),
+            _ => (x2 - x1, y2 - y1),
+        };
+        (cx, cy, real_width, real_height)
+    }
+
+    /// Save phase: the `shape_type` string stored for a shape type.
+    fn shape_type_name(shape_type: ShapeType) -> &'static str {
+        match shape_type {
+            ShapeType::Rectangle => "rectangle",
+            ShapeType::Circle => "circle",
+            ShapeType::Line => "line",
+            ShapeType::Ellipse => "ellipse",
+            ShapeType::Path => "path",
+            ShapeType::Text => "text",
+            ShapeType::Triangle => "triangle",
+            ShapeType::Polygon => "polygon",
+            ShapeType::Gear => "gear",
+            ShapeType::Sprocket => "sprocket",
+            ShapeType::RasterImage => "raster_image",
+        }
+    }
+
+    /// Save phase: overwrites the defaults in `data` with the fields only
+    /// this kind of shape carries (line points, text, path data, corner
+    /// radius, sides, gear and sprocket teeth, raster settings, ...).
+    fn fill_shape_specific_data(data: &mut ShapeData, shape: &Shape) {
+        match shape {
+            Shape::Line(line) => {
+                data.points = vec![(line.start.x, line.start.y), (line.end.x, line.end.y)];
+            }
+            Shape::Text(text_shape) => {
+                data.text_content = text_shape.text.clone();
+                data.font_size = text_shape.font_size;
+                data.font_family = text_shape.font_family.clone();
+                data.font_bold = text_shape.bold;
+                data.font_italic = text_shape.italic;
+            }
+            Shape::Path(path_shape) => {
+                data.path_data = path_shape.to_svg_path();
+                data.parametric_source = path_shape.parametric_source.clone();
+            }
+            Shape::Rectangle(r) => {
+                data.corner_radius = r.corner_radius;
+                data.is_slot = r.is_slot;
+            }
+            Shape::Polygon(p) => data.sides = p.sides,
+            Shape::Gear(g) => {
+                data.mirrored = g.mirrored;
+                data.teeth = g.teeth;
+                data.module = g.module;
+                data.pressure_angle = g.pressure_angle_deg;
+                data.hole_radius = g.hole_radius;
+            }
+            Shape::Sprocket(s) => {
+                data.mirrored = s.mirrored;
+                data.teeth = s.teeth;
+                data.pitch = s.pitch;
+                data.roller_diameter = s.roller_diameter;
+                data.hole_radius = s.hole_radius;
+            }
+            Shape::RasterImage(raster) => {
+                data.original_path = raster
+                    .original_path
+                    .clone()
+                    .map(|p| p.display().to_string());
+                // ========== EXTRACT LASER PARAMETERS ==========
+                data.feed_rate = raster.feed_rate;
+                data.travel_rate = raster.travel_rate;
+                data.min_power = raster.min_power;
+                data.max_power = raster.max_power;
+                data.ppi = raster.ppi;
+                data.bidirectional = raster.bidirectional;
+                data.invert = raster.invert;
+                data.scan_direction = raster.scan_direction.clone();
+                data.dithering = raster.dithering.clone();
+                data.halftone_threshold = raster.halftone_threshold;
+            }
+            Shape::Triangle(t) => data.right_angle_corner = t.right_angle_corner,
+            Shape::Circle(_) | Shape::Ellipse(_) => {}
+        }
+    }
+
+    pub fn to_drawing_object(data: &ShapeData, next_id: i32) -> Result<DrawingObject> {
+        // Read laser_params once
+        let laser_params = data.laser_params;
+
+        let shape: Shape = match data.shape_type.as_str() {
+            "rectangle" => {
+                let x = data.x - data.width / 2.0;
+                let y = data.y - data.height / 2.0;
+                let mut rect = Rectangle::new(x, y, data.width, data.height);
+                rect.corner_radius = data.corner_radius;
+                rect.is_slot = data.is_slot;
+                rect.laser_params = laser_params;
+                Shape::Rectangle(rect)
+            }
+            "circle" => {
+                let radius = data.width.min(data.height) / 2.0;
+                let center = Point::new(data.x, data.y);
+                let mut circle = Circle::new(center, radius);
+                circle.laser_params = laser_params;
+                Shape::Circle(circle)
+            }
+            "line" => {
+                let mut line = if data.points.len() >= 2 {
+                    let start = Point::new(data.points[0].0, data.points[0].1);
+                    let end = Point::new(data.points[1].0, data.points[1].1);
+                    Line::new(start, end)
+                } else {
+                    let half_w = data.width / 2.0;
+                    let half_h = data.height / 2.0;
+                    let start = Point::new(data.x - half_w, data.y - half_h);
+                    let end = Point::new(data.x + half_w, data.y + half_h);
+                    Line::new(start, end)
+                };
+                line.rotation = data.rotation;
+                line.laser_params = laser_params;
+                Shape::Line(line)
+            }
+            "ellipse" => {
+                let center = Point::new(data.x, data.y);
+                let mut ellipse = Ellipse::new(center, data.width / 2.0, data.height / 2.0);
+                ellipse.laser_params = laser_params;
+                Shape::Ellipse(ellipse)
+            }
+            "triangle" => {
+                let center = Point::new(data.x, data.y);
+                let mut triangle = Triangle::new_with_corner(
+                    center,
+                    data.width,
+                    data.height,
+                    data.right_angle_corner,
+                );
+                triangle.rotation = data.rotation;
+                triangle.laser_params = laser_params;
+                Shape::Triangle(triangle)
+            }
+            "polygon" => {
+                let center = Point::new(data.x, data.y);
+                let radius = data.width.max(data.height) / 2.0;
+                let mut polygon = Polygon::new(center, radius, data.sides);
+                polygon.laser_params = laser_params;
+                Shape::Polygon(polygon)
+            }
+            "polyline" => {
+                let center = Point::new(data.x, data.y);
+                let radius = data.width.min(data.height) / 2.0;
+                let sides = 6;
+                let mut vertices = Vec::with_capacity(sides);
+                for i in 0..sides {
+                    let angle = 2.0 * std::f64::consts::PI * (i as f64) / (sides as f64);
+                    let x = center.x + radius * angle.cos();
+                    let y = center.y + radius * angle.sin();
+                    vertices.push(Point::new(x, y));
+                }
+                let mut path = PathShape::from_points(&vertices, true);
+                path.laser_params = laser_params;
+                Shape::Path(path)
+            }
+            "text" => {
+                let mut s =
+                    TextShape::new(data.text_content.clone(), data.x, data.y, data.font_size);
+                if !data.font_family.is_empty() {
+                    s.font_family = data.font_family.clone();
+                }
+                s.bold = data.font_bold;
+                s.italic = data.font_italic;
+                s.laser_params = laser_params;
+                Shape::Text(s)
+            }
+            "path" => {
+                match PathShape::from_svg_path(&data.path_data) {
+                    Some(mut path_shape) => {
+                        path_shape.laser_params = laser_params;
+                        path_shape.parametric_source = data.parametric_source.clone();
+                        Shape::Path(path_shape)
+                    }
+                    _ => {
+                        // Fallback...
+                        let mut rect = Rectangle::new(data.x, data.y, data.width, data.height);
+                        rect.corner_radius = data.corner_radius;
+                        rect.is_slot = data.is_slot;
+                        rect.laser_params = laser_params;
+                        Shape::Rectangle(rect)
+                    }
+                }
+            }
+            "gear" => {
+                let center = Point::new(data.x, data.y);
+                let mut gear = DesignGear::new(center, data.module, data.teeth);
+                gear.pressure_angle_deg = data.pressure_angle;
+                gear.hole_radius = data.hole_radius;
+                gear.mirrored = data.mirrored;
+                gear.laser_params = laser_params;
+                Shape::Gear(gear)
+            }
+            "sprocket" => {
+                let center = Point::new(data.x, data.y);
+                let mut sprocket = DesignSprocket::new(center, data.pitch, data.teeth);
+                sprocket.roller_diameter = data.roller_diameter;
+                sprocket.hole_radius = data.hole_radius;
+                sprocket.mirrored = data.mirrored;
+                sprocket.laser_params = laser_params;
+                Shape::Sprocket(sprocket)
+            }
+            "raster_image" => {
+                let center = Point::new(data.x, data.y);
+                let original_path = data.original_path.as_ref().map(std::path::PathBuf::from);
+
+                let (image_data, width_mm, height_mm) = if let Some(ref path) = original_path {
+                    if path.exists() {
+                        match crate::image_importer::ImageImporter::load_image_data_with_size(
+                            path,
+                            data.width,
+                            data.height,
+                        ) {
+                            Ok((data, w, h)) => (data, w, h),
+                            Err(e) => {
+                                tracing::warn!(path = ?path, error = %e, "Could not load raster image");
+                                (Vec::new(), data.width, data.height)
+                            }
+                        }
+                    } else {
+                        tracing::warn!(path = ?path, "Raster image file not found");
+                        (Vec::new(), data.width, data.height)
+                    }
+                } else {
+                    (Vec::new(), data.width, data.height)
+                };
+
+                let mut raster = RasterImage::new(
+                    data.id as u64,
+                    center,
+                    width_mm,
+                    height_mm,
+                    image_data,
+                    original_path,
+                );
+
+                // Laser parameters for the raster
+                raster.feed_rate = data.feed_rate;
+                raster.travel_rate = data.travel_rate;
+                raster.min_power = data.min_power;
+                raster.max_power = data.max_power;
+                raster.ppi = data.ppi;
+                raster.bidirectional = data.bidirectional;
+                raster.invert = data.invert;
+                raster.scan_direction = data.scan_direction.clone();
+                raster.dithering = data.dithering.clone();
+                raster.halftone_threshold = data.halftone_threshold;
+                raster.rotation = data.rotation;
+
+                Shape::RasterImage(raster)
+            }
+            _ => anyhow::bail!("Unknown shape type: {}", data.shape_type),
+        };
+
+        // Apply rotation
+        let mut shape = shape;
+        match &mut shape {
+            Shape::Rectangle(s) => s.rotation = data.rotation,
+            Shape::Circle(s) => s.rotation = data.rotation,
+            Shape::Line(s) => s.rotation = data.rotation,
+            Shape::Ellipse(s) => s.rotation = data.rotation,
+            Shape::Path(s) => s.rotation = data.rotation,
+            Shape::Text(s) => s.rotation = data.rotation,
+            Shape::Triangle(s) => s.rotation = data.rotation,
+            Shape::Polygon(s) => s.rotation = data.rotation,
+            Shape::Gear(s) => s.rotation = data.rotation,
+            Shape::Sprocket(s) => s.rotation = data.rotation,
+            Shape::RasterImage(s) => s.rotation = data.rotation,
+        }
+
+        let operation_type = match data.operation_type.as_str() {
+            "pocket" => OperationType::Pocket,
+            _ => OperationType::Profile,
+        };
+
+        let default_name = match shape.shape_type() {
+            crate::model::ShapeType::Rectangle => "Rectangle",
+            crate::model::ShapeType::Circle => "Circle",
+            crate::model::ShapeType::Line => "Line",
+            crate::model::ShapeType::Ellipse => "Ellipse",
+            crate::model::ShapeType::Path => "Path",
+            crate::model::ShapeType::Text => "Text",
+            crate::model::ShapeType::Triangle => "Triangle",
+            crate::model::ShapeType::Polygon => "Polygon",
+            crate::model::ShapeType::Gear => "Gear",
+            crate::model::ShapeType::Sprocket => "Sprocket",
+            crate::model::ShapeType::RasterImage => "Raster Image",
+        };
+
+        Ok(DrawingObject {
+            id: next_id as u64,
+            group_id: data.group_id,
+            name: if data.name.is_empty() {
+                default_name.to_string()
+            } else {
+                data.name.clone()
+            },
+            shape,
+            selected: data.selected,
+            operation_type,
+            use_custom_values: data.use_custom_values,
+            pocket_depth: data.pocket_depth,
+            start_depth: data.start_depth,
+            step_down: data.step_down,
+            step_in: data.step_in,
+            ramp_angle: data.ramp_angle,
+            pocket_strategy: data.pocket_strategy,
+            raster_fill_ratio: data.raster_fill_ratio,
+            offset: data.offset,
+            fillet: data.fillet,
+            chamfer: data.chamfer,
+            lock_aspect_ratio: data.lock_aspect_ratio,
+            use_global_laser: data.use_global_laser,
+            laser_params,
+        })
+    }
+}

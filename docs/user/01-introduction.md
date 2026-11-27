@@ -1,8 +1,8 @@
-# Introduction to GCodeKit5
+# Introduction to GCodeKit6
 
-## What is GCodeKit5?
+## What is GCodeKit6?
 
-GCodeKit5 is a modern, cross-platform G-code sender and CNC machine controller written in Rust with an egui user interface drawn by wgpu. It provides a comprehensive solution for controlling CNC machines, laser engravers, and other G-code-based devices, with an integrated CAD designer and a full suite of CAM tools.
+GCodeKit6 is a modern, cross-platform G-code sender and CNC machine controller written in Rust with an egui user interface drawn by wgpu. It provides a comprehensive solution for controlling CNC machines, laser engravers, and other G-code-based devices, with an integrated CAD designer and a full suite of CAM tools.
 
 ## Who is it for?
 
@@ -81,6 +81,6 @@ GCodeKit5 is a modern, cross-platform G-code sender and CNC machine controller w
 
 ## Next Steps
 
-- [Installation](02-installation.md) — Install GCodeKit5 on your system
+- [Installation](02-installation.md) — Install GCodeKit6 on your system
 - [Quick Start](03-quick-start.md) — Get running in 5 minutes
 - [Device Setup](04-device-setup.md) — Connect your CNC controller

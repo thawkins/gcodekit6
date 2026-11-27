@@ -2202,16 +2202,16 @@ dependencies = [
 ]
 
 [[package]]
-name = "gcodekit5-app"
+name = "gcodekit6-app"
 version = "2.0.0-alpha.5"
 dependencies = [
  "anyhow",
  "dirs",
- "gcodekit5-app",
- "gcodekit5-communication",
- "gcodekit5-core",
- "gcodekit5-devicedb",
- "gcodekit5-settings",
+ "gcodekit6-app",
+ "gcodekit6-communication",
+ "gcodekit6-core",
+ "gcodekit6-devicedb",
+ "gcodekit6-settings",
  "polib",
  "serde",
  "serde_json",
@@ -2221,15 +2221,15 @@ dependencies = [
 ]
 
 [[package]]
-name = "gcodekit5-camtools"
+name = "gcodekit6-camtools"
 version = "2.0.0-alpha.5"
 dependencies = [
  "anyhow",
  "cavalier_contours",
  "chrono",
  "csgrs",
- "gcodekit5-core",
- "gcodekit5-devicedb",
+ "gcodekit6-core",
+ "gcodekit6-devicedb",
  "gerber-types",
  "gerber_parser",
  "image",
@@ -2243,11 +2243,11 @@ dependencies = [
 ]
 
 [[package]]
-name = "gcodekit5-communication"
+name = "gcodekit6-communication"
 version = "2.0.0-alpha.5"
 dependencies = [
  "anyhow",
- "gcodekit5-core",
+ "gcodekit6-core",
  "proptest",
  "serde",
  "serde_json",
@@ -2257,7 +2257,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "gcodekit5-core"
+name = "gcodekit6-core"
 version = "2.0.0-alpha.5"
 dependencies = [
  "chrono",
@@ -2271,18 +2271,19 @@ dependencies = [
 ]
 
 [[package]]
-name = "gcodekit5-design"
+name = "gcodekit6-design"
 version = "2.0.0-alpha.5"
 dependencies = [
  "anyhow",
  "dirs",
- "gcodekit5-ui-egui",
+ "gcodekit6-settings",
+ "gcodekit6-ui-egui",
  "mutants",
  "tracing-subscriber",
 ]
 
 [[package]]
-name = "gcodekit5-designer"
+name = "gcodekit6-designer"
 version = "2.0.0-alpha.5"
 dependencies = [
  "anyhow",
@@ -2291,8 +2292,8 @@ dependencies = [
  "criterion",
  "csgrs",
  "fontdb",
- "gcodekit5-camtools",
- "gcodekit5-core",
+ "gcodekit6-camtools",
+ "gcodekit6-core",
  "image",
  "lyon",
  "nalgebra",
@@ -2307,12 +2308,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "gcodekit5-devicedb"
+name = "gcodekit6-devicedb"
 version = "2.0.0-alpha.5"
 dependencies = [
  "anyhow",
  "chrono",
- "gcodekit5-core",
+ "gcodekit6-core",
  "serde",
  "serde_json",
  "tempfile",
@@ -2321,21 +2322,22 @@ dependencies = [
 ]
 
 [[package]]
-name = "gcodekit5-settings"
+name = "gcodekit6-settings"
 version = "2.0.0-alpha.5"
 dependencies = [
  "craft-settings",
  "dirs",
- "gcodekit5-core",
+ "gcodekit6-core",
  "serde",
  "serde_json",
  "tempfile",
  "thiserror 2.0.21",
  "toml",
+ "tracing",
 ]
 
 [[package]]
-name = "gcodekit5-ui-egui"
+name = "gcodekit6-ui-egui"
 version = "2.0.0-alpha.5"
 dependencies = [
  "anyhow",
@@ -2352,15 +2354,15 @@ dependencies = [
  "egui-wgpu",
  "egui_extras",
  "egui_kittest",
- "gcodekit5-app",
- "gcodekit5-camtools",
- "gcodekit5-communication",
- "gcodekit5-core",
- "gcodekit5-designer",
- "gcodekit5-devicedb",
- "gcodekit5-settings",
- "gcodekit5-ui-egui",
- "gcodekit5-visualizer",
+ "gcodekit6-app",
+ "gcodekit6-camtools",
+ "gcodekit6-communication",
+ "gcodekit6-core",
+ "gcodekit6-designer",
+ "gcodekit6-devicedb",
+ "gcodekit6-settings",
+ "gcodekit6-ui-egui",
+ "gcodekit6-visualizer",
  "glam 0.34.3",
  "image",
  "lyon",
@@ -2372,11 +2374,11 @@ dependencies = [
 ]
 
 [[package]]
-name = "gcodekit5-visualizer"
+name = "gcodekit6-visualizer"
 version = "2.0.0-alpha.5"
 dependencies = [
- "gcodekit5-camtools",
- "gcodekit5-core",
+ "gcodekit6-camtools",
+ "gcodekit6-core",
  "glam 0.34.3",
  "proptest",
  "tracing",

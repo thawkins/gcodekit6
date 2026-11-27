@@ -23,7 +23,7 @@ On other distributions, install the equivalent packages.
 git clone https://github.com/thawkins/gcodekit6.git
 cd gcodekit6
 cargo build --release
-./target/release/gcodekit5
+./target/release/gcodekit6
 ```
 
 ### Serial Port Permissions
@@ -37,11 +37,11 @@ sudo usermod -aG dialout $USER
 
 ### Flatpak
 
-Each GitHub release includes a Flatpak bundle, `gcodekit5-<tag>-linux-x86_64.flatpak`, where
+Each GitHub release includes a Flatpak bundle, `gcodekit6-<tag>-linux-x86_64.flatpak`, where
 `<tag>` is the release tag. Install it with:
 
 ```bash
-flatpak install --user gcodekit5-<tag>-linux-x86_64.flatpak
+flatpak install --user gcodekit6-<tag>-linux-x86_64.flatpak
 ```
 
 ## macOS
@@ -65,10 +65,10 @@ See [Windows Build Guide](../WINDOWS_BUILD.md) for detailed instructions.
 After building, launch the application:
 
 ```bash
-./target/release/gcodekit5
+./target/release/gcodekit6
 ```
 
-You should see the main GCodeKit5 window with the connection panel, DRO, and console.
+You should see the main GCodeKit6 window with the connection panel, DRO, and console.
 
 ## Next Steps
 

@@ -1,7 +1,7 @@
 ; 4-Axis Rotary Table Test (XYZA)
 ; Tests 4-axis simultaneous motion
 ;
-; GCodeKit5 Test File - 4-Axis
+; GCodeKit6 Test File - 4-Axis
 ; Machine: XYZA (4-Axis with A-axis rotary)
 
 G21              ; Metric

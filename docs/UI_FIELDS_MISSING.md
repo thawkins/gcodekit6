@@ -36,18 +36,18 @@
 
 ## Files to Modify
 
-1. `crates/gcodekit5-ui-egui/src/windows/tools_manager/`
+1. `crates/gcodekit6-ui-egui/src/windows/tools_manager/`
    - `view.rs`: add the new fields to `geometry()` and add tab functions for
      Advanced Geometry and Limits
    - `mod.rs`: add the new tabs to `Tab`
-   - `crates/gcodekit5-app/src/tool_form.rs`: add the fields to `ToolForm`,
+   - `crates/gcodekit6-app/src/tool_form.rs`: add the fields to `ToolForm`,
      `from_tool()` and `build()`
 
-2. `crates/gcodekit5-ui-egui/src/windows/materials_manager/`
+2. `crates/gcodekit6-ui-egui/src/windows/materials_manager/`
    - `view.rs`: add the new fields to `properties()` and add a tab function for
      cutting parameters per tool type
    - `mod.rs`: add the new tab to `Tab`
-   - `crates/gcodekit5-app/src/material_form.rs`: add the fields to
+   - `crates/gcodekit6-app/src/material_form.rs`: add the fields to
      `MaterialForm`, `from_material()` and `build()`
 
 ## Implementation Priority

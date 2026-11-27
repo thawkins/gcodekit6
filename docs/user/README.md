@@ -1,13 +1,13 @@
-# GCodeKit5 User Guide
+# GCodeKit6 User Guide
 
-Welcome to the GCodeKit5 User Guide. This documentation covers all features of GCodeKit5, a modern CNC machine controller and CAM suite.
+Welcome to the GCodeKit6 User Guide. This documentation covers all features of GCodeKit6, a modern CNC machine controller and CAM suite.
 
 ---
 
 ## Table of Contents
 
 ### Getting Started
-- [Introduction](01-introduction.md) — What is GCodeKit5 and who is it for
+- [Introduction](01-introduction.md) — What is GCodeKit6 and who is it for
 - [Installation](02-installation.md) — Installing on Linux, macOS, and Windows
 - [Quick Start](03-quick-start.md) — Get up and running in 5 minutes
 

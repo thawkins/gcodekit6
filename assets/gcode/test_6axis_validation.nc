@@ -1,7 +1,7 @@
 ; 6-Axis Validation Edge Cases
 ; Tests for validating 6-axis G-code parser and validator
 ;
-; GCodeKit5 Test File - Validation Edge Cases
+; GCodeKit6 Test File - Validation Edge Cases
 ; Purpose: Test validation of 6-axis G-code
 
 ; ============ VALID CASES ============

@@ -8,8 +8,8 @@ VERSION="${1:-1.0.0}"
 ARCH="${2:-macos-arm64}"
 
 APP_BUNDLE="GCodeKit.app"
-DMG_NAME="gcodekit5-${VERSION}-${ARCH}.dmg"
-TEMP_DMG="gcodekit5-temp-${ARCH}.dmg"
+DMG_NAME="gcodekit6-${VERSION}-${ARCH}.dmg"
+TEMP_DMG="gcodekit6-temp-${ARCH}.dmg"
 VOLUME_NAME="GCodeKit"
 MOUNT_POINT="/Volumes/${VOLUME_NAME}"
 

@@ -5,7 +5,7 @@
     windows_subsystem = "windows"
 )]
 
-use gcodekit5_design::{CliAction, HELP_TEXT, init_logging, parse_args, version_line};
+use gcodekit6_design::{CliAction, HELP_TEXT, init_logging, parse_args, version_line};
 
 #[cfg_attr(test, mutants::skip)]
 fn main() -> anyhow::Result<()> {
@@ -22,11 +22,18 @@ fn main() -> anyhow::Result<()> {
         CliAction::Run(files) => files,
     };
 
+    // Carry the GCodeKit5 folders over before anything (the Windows log file included)
+    // creates the GCodeKit6 ones; the outcome is logged once logging is up.
+    let renamed = gcodekit6_settings::rename::migrate_renamed_folders(
+        &gcodekit6_settings::rename::platform_bases(),
+    );
+
     // Initialize logging
     init_logging()?;
+    renamed.iter().for_each(|migration| migration.log());
 
     // Launch the egui + craft-libs front end, opening any files named on the command line.
-    gcodekit5_ui_egui::run(gcodekit5_ui_egui::LaunchOptions {
+    gcodekit6_ui_egui::run(gcodekit6_ui_egui::LaunchOptions {
         files: files.into_iter().map(Into::into).collect(),
     })?;
 

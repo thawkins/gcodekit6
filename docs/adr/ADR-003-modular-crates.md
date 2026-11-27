@@ -7,7 +7,7 @@ Amended 2026-11-28: replaced the hand-written crate tree with the command that l
 
 ## Context
 
-As GCodeKit5 grew, the single-crate structure became problematic:
+As GCodeKit6 grew, the single-crate structure became problematic:
 
 - **Compile Times**: Full rebuilds took several minutes due to the large codebase
 - **Code Organization**: Related functionality was scattered across files
@@ -17,7 +17,7 @@ As GCodeKit5 grew, the single-crate structure became problematic:
 
 ## Decision
 
-We restructured GCodeKit5 as a **Cargo workspace** with multiple focused crates under `crates/`, plus the root `gcodekit5-design` package that builds the `gcodekit5` binary from `src/main.rs`.
+We restructured GCodeKit6 as a **Cargo workspace** with multiple focused crates under `crates/`, plus the root `gcodekit6-design` package that builds the `gcodekit6` binary from `src/main.rs`.
 
 The member list comes from this command, not from this file:
 
@@ -29,15 +29,15 @@ cargo metadata --no-deps --format-version 1 | jq -r '.packages[].name'
 
 | Crate | Responsibility |
 |-------|----------------|
-| `gcodekit5-core` | Core types, traits, units and errors |
-| `gcodekit5-communication` | Serial, TCP and WebSocket transports; firmware protocols |
-| `gcodekit5-visualizer` | Toolpath interpretation, camera and stock-removal simulation |
-| `gcodekit5-designer` | Shape drawing and toolpath generation |
-| `gcodekit5-camtools` | CAM tools (box maker, puzzle, engraver) |
-| `gcodekit5-devicedb` | Device profiles and persistence |
-| `gcodekit5-settings` | Application settings |
-| `gcodekit5-app` | Toolkit-free application state (machine controller, console model) |
-| `gcodekit5-ui-egui` | egui front end (see ADR-012) |
+| `gcodekit6-core` | Core types, traits, units and errors |
+| `gcodekit6-communication` | Serial, TCP and WebSocket transports; firmware protocols |
+| `gcodekit6-visualizer` | Toolpath interpretation, camera and stock-removal simulation |
+| `gcodekit6-designer` | Shape drawing and toolpath generation |
+| `gcodekit6-camtools` | CAM tools (box maker, puzzle, engraver) |
+| `gcodekit6-devicedb` | Device profiles and persistence |
+| `gcodekit6-settings` | Application settings |
+| `gcodekit6-app` | Toolkit-free application state (machine controller, console model) |
+| `gcodekit6-ui-egui` | egui front end (see ADR-012) |
 
 ## Consequences
 

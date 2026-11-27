@@ -33,9 +33,9 @@ features that the docs do not list but that a user of the GTK build would miss.
 Status values:
 
 - **Ported**: the egui build has it, and the evidence names a test (`file::test`, test
-  names with or without the `test_` prefix are in `crates/gcodekit5-ui-egui/tests/` unless the
-  path says `app/`, which is `crates/gcodekit5-app/tests/`, or `settings/`, which is
-  `crates/gcodekit5-settings/tests/`). Every name cited was checked to exist in G7.
+  names with or without the `test_` prefix are in `crates/gcodekit6-ui-egui/tests/` unless the
+  path says `app/`, which is `crates/gcodekit6-app/tests/`, or `settings/`, which is
+  `crates/gcodekit6-settings/tests/`). Every name cited was checked to exist in G7.
 - **Gap**: the GTK build has it and the egui build does not.
 - **Manual check needed**: the egui code exists but no automated test covers the
   user-visible part, or the check needs real hardware or another OS. No manual checks have
@@ -186,7 +186,7 @@ Status values:
 | Machine bounds, fit to device | *(GTK)* | Ported | `test_visualizer_bounds::work_area_comes_from_the_profile`, `test_visualizer_bounds::fit_to_device_buttons_fit_the_work_area`, `test_visualizer_bounds::fit_to_device_without_a_profile_does_nothing`, `test_visualizer_bounds::machine_bounds_drawn_when_shown` |
 | Stock removal simulation | 30-visualizer, SPEC | Ported | `test_visualizer_stock::toggle_follows_the_setting`, `test_visualizer_stock::simulation_restarts_on_program_change`, `test_visualizer_stock::frame_returns_while_simulating`, `test_visualizer_stock::rendered_cut_lies_in_its_groove`, `test_visualizer_stock::designer_generate_seeds_the_stock`, `test_visualizer_stock::designer_without_stock_keeps_the_stock`, `test_visualizer_stock::dragging_a_field_runs_one_simulation`, `test_visualizer_stock::snapshot_stock_groove`, `test_visualizer_stock::test_show_stock_removal_tooltip_states_the_resolution` (GTK's resolution tooltip) |
 | Run preview (play/pause/speed) | *(GTK)* | Ported | `test_visualizer_preview::preview_steps_by_speed_per_tick`, `test_visualizer_preview::preview_bar_buttons_drive_the_preview`, `test_visualizer_preview::preview_plays_in_frames_and_asks_nothing`, `test_visualizer_preview::file_run_in_the_app_shows_the_visualizer_and_sends_nothing`, `test_visualizer_preview::preview_marker_drawn_unless_hidden`, `test_visualizer_preview::preview_path_spacing_as_gtk`, `test_visualizer_preview::file_run_right_after_an_edit_previews_the_edited_program`, `test_visualizer_preview::app_file_run_hands_the_edit_to_the_machine_at_once` (File > Run previews the editor's text, as in GTK) |
-| Copy cursor coordinates (right-click menu) | *(GTK)* | Ported | `test_visualizer_menu::copy_cursor_coordinates_copies_the_clicked_point`, `test_visualizer_menu::cursor_on_plane_inverts_the_projection`, `test_visualizer_menu::coordinates_text_is_gtk_format`, `test_visualizer_menu::menu_toggles_and_fits` (GTK's menu: fits, copy, Toggle Grid/Machine Bounds/Rapid Moves/Cutting Moves; the copied text keeps GTK's three decimals, `gcodekit5_core::units::format_length`, as clipboard data rather than the UI's two) |
+| Copy cursor coordinates (right-click menu) | *(GTK)* | Ported | `test_visualizer_menu::copy_cursor_coordinates_copies_the_clicked_point`, `test_visualizer_menu::cursor_on_plane_inverts_the_projection`, `test_visualizer_menu::coordinates_text_is_gtk_format`, `test_visualizer_menu::menu_toggles_and_fits` (GTK's menu: fits, copy, Toggle Grid/Machine Bounds/Rapid Moves/Cutting Moves; the copied text keeps GTK's three decimals, `gcodekit6_core::units::format_length`, as clipboard data rather than the UI's two) |
 | Intensity statistics | *(GTK)* | Ported | `test_visualizer_intensity::intensity_statistics_as_gtk`, `test_visualizer_intensity::inspector_shows_the_s_statistics` |
 | Sidebar Hide kept between runs (and the Designer inspector's) | *(GTK)* | Ported | `test_panel_visibility::visualizer_sidebar_hide_is_kept_between_runs`, `test_panel_visibility::designer_inspector_hide_is_kept_between_runs`, `test_panel_visibility::visualizer_pane_follows_the_setting` (GTK's `visualizer_sidebar` key; GTK did not keep the inspector's, egui keeps it under `designer_properties`) |
 
@@ -216,7 +216,7 @@ Status values:
 | Ctrl+G / Ctrl+Shift+G | 40-designer, 90-shortcuts | Ported | `test_designer_shape_ops::test_group_and_ungroup_keys_run_on_the_canvas_but_not_while_typing`, `test_designer_shape_ops::test_group_and_ungroup_from_context_menu`, `test_commands::test_every_gtk_accelerator_bound` (Designer keymap scope; also Group / Ungroup in the context menu. GTK's second ungroup key Ctrl+U stays Unlock) |
 | Offset, fillet, chamfer | 40-designer | Ported | `test_designer_properties_shapes::offset_previews_while_typing_and_applies_on_commit`, `test_designer_properties_shapes::path_fillet_and_closed` |
 | Layers: hide, lock, rename, reorder | 40-designer | Ported | `test_designer_layers::layer_visibility_hides_shape`, `test_designer_layers::locked_shape_is_drawn_but_not_pickable`, `test_designer_layers::move_buttons_reorder_one_undo_step_each` |
-| Import SVG and DXF | 40-designer | Ported | `test_designer_files::import_svg_adds_its_shapes`, `test_designer_files::import_dxf_adds_its_shapes` (still the gcodekit5 readers, not craft-libs: CHANGELOG known gap) |
+| Import SVG and DXF | 40-designer | Ported | `test_designer_files::import_svg_adds_its_shapes`, `test_designer_files::import_dxf_adds_its_shapes` (still the gcodekit6 readers, not craft-libs: CHANGELOG known gap) |
 | Import STL | 40-designer | Ported | `test_designer_stl_import::test_stl_import_adds_the_models_shadow_when_enabled`, `test_designer_stl_import::test_stl_import_is_refused_when_disabled`, `test_designer_stl_import::test_import_dialog_offers_stl_only_when_enabled` (behind GTK's Settings switch "STL File Import", `ui.enable_stl_import`) |
 | Import images, engraving settings, Frame | 40-designer | Ported | `test_designer_files::import_image_in_laser_mode_only`, `test_designer_properties_cam::raster_image_engraving_settings`, `test_designer_files::generate_and_frame_hand_gcode_to_the_editor` |
 | Profile and pocket operations, per-shape CAM | 40-designer | Ported | `test_designer_properties_cam::cam_fields_follow_use_global_and_pocket`, `test_designer_toolpath::exported_gcode_cuts_what_the_preview_shows` |
@@ -370,7 +370,7 @@ Features without automated evidence of the user-visible part:
 
 Comparison of the egui pages with the GTK build, after the visual restore (tasks V1 to V7,
 2026-11-26). Renders: 1440x900 dark, from the page snapshots in
-`crates/gcodekit5-ui-egui/tests/snapshots/*_page_dark.png` (copies in
+`crates/gcodekit6-ui-egui/tests/snapshots/*_page_dark.png` (copies in
 `target/temp/v7-capture/`, untracked). Pages with a help image (`resources/help_images/`)
 were compared with it. The other pages were compared with the GTK source layout, because
 there is no screenshot of them. The lists below are what still differs.

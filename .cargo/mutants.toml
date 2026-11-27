@@ -20,10 +20,10 @@ skip_calls = [
 # Exclude UI crate (egui front end, needs a GPU), settings, and device DB
 # Focus on core logic crates
 exclude_globs = [
-    "crates/gcodekit5-ui-egui/**",
-    "crates/gcodekit5-settings/**",
-    "crates/gcodekit5-devicedb/**",
-    "crates/gcodekit5-camtools/**",
+    "crates/gcodekit6-ui-egui/**",
+    "crates/gcodekit6-settings/**",
+    "crates/gcodekit6-devicedb/**",
+    "crates/gcodekit6-camtools/**",
 ]
 
 # Timeout settings — builds can be slow

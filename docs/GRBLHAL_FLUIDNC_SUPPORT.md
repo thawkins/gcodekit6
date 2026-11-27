@@ -1,16 +1,16 @@
 # grblHAL and FluidNC Support
 
-GCodeKit5 drives grblHAL and FluidNC controllers through its GRBL protocol. Both
+GCodeKit6 drives grblHAL and FluidNC controllers through its GRBL protocol. Both
 firmwares speak the GRBL protocol, so a profile set to either one connects,
 streams and edits settings the same way as a GRBL machine.
 
 ## Device profiles
 
 The device profile's controller type can be `GrblHal` or `FluidNC`
-(`ControllerType` in `crates/gcodekit5-devicedb/src/model.rs`). The Device Manager form
+(`ControllerType` in `crates/gcodekit6-devicedb/src/model.rs`). The Device Manager form
 lists them as "grblHAL (supported via GRBL)" and "FluidNC (supported via GRBL)".
 
-In the protocol registry (`crates/gcodekit5-communication/src/firmware/protocol_registry.rs`)
+In the protocol registry (`crates/gcodekit6-communication/src/firmware/protocol_registry.rs`)
 grblHAL and FluidNC are **not** marked as supported protocols of their own.
 `ControllerProtocol::from_name` maps `grblHAL`, `GrblHal` and `FluidNC` to the
 GRBL protocol.
@@ -70,7 +70,7 @@ sudo ./scripts/start-grblhal-sim.sh   # start; creates /dev/ttyGRBL
 sudo ./scripts/stop-grblhal-sim.sh    # stop socat and remove /dev/ttyGRBL
 ```
 
-Connect GCodeKit5 to the serial port `/dev/ttyGRBL`. Any baud rate works.
+Connect GCodeKit6 to the serial port `/dev/ttyGRBL`. Any baud rate works.
 
 ## Troubleshooting
 

@@ -3,20 +3,20 @@
 ## Status
 Superseded by ADR-012
 
-Amended 2026-11-28: the GTK layout manager was removed with the GTK front end. Pages in `crates/gcodekit5-ui-egui/src/workspace.rs` now use resizable egui side and bottom panels. The Decision section records both.
+Amended 2026-11-28: the GTK layout manager was removed with the GTK front end. Pages in `crates/gcodekit6-ui-egui/src/workspace.rs` now use resizable egui side and bottom panels. The Decision section records both.
 
 ## Date
 2026-02-18
 
 ## Context
-GCodeKit5 has many UI panels (Connection, DRO, Jog, Editor, Console, Visualizer, Overrides, Macros, Settings) that need to be visible simultaneously on varying screen sizes. Users operate on screens from 1080p at 125% scaling to 4K monitors, and need the ability to resize panels to prioritize different workflows (e.g., more space for the visualizer during preview, more space for the editor during G-code editing).
+GCodeKit6 has many UI panels (Connection, DRO, Jog, Editor, Console, Visualizer, Overrides, Macros, Settings) that need to be visible simultaneously on varying screen sizes. Users operate on screens from 1080p at 125% scaling to 4K monitors, and need the ability to resize panels to prioritize different workflows (e.g., more space for the visualizer during preview, more space for the editor during G-code editing).
 
 Early approaches used fixed layouts, which wasted space on large screens and cramped content on smaller ones.
 
 ## Decision
 Original (GTK, removed): a central layout manager tracked each panel's visibility, region (left, center, right, bottom), dock state and size, drew the dividers with GTK `Paned` widgets, saved the state between sessions, and offered predefined layouts.
 
-Current (egui): each page in `crates/gcodekit5-ui-egui/src/workspace.rs` lays out its panes with `egui::Panel::right(...)` and `egui::Panel::bottom(...)`, both `.resizable(true)`, with a default size and, where needed, a size range. Which hideable panels are shown is saved in the settings' `panel_visibility` map. There are no predefined layouts and panels do not move between regions.
+Current (egui): each page in `crates/gcodekit6-ui-egui/src/workspace.rs` lays out its panes with `egui::Panel::right(...)` and `egui::Panel::bottom(...)`, both `.resizable(true)`, with a default size and, where needed, a size range. Which hideable panels are shown is saved in the settings' `panel_visibility` map. There are no predefined layouts and panels do not move between regions.
 
 ## Consequences
 

@@ -18,10 +18,10 @@ a task is NOT complete while any edited `.rs` file is unformatted.
 
 ## Workspace Layout
 
-- All crates live in `crates/<crate-name>/` (e.g. `crates/gcodekit5-core`), each with its own metadata,
+- All crates live in `crates/<crate-name>/` (e.g. `crates/gcodekit6-core`), each with its own metadata,
   dependencies and targets. Prefer small, single-responsibility crates.
 - The root `Cargo.toml` is the workspace manifest (explicit `members = [...]` list, `resolver = "2"`) and also
-  hosts the primary binary package (`[package] name = "gcodekit5-design"`, `[[bin]] name = "gcodekit5"`).
+  hosts the primary binary package (`[package] name = "gcodekit6-design"`, `[[bin]] name = "gcodekit6"`).
   Do not put library-crate metadata or dependencies there.
 - Organize modules as named files with inline `mod` declarations; reserve `mod.rs` for legacy or deeply
   nested modules.
@@ -42,7 +42,7 @@ a task is NOT complete while any edited `.rs` file is unformatted.
   when ownership is not needed.
 - Errors: `Result<T, E>` with `?`; `thiserror` for custom (library) errors, `anyhow::Result` in `main`.
 - Concurrency: there is no async runtime. Device I/O runs on a worker thread fed by `std::sync::mpsc`
-  (gcodekit5-app `MachineController`).
+  (gcodekit6-app `MachineController`).
 - Logging: the `tracing` crate with structured logging, not `println!`/`eprintln!` in application code;
   `debug!()` for non-hot paths, `trace!()` for debug scenarios. Remove temporary `debug!()` calls once the
   issue is resolved.
@@ -72,13 +72,13 @@ Layout:
 - All tests live in a crate's `tests/` directory (workspace-root tests in the root `tests/`). Do not add new
   inline `#[cfg(test)]` modules to library source; move inline tests out where practical.
 - Use `#[test]` (no async tests). Name tests `test_<component>_<scenario>`. Import the crate under test by
-  its public name (e.g. `gcodekit5_core`).
+  its public name (e.g. `gcodekit6_core`).
 - One file per test unit, one binary per crate: each crate sets `autotests = false` and one
   `[[test]] name = "all"` with `path = "tests/all.rs"`. Add a file as one more
   `#[path = "test_x.rs"] mod test_x;` line in `tests/all.rs`, never as a new top-level target. Test names keep
   the `test_x::` prefix. Convert CI `--test <file>` uses to `-E 'test(<file>::)'`.
 - Private items: widen to `pub(crate)` and re-import via `#[path = "../src/<module>.rs"] mod <module>;`;
-  `crate::` inside it resolves at the `all.rs` root, so add a `pub use gcodekit5_<crate>::<x>;` shim there
+  `crate::` inside it resolves at the `all.rs` root, so add a `pub use gcodekit6_<crate>::<x>;` shim there
   (or use the crate-absolute path). Complex cases put this in the source file:
   `#[cfg(test)] #[path = "../../tests/test_<module>.rs"] mod test_<module>;`. A narrow `#[allow(clippy::duplicate_mod)]` on `all.rs` is
   expected when children share `support/mod.rs`.

@@ -49,7 +49,7 @@ struct SharedDeviceState {
 
 ### 3. Current Use in the egui Front End
 
-egui is immediate mode: there are no widget objects or signal handlers to share state with. `GcodeKitApp` (`crates/gcodekit5-ui-egui/src/app.rs`) owns the panes. `Rc<RefCell<_>>` is kept only for the panes that more than one page draws (the editor, designer and CAM tools). The machine worker runs on its own `std::thread`; it talks to the UI over `std::sync::mpsc` channels, and `Arc<Mutex<_>>` holds the little state the two threads share (`crates/gcodekit5-app/src/machine/`).
+egui is immediate mode: there are no widget objects or signal handlers to share state with. `GcodeKitApp` (`crates/gcodekit6-ui-egui/src/app.rs`) owns the panes. `Rc<RefCell<_>>` is kept only for the panes that more than one page draws (the editor, designer and CAM tools). The machine worker runs on its own `std::thread`; it talks to the UI over `std::sync::mpsc` channels, and `Arc<Mutex<_>>` holds the little state the two threads share (`crates/gcodekit6-app/src/machine/`).
 
 ### Guidelines
 

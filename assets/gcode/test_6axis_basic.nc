@@ -1,7 +1,7 @@
 ; 6-Axis Test G-code
 ; Test file for 6-axis CNC machines (XYZABC)
 ; 
-; GCodeKit5 Test File
+; GCodeKit6 Test File
 ; Machine: 6-Axis CNC
 ; Material: Aluminum
 

@@ -26,17 +26,17 @@ jobs:
           - os_name: Linux-x86_64
             os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
-            bin: gcodekit5
+            bin: gcodekit6
             name_suffix: linux-x86_64
           - os_name: macOS-ARM64
             os: macos-latest
             target: aarch64-apple-darwin
-            bin: gcodekit5
+            bin: gcodekit6
             name_suffix: macos-arm64
           - os_name: Windows-x86_64
             os: windows-latest
             target: x86_64-pc-windows-msvc
-            bin: gcodekit5.exe
+            bin: gcodekit6.exe
             name_suffix: windows-x86_64
         
     steps:
@@ -69,7 +69,7 @@ jobs:
           echo "PKG_VERSION=$PKG_VERSION"
           echo "CARGO_NUM_VERSION=$CARGO_NUM_VERSION"
           echo "BUNDLE_VERSION=$BUNDLE_VERSION"
-          echo "ASSET_NAME=gcodekit5-$REF_SLUG-${{ matrix.platform.name_suffix }}"
+          echo "ASSET_NAME=gcodekit6-$REF_SLUG-${{ matrix.platform.name_suffix }}"
         } >> "$GITHUB_ENV"
 
     - name: Install Linux Dependencies
@@ -96,12 +96,12 @@ jobs:
         mkdir -p "GCodeKit.app/Contents/Resources"
 
         # Copy the binary
-        cp target/${{ matrix.platform.target }}/release/${{ matrix.platform.bin }} "GCodeKit.app/Contents/MacOS/gcodekit5"
+        cp target/${{ matrix.platform.target }}/release/${{ matrix.platform.bin }} "GCodeKit.app/Contents/MacOS/gcodekit6"
 
         # Generate the app icon (.icns) from the 256x256 PNG
         ICONSET="target/AppIcon.iconset"
         mkdir -p "$ICONSET"
-        SRC=assets/pictures/com.github.thawkins.gcodekit5.png
+        SRC=assets/pictures/com.github.thawkins.gcodekit6.png
         for size in 16 32 128 256; do
           sips -z $size $size "$SRC" --out "$ICONSET/icon_${size}x${size}.png"
         done
@@ -120,11 +120,11 @@ jobs:
             <key>CFBundleDevelopmentRegion</key>
             <string>en</string>
             <key>CFBundleExecutable</key>
-            <string>gcodekit5</string>
+            <string>gcodekit6</string>
             <key>CFBundleIconFile</key>
             <string>AppIcon</string>
             <key>CFBundleIdentifier</key>
-            <string>com.github.thawkins.gcodekit5</string>
+            <string>com.github.thawkins.gcodekit6</string>
             <key>CFBundleInfoDictionaryVersion</key>
             <string>6.0</string>
             <key>CFBundleName</key>
@@ -155,23 +155,23 @@ jobs:
       run: |
         timeout 1800 cargo build --release --target ${{ matrix.platform.target }}
         cp target/${{ matrix.platform.target }}/release/${{ matrix.platform.bin }} ${{ env.ASSET_NAME }}
-        cp target/${{ matrix.platform.target }}/release/${{ matrix.platform.bin }} gcodekit5-linux-x86_64
+        cp target/${{ matrix.platform.target }}/release/${{ matrix.platform.bin }} gcodekit6-linux-x86_64
         
         # Install packaging tools
         cargo install cargo-deb
         cargo install cargo-generate-rpm
 
         # Build Deb
-        cargo deb --target ${{ matrix.platform.target }} --no-build --output gcodekit5-${{ env.REF_SLUG }}-linux-x86_64.deb
+        cargo deb --target ${{ matrix.platform.target }} --no-build --output gcodekit6-${{ env.REF_SLUG }}-linux-x86_64.deb
 
         # Build RPM (rpm versions may not contain '-': 1.2.0-beta.2 -> 1.2.0~beta.2)
         cargo generate-rpm --target ${{ matrix.platform.target }} \
           --set-metadata "version = \"${PKG_VERSION//-/\~}\"" \
-          --output gcodekit5-${{ env.REF_SLUG }}-linux-x86_64.rpm
+          --output gcodekit6-${{ env.REF_SLUG }}-linux-x86_64.rpm
         
         # Build Flatpak
-        flatpak-builder --user --install-deps-from=flathub --force-clean build-dir flatpak/com.github.thawkins.gcodekit5.yml --repo=repo
-        flatpak build-bundle repo gcodekit5-${{ env.REF_SLUG }}-linux-x86_64.flatpak com.github.thawkins.gcodekit5
+        flatpak-builder --user --install-deps-from=flathub --force-clean build-dir flatpak/com.github.thawkins.gcodekit6.yml --repo=repo
+        flatpak build-bundle repo gcodekit6-${{ env.REF_SLUG }}-linux-x86_64.flatpak com.github.thawkins.gcodekit6
 
         # Build AppImage
         mkdir -p AppDir/usr/bin
@@ -184,11 +184,11 @@ jobs:
         ./linuxdeploy-x86_64.AppImage \
           --appdir AppDir \
           --output appimage \
-          --icon-file assets/pictures/com.github.thawkins.gcodekit5.png \
-          --desktop-file flatpak/com.github.thawkins.gcodekit5.desktop \
+          --icon-file assets/pictures/com.github.thawkins.gcodekit6.png \
+          --desktop-file flatpak/com.github.thawkins.gcodekit6.desktop \
           --executable AppDir/usr/bin/${{ matrix.platform.bin }}
 
-        find . -maxdepth 1 -name "gcodekit5-*.AppImage" -exec mv {} gcodekit5-${{ env.REF_SLUG }}-linux-x86_64.AppImage \;
+        find . -maxdepth 1 -name "gcodekit6-*.AppImage" -exec mv {} gcodekit6-${{ env.REF_SLUG }}-linux-x86_64.AppImage \;
 
     - name: Build (Windows)
       if: matrix.platform.os == 'windows-latest'
@@ -197,9 +197,9 @@ jobs:
         cargo build --release --target ${{ matrix.platform.target }}
 
         # Portable distribution: the executable and the licence, nothing else
-        New-Item -ItemType Directory -Force -Path "dist\gcodekit5" | Out-Null
-        Copy-Item "target\${{ matrix.platform.target }}\release\${{ matrix.platform.bin }}" "dist\gcodekit5\"
-        Copy-Item "wix\License.rtf" "dist\gcodekit5\"
+        New-Item -ItemType Directory -Force -Path "dist\gcodekit6" | Out-Null
+        Copy-Item "target\${{ matrix.platform.target }}\release\${{ matrix.platform.bin }}" "dist\gcodekit6\"
+        Copy-Item "wix\License.rtf" "dist\gcodekit6\"
 
     - name: Install WiX Toolset v3
       if: matrix.platform.os == 'windows-latest'
@@ -229,10 +229,10 @@ jobs:
       run: |
         cargo install cargo-wix
 
-        # The package is gcodekit5-design; its binary is gcodekit5.exe
-        cargo wix --package gcodekit5-design --target ${{ matrix.platform.target }} --no-build --nocapture --install-version ${{ env.CARGO_NUM_VERSION }} -o gcodekit5-${{ env.REF_SLUG }}-windows-x86_64.msi
+        # The package is gcodekit6-design; its binary is gcodekit6.exe
+        cargo wix --package gcodekit6-design --target ${{ matrix.platform.target }} --no-build --nocapture --install-version ${{ env.CARGO_NUM_VERSION }} -o gcodekit6-${{ env.REF_SLUG }}-windows-x86_64.msi
 
-        Compress-Archive -Path "dist\gcodekit5\*" -DestinationPath "gcodekit5-${{ env.REF_SLUG }}-windows-x86_64-portable.zip"
+        Compress-Archive -Path "dist\gcodekit6\*" -DestinationPath "gcodekit6-${{ env.REF_SLUG }}-windows-x86_64-portable.zip"
 
     - name: Upload Artifact (Linux)
       if: matrix.platform.os_name == 'Linux-x86_64'
@@ -244,7 +244,7 @@ jobs:
           *.deb
           *.rpm
           *.flatpak
-          gcodekit5-*.AppImage
+          gcodekit6-*.AppImage
         if-no-files-found: error
 
     - name: Upload Artifact (macOS)
@@ -301,7 +301,7 @@ jobs:
           *.flatpak
           *.deb
           *.rpm
-          gcodekit5-*.AppImage
+          gcodekit6-*.AppImage
 
     - name: Release (macOS)
       if: startsWith(matrix.platform.os_name, 'macOS') && github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')

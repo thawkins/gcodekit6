@@ -61,10 +61,10 @@ jobs:
         if: ${{ inputs.package == '' }}
         run: |
           cargo mutants \
-            -p gcodekit5-core \
-            -p gcodekit5-designer \
-            -p gcodekit5-visualizer \
-            -p gcodekit5-communication \
+            -p gcodekit6-core \
+            -p gcodekit6-designer \
+            -p gcodekit6-visualizer \
+            -p gcodekit6-communication \
             --output mutants-results -- \
             --release 2>&1 | tee mutants-output.txt
 

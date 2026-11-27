@@ -59,7 +59,7 @@ def select(sections, version, published):
 def render(version, chosen, repo):
     """Render the release body in Markdown."""
     tag = f"v{version}"
-    out = [f"# GCodeKit5 {version}", ""]
+    out = [f"# GCodeKit6 {version}", ""]
     if "-" in version:
         out += [
             "This is a pre-release. It has not been tested on every "

@@ -17,7 +17,7 @@ callbacks. Event flow was hard to trace and components were tightly coupled.
 
 ## Decision (proposed, not adopted)
 
-Add one typed, asynchronous `EventBus` in `gcodekit5-core`: a root `AppEvent` enum (connection,
+Add one typed, asynchronous `EventBus` in `gcodekit6-core`: a root `AppEvent` enum (connection,
 machine, file, UI, communication, settings, error), a subscriber trait with filters, publish
 helpers, and a bridge to GTK signals. Existing listeners would have been migrated to it in phases.
 
@@ -26,7 +26,7 @@ helpers, and a bridge to GTK signals. Existing listeners would have been migrate
 The bus was never built. The egui front end (ADR-012) removed the need for it:
 
 - egui is immediate mode, so there are no widget signals or UI callbacks to connect.
-- `MachineController` (`crates/gcodekit5-app/src/machine/`) owns one worker thread. Commands go
+- `MachineController` (`crates/gcodekit6-app/src/machine/`) owns one worker thread. Commands go
   to it and `MachineEvent`s come back over two `std::sync::mpsc` channels; the app collects the
   events with `MachineController::poll` each frame.
 - The listener types above were removed in audit T48

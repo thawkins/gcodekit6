@@ -19,7 +19,7 @@ Notes:
 
 - The release and debug builds are from a clean tree.
 - The tests and coverage rows are a re-run, so they are not from a clean tree:
-  - The first test run (3m 2s) found 5 tests in `gcodekit5-ui-egui` that fail under `cargo test`, which runs every test of a binary in one process:
+  - The first test run (3m 2s) found 5 tests in `gcodekit6-ui-egui` that fail under `cargo test`, which runs every test of a binary in one process:
     - `test_machine_jog::test_inverted_z_jogs_negative` raced on a process-wide jog-inversion table;
     - four `test_cam_drill_press` tests raced with the laser-mode test's `$32=1`.
   - The first coverage run did not compile, because a source file was being edited while it ran.
@@ -48,13 +48,13 @@ How it was measured:
 
 | Crate | Lines covered | Lines | Coverage |
 |-------|---------------|-------|----------|
-| gcodekit5 (bin, `src/`) | 0 | 24 | 0.00% |
-| gcodekit5-app | 4513 | 5052 | 89.33% |
-| gcodekit5-camtools | 4014 | 5062 | 79.30% |
-| gcodekit5-communication | 970 | 1707 | 56.82% |
-| gcodekit5-core | 1255 | 2153 | 58.29% |
-| gcodekit5-designer | 9140 | 14609 | 62.56% |
-| gcodekit5-devicedb | 321 | 481 | 66.74% |
-| gcodekit5-settings | 1320 | 1629 | 81.03% |
-| gcodekit5-ui-egui | 22874 | 24729 | 92.50% |
-| gcodekit5-visualizer | 1737 | 3390 | 51.24% |
+| gcodekit6 (bin, `src/`) | 0 | 24 | 0.00% |
+| gcodekit6-app | 4513 | 5052 | 89.33% |
+| gcodekit6-camtools | 4014 | 5062 | 79.30% |
+| gcodekit6-communication | 970 | 1707 | 56.82% |
+| gcodekit6-core | 1255 | 2153 | 58.29% |
+| gcodekit6-designer | 9140 | 14609 | 62.56% |
+| gcodekit6-devicedb | 321 | 481 | 66.74% |
+| gcodekit6-settings | 1320 | 1629 | 81.03% |
+| gcodekit6-ui-egui | 22874 | 24729 | 92.50% |
+| gcodekit6-visualizer | 1737 | 3390 | 51.24% |

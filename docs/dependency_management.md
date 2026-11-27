@@ -1,6 +1,6 @@
 # Dependency Management Guide
 
-This document describes the dependency management process for GCodeKit5.
+This document describes the dependency management process for GCodeKit6.
 
 ## Automated Updates (Dependabot)
 
