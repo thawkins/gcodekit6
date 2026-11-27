@@ -15,6 +15,9 @@ use std::path::{Path, PathBuf};
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct PersistedTool {
     pub id: ToolId,
+    /// The tool number; files written before it was stored load as 0.
+    #[serde(default)]
+    pub number: u32,
     pub name: String,
     pub description: String,
     pub tool_type: ToolType,
@@ -44,6 +47,7 @@ impl From<&Tool> for PersistedTool {
     fn from(t: &Tool) -> Self {
         Self {
             id: t.id.clone(),
+            number: t.number,
             name: t.name.clone(),
             description: t.description.clone(),
             tool_type: t.tool_type,
@@ -69,9 +73,7 @@ impl From<&Tool> for PersistedTool {
 
 impl From<PersistedTool> for Tool {
     fn from(t: PersistedTool) -> Self {
-        // Tool number is intentionally not persisted (it is not a device tool index).
-        // Use 0 as a stable placeholder.
-        let mut tool = Tool::new(t.id, 0, t.name, t.tool_type, t.diameter, t.length);
+        let mut tool = Tool::new(t.id, t.number, t.name, t.tool_type, t.diameter, t.length);
         tool.description = t.description;
         tool.shaft_diameter = t.shaft_diameter;
         tool.flute_length = t.flute_length;
@@ -155,7 +157,7 @@ impl ToolsManagerBackend {
 
     /// The custom tools as the file holds them.
     fn custom_json(&self) -> Result<String, BoxedError> {
-        // Only custom tools are saved (tool numbers are intentionally not persisted).
+        // Only custom tools are saved.
         let mut custom_tools: Vec<PersistedTool> = self
             .library
             .get_all_tools()
