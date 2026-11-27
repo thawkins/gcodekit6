@@ -953,6 +953,7 @@ impl Pane for VisualizerPane {
                 | MachineEvent::StreamStopped { acked, .. } => self.progress = count(*acked),
                 MachineEvent::StreamFinished { lines } => self.progress = count(*lines),
                 MachineEvent::Connected
+                | MachineEvent::Reconnecting { .. }
                 | MachineEvent::Disconnected
                 | MachineEvent::StatusReport(_)
                 | MachineEvent::Received(_)

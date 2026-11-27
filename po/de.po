@@ -4779,3 +4779,12 @@ msgstr "Wählen Sie das aktive Werkstückkoordinatensystem: Das Programm hat es 
 
 msgid "the command line is empty"
 msgstr "die Befehlszeile ist leer"
+
+msgid "Reconnecting… ({attempt}/{max})"
+msgstr "Verbinde erneut… ({attempt}/{max})"
+
+msgid "connection lost: the job was stopped and will not resume"
+msgstr "Verbindung verloren: Der Auftrag wurde gestoppt und wird nicht fortgesetzt"
+
+msgid "automatic reconnect failed"
+msgstr "automatische Wiederverbindung fehlgeschlagen"

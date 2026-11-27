@@ -124,16 +124,6 @@ fn test_tcp_transport_idle_receive_returns_quickly() {
     server.join().expect("server thread");
 }
 
-#[test]
-fn test_websocket_connect_is_rejected_clearly() {
-    let mut comm = SerialCommunicator::new();
-    assert!(
-        comm.connect(&ConnectionParams::websocket("127.0.0.1", 81))
-            .is_err()
-    );
-    assert!(!comm.is_connected());
-}
-
 /// A port whose cable has been pulled: every read and write fails the way
 /// serialport reports a hang-up.
 struct HungUpPort;

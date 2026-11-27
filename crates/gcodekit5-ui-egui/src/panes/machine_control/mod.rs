@@ -795,6 +795,7 @@ impl MachineControlPane {
                 matches!(classify_response(line), GrblResponseLine::Reset(_))
             }
             MachineEvent::Connected
+            | MachineEvent::Reconnecting { .. }
             | MachineEvent::Disconnected
             | MachineEvent::StatusReport(_)
             | MachineEvent::StreamProgress { .. }
@@ -1357,6 +1358,8 @@ impl Pane for MachineControlPane {
         // profile's pen mode at job start.
         let pen_mode = profile.is_some_and(|p| p.pen_mode);
         self.with_controller(|c| c.set_pen_mode(pen_mode));
+        // The next connect uses the profile's network connection and Auto Reconnect.
+        self.connection.apply_profile(profile);
     }
 
     fn take_confirm(&mut self) -> Option<ConfirmRequest> {

@@ -201,6 +201,7 @@ impl FirmwareSettingsWindow {
                     }
                 }
                 MachineEvent::Connected
+                | MachineEvent::Reconnecting { .. }
                 | MachineEvent::StatusReport(_)
                 | MachineEvent::StreamProgress { .. }
                 | MachineEvent::StreamHalted { .. }

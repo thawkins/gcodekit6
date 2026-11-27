@@ -388,6 +388,7 @@ impl ProbeRun {
                 None
             }
             MachineEvent::Connected
+            | MachineEvent::Reconnecting { .. }
             | MachineEvent::Disconnected
             | MachineEvent::StatusReport(_)
             | MachineEvent::StreamProgress { .. }

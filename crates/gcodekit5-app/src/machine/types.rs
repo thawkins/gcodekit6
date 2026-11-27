@@ -61,9 +61,15 @@ pub mod worker_text {
     pub const EMPTY_LINE: &str = "the command line is empty";
     /// [`MachineError::Halted`](super::MachineError::Halted): after a Repetier `M112`.
     pub const HALTED: &str = "the controller is emergency-stopped (M112): reset it or reconnect";
+    /// The connection dropped while a program streamed: the job was stopped, and a
+    /// reconnect does not resume it.
+    pub const JOB_STOPPED_CONNECTION_LOST: &str =
+        "connection lost: the job was stopped and will not resume";
+    /// Every automatic reconnect attempt failed; the connection stays closed.
+    pub const RECONNECT_FAILED: &str = "automatic reconnect failed";
 
     /// Every text above, for a front end's translation table.
-    pub const ALL: [&str; 20] = [
+    pub const ALL: [&str; 22] = [
         CONNECT_FAILED,
         WRITE_FAILED,
         READ_FAILED,
@@ -84,6 +90,8 @@ pub mod worker_text {
         RESEND_FAILED,
         EMPTY_LINE,
         HALTED,
+        JOB_STOPPED_CONNECTION_LOST,
+        RECONNECT_FAILED,
     ];
 }
 
@@ -244,6 +252,16 @@ pub enum MachineEvent {
     Connected,
     /// The transport closed (on request or after an error).
     Disconnected,
+    /// The connection dropped and Auto Reconnect is on: the worker waits, then tries to
+    /// open it again. Follows [`MachineEvent::Disconnected`]; [`MachineEvent::Connected`]
+    /// reports success, [`MachineEvent::Disconnected`] that the worker gave up (or was told
+    /// to stop). A program that was streaming is not resumed.
+    Reconnecting {
+        /// This attempt, from 1.
+        attempt: u32,
+        /// The most attempts made before giving up.
+        max_attempts: u32,
+    },
     /// A parsed `<...>` status report.
     StatusReport(Box<FullStatus>),
     /// A response line that is not an ack or status report (`[MSG:...]`, banner, ...).

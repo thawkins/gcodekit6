@@ -3,9 +3,11 @@
 //! the Connect / Disconnect button.
 //!
 //! Dependencies: `egui`, `gcodekit5-communication` (serial port list),
-//! `gcodekit5-settings` (connection settings).
+//! `gcodekit5-settings` (connection settings), `gcodekit5-devicedb` (the active device
+//! profile's connection and Auto Reconnect setting).
 
 use gcodekit5_app::i18n::Translator;
+use gcodekit5_devicedb::DeviceProfile;
 use gcodekit5_settings::{ConnectionSettings, ConnectionType};
 
 use crate::icons::{Icon, icon_only_button};
@@ -25,6 +27,7 @@ pub(super) const MSGIDS: &[&str] = &[
     n_!("Refresh ports"),
     n_!("No ports available"),
     n_!("Error connecting"),
+    crate::machine::RECONNECTING,
 ];
 
 /// What the user asked for in the section.
@@ -40,6 +43,11 @@ pub(super) enum Action {
 #[derive(Debug)]
 pub(super) struct ConnectionForm {
     settings: ConnectionSettings,
+    /// The configured connection the form started from; a serial device profile goes back
+    /// to its connection type, host and port.
+    base: ConnectionSettings,
+    /// Whether the connection type, host and port came from a network device profile.
+    from_profile: bool,
     /// Serial ports found by the last refresh; `None` before the first one.
     ports: Option<Vec<String>>,
     connecting: bool,
@@ -49,10 +57,50 @@ impl ConnectionForm {
     /// A form starting from `settings`.
     pub(super) fn new(settings: ConnectionSettings) -> Self {
         Self {
+            base: settings.clone(),
+            from_profile: false,
             settings,
             ports: None,
             connecting: false,
         }
+    }
+
+    /// Takes the connection the active device `profile` describes: its Auto Reconnect
+    /// setting always; for a network profile (TCP/IP or WebSocket with a host) also its
+    /// connection type, host, port and timeout. A serial profile, or none, keeps the
+    /// configured connection (and the serial port chosen in the form).
+    ///
+    /// # Arguments
+    /// * `profile` - The active device profile, if one is set.
+    pub(super) fn apply_profile(&mut self, profile: Option<&DeviceProfile>) {
+        let network = profile.and_then(|p| {
+            let kind = match p.connection_type.as_str() {
+                "TCP/IP" => ConnectionType::Tcp,
+                "WebSocket" => ConnectionType::WebSocket,
+                _ => return None,
+            };
+            let host = p.tcp_host.trim();
+            (!host.is_empty()).then(|| (kind, host.to_string(), p.tcp_port, p.timeout_ms))
+        });
+        match network {
+            Some((kind, host, port, timeout_ms)) => {
+                self.settings.connection_type = kind;
+                self.settings.port = host;
+                self.settings.tcp_port = port;
+                self.settings.timeout_ms = timeout_ms;
+                self.from_profile = true;
+            }
+            None if self.from_profile => {
+                self.from_profile = false;
+                self.settings.connection_type = self.base.connection_type;
+                self.settings.port = self.base.port.clone();
+                self.settings.tcp_port = self.base.tcp_port;
+                self.settings.timeout_ms = self.base.timeout_ms;
+            }
+            None => {}
+        }
+        self.settings.auto_reconnect =
+            profile.map_or(self.base.auto_reconnect, |p| p.auto_reconnect);
     }
 
     /// The settings to connect with.
@@ -119,7 +167,9 @@ impl ConnectionForm {
     ) -> Option<Action> {
         let network = !matches!(self.settings.connection_type, ConnectionType::Serial);
         crate::theme::section_heading(ui, &tr.tr("Connection"));
-        let editable = !status.connected && !self.connecting;
+        // While Auto Reconnect retries, the connection is still the user's to close.
+        let open = status.connected || self.connecting || status.reconnecting.is_some();
+        let editable = !open;
         ui.add_enabled_ui(editable, |ui| {
             if network {
                 self.show_host(ui, tr);
@@ -142,7 +192,7 @@ impl ConnectionForm {
                     });
                 }
                 let size = egui::vec2(ui.available_width(), 0.0);
-                let button = if status.connected || self.connecting {
+                let button = if open {
                     let label = tr.tr("Disconnect");
                     egui::Button::image_and_text(Icon::Disconnected.themed(ui), label)
                         .min_size(size)
@@ -151,7 +201,7 @@ impl ConnectionForm {
                         .min_size(size)
                 };
                 if ui.add(button).clicked() {
-                    action = Some(if status.connected || self.connecting {
+                    action = Some(if open {
                         Action::Disconnect
                     } else {
                         Action::Connect
@@ -201,7 +251,8 @@ impl ConnectionForm {
     }
 }
 
-/// The connection state as text: Connected, Connecting... or Disconnected.
+/// The connection state as text: Connected, Connecting..., Reconnecting... (n/m) or
+/// Disconnected.
 pub(super) fn state_text(
     tr: &Translator,
     status: &MachineStatus,
@@ -209,6 +260,8 @@ pub(super) fn state_text(
 ) -> std::borrow::Cow<'static, str> {
     if status.connected {
         tr.tr("Connected")
+    } else if let Some(text) = crate::machine::reconnecting_text(status, tr) {
+        text.into()
     } else if connecting {
         tr.tr("Connecting…")
     } else {

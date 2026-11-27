@@ -258,6 +258,7 @@ impl WcsPanel {
                 | MachineEvent::StreamProgress { .. }
                 | MachineEvent::StreamHalted { .. }
                 | MachineEvent::ProtocolMismatch { .. }
+                | MachineEvent::Reconnecting { .. }
                 | MachineEvent::Error(_) => {}
             }
         }

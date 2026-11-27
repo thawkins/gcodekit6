@@ -93,6 +93,9 @@ pub struct MachineStatus {
     /// Whether the active system is outside G54-G59 (`G59.1`, `G54.1`), as reported or sent;
     /// [`MachineStatus::active_wcs`] is then `None`. Cleared by a G54-G59 report or line.
     pub wcs_outside: bool,
+    /// While Auto Reconnect tries to reopen a dropped connection: the attempt (from 1) and
+    /// the most attempts. Cleared once connected again or closed for good.
+    pub reconnecting: Option<(u32, u32)>,
 }
 
 /// X, Y and Z in millimetres.
@@ -258,8 +261,14 @@ impl MachineStatus {
                     self.connected = true;
                     self.last_error = None;
                     self.estopped = false;
+                    self.reconnecting = None;
                 }
+                MachineEvent::Reconnecting {
+                    attempt,
+                    max_attempts,
+                } => self.reconnecting = Some((*attempt, *max_attempts)),
                 MachineEvent::Disconnected => {
+                    self.reconnecting = None;
                     if self.streaming {
                         self.stream_end = Some(StreamEnd::Stopped);
                     }
@@ -408,6 +417,24 @@ pub fn protocol_mismatch_text(
     tr.tr(PROTOCOL_MISMATCH)
         .replacen("{}", configured.as_str(), 1)
         .replacen("{}", detected.as_str(), 1)
+}
+
+/// How the connection state reads while Auto Reconnect retries (`{attempt}` of `{max}`).
+pub const RECONNECTING: &str = n_!("Reconnecting… ({attempt}/{max})");
+
+/// The connection state while Auto Reconnect retries, as the status bar and the Machine
+/// Control pane show it, or `None` when it does not.
+///
+/// # Arguments
+/// * `status` - The app's machine status.
+/// * `tr` - Translator for the current UI language.
+pub fn reconnecting_text(status: &MachineStatus, tr: &Translator) -> Option<String> {
+    let (attempt, max) = status.reconnecting?;
+    Some(
+        tr.tr(RECONNECTING)
+            .replace("{attempt}", &attempt.to_string())
+            .replace("{max}", &max.to_string()),
+    )
 }
 
 /// The controller's own message texts, for the translation check.

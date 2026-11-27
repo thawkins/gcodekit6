@@ -14,12 +14,14 @@
 pub mod reply_ledger;
 pub mod serial;
 pub mod tcp;
+pub mod websocket;
 
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
 pub use serial::{SerialPortInfo, list_ports};
 pub use tcp::TcpConnectionInfo;
+pub use websocket::websocket_url;
 
 /// Connection driver type
 ///
@@ -464,8 +466,9 @@ impl Communicator for SerialCommunicator {
     /// Opens the connection described by `params`.
     ///
     /// Serial ports are opened directly; TCP connections are opened with
-    /// [`tcp::RealTcpPort`] and carried through the same byte-stream interface.
-    /// WebSocket connections are not supported and return an error.
+    /// [`tcp::RealTcpPort`] and WebSocket connections with
+    /// [`websocket::RealWebSocketPort`], both carried through the same byte-stream
+    /// interface.
     fn connect(&mut self, params: &ConnectionParams) -> gcodekit5_core::Result<()> {
         params.validate()?;
         let opened: gcodekit5_core::Result<Box<dyn serial::SerialPort>> = match params.driver {
@@ -484,9 +487,11 @@ impl Communicator for SerialCommunicator {
                     name: format!("{}:{}", params.port, params.network_port),
                 }) as Box<dyn serial::SerialPort>)
             }),
-            ConnectionDriver::WebSocket => Err(gcodekit5_core::Error::other(
-                "WebSocket connections are not supported yet",
-            )),
+            // As for TCP, `timeout_ms` governs connecting and writes; reads are polled.
+            ConnectionDriver::WebSocket => {
+                websocket::RealWebSocketPort::open(params, serial::POLL_READ_TIMEOUT)
+                    .map(|p| Box::new(p) as Box<dyn serial::SerialPort>)
+            }
         };
 
         // Forget the previous connection's pending replies and unread bytes

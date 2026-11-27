@@ -35,3 +35,5 @@ mod test_repetier;
 mod test_reply_ledger;
 #[path = "test_serial_passthrough.rs"]
 mod test_serial_passthrough;
+#[path = "test_websocket_transport.rs"]
+mod test_websocket_transport;
