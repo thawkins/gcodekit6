@@ -82,10 +82,12 @@ impl DeviceIdentity {
         } else if let Some(reply) = line.split("FIRMWARE_NAME:").nth(1) {
             self.apply_m115(line, reply);
         } else if let Some((number, value)) = SettingsManager::parse_setting_line(line) {
-            let on = value.trim().parse::<f64>().ok().map(|v| v >= 1.0);
+            let value = value.trim().parse::<f64>().ok();
             match number {
-                22 => self.homing = on,
-                32 => self.laser = on,
+                // `$22` is a bitmask on grblHAL: any bit set enables homing.
+                22 => self.homing = value.map(|v| v >= 1.0),
+                // `$32` is a mode on grblHAL (0 normal, 1 laser, 2 lathe): only 1 is laser.
+                32 => self.laser = value.map(|v| v == 1.0),
                 _ => {}
             }
         }

@@ -45,6 +45,8 @@ mod test_machine_probe_stream;
 mod test_machine_repetier;
 #[path = "test_machine_sent_events.rs"]
 mod test_machine_sent_events;
+#[path = "test_material_form.rs"]
+mod test_material_form;
 #[path = "test_materials_manager_backend.rs"]
 mod test_materials_manager_backend;
 #[path = "test_override_target.rs"]
