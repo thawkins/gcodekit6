@@ -82,20 +82,19 @@ fn element(shape: &Shape, flip: &dyn Fn(f64) -> f64) -> String {
                 e.rx, e.ry, -e.rotation
             )
         }
-        Shape::Line(l) => {
-            let (x1, y1, x2, y2) = (l.start.x, flip(l.start.y), l.end.x, flip(l.end.y));
-            format!(
-                "<line x1=\"{x1:.2}\" y1=\"{y1:.2}\" x2=\"{x2:.2}\" y2=\"{y2:.2}\" style=\"{STYLE}\" \
-                 transform=\"rotate({:.2} {:.2} {:.2})\" />",
-                -l.rotation,
-                (x1 + x2) / 2.0,
-                (y1 + y2) / 2.0
-            )
-        }
+        // `start`/`end` are the line's absolute geometry; its `rotation` is derived from
+        // them, so it is not applied again.
+        Shape::Line(l) => format!(
+            "<line x1=\"{:.2}\" y1=\"{:.2}\" x2=\"{:.2}\" y2=\"{:.2}\" style=\"{STYLE}\" />",
+            l.start.x,
+            flip(l.start.y),
+            l.end.x,
+            flip(l.end.y)
+        ),
         Shape::Text(t) => {
             let y = flip(t.y);
             format!(
-                "<text x=\"{:.2}\" y=\"{y:.2}\" font-size=\"{:.2}\" style=\"fill:black;stroke:none\" \
+                "<text x=\"{:.2}\" y=\"{y:.2}\" font-size=\"{:.2}\" style=\"fill:black;stroke:none;text-anchor:middle;dominant-baseline:central\" \
                  transform=\"rotate({:.2} {:.2} {y:.2})\">{}</text>",
                 t.x,
                 t.font_size,
@@ -107,8 +106,8 @@ fn element(shape: &Shape, flip: &dyn Fn(f64) -> f64) -> String {
         Shape::RasterImage(r) => {
             let (x1, y1, x2, y2) = r.bounds();
             format!(
-                "<rect x=\"{x1:.2}\" y=\"{:.2}\" width=\"{:.2}\" height=\"{:.2}\" style=\"{STYLE}\" \
-                 fill=\"gray\" stroke=\"black\" stroke-width=\"0.5\" />",
+                "<rect x=\"{x1:.2}\" y=\"{:.2}\" width=\"{:.2}\" height=\"{:.2}\" \
+                 style=\"fill:gray;stroke:black;stroke-width:0.5\" />",
                 flip(y2),
                 x2 - x1,
                 flip(y1) - flip(y2)
