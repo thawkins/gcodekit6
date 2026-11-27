@@ -59,3 +59,37 @@ fn test_pocket_tiny_steps_are_bounded() {
         );
     }
 }
+
+/// A degenerate polygon (2 vertices, or 3 collinear ones) has nothing to pocket: the
+/// contour-parallel and adaptive generators return without cutting instead of looping on an
+/// inward offset that never comes back empty.
+#[test]
+fn test_pocket_degenerate_polygon_returns() {
+    let shapes = [
+        vec![Point::new(0.0, 0.0), Point::new(20.0, 0.0)],
+        vec![
+            Point::new(0.0, 0.0),
+            Point::new(10.0, 0.0),
+            Point::new(20.0, 0.0),
+        ],
+    ];
+    for strategy in [PocketStrategy::ContourParallel, PocketStrategy::Adaptive] {
+        for shape in &shapes {
+            let mut op = PocketOperation::new("p".into(), -1.0, 3.0);
+            op.set_strategy(strategy);
+            let started = std::time::Instant::now();
+            let toolpaths = PocketGenerator::new(op).generate_polygon_pocket(shape, 1.0);
+            let cuts = toolpaths
+                .iter()
+                .flat_map(|tp| tp.segments.iter())
+                .filter(|s| s.segment_type == ToolpathSegmentType::LinearMove)
+                .count();
+            assert_eq!(cuts, 0, "{strategy:?} cut a degenerate polygon");
+            assert!(
+                started.elapsed().as_secs() < 10,
+                "took {:?}",
+                started.elapsed()
+            );
+        }
+    }
+}
