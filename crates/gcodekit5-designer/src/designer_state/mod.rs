@@ -8,9 +8,11 @@
 //! - `shapes`: Shape creation, deletion, clipboard
 //! - `transforms`: Move, resize, align, mirror
 //! - `properties`: Property setters for selected shapes
+//! - `cam`: CAM dispatch (effective CAM parameters, shape toolpaths) shared with the preview
 //! - `gcode`: G-code generation
 //! - `file_io`: Save/load operations
 
+pub mod cam;
 mod file_io;
 mod gcode;
 mod history;

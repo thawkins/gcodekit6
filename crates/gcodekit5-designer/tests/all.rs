@@ -21,6 +21,8 @@ pub fn global_env_lock() -> std::sync::MutexGuard<'static, ()> {
 mod test_audit_regressions;
 #[path = "test_cam_depth_and_gcode.rs"]
 mod test_cam_depth_and_gcode;
+#[path = "test_cam_dispatch.rs"]
+mod test_cam_dispatch;
 #[path = "test_chamfer_dimensions.rs"]
 mod test_chamfer_dimensions;
 #[path = "test_default_properties_inheritance.rs"]
