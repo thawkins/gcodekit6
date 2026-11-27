@@ -3,6 +3,8 @@
 ## Status
 Accepted
 
+Amended 2026-11-28: replaced the hand-written crate tree with the command that lists the members; removed the deleted `ui` and `gcodeeditor` crates and an unmeasured build-time figure.
+
 ## Context
 
 As GCodeKit5 grew, the single-crate structure became problematic:
@@ -15,42 +17,32 @@ As GCodeKit5 grew, the single-crate structure became problematic:
 
 ## Decision
 
-We restructured GCodeKit5 as a **Cargo workspace** with multiple focused crates:
+We restructured GCodeKit5 as a **Cargo workspace** with multiple focused crates under `crates/`, plus the root `gcodekit5-design` package that builds the `gcodekit5` binary from `src/main.rs`.
 
-```
-gcodekit5/
-├── Cargo.toml           # Workspace root
-├── src/                 # Main binary crate
-└── crates/
-    ├── gcodekit5-core/          # Core types, traits, events
-    ├── gcodekit5-communication/ # Serial, firmware protocols
-    ├── gcodekit5-gcodeeditor/   # G-code editing, buffer
-    ├── gcodekit5-visualizer/    # 2D/3D toolpath rendering
-    ├── gcodekit5-designer/      # CAD/CAM design tools
-    ├── gcodekit5-camtools/      # CAM operations
-    ├── gcodekit5-devicedb/      # Device profile management
-    ├── gcodekit5-settings/      # Application settings
-    └── gcodekit5-ui/            # GTK4 UI components
+The member list comes from this command, not from this file:
+
+```bash
+cargo metadata --no-deps --format-version 1 | jq -r '.packages[].name'
 ```
 
-### Crate Responsibilities
+### Crate Responsibilities (as of 2026-11-28)
 
-| Crate | Responsibility | Dependencies |
-|-------|----------------|--------------|
-| `core` | Types, traits, state, events | Minimal (serde, thiserror) |
-| `communication` | Serial ports, firmware protocols | core |
-| `gcodeeditor` | Text editing, syntax highlighting | core |
-| `visualizer` | Toolpath rendering, viewport | core |
-| `designer` | Shape drawing, toolpath generation | core, visualizer |
-| `camtools` | Box maker, puzzle, engraver | core |
-| `devicedb` | Device profiles, persistence | core |
-| `settings` | App configuration | core |
-| `ui` | GTK4 widgets, main window | All above |
+| Crate | Responsibility |
+|-------|----------------|
+| `gcodekit5-core` | Core types, traits, units and errors |
+| `gcodekit5-communication` | Serial, TCP and WebSocket transports; firmware protocols |
+| `gcodekit5-visualizer` | Toolpath interpretation, camera and stock-removal simulation |
+| `gcodekit5-designer` | Shape drawing and toolpath generation |
+| `gcodekit5-camtools` | CAM tools (box maker, puzzle, engraver) |
+| `gcodekit5-devicedb` | Device profiles and persistence |
+| `gcodekit5-settings` | Application settings |
+| `gcodekit5-app` | Toolkit-free application state (machine controller, console model) |
+| `gcodekit5-ui-egui` | egui front end (see ADR-012) |
 
 ## Consequences
 
 ### Positive
-- **Faster Incremental Builds**: Only changed crates recompile (~10x faster)
+- **Faster Incremental Builds**: Only changed crates recompile
 - **Clear Boundaries**: Each crate has defined responsibilities
 - **Independent Testing**: Unit tests run per-crate in parallel
 - **Reusability**: Core crates could be used in CLI tools or other UIs

@@ -3,6 +3,8 @@
 ## Status
 Accepted
 
+Amended 2026-11-28: named the transform functions that exist in the egui front end and the designer crate.
+
 ## Context
 
 CNC machines and CAD software use different coordinate system conventions:
@@ -26,17 +28,19 @@ We implement a **Y-flip transformation** at the rendering layer:
    - Positive Y extends upward on screen
    - This matches how operators visualize their machine bed
 
-3. **Centralized Transform**: The `ViewportTransform` struct handles all coordinate conversions between world coordinates (mm) and screen coordinates (pixels).
+3. **Centralized Transform**: two types own the conversion between world coordinates (mm) and screen coordinates:
+   - `CanvasView::world_to_screen` and `CanvasView::screen_to_world` in `crates/gcodekit5-ui-egui/src/panes/designer/canvas/mod.rs` (egui points).
+   - `Viewport::world_to_pixel` and `Viewport::pixel_to_world` in `crates/gcodekit5-designer/src/viewport.rs` (pixels).
 
 ### Implementation
 
 ```rust
-// In ViewportTransform
-pub fn world_to_screen(&self, world: Point) -> Point {
-    Point {
-        x: (world.x - self.pan_x) * self.zoom + self.width / 2.0,
-        y: self.height - ((world.y - self.pan_y) * self.zoom + self.height / 2.0),
-    }
+// CanvasView, crates/gcodekit5-ui-egui/src/panes/designer/canvas/mod.rs
+pub fn world_to_screen(&self, p: Vec2) -> Pos2 {
+    pos2(
+        self.rect.left() + p.x * self.zoom + self.pan.x,
+        self.rect.bottom() - (p.y * self.zoom + self.pan.y),
+    )
 }
 ```
 
@@ -46,7 +50,7 @@ pub fn world_to_screen(&self, world: Point) -> Point {
 - Visual display matches physical machine orientation
 - Operators can intuitively understand toolpath preview
 - Consistent with most CAM software conventions
-- Single point of transformation logic
+- Transform logic lives in the two types above, not in each drawing call
 
 ### Negative
 - Must remember to apply transform for all drawing operations

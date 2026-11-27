@@ -1,7 +1,9 @@
 # ADR-007: Paned Layout for Resizable Panels
 
 ## Status
-Accepted
+Superseded by ADR-012
+
+Amended 2026-11-28: the GTK layout manager was removed with the GTK front end. Pages in `crates/gcodekit5-ui-egui/src/workspace.rs` now use resizable egui side and bottom panels. The Decision section records both.
 
 ## Date
 2026-02-18
@@ -12,39 +14,16 @@ GCodeKit5 has many UI panels (Connection, DRO, Jog, Editor, Console, Visualizer,
 Early approaches used fixed layouts, which wasted space on large screens and cramped content on smaller ones.
 
 ## Decision
-Implement a centralized `LayoutManager` with a `PanelState` model that tracks each panel's visibility, location, dock state, and size. Panels are assigned to regions (`Left`, `Center`, `Right`, `Bottom`) and can be toggled visible/hidden independently.
+Original (GTK, removed): a central layout manager tracked each panel's visibility, region (left, center, right, bottom), dock state and size, drew the dividers with GTK `Paned` widgets, saved the state between sessions, and offered predefined layouts.
 
-Key design choices:
-- **GTK4-native Paned widgets** for resizable dividers between regions
-- **Serializable layout state** (`PanelState`) for persistence across sessions
-- **Predefined layouts** (Default, Designer, Operator) as starting points
-- **Panel locations are configurable** — panels can move between Left/Center/Right/Bottom
-
-```rust
-pub enum PanelLocation {
-    Left,
-    Center,
-    Right,
-    Bottom,
-}
-
-pub struct PanelState {
-    pub id: PanelId,
-    pub visible: bool,
-    pub location: PanelLocation,
-    pub docked: bool,
-    pub width: Option<i32>,
-    pub height: Option<i32>,
-}
-```
+Current (egui): each page in `crates/gcodekit5-ui-egui/src/workspace.rs` lays out its panes with `egui::Panel::right(...)` and `egui::Panel::bottom(...)`, both `.resizable(true)`, with a default size and, where needed, a size range. Which hideable panels are shown is saved in the settings' `panel_visibility` map. There are no predefined layouts and panels do not move between regions.
 
 ## Consequences
 
 **Positive:**
 - Users can resize panels to match their workflow and screen size
-- Layout persistence means users don't lose their configuration
-- Predefined layouts reduce initial setup friction
-- GTK4-native approach avoids custom layout engine complexity
+- The hideable panels' visibility is kept between sessions
+- Toolkit panels avoid custom layout engine complexity
 
 **Negative:**
 - Panel minimum sizes must be carefully managed to prevent unusable states
