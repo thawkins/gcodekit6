@@ -133,7 +133,7 @@ impl DrillPressGenerator {
         gcode.push_str(&format!("; Center: X{:.3} Y{:.3}\n", p.x, p.y));
 
         // Initialization
-        crate::job_preamble::push_modal_header(&mut gcode, false);
+        crate::job_preamble::push_modal_header(&mut gcode, true);
         crate::job_preamble::push_work_setup(&mut gcode, p.home_before_job);
         gcode.push_str(&crate::job_preamble::travel_z_line(
             p.home_before_job,

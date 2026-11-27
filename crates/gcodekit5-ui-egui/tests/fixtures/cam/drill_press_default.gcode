@@ -5,6 +5,7 @@
 ; Center: X100.000 Y100.000
 G21 ; Set units to millimeters
 G90 ; Absolute positioning
+G17 ; XY plane selection
 ; Runs in the active work coordinate system: set the X/Y/Z work zero first
 G0 Z5.00 ; Move to safe height
 M3 S10000 ; Start spindle

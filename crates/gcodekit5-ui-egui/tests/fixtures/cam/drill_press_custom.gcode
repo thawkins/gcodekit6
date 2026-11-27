@@ -5,6 +5,7 @@
 ; Center: X50.000 Y25.000
 G21 ; Set units to millimeters
 G90 ; Absolute positioning
+G17 ; XY plane selection
 ; Home, then run from the G54 work zero you set (offsets unchanged)
 $H ; Home all axes
 G54 ; Select work coordinate system 1
