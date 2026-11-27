@@ -223,7 +223,7 @@ See [GitHub Issues](https://github.com/thawkins/gcodekit6/issues) for the curren
 - **[ARCHITECTURE.md](ARCHITECTURE.md)** - System architecture overview
 - **[docs/adr/](docs/adr/)** - Architecture Decision Records (ADRs)
 - **[docs/COORDINATE_SYSTEM.md](docs/COORDINATE_SYSTEM.md)** - Coordinate system and Y-flip explanation
-- **[SPEC.md](SPEC.md)** - Complete technical specification
+- **[SPEC.md](SPEC.md)** - As-built specification
 - **[AGENTS.md](AGENTS.md)** - Development guidelines
 - **[AGENTS-LANGUAGE.md](AGENTS-LANGUAGE.md)** - Rust-specific development guidelines
 - **[CHANGELOG.md](CHANGELOG.md)** - Version history

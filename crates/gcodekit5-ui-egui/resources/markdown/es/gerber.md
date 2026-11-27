@@ -1,6 +1,6 @@
-# Gerber a G-code
+# De Gerber a G-Code
 
-La herramienta Gerber a G-code permite convertir archivos Gerber estándar (comúnmente utilizados en la fabricación de PCB) a G-code para el fresado de aislamiento CNC.
+La herramienta De Gerber a G-Code permite convertir archivos Gerber estándar (comúnmente utilizados en la fabricación de PCB) a G-code para el fresado de aislamiento CNC.
 
 ## Uso
 
