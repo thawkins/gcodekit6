@@ -42,6 +42,7 @@ mod cam_presets;
 pub mod designer_files;
 mod library_windows;
 mod machine_windows;
+mod managers;
 
 use std::cell::RefCell;
 use std::path::{Path, PathBuf};
@@ -76,14 +77,12 @@ use crate::panes::editor::{EditorPane, SharedEditor};
 use crate::panes::machine_control::MachineControlPane;
 use crate::panes::visualizer::VisualizerPane;
 use crate::theme;
-use crate::windows::{
-    AboutWindow, DeviceInfoPanel, DeviceManagerWindow, FirmwareSettingsWindow, HelpWindow,
-    MaterialsManagerWindow, SettingsOutcome, SettingsWindow, ToolsManagerWindow, help,
-};
+use crate::windows::{AboutWindow, HelpWindow, SettingsOutcome, SettingsWindow, help};
 use crate::workspace::{JogKey, Page, PaneContext, PaneId, Workspace};
 use designer_files::{DesignFlow, DesignNext, EditorNext, OPEN_BEHIND_HANDOFF};
 use gcodekit5_app::materials_manager_backend::MATERIALS_FILE;
 use gcodekit5_app::tools_manager_backend::TOOLS_FILE;
+use managers::Managers;
 
 /// The GTK build's device profiles file, in the legacy settings folder.
 const DEVICES_FILE: &str = "devices.json";
@@ -379,16 +378,8 @@ pub struct GcodeKitApp {
     shortcut_notice: Option<String>,
     /// GTK's "Settings could not be loaded" warning, shown at start until OK.
     settings_notice: Option<String>,
-    /// The Device Config page's firmware settings.
-    firmware_settings: FirmwareSettingsWindow,
-    /// The Device Info panel (the left column of the Device Config page).
-    device_info: DeviceInfoPanel,
-    /// The Device Manager page, which also holds the device profiles.
-    device_manager: DeviceManagerWindow,
-    /// The CNC Tools page, which also holds the tool library.
-    tools_manager: ToolsManagerWindow,
-    /// The Materials page, which also holds the material library.
-    materials_manager: MaterialsManagerWindow,
+    /// The manager pages (Device Config, Device Manager, CNC Tools, Materials).
+    managers: Managers,
     /// The last command dispatched.
     last_dispatched: Option<Command>,
     /// The quit being decided, if any.
@@ -510,18 +501,16 @@ impl GcodeKitApp {
         workspace.set_pane(Box::new(SharedDesigner(Rc::clone(&designer))));
         workspace.set_pane(Box::new(LayersPane::new(Rc::clone(&designer))));
         workspace.set_pane(Box::new(PropertiesPane::new(Rc::clone(&designer))));
-        let device_manager = DeviceManagerWindow::new(state.device_file.clone());
-        let tools_manager = ToolsManagerWindow::new(state.tools_file.clone(), state.config());
-        let materials_manager = MaterialsManagerWindow::new(state.materials_file.clone());
+        let managers = Managers::new(&state);
         let cam_tools = Rc::new(RefCell::new(CamToolsPane::new()));
         cam_tools.borrow_mut().set_libraries(
-            tools_manager.tools(),
-            materials_manager.materials(),
-            device_manager.active_profile(),
+            managers.tools_manager.tools(),
+            managers.materials_manager.materials(),
+            managers.device_manager.active_profile(),
         );
         workspace.set_pane(Box::new(SharedCamTools::new(Rc::clone(&cam_tools))));
         workspace.configure(state.config());
-        workspace.set_device(device_manager.active_profile().as_ref());
+        workspace.set_device(managers.device_manager.active_profile().as_ref());
         let panel_visibility = workspace.panel_visibility();
         {
             // Wake the event loop whenever the machine reports something.
@@ -552,11 +541,7 @@ impl GcodeKitApp {
             help_window: HelpWindow::default(),
             shortcut_notice,
             settings_notice,
-            firmware_settings: FirmwareSettingsWindow::default(),
-            device_info: DeviceInfoPanel::default(),
-            device_manager,
-            tools_manager,
-            materials_manager,
+            managers,
             last_dispatched: None,
             quit: QuitFlow::default(),
             editor,
@@ -642,14 +627,8 @@ impl GcodeKitApp {
             Some(ConfirmRequest::UnsavedGcode)
         } else if state.dirty.designer && !quit.discarded.designer {
             Some(ConfirmRequest::UnsavedDesign)
-        } else if self.tools_manager.has_unsaved_changes() && !quit.discarded_tool {
-            Some(ConfirmRequest::UnsavedTool)
-        } else if self.materials_manager.has_unsaved_changes() && !quit.discarded_material {
-            Some(ConfirmRequest::UnsavedMaterial)
-        } else if self.device_manager.has_unsaved_changes() && !quit.discarded_device {
-            Some(ConfirmRequest::UnsavedDevice)
         } else {
-            None
+            self.managers.unsaved_request(quit)
         };
         match next {
             Some(request) => {
@@ -816,7 +795,7 @@ impl GcodeKitApp {
         if let Some(page) = tab {
             self.show_page(page);
         }
-        let profile = self.device_manager.active_profile();
+        let profile = self.managers.device_manager.active_profile();
         egui::Panel::bottom("gcodekit5-status-bar").show(ui, |ui| {
             if crate::status_bar::show(
                 ui,
@@ -1649,17 +1628,7 @@ impl GcodeKitApp {
             return;
         }
         self.workspace.set_page(page);
-        let tr = &self.state.translator;
-        match page {
-            Page::DeviceManager => self.device_manager.open(tr),
-            Page::CncTools => self.tools_manager.open(tr),
-            Page::Materials => self.materials_manager.open(tr),
-            Page::Designer
-            | Page::Visualizer
-            | Page::MachineControl
-            | Page::CamTools
-            | Page::DeviceConfig => {}
-        }
+        self.managers.open(page, &self.state.translator);
     }
 
     /// Makes the folder of `file` the one the next file dialog starts in, and keeps it as
@@ -1709,12 +1678,16 @@ impl GcodeKitApp {
         let tr = &self.state.translator;
         match self.workspace.page() {
             Page::DeviceManager => {
-                self.device_manager
-                    .show(ui, &self.state.machine, self.state.settings.config(), tr);
+                self.managers.device_manager.show(
+                    ui,
+                    &self.state.machine,
+                    self.state.settings.config(),
+                    tr,
+                );
             }
             Page::DeviceConfig => self.show_firmware_settings(ui),
-            Page::CncTools => self.tools_manager.show(ui, tr),
-            Page::Materials => self.materials_manager.show(ui, tr),
+            Page::CncTools => self.managers.tools_manager.show(ui, tr),
+            Page::Materials => self.managers.materials_manager.show(ui, tr),
             Page::Designer | Page::Visualizer | Page::MachineControl | Page::CamTools => {}
         }
     }
