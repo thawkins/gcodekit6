@@ -1,11 +1,11 @@
 //! The user's keyboard shortcuts (`ui.keyboard_shortcuts`, written by the egui front end) are
-//! saved with the settings, and the GTK build reads and saves the same file without losing
+//! saved with the settings, and a later save of other settings does not lose
 //! them. A settings file from before the field loads with no changed shortcuts.
 
 use craft_settings::SettingsStore;
 use gcodekit5_settings::config::ShortcutOverride;
 use gcodekit5_settings::migrate::ConfigDirs;
-use gcodekit5_settings::{Config, SettingsManager, SettingsPersistence};
+use gcodekit5_settings::{Config, SettingsManager};
 use std::path::PathBuf;
 
 /// Fresh settings folders under `target/temp/settings_keyboard_shortcuts/<test>-<pid>`.
@@ -74,23 +74,24 @@ fn test_removed_entries_stay_removed() {
     assert!(reloaded.config().ui.keyboard_shortcuts.is_empty());
 }
 
-/// The GTK build loads the settings through `SettingsPersistence`, changes its own fields and
-/// saves: the shortcuts egui wrote come through unchanged.
+/// A later load, change of another field and save through `SettingsManager` keeps the
+/// shortcuts saved before unchanged.
 #[test]
-fn test_gtk_save_keeps_the_shortcuts() {
-    let dirs = scratch("test_gtk_save_keeps_the_shortcuts");
+fn test_other_settings_save_keeps_the_shortcuts() {
+    let dirs = scratch("test_other_settings_save_keeps_the_shortcuts");
     let mut config = Config::default();
     config.ui.keyboard_shortcuts = vec![entry("jog.x_pos", &["J"])];
     SettingsManager::save(&dirs, &config).expect("save");
 
-    let (mut gtk, problem) = SettingsPersistence::load_from_dirs(&dirs);
+    let (mut manager, problem) = SettingsManager::open(dirs.clone());
     assert!(problem.is_none(), "{problem:?}");
     assert_eq!(
-        gtk.config().ui.keyboard_shortcuts,
+        manager.config().ui.keyboard_shortcuts,
         config.ui.keyboard_shortcuts
     );
-    gtk.config_mut().ui.language = "fr".to_string();
-    gtk.persist().expect("GTK save");
+    let mut changed = manager.config().clone();
+    changed.ui.language = "fr".to_string();
+    manager.apply(changed).expect("save");
 
     let (store, _) = SettingsStore::<Config>::open_at(&dirs.config);
     assert_eq!(store.get().ui.language, "fr");

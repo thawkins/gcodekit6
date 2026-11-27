@@ -530,35 +530,6 @@ impl Config {
         Ok(config)
     }
 
-    /// Save config to file (JSON or TOML)
-    pub fn save_to_file(&self, path: &Path) -> Result<()> {
-        self.validate()?;
-
-        let content = if path.extension().is_some_and(|ext| ext == "json") {
-            serde_json::to_string_pretty(self)
-                .map_err(|e| Error::other(format!("Failed to serialize config: {}", e)))?
-        } else if path.extension().is_some_and(|ext| ext == "toml") {
-            toml::to_string_pretty(self)
-                .map_err(|e| Error::other(format!("Failed to serialize config: {}", e)))?
-        } else {
-            return Err(Error::other(
-                "Config file must be .json or .toml".to_string(),
-            ));
-        };
-
-        // Write a sibling temp file and rename it over the config, so a crash
-        // mid-write cannot leave a truncated file that then fails to load.
-        let mut tmp_name = path.file_name().unwrap_or_default().to_os_string();
-        tmp_name.push(".tmp");
-        let tmp = path.with_file_name(tmp_name);
-        std::fs::write(&tmp, content)
-            .map_err(|e| Error::other(format!("Failed to write config file: {}", e)))?;
-        std::fs::rename(&tmp, path)
-            .map_err(|e| Error::other(format!("Failed to replace config file: {}", e)))?;
-
-        Ok(())
-    }
-
     /// Validate configuration
     pub fn validate(&self) -> Result<()> {
         // Validate connection settings

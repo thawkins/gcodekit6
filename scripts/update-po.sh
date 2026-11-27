@@ -8,8 +8,8 @@ mkdir -p po
 # We look for gettext calls: gettext("..."), t!("..."), tr!("..."), trn!(...)
 # and the n_!("...") marker for literals translated later through a variable.
 # Note: We need to define keywords for xgettext to recognize our macros.
-# Every tracked Rust source outside tests/ is scanned (the settings crate
-# has translatable descriptions too); git ls-files avoids relying on the
+# Every tracked Rust source outside tests/ is scanned (model code in the app
+# crate translates with tr!/trn! too); git ls-files avoids relying on the
 # shell's globstar option, which `**` needs to recurse.
 VERSION=$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -n 1)
 git ls-files 'crates/*.rs' 'src/*.rs' | grep -v '/tests/' | \

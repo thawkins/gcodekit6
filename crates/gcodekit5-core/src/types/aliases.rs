@@ -5,9 +5,9 @@
 //!
 //! ## Rationale
 //!
-//! Complex types like `Rc<RefCell<Option<Box<dyn Fn()>>>>` are hard to read and
+//! Complex types like `Arc<Mutex<Vec<Box<dyn Fn() + Send + Sync>>>>` are hard to read and
 //! understand at a glance. Type aliases provide:
-//! - **Readability**: `UiCallback` is clearer than the full type
+//! - **Readability**: `CallbackList` is clearer than the full type
 //! - **Consistency**: Same pattern used the same way across crates
 //! - **Documentation**: Alias names convey intent
 //! - **Refactoring**: Change the underlying type in one place
@@ -17,45 +17,13 @@
 //! ```rust,ignore
 //! use gcodekit5_core::types::*;
 //!
-//! // Instead of: Rc<RefCell<MyState>>
-//! let state: Shared<MyState> = Shared::new(RefCell::new(MyState::default()));
-//!
 //! // Instead of: Arc<Mutex<Vec<String>>>
 //! let queue: ThreadSafeVec<String> = Arc::new(Mutex::new(Vec::new()));
 //! ```
 
 use parking_lot::{Mutex, RwLock};
-use std::cell::RefCell;
-use std::collections::{HashMap, VecDeque};
-use std::rc::Rc;
+use std::collections::HashMap;
 use std::sync::Arc;
-
-// =============================================================================
-// SINGLE-THREADED SHARED TYPES (Rc<RefCell<T>>)
-// =============================================================================
-
-/// A reference-counted, interior-mutable wrapper for single-threaded sharing.
-///
-/// Use when you need to share mutable state within a single thread (e.g., GTK UI).
-/// This is the fundamental building block for UI state management.
-///
-/// # Example
-/// ```rust,ignore
-/// let state: Shared<AppState> = Shared::new(RefCell::new(AppState::default()));
-/// state.borrow_mut().update();
-/// ```
-pub type Shared<T> = Rc<RefCell<T>>;
-
-/// An optional shared reference, for lazily-initialized shared state.
-///
-/// Common pattern for optional UI components or deferred initialization.
-pub type SharedOption<T> = Rc<RefCell<Option<T>>>;
-
-/// A shared vector for single-threaded collection management.
-pub type SharedVec<T> = Rc<RefCell<Vec<T>>>;
-
-/// A shared hash map for single-threaded key-value storage.
-pub type SharedHashMap<K, V> = Rc<RefCell<HashMap<K, V>>>;
 
 // =============================================================================
 // THREAD-SAFE SHARED TYPES (Arc<Mutex<T>> / Arc<RwLock<T>>)
@@ -73,17 +41,8 @@ pub type SharedHashMap<K, V> = Rc<RefCell<HashMap<K, V>>>;
 /// ```
 pub type ThreadSafe<T> = Arc<Mutex<T>>;
 
-/// A thread-safe optional wrapper for lazily-initialized cross-thread state.
-pub type ThreadSafeOption<T> = Arc<Mutex<Option<T>>>;
-
 /// A thread-safe vector for cross-thread collection management.
 pub type ThreadSafeVec<T> = Arc<Mutex<Vec<T>>>;
-
-/// A thread-safe deque for cross-thread queue/buffer management.
-pub type ThreadSafeDeque<T> = Arc<Mutex<VecDeque<T>>>;
-
-/// A thread-safe hash map for cross-thread key-value storage.
-pub type ThreadSafeMap<K, V> = Arc<Mutex<HashMap<K, V>>>;
 
 /// A thread-safe reader-writer lock wrapper for read-heavy workloads.
 ///
@@ -107,17 +66,6 @@ pub type Callback = Box<dyn Fn() + Send + Sync>;
 ///
 /// Thread-safe, suitable for cross-thread data notification.
 pub type DataCallback<T> = Box<dyn Fn(T) + Send + Sync>;
-
-/// A UI callback stored in RefCell for GTK signal handlers.
-///
-/// Single-threaded, suitable for GTK callbacks that capture UI state.
-pub type UiCallback = Rc<RefCell<Option<Box<dyn Fn()>>>>;
-
-/// A UI callback with a single parameter.
-pub type UiDataCallback<T> = Rc<RefCell<Option<Box<dyn Fn(T)>>>>;
-
-/// A UI callback with two parameters.
-pub type UiDataCallback2<T, U> = Rc<RefCell<Option<Box<dyn Fn(T, U)>>>>;
 
 // =============================================================================
 // LISTENER/HANDLER TYPES
@@ -182,29 +130,6 @@ pub type BoxedSendResult<T> = Result<T, BoxedSendError>;
 // CONSTRUCTOR HELPERS
 // =============================================================================
 
-/// Create a new `Shared<T>` from a value.
-///
-/// # Example
-/// ```rust,ignore
-/// let state = shared(AppState::default());
-/// ```
-#[inline]
-pub fn shared<T>(value: T) -> Shared<T> {
-    Rc::new(RefCell::new(value))
-}
-
-/// Create a new `SharedOption<T>` initialized to `None`.
-#[inline]
-pub fn shared_none<T>() -> SharedOption<T> {
-    Rc::new(RefCell::new(None))
-}
-
-/// Create a new `SharedOption<T>` initialized to `Some(value)`.
-#[inline]
-pub fn shared_some<T>(value: T) -> SharedOption<T> {
-    Rc::new(RefCell::new(Some(value)))
-}
-
 /// Create a new `ThreadSafe<T>` from a value.
 ///
 /// # Example
@@ -220,18 +145,6 @@ pub fn thread_safe<T>(value: T) -> ThreadSafe<T> {
 #[inline]
 pub fn thread_safe_vec<T>() -> ThreadSafeVec<T> {
     Arc::new(Mutex::new(Vec::new()))
-}
-
-/// Create a new empty `ThreadSafeDeque<T>`.
-#[inline]
-pub fn thread_safe_deque<T>() -> ThreadSafeDeque<T> {
-    Arc::new(Mutex::new(VecDeque::new()))
-}
-
-/// Create a new empty `ThreadSafeMap<K, V>`.
-#[inline]
-pub fn thread_safe_map<K, V>() -> ThreadSafeMap<K, V> {
-    Arc::new(Mutex::new(HashMap::new()))
 }
 
 /// Create a new `ThreadSafeRw<T>` from a value.

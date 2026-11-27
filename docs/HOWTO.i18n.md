@@ -6,8 +6,8 @@ GCodeKit5 reads its translations from gettext `.po` files, but it does not use g
 
 - Template (source strings): `po/gcodekit5.pot`
 - Per-language translations: `po/<lang>.po` (e.g. `po/fr.po`)
-- Build-time embedding: `crates/gcodekit5-settings/build.rs` (parses the catalogs with `polib`)
-- Runtime lookup: `crates/gcodekit5-settings/src/i18n.rs` (re-exported as `gcodekit5_app::i18n`)
+- Build-time embedding: `crates/gcodekit5-app/build.rs` (parses the catalogs with `polib`)
+- Runtime lookup: `crates/gcodekit5-app/src/i18n.rs` (`gcodekit5_app::i18n`)
 - Extraction/update script: `scripts/update-po.sh`
 
 ## How strings are translated in code
@@ -21,7 +21,7 @@ let label = translator.tr("Machine Control");
 let lines = translator.trn("line", "lines", n);
 ```
 
-Model code in `gcodekit5-app` and `gcodekit5-settings` has no translator at hand. It uses the `tr!` and `trn!` macros, which read the process-wide current language:
+Model code in `gcodekit5-app` has no translator at hand. It uses the `tr!` and `trn!` macros, which read the process-wide current language:
 
 ```rust
 let reason = crate::tr!("the machine must be idle");

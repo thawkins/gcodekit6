@@ -15,13 +15,8 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 toml = "1.1"
 dirs = "7.0"
-tracing = { workspace = true }
 thiserror = { workspace = true }
 craft-settings = { workspace = true }
-
-[build-dependencies]
-# Parses po/*.po into the embedded translation tables (src/i18n.rs); no msgfmt.
-polib = "0.3"
 
 [dev-dependencies]
 tempfile = { workspace = true }
