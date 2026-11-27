@@ -4,7 +4,7 @@
 
 ### What CNC controllers does GCodeKit5 support?
 
-GCodeKit5 supports **GRBL**, **grblHAL**, **TinyG**, **g2core**, **FluidNC**, and **Smoothieware**. Firmware is auto-detected on connection. See [Supported Controllers](05-supported-controllers.md) for a full feature comparison.
+GCodeKit5 supports **GRBL** and **Repetier**. **grblHAL** and **FluidNC** are supported via GRBL. You choose the controller in the device profile. See [Supported Controllers](05-supported-controllers.md).
 
 ### Is GCodeKit5 free?
 
@@ -39,7 +39,7 @@ Yes, for controllers that support it (e.g., FluidNC). Use the **WebSocket** or *
 
 ### Can I use GCodeKit5 with a laser?
 
-Yes. GCodeKit5 supports laser mode with variable power control (M3/M4 with S values). The CAM tools include a **Laser Bitmap Engraver** for raster images and a **Laser Vector Engraver** for cutting/engraving paths. Set your device type to "Laser" in settings to enable laser-specific features.
+Yes. GCodeKit5 supports laser mode with variable power control (M3/M4 with S values). The CAM tools include a **Laser Image Engraver** for raster images. The device type follows the controller's `$32` (laser mode) report.
 
 ### Does it support 4-axis or more?
 
@@ -57,15 +57,11 @@ Yes. The **Gerber Converter** CAM tool converts Gerber and Excellon files to G-c
 
 Use the built-in **Speeds & Feeds Calculator** in the CAM Tools tab. Select your material and tool, and it calculates the recommended RPM and feed rate.
 
-### Can I create macros?
-
-Yes. The Macros panel lets you create custom G-code macros with variable substitution (`${variable}`). Macros can be imported/exported as JSON.
-
 ## Jogging
 
 ### What keys do I use to jog?
 
-The default jog keys are **WASD** for X/Y movement and **Q/Z** for Z movement. See [Keyboard Shortcuts](90-shortcuts.md) for the full list. All shortcuts are customizable in Settings.
+The default jog keys are on the numeric keypad: **6**/**4** for X, **8**/**2** for Y and **9**/**3** for Z. They work while the Machine Control page has the keyboard. See [Keyboard Shortcuts](90-shortcuts.md) for the full list. All shortcuts are customizable in Settings.
 
 ### Why won't my machine jog?
 
@@ -75,24 +71,18 @@ The default jog keys are **WASD** for X/Y movement and **Q/Z** for Z movement. S
 
 ## Troubleshooting
 
-### The UI looks broken or unstyled
-
-Ensure **GTK4** and **libadwaita** are installed. You can try forcing a theme: `GTK_THEME=Adwaita:dark ./target/release/gcodekit5`
-
 ### G-code streaming is slow
 
 - Try a shorter or higher-quality USB cable
 - Close other applications that may be using the serial port
-- Check the **Safety & Diagnostics** panel for communication latency metrics
 
 ### The visualizer is blank or slow
 
-- Ensure your graphics driver supports OpenGL 3.3 or later
+- Ensure your GPU and driver support Vulkan, Metal, DirectX 12 or OpenGL ES 3 (wgpu)
 - Update your graphics drivers
 - For large G-code files (100k+ lines), rendering may take a few seconds
 
 ## Getting Help
 
 - **Built-in Help**: Click the Help button on any panel for context-sensitive documentation
-- **GitHub Issues**: [Report bugs](https://github.com/thawkins/gcodekit5/issues)
-- **Discussions**: [Ask questions](https://github.com/thawkins/gcodekit5/discussions)
+- **GitHub Issues**: [Report bugs](https://github.com/thawkins/gcodekit6/issues)

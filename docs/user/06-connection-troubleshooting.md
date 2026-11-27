@@ -67,10 +67,9 @@ sudo usermod -aG dialout $USER
 
 1. Open the **Console** panel and observe messages during connection
 2. Enable debug logging: `RUST_LOG=debug ./target/release/gcodekit5`
-3. Check the **Safety & Diagnostics** panel for communication health indicators
-4. Verify the firmware responds to manual commands (type `$$` in the console for GRBL)
+3. Verify the firmware responds to manual commands (type `$$` in the console for GRBL)
 
 ## Still Having Issues?
 
-- [GitHub Issues](https://github.com/thawkins/gcodekit5/issues)
+- [GitHub Issues](https://github.com/thawkins/gcodekit6/issues)
 - [FAQ](92-faq.md)

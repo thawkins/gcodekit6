@@ -20,20 +20,28 @@ The help browser displays markdown-formatted documentation topics:
 
 ## Available Topics
 
-The help system covers:
+The topic list shows these topics (indented entries appear under the topic above them):
 
-| Category | Topics |
-|----------|--------|
-| **Connection** | Serial, TCP/IP, and WebSocket setup |
-| **Machine Control** | Jogging, homing, coordinate systems |
-| **File Operations** | Opening, saving, and importing files |
-| **G-Code Editor** | Editing, search, and execution tracking |
-| **Visualizer** | 3D preview, camera controls, display options |
-| **CAM Tools** | One topic per tool (box maker, puzzle, drill press, bitmap engraver, vector engraver, spoilboard surfacing, spoilboard grid, Gerber converter, speeds & feeds) |
-| **Designer** | Shapes, import, toolpath generation |
-| **Macros** | Creating and running macros |
-| **Settings** | Application configuration |
-| **Shortcuts** | Keyboard shortcut reference by category |
+- Index
+- Preferences
+- Designer
+- Visualizer
+- Machine Control
+  - G-Code Editor
+  - Device Console
+- CAM Tools
+  - Tabbed Box Maker
+  - Jigsaw Puzzle Generator
+  - Laser Image Engraver
+  - Speeds and Feeds Calculator
+  - Spoilboard Surfacing
+  - Create Spoilboard Grid
+  - Gerber to G-Code
+  - Drill Press
+- Device Manager
+- Device Config
+- CNC Tools
+- Materials
 
 ## See Also
 

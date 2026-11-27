@@ -2,30 +2,26 @@
 
 ## Prerequisites
 
-- **Rust toolchain** 1.88 or later (install from [rustup.rs](https://rustup.rs))
-- **GTK4** and **libadwaita** development libraries
-- **OpenGL 3.3+** capable graphics driver
+- **Rust toolchain** 1.95 or later (install from [rustup.rs](https://rustup.rs))
+- A GPU with Vulkan, Metal, DirectX 12 or OpenGL ES 3 support (the UI is drawn with wgpu)
 
 ## Linux
 
 ### Dependencies
 
+Ubuntu / Debian (the package list the CI build uses):
+
 ```bash
-# Fedora
-sudo dnf install gtk4-devel libadwaita-devel
-
-# Ubuntu / Debian
-sudo apt install libgtk-4-dev libadwaita-1-dev
-
-# Arch Linux
-sudo pacman -S gtk4 libadwaita
+sudo apt-get install -y libudev-dev pkg-config libxkbcommon-dev libwayland-dev libx11-dev libxcursor-dev libxrandr-dev libxi-dev libvulkan1 mesa-vulkan-drivers
 ```
+
+On other distributions, install the equivalent packages.
 
 ### Build from Source
 
 ```bash
-git clone https://github.com/thawkins/gcodekit5.git
-cd gcodekit5
+git clone https://github.com/thawkins/gcodekit6.git
+cd gcodekit6
 cargo build --release
 ./target/release/gcodekit5
 ```
@@ -41,19 +37,22 @@ sudo usermod -aG dialout $USER
 
 ### Flatpak
 
+Each GitHub release includes a Flatpak bundle, `gcodekit5-<tag>-linux-x86_64.flatpak`, where
+`<tag>` is the release tag. Install it with:
+
 ```bash
-# When available on Flathub
-flatpak install flathub com.github.thawkins.gcodekit5
+flatpak install --user gcodekit5-<tag>-linux-x86_64.flatpak
 ```
 
 ## macOS
 
-See [macOS Build Guide](../MACOS_BUILD.md) for detailed instructions.
+See [macOS Build Guide](../MACOS_BUILD.md) for detailed instructions. The only prerequisite
+besides Rust is the Xcode Command Line Tools.
 
 ```bash
-brew install gtk4 libadwaita
-git clone https://github.com/thawkins/gcodekit5.git
-cd gcodekit5
+xcode-select --install
+git clone https://github.com/thawkins/gcodekit6.git
+cd gcodekit6
 cargo build --release
 ```
 
