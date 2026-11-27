@@ -186,6 +186,8 @@ mod test_translations;
 mod test_visualizer;
 #[path = "test_visualizer_2d.rs"]
 mod test_visualizer_2d;
+#[path = "test_visualizer_arc_segments.rs"]
+mod test_visualizer_arc_segments;
 #[path = "test_visualizer_bounds.rs"]
 mod test_visualizer_bounds;
 #[path = "test_visualizer_display.rs"]

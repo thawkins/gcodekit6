@@ -572,7 +572,7 @@ fn file_rows(ui: &mut egui::Ui, tr: &Translator, config: &mut Config) {
         tr,
         n_!("Arc Segment Length"),
         &mut file.arc_segment_length,
-        0.01..=100.0,
+        crate::panes::visualizer::toolpath::ARC_SEGMENT_LENGTH_RANGE,
         " mm",
     );
     let label = row_label(ui, tr, n_!("Max Line Length"));

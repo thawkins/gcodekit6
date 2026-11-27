@@ -9,7 +9,8 @@
 //!
 //! As in the GTK `ui/gtk/renderer_3d.rs`, rapids and moves made with the spindle/laser off
 //! are travel (grey), powered feed moves and arcs are cuts coloured by spindle/laser power,
-//! and arcs are split into segments of at most 5 degrees.
+//! and arcs are split into segments of at most 5 degrees and at most the Preferences "Arc
+//! Segment Length" long ([`arc_segment_count`]).
 //!
 //! The same pass takes GTK's inspector statistics of the S values ([`Intensity`]) and
 //! builds the run preview's path ([`super::preview::PathBuilder`]), so the
@@ -29,6 +30,58 @@ pub const MARKER_DWELL: f32 = 12345.678;
 
 /// Colour of travel: rapids and moves with the spindle/laser off (GTK's 50% grey).
 pub const TRAVEL_COLOR: [u8; 4] = [128, 128, 128, 255];
+
+/// The default "Arc Segment Length" (mm). Arcs are drawn in steps of at most 5 degrees
+/// whatever the length, so this long a chord binds only on arcs of radius above about 1146
+/// mm: the default draws as the visualizer always has (5-degree steps).
+pub const DEFAULT_ARC_SEGMENT_LENGTH: f64 = 100.0;
+
+/// The "Arc Segment Length" values honoured (mm); others are clamped into it, and a value
+/// that is not a number falls back to [`DEFAULT_ARC_SEGMENT_LENGTH`].
+pub const ARC_SEGMENT_LENGTH_RANGE: std::ops::RangeInclusive<f64> = 0.01..=100.0;
+
+/// The longest arc step, in radians (5 degrees, as GTK draws arcs).
+const ARC_MAX_STEP: f64 = std::f64::consts::PI / 36.0;
+
+/// The fewest and most segments one arc is drawn with, so a tiny segment length cannot
+/// explode the vertex count.
+const ARC_SEGMENTS: (usize, usize) = (4, 128);
+
+/// `mm` as an "Arc Segment Length" the visualizer honours: clamped into
+/// [`ARC_SEGMENT_LENGTH_RANGE`], or the default when it is not a number.
+///
+/// # Arguments
+/// * `mm` - The configured length.
+pub fn clamp_arc_segment_length(mm: f64) -> f64 {
+    if mm.is_nan() {
+        DEFAULT_ARC_SEGMENT_LENGTH
+    } else {
+        mm.clamp(
+            *ARC_SEGMENT_LENGTH_RANGE.start(),
+            *ARC_SEGMENT_LENGTH_RANGE.end(),
+        )
+    }
+}
+
+/// The number of segments an arc of `sweep` radians and `radius` mm is drawn with: steps of
+/// at most 5 degrees and chords of at most `segment_length` mm (clamped by
+/// [`clamp_arc_segment_length`]), between 4 and 128 segments.
+///
+/// # Arguments
+/// * `sweep` - The arc's sweep in radians (either sign).
+/// * `radius` - The arc's radius in mm.
+/// * `segment_length` - The Preferences "Arc Segment Length" in mm.
+pub fn arc_segment_count(sweep: f64, radius: f64, segment_length: f64) -> usize {
+    let (min, max) = ARC_SEGMENTS;
+    let by_angle = (sweep.abs() / ARC_MAX_STEP).ceil();
+    let by_length = (sweep.abs() * radius.abs() / clamp_arc_segment_length(segment_length)).ceil();
+    let wanted = by_angle.max(by_length);
+    if wanted.is_finite() {
+        (wanted as usize).clamp(min, max)
+    } else {
+        min
+    }
+}
 
 /// The bit of [`ToolpathVertex`]'s tag set on travel (rapids and moves with the
 /// spindle/laser off), so the shader can hide travel or cuts (the sidebar's Show Rapid Moves
@@ -144,6 +197,8 @@ struct Builder {
     mesh: ToolpathMesh,
     line: u32,
     path: PathBuilder,
+    /// The longest arc chord (mm).
+    arc_segment_length: f64,
 }
 
 impl Builder {
@@ -164,7 +219,8 @@ impl Builder {
         }
     }
 
-    /// An XY arc as segments of at most 5 degrees (4 to 128 of them), as GTK draws it.
+    /// An XY arc as segments of at most 5 degrees and the arc segment length
+    /// ([`arc_segment_count`]).
     fn arc(
         &mut self,
         from: Point3D,
@@ -187,7 +243,7 @@ impl Builder {
             self.path.line(v(from), v(to), 2);
             return;
         };
-        let segments = sweep.segment_count(std::f64::consts::PI / 36.0, 4, 128);
+        let segments = arc_segment_count(sweep.sweep, sweep.radius, self.arc_segment_length);
         let mut prev = v(from);
         for i in 1..=segments {
             let next = if i == segments {
@@ -212,17 +268,28 @@ fn cut_color(vis: &Visualizer, s: f32) -> [u8; 4] {
 }
 
 /// Builds the toolpath of `lines`, the program as the machine streams it (one entry per
-/// streamed line).
+/// streamed line), with the default arc segment length.
 ///
 /// # Arguments
 /// * `lines` - The program's lines.
 pub fn build(lines: &[String]) -> ToolpathMesh {
+    build_with(lines, DEFAULT_ARC_SEGMENT_LENGTH)
+}
+
+/// Builds the toolpath of `lines` like [`build`], drawing arcs with chords of at most
+/// `arc_segment_length` mm (see [`arc_segment_count`]).
+///
+/// # Arguments
+/// * `lines` - The program's lines.
+/// * `arc_segment_length` - The Preferences "Arc Segment Length" in mm.
+pub fn build_with(lines: &[String], arc_segment_length: f64) -> ToolpathMesh {
     let mut vis = Visualizer::new();
     vis.parse_gcode(&marked_program(lines));
     let mut builder = Builder {
         mesh: ToolpathMesh::default(),
         line: 0,
         path: PathBuilder::default(),
+        arc_segment_length,
     };
     let v = |p: &Point3D| Vec3::new(p.x, p.y, p.z);
     let mut intensity = IntensitySum::default();
