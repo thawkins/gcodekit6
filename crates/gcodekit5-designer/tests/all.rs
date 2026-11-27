@@ -33,6 +33,8 @@ mod test_dxf_spline_import;
 mod test_dxf_z_metadata;
 #[path = "test_import_transforms_units.rs"]
 mod test_import_transforms_units;
+#[path = "test_path_rotation.rs"]
+mod test_path_rotation;
 #[path = "test_pocket_bounds.rs"]
 mod test_pocket_bounds;
 #[path = "test_pocket_holes.rs"]
