@@ -150,33 +150,6 @@ impl DesignerState {
         }
     }
 
-    /// Sets the text properties of the selected shape.
-    pub fn set_selected_text_properties(&mut self, content: String, font_size: f64) {
-        let updates = self
-            .canvas
-            .calculate_text_property_updates(&content, font_size);
-        if updates.is_empty() {
-            return;
-        }
-
-        let mut commands = Vec::new();
-        for (id, new_obj) in updates {
-            if let Some(old_obj) = self.canvas.get_shape(id) {
-                commands.push(DesignerCommand::ChangeProperty(ChangeProperty {
-                    id,
-                    old_state: old_obj.clone(),
-                    new_state: new_obj,
-                }));
-            }
-        }
-
-        let cmd = DesignerCommand::CompositeCommand(CompositeCommand {
-            commands,
-            name: "Change Text Properties".to_string(),
-        });
-        self.push_command(cmd);
-    }
-
     /// Sets corner radius for supported selected shapes.
     pub fn set_selected_corner_radius(&mut self, radius: f64) {
         let mut commands = Vec::new();
@@ -365,30 +338,6 @@ impl DesignerState {
             let cmd = DesignerCommand::CompositeCommand(CompositeCommand {
                 commands,
                 name: "Change Is Slot".to_string(),
-            });
-            self.push_command(cmd);
-        }
-    }
-
-    /// Sets the name of selected shapes.
-    pub fn set_selected_name(&mut self, name: String) {
-        let mut commands = Vec::new();
-        for obj in self.canvas.shapes_mut() {
-            if obj.selected && obj.name != name {
-                let mut new_obj = obj.clone();
-                new_obj.name = name.clone();
-
-                commands.push(DesignerCommand::ChangeProperty(ChangeProperty {
-                    id: obj.id,
-                    old_state: obj.clone(),
-                    new_state: new_obj,
-                }));
-            }
-        }
-        if !commands.is_empty() {
-            let cmd = DesignerCommand::CompositeCommand(CompositeCommand {
-                commands,
-                name: "Change Name".to_string(),
             });
             self.push_command(cmd);
         }

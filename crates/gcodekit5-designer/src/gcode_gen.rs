@@ -3,7 +3,6 @@
 use super::toolpath::{Toolpath, ToolpathSegment, ToolpathSegmentType};
 use crate::geometry::point_segment_distance;
 use crate::model::Point;
-use gcodekit5_core::Units;
 
 /// Límites de la máquina para verificación
 #[derive(Debug, Clone)]
@@ -58,11 +57,9 @@ struct BodyState {
 }
 
 impl ToolpathToGcode {
-    /// Creates a new G-code generator.
-    ///
-    /// Output is always millimetres (`G21`); `_units` is kept for API
-    /// compatibility.
-    pub fn new(_units: Units, safe_z: f64) -> Self {
+    /// Creates a new G-code generator emitting millimetres (`G21`) with the
+    /// given safe Z height.
+    pub fn new(safe_z: f64) -> Self {
         Self {
             safe_z,
             line_numbers_enabled: false,
@@ -77,8 +74,8 @@ impl ToolpathToGcode {
     }
 
     /// Creates a new G-code generator with line numbers enabled.
-    pub fn with_line_numbers(units: Units, safe_z: f64, enabled: bool) -> Self {
-        let mut generator = Self::new(units, safe_z);
+    pub fn with_line_numbers(safe_z: f64, enabled: bool) -> Self {
+        let mut generator = Self::new(safe_z);
         generator.line_numbers_enabled = enabled;
         generator
     }
@@ -750,6 +747,6 @@ impl ToolpathToGcode {
 
 impl Default for ToolpathToGcode {
     fn default() -> Self {
-        Self::new(Units::MM, 10.0)
+        Self::new(10.0)
     }
 }

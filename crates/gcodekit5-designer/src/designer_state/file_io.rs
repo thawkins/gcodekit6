@@ -247,11 +247,6 @@ impl DesignerState {
         self.clear_history();
     }
 
-    /// Mark design as modified.
-    pub fn mark_modified(&mut self) {
-        self.is_modified = true;
-    }
-
     /// Get display name for the design.
     pub fn display_name(&self) -> String {
         let name = if let Some(path) = &self.current_file_path {

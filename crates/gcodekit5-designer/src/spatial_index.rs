@@ -53,14 +53,6 @@ impl Bounds {
             || self.max_y < other.min_y
             || self.min_y > other.max_y)
     }
-
-    /// Check if bounds fully contains another bounds
-    pub fn contains_bounds(&self, other: &Bounds) -> bool {
-        self.min_x <= other.min_x
-            && self.max_x >= other.max_x
-            && self.min_y <= other.min_y
-            && self.max_y >= other.max_y
-    }
 }
 
 /// Quadtree node for spatial indexing
@@ -280,11 +272,6 @@ impl SpatialIndex {
         self.root.children = None;
     }
 
-    /// Get memory usage estimate in bytes
-    pub fn memory_usage(&self) -> usize {
-        estimate_node_size(&self.root)
-    }
-
     /// Get statistics about the index
     pub fn stats(&self) -> SpatialIndexStats {
         let mut stats = SpatialIndexStats {
@@ -302,20 +289,6 @@ impl SpatialIndex {
 
         stats
     }
-}
-
-/// Estimate node tree size (helper)
-fn estimate_node_size(node: &QuadtreeNode) -> usize {
-    let mut size = std::mem::size_of::<QuadtreeNode>();
-    size += node.items.capacity() * std::mem::size_of::<u64>();
-
-    if let Some(children) = &node.children {
-        for child in children.iter() {
-            size += estimate_node_size(child);
-        }
-    }
-
-    size
 }
 
 /// Collect statistics (helper)

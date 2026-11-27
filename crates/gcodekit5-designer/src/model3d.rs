@@ -186,21 +186,6 @@ impl Mesh3D {
         Self::new(triangles)
     }
 
-    pub fn from_stl_triangles(stl_triangles: &[stl_io::Triangle]) -> Self {
-        let triangles: Vec<Triangle3D> = stl_triangles
-            .iter()
-            .map(|tri| {
-                Triangle3D::new(
-                    Point3::new(tri.vertices[0][0], tri.vertices[0][1], tri.vertices[0][2]),
-                    Point3::new(tri.vertices[1][0], tri.vertices[1][1], tri.vertices[1][2]),
-                    Point3::new(tri.vertices[2][0], tri.vertices[2][1], tri.vertices[2][2]),
-                )
-            })
-            .collect();
-
-        Self::new(triangles)
-    }
-
     fn calculate_bounds(&mut self) {
         if self.triangles.is_empty() {
             return;
@@ -260,14 +245,6 @@ impl Mesh3D {
     pub fn center(&mut self) {
         let center = (self.bounds_min + self.bounds_max.coords) * 0.5;
         self.translate(-center.coords);
-    }
-
-    /// Get all triangles that intersect with a horizontal plane at Z height
-    pub fn get_intersecting_triangles(&self, z: f32) -> Vec<&Triangle3D> {
-        self.triangles
-            .iter()
-            .filter(|tri| tri.intersects_plane_z(z))
-            .collect()
     }
 
     /// Project the mesh to a 2D silhouette by projecting along Z-axis
@@ -364,38 +341,6 @@ impl Mesh3D {
         let mut path = PathShape::from_csg(shadow);
         path.closed = true;
         Ok(vec![Shape::Path(path)])
-    }
-
-    /// Slice the mesh at a specific Z height and return 2D contour paths
-    pub fn slice_at_z(&self, z: f32) -> Result<Vec<Shape>> {
-        debug!("Slicing mesh at Z = {}", z);
-
-        let mut intersection_segments = Vec::new();
-
-        for triangle in &self.triangles {
-            let intersections = triangle.intersect_plane_z(z);
-            if intersections.len() == 2 {
-                // Two intersection points form a line segment
-                let p1 = Point::new(intersections[0].x as f64, intersections[0].y as f64);
-                let p2 = Point::new(intersections[1].x as f64, intersections[1].y as f64);
-                intersection_segments.push((p1, p2));
-            }
-        }
-
-        debug!(
-            "Found {} intersection segments at Z = {}",
-            intersection_segments.len(),
-            z
-        );
-
-        // Build contour paths from intersection segments
-        let contours = build_contours_from_segments(&intersection_segments)?;
-
-        debug!("Built {} contour paths from slice", contours.len());
-
-        let shapes: Vec<Shape> = contours.into_iter().map(Shape::Path).collect();
-
-        Ok(shapes)
     }
 }
 
@@ -554,37 +499,6 @@ impl Model3DImporter {
 
         let stl = stl_io::read_stl(&mut file)
             .map_err(|e| anyhow!("Failed to parse STL file {}: {}", path, e))?;
-
-        debug!("STL contains {} faces", stl.faces.len());
-
-        let mut mesh = Mesh3D::from_stl_mesh(&stl);
-
-        // Apply transformations
-        if self.scale != 1.0 {
-            debug!("Scaling mesh by factor {}", self.scale);
-            mesh.scale(self.scale);
-        }
-
-        if self.center_model {
-            debug!("Centering mesh at origin");
-            mesh.center();
-        }
-
-        debug!(
-            "Final mesh bounds: {:?} to {:?}",
-            mesh.bounds_min, mesh.bounds_max
-        );
-
-        Ok(mesh)
-    }
-
-    /// Import STL from string content (binary STL data)
-    pub fn import_stl_data(&self, data: &[u8]) -> Result<Mesh3D> {
-        debug!("Importing STL from binary data ({} bytes)", data.len());
-
-        let mut cursor = std::io::Cursor::new(data);
-        let stl = stl_io::read_stl(&mut cursor)
-            .map_err(|e| anyhow!("Failed to parse STL data: {}", e))?;
 
         debug!("STL contains {} faces", stl.faces.len());
 

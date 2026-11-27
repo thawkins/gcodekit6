@@ -5,9 +5,9 @@ mod segment;
 
 use super::pocket_operations::{PocketGenerator, PocketOperation, PocketStrategy};
 use crate::model::{
-    DesignCircle as Circle, DesignGear, DesignLine as Line, DesignPath as PathShape,
-    DesignPolygon as Polygon, DesignRectangle as Rectangle, DesignSprocket,
-    DesignText as TextShape, DesignTriangle as Triangle, DesignerShape, Point, rotate_point,
+    DesignCircle as Circle, DesignLine as Line, DesignPath as PathShape, DesignPolygon as Polygon,
+    DesignRectangle as Rectangle, DesignText as TextShape, DesignTriangle as Triangle,
+    DesignerShape, Point, rotate_point,
 };
 
 pub use generator::ToolpathGenerator;

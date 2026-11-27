@@ -224,56 +224,6 @@ impl ShapeStore {
     pub fn contains(&self, id: u64) -> bool {
         self.shapes.contains_key(&id)
     }
-
-    /// Brings a shape to the front (top of draw order).
-    ///
-    /// # Arguments
-    ///
-    /// * `id` - The ID of the shape to bring to front
-    pub fn bring_to_front(&mut self, id: u64) {
-        if let Some(pos) = self.draw_order.iter().position(|&x| x == id) {
-            self.draw_order.remove(pos);
-            self.draw_order.push(id);
-        }
-    }
-
-    /// Sends a shape to the back (bottom of draw order).
-    ///
-    /// # Arguments
-    ///
-    /// * `id` - The ID of the shape to send to back
-    pub fn send_to_back(&mut self, id: u64) {
-        if let Some(pos) = self.draw_order.iter().position(|&x| x == id) {
-            self.draw_order.remove(pos);
-            self.draw_order.insert(0, id);
-        }
-    }
-
-    /// Moves a shape forward one position in draw order.
-    ///
-    /// # Arguments
-    ///
-    /// * `id` - The ID of the shape to move forward
-    pub fn bring_forward(&mut self, id: u64) {
-        if let Some(pos) = self.draw_order.iter().position(|&x| x == id)
-            && pos < self.draw_order.len() - 1
-        {
-            self.draw_order.swap(pos, pos + 1);
-        }
-    }
-
-    /// Moves a shape backward one position in draw order.
-    ///
-    /// # Arguments
-    ///
-    /// * `id` - The ID of the shape to move backward
-    pub fn send_backward(&mut self, id: u64) {
-        if let Some(pos) = self.draw_order.iter().position(|&x| x == id)
-            && pos > 0
-        {
-            self.draw_order.swap(pos, pos - 1);
-        }
-    }
     /// Sets the next ID to be generated.
     ///
     /// This is useful when loading shapes from a file to ensure new IDs
@@ -311,56 +261,6 @@ impl ShapeStore {
     /// Devuelve los IDs seleccionados (en orden de `draw_order`).
     pub fn selected_ids(&self) -> Vec<u64> {
         self.selected_ids_in_order()
-    }
-
-    /// Mueve los IDs dados al principio del `draw_order`, manteniendo su orden
-    /// relativo y el del resto. Los IDs que no existan se ignoran.
-    pub fn move_ids_to_top(&mut self, ids: &[u64]) {
-        let id_set: std::collections::HashSet<u64> = ids.iter().copied().collect();
-        let (selected, rest): (Vec<u64>, Vec<u64>) = self
-            .draw_order
-            .drain(..)
-            .partition(|id| id_set.contains(id));
-        self.draw_order = selected;
-        self.draw_order.extend(rest);
-    }
-
-    /// Mueve los IDs dados al final del `draw_order`, manteniendo su orden
-    /// relativo y el del resto.
-    pub fn move_ids_to_bottom(&mut self, ids: &[u64]) {
-        let id_set: std::collections::HashSet<u64> = ids.iter().copied().collect();
-        let (selected, rest): (Vec<u64>, Vec<u64>) = self
-            .draw_order
-            .drain(..)
-            .partition(|id| id_set.contains(id));
-        self.draw_order = rest;
-        self.draw_order.extend(selected);
-    }
-
-    /// Mueve los IDs dados una posición hacia arriba en el `draw_order`.
-    /// Los seleccionados no se adelantan entre sí.
-    pub fn move_ids_up(&mut self, ids: &[u64]) {
-        let id_set: std::collections::HashSet<u64> = ids.iter().copied().collect();
-        for i in 1..self.draw_order.len() {
-            let prev_selected = id_set.contains(&self.draw_order[i - 1]);
-            let curr_selected = id_set.contains(&self.draw_order[i]);
-            if curr_selected && !prev_selected {
-                self.draw_order.swap(i - 1, i);
-            }
-        }
-    }
-
-    /// Mueve los IDs dados una posición hacia abajo en el `draw_order`.
-    /// Los seleccionados no se adelantan entre sí.
-    pub fn move_ids_down(&mut self, ids: &[u64]) {
-        let id_set: std::collections::HashSet<u64> = ids.iter().copied().collect();
-        for i in (0..self.draw_order.len().saturating_sub(1)).rev() {
-            let next_selected = id_set.contains(&self.draw_order[i + 1]);
-            let curr_selected = id_set.contains(&self.draw_order[i]);
-            if curr_selected && !next_selected {
-                self.draw_order.swap(i, i + 1);
-            }
-        }
     }
 
     /// Comprueba si mover `id` a `target_idx` dejaría algún grupo partido

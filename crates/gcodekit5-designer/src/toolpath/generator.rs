@@ -98,10 +98,6 @@ impl ToolpathGenerator {
         self.raster_fill_ratio
     }
 
-    pub fn empty_toolpath(&self) -> Toolpath {
-        Toolpath::new(self.tool_diameter, self.start_depth - self.cut_depth.abs())
-    }
-
     // ==================== CONTOUR METHODS ====================
 
     pub fn generate_rectangle_contour(&self, rect: &Rectangle, step_down: f64) -> Vec<Toolpath> {
@@ -681,27 +677,6 @@ impl ToolpathGenerator {
         }
 
         self.create_multipass_toolpaths(segments, step_down)
-    }
-
-    pub fn generate_gear_contour(&self, gear: &DesignGear, step_down: f64) -> Vec<Toolpath> {
-        let path = gear.render();
-        let path_shape = PathShape::from_lyon_path(&path);
-        // Transferir laser_params del gear al path_shape
-        let mut path_with_params = path_shape;
-        path_with_params.laser_params = gear.laser_params;
-        self.generate_path_contour(&path_with_params, step_down)
-    }
-
-    pub fn generate_sprocket_contour(
-        &self,
-        sprocket: &DesignSprocket,
-        step_down: f64,
-    ) -> Vec<Toolpath> {
-        let path = sprocket.render();
-        let path_shape = PathShape::from_lyon_path(&path);
-        let mut path_with_params = path_shape;
-        path_with_params.laser_params = sprocket.laser_params;
-        self.generate_path_contour(&path_with_params, step_down)
     }
 
     pub fn generate_text_toolpath(&self, text_shape: &TextShape, step_down: f64) -> Vec<Toolpath> {
@@ -1290,30 +1265,6 @@ impl ToolpathGenerator {
             ));
         }
         toolpaths
-    }
-
-    pub fn generate_gear_pocket(
-        &self,
-        gear: &DesignGear,
-        pocket_depth: f64,
-        step_down: f64,
-        step_in: f64,
-    ) -> Vec<Toolpath> {
-        let path = gear.render();
-        let path_shape = PathShape::from_lyon_path(&path);
-        self.generate_path_pocket(&path_shape, pocket_depth, step_down, step_in)
-    }
-
-    pub fn generate_sprocket_pocket(
-        &self,
-        sprocket: &DesignSprocket,
-        pocket_depth: f64,
-        step_down: f64,
-        step_in: f64,
-    ) -> Vec<Toolpath> {
-        let path = sprocket.render();
-        let path_shape = PathShape::from_lyon_path(&path);
-        self.generate_path_pocket(&path_shape, pocket_depth, step_down, step_in)
     }
 
     pub fn generate_text_pocket_toolpath(

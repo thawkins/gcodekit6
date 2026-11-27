@@ -3,7 +3,6 @@
 //! the DXF `$EXTMIN`/`$EXTMAX` header extents.
 
 use cavalier_contours::polyline::{PlineSource, PlineSourceMut, PlineVertex, Polyline};
-use gcodekit5_core::Units;
 use gcodekit5_designer::ToolpathToGcode;
 use gcodekit5_designer::model::Point;
 use gcodekit5_designer::ops::safe_parallel_offset;
@@ -41,9 +40,9 @@ fn settings(g: &ToolpathToGcode) -> String {
 
 #[test]
 fn test_with_line_numbers_matches_new_apart_from_numbering() {
-    let plain = ToolpathToGcode::new(Units::MM, 7.5);
-    let off = ToolpathToGcode::with_line_numbers(Units::MM, 7.5, false);
-    let on = ToolpathToGcode::with_line_numbers(Units::MM, 7.5, true);
+    let plain = ToolpathToGcode::new(7.5);
+    let off = ToolpathToGcode::with_line_numbers(7.5, false);
+    let on = ToolpathToGcode::with_line_numbers(7.5, true);
     assert_eq!(settings(&plain), settings(&off));
     assert_eq!(settings(&plain), settings(&on));
 

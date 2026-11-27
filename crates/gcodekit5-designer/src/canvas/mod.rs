@@ -8,9 +8,8 @@ pub use types::{Alignment, CanvasPoint, CanvasSnapshot, DrawingMode, DrawingObje
 use super::spatial_index::Bounds;
 use super::viewport::Viewport;
 use crate::model::{
-    DesignCircle as Circle, DesignEllipse as Ellipse, DesignLine as Line, DesignPath as PathShape,
-    DesignPolygon as Polygon, DesignRectangle as Rectangle, DesignText as TextShape,
-    DesignTriangle as Triangle, DesignerShape, Point, Shape,
+    DesignCircle as Circle, DesignEllipse as Ellipse, DesignPolygon as Polygon,
+    DesignRectangle as Rectangle, DesignTriangle as Triangle, DesignerShape, Point, Shape,
 };
 use crate::selection_manager::SelectionManager;
 use crate::shape_store::ShapeStore;
@@ -138,18 +137,6 @@ impl Canvas {
         id
     }
 
-    /// Adds a line to the canvas.
-    pub fn add_line(&mut self, start: Point, end: Point) -> u64 {
-        let id = self.shape_store.generate_id();
-        let line = Line::new(start, end);
-        let (min_x, min_y, max_x, max_y) = line.bounds();
-        self.shape_store
-            .insert(id, DrawingObject::new(id, Shape::Line(line)));
-        self.spatial_manager
-            .insert_bounds(id, &Bounds::new(min_x, min_y, max_x, max_y));
-        id
-    }
-
     /// Adds an ellipse to the canvas.
     pub fn add_ellipse(&mut self, center: Point, rx: f64, ry: f64) -> u64 {
         let id = self.shape_store.generate_id();
@@ -157,31 +144,6 @@ impl Canvas {
         let (min_x, min_y, max_x, max_y) = ellipse.bounds();
         self.shape_store
             .insert(id, DrawingObject::new(id, Shape::Ellipse(ellipse)));
-        self.spatial_manager
-            .insert_bounds(id, &Bounds::new(min_x, min_y, max_x, max_y));
-        id
-    }
-
-    /// Adds a polyline to the canvas.
-    pub fn add_polyline(&mut self, vertices: Vec<Point>) -> u64 {
-        let id = self.shape_store.generate_id();
-        // Create a closed PathShape from vertices
-        let path_shape = PathShape::from_points(&vertices, true);
-        let (min_x, min_y, max_x, max_y) = path_shape.bounds();
-        self.shape_store
-            .insert(id, DrawingObject::new(id, Shape::Path(path_shape)));
-        self.spatial_manager
-            .insert_bounds(id, &Bounds::new(min_x, min_y, max_x, max_y));
-        id
-    }
-
-    /// Adds a text shape to the canvas.
-    pub fn add_text(&mut self, text: String, x: f64, y: f64, font_size: f64) -> u64 {
-        let id = self.shape_store.generate_id();
-        let shape = TextShape::new(text, x, y, font_size);
-        let (min_x, min_y, max_x, max_y) = shape.bounds();
-        self.shape_store
-            .insert(id, DrawingObject::new(id, Shape::Text(shape)));
         self.spatial_manager
             .insert_bounds(id, &Bounds::new(min_x, min_y, max_x, max_y));
         id
@@ -462,18 +424,6 @@ impl Canvas {
         self.selection_manager.select_all(&mut self.shape_store);
     }
 
-    /// Checks if point is inside currently selected shape (primary selection only)
-    pub fn is_point_in_selected(&self, point: &Point) -> bool {
-        if let Some(id) = self.selection_manager.selected_id()
-            && let Some(obj) = self.shape_store.get(id)
-        {
-            // Calculate tolerance based on zoom (5 pixels on screen)
-            let tolerance = 5.0 / self.viewport.zoom();
-            return obj.contains_point(point, tolerance);
-        }
-        false
-    }
-
     /// Sets the canvas size (viewport dimensions).
     pub fn set_canvas_size(&mut self, width: f64, height: f64) {
         self.viewport.set_canvas_size(width, height);
@@ -602,11 +552,6 @@ impl Canvas {
         self.viewport.reset();
     }
 
-    /// Gets the pan offset (compatibility method).
-    pub fn pan_offset(&self) -> (f64, f64) {
-        (self.viewport.pan_x(), self.viewport.pan_y())
-    }
-
     /// Pans the canvas (compatibility method).
     pub fn pan(&mut self, dx: f64, dy: f64) {
         self.viewport.pan_by(dx, dy);
@@ -621,45 +566,6 @@ impl Canvas {
 
     pub fn set_selected_id(&mut self, id: Option<u64>) {
         self.selection_manager.set_selected_id(id);
-    }
-
-    pub fn select_next_at_position(&mut self, point: &Point, tolerance: f64) -> Option<u64> {
-        // Get all IDs near the point using the spatial manager
-        let near_ids = self.spatial_manager.query_point(point.x, point.y);
-
-        // Collect objects that actually contain the dot
-        let objects_at_point: Vec<u64> = near_ids
-            .iter()
-            .filter_map(|&id| {
-                if let Some(obj) = self.shape_store.get(id) {
-                    // Use contains_point method of DrawingObject
-                    if obj.contains_point(point, tolerance) {
-                        return Some(id);
-                    }
-                }
-                None
-            })
-            .collect();
-
-        if objects_at_point.is_empty() {
-            return None;
-        }
-
-        // If there is a current selection, find the next one.
-        if let Some(current_id) = self.selection_manager.selected_id()
-            && let Some(pos) = objects_at_point.iter().position(|&id| id == current_id)
-        {
-            // Select the next one (or go back to the first one)
-            let next_idx = (pos + 1) % objects_at_point.len();
-            let next_id = objects_at_point[next_idx];
-            self.select_shape(next_id, false);
-            return Some(next_id);
-        }
-
-        // If there is no current selection, select the first one.
-        let first_id = objects_at_point[0];
-        self.select_shape(first_id, false);
-        Some(first_id)
     }
 }
 

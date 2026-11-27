@@ -3,10 +3,9 @@
 use super::DesignerState;
 use crate::canvas::DrawingObject;
 use crate::commands::*;
-use crate::model::{DesignPath as PathShape, DesignText as TextShape, DesignerShape, Shape};
+use crate::model::{DesignerShape, Shape};
 use crate::ops::{BooleanOp, perform_boolean};
 use crate::shapes::OperationType;
-use crate::{Circle, DrawingMode, Ellipse, Line, Point, Rectangle};
 
 impl DesignerState {
     fn apply_mode_defaults_to_new_object(&self, obj: &mut DrawingObject) {
@@ -327,128 +326,6 @@ impl DesignerState {
         });
         self.push_command(cmd);
         id
-    }
-
-    /// Adds a shape to the canvas at the specified position based on current mode.
-    pub fn add_shape_at(&mut self, x: f64, y: f64, shift: bool, ctrl: bool) {
-        match self.canvas.mode() {
-            DrawingMode::Select => {
-                let tolerance = 3.0 / self.canvas.zoom();
-                self.canvas
-                    .select_at(&Point::new(x, y), tolerance, shift, ctrl);
-            }
-            DrawingMode::Rectangle => {
-                let id = self.canvas.generate_id();
-                let rect = Rectangle::new(x, y, 60.0, 40.0);
-                let obj = self.new_object_with_mode_defaults(id, Shape::Rectangle(rect));
-                let cmd = DesignerCommand::AddShape(AddShape {
-                    id,
-                    object: Some(obj),
-                });
-                self.push_command(cmd);
-            }
-            DrawingMode::Circle => {
-                let id = self.canvas.generate_id();
-                let circle = Circle::new(Point::new(x, y), 25.0);
-                let obj = self.new_object_with_mode_defaults(id, Shape::Circle(circle));
-                let cmd = DesignerCommand::AddShape(AddShape {
-                    id,
-                    object: Some(obj),
-                });
-                self.push_command(cmd);
-            }
-            DrawingMode::Line => {
-                let id = self.canvas.generate_id();
-                let line = Line::new(Point::new(x, y), Point::new(x + 50.0, y));
-                let obj = self.new_object_with_mode_defaults(id, Shape::Line(line));
-                let cmd = DesignerCommand::AddShape(AddShape {
-                    id,
-                    object: Some(obj),
-                });
-                self.push_command(cmd);
-            }
-            DrawingMode::Ellipse => {
-                let id = self.canvas.generate_id();
-                let ellipse = Ellipse::new(Point::new(x, y), 40.0, 25.0);
-                let obj = self.new_object_with_mode_defaults(id, Shape::Ellipse(ellipse));
-                let cmd = DesignerCommand::AddShape(AddShape {
-                    id,
-                    object: Some(obj),
-                });
-                self.push_command(cmd);
-            }
-            DrawingMode::Polyline => {
-                let id = self.canvas.generate_id();
-                let center = Point::new(x, y);
-                let radius = 30.0;
-                let sides = 6;
-                let mut vertices = Vec::with_capacity(sides);
-                for i in 0..sides {
-                    let angle = 2.0 * std::f64::consts::PI * (i as f64) / (sides as f64);
-                    let vx = center.x + radius * angle.cos();
-                    let vy = center.y + radius * angle.sin();
-                    vertices.push(Point::new(vx, vy));
-                }
-                let path_shape = PathShape::from_points(&vertices, true); // default closed polyline
-                let obj = self.new_object_with_mode_defaults(id, Shape::Path(path_shape));
-                let cmd = DesignerCommand::AddShape(AddShape {
-                    id,
-                    object: Some(obj),
-                });
-                self.push_command(cmd);
-            }
-            DrawingMode::Text => {
-                let id = self.canvas.generate_id();
-                let text = TextShape::new("Text".to_string(), x, y, 20.0);
-                let obj = self.new_object_with_mode_defaults(id, Shape::Text(text));
-                let cmd = DesignerCommand::AddShape(AddShape {
-                    id,
-                    object: Some(obj),
-                });
-                self.push_command(cmd);
-            }
-            DrawingMode::Triangle => {
-                let id = self.canvas.generate_id();
-                let triangle = crate::model::DesignTriangle::new(Point::new(x, y), 50.0, 50.0);
-                let obj = self.new_object_with_mode_defaults(id, Shape::Triangle(triangle));
-                let cmd = DesignerCommand::AddShape(AddShape {
-                    id,
-                    object: Some(obj),
-                });
-                self.push_command(cmd);
-            }
-            DrawingMode::Polygon => {
-                let id = self.canvas.generate_id();
-                let polygon = crate::model::DesignPolygon::new(Point::new(x, y), 30.0, 6);
-                let obj = self.new_object_with_mode_defaults(id, Shape::Polygon(polygon));
-                let cmd = DesignerCommand::AddShape(AddShape {
-                    id,
-                    object: Some(obj),
-                });
-                self.push_command(cmd);
-            }
-            DrawingMode::Gear => {
-                let id = self.canvas.generate_id();
-                let gear = crate::model::DesignGear::new(Point::new(x, y), 2.0, 20);
-                let obj = self.new_object_with_mode_defaults(id, Shape::Gear(gear));
-                let cmd = DesignerCommand::AddShape(AddShape {
-                    id,
-                    object: Some(obj),
-                });
-                self.push_command(cmd);
-            }
-            DrawingMode::Sprocket => {
-                let id = self.canvas.generate_id();
-                let sprocket = crate::model::DesignSprocket::new(Point::new(x, y), 12.7, 15);
-                let obj = self.new_object_with_mode_defaults(id, Shape::Sprocket(sprocket));
-                let cmd = DesignerCommand::AddShape(AddShape {
-                    id,
-                    object: Some(obj),
-                });
-                self.push_command(cmd);
-            }
-            DrawingMode::Pan => {}
-        }
     }
 
     /// Performs a boolean union on selected shapes.

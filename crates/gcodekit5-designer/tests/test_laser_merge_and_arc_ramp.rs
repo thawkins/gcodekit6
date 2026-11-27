@@ -6,7 +6,6 @@
 //! contour's closing point (P2DES-11), and ramps over arcs must descend at
 //! the requested angle measured along the arc, not the chord (DESIGNER-3).
 
-use gcodekit5_core::Units;
 use gcodekit5_designer::model::{DesignCircle, Point};
 use gcodekit5_designer::{
     Toolpath, ToolpathGenerator, ToolpathSegment, ToolpathSegmentType, ToolpathToGcode,
@@ -52,7 +51,7 @@ fn flattened_arc(r: f64) -> (Toolpath, Vec<Point>) {
 
 #[test]
 fn test_laser_merge_sag_stays_within_curve_tolerance() {
-    let generator = ToolpathToGcode::new(Units::MM, 5.0).with_laser_2d();
+    let generator = ToolpathToGcode::new(5.0).with_laser_2d();
     let tolerance = generator.curve_simplification_tolerance;
     let (tp, points) = flattened_arc(50.0);
     let optimized = generator.optimize_toolpath_for_laser(&tp);
@@ -79,7 +78,7 @@ fn test_laser_merge_sag_stays_within_curve_tolerance() {
 
 #[test]
 fn test_laser_merge_keeps_straight_lines_as_one_segment() {
-    let generator = ToolpathToGcode::new(Units::MM, 5.0).with_laser_2d();
+    let generator = ToolpathToGcode::new(5.0).with_laser_2d();
     let mut tp = Toolpath::new(0.1, 0.0);
     tp.add_segment(rapid(Point::new(0.0, 0.0)));
     for i in 0..10 {
@@ -101,7 +100,7 @@ fn test_laser_merge_keeps_straight_lines_as_one_segment() {
 #[test]
 fn test_laser_filter_keeps_closing_point_of_contour() {
     // The last edge is shorter than `min_point_distance`; the contour must still close.
-    let generator = ToolpathToGcode::new(Units::MM, 5.0).with_laser_2d();
+    let generator = ToolpathToGcode::new(5.0).with_laser_2d();
     let pts = [
         Point::new(0.0, 0.0),
         Point::new(10.0, 0.0),
@@ -141,7 +140,7 @@ fn test_laser_filter_keeps_closing_point_of_contour() {
 fn test_laser_body_filter_resets_reference_after_arc() {
     // After the arc the tool is at (30, 0). The next move ends at (10.05, 0), 0.05 mm
     // from the pre-arc point (10, 0), but 20 mm from the real position.
-    let generator = ToolpathToGcode::new(Units::MM, 5.0).with_laser_2d();
+    let generator = ToolpathToGcode::new(5.0).with_laser_2d();
     let mut tp = Toolpath::new(0.1, 0.0);
     tp.add_segment(rapid(Point::new(0.0, 0.0)));
     tp.add_segment(line(Point::new(0.0, 0.0), Point::new(10.0, 0.0)));

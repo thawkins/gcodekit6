@@ -68,12 +68,6 @@ impl ToolpathSegment {
         }
     }
 
-    /// Set the Z depth for this segment
-    pub fn with_z_depth(mut self, z: f64) -> Self {
-        self.z_depth = Some(z);
-        self
-    }
-
     /// Returns the length of the path the tool travels along this segment, in mm.
     ///
     /// Linear and rapid moves return the straight-line distance. Arcs with a

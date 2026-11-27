@@ -43,25 +43,6 @@ impl StockMaterial {
         stock
     }
 
-    /// Create a new stock material definition with custom safe Z height
-    pub fn with_safe_z(
-        width: f32,
-        height: f32,
-        thickness: f32,
-        origin: (f32, f32, f32),
-        safe_z: f32,
-    ) -> Self {
-        let mut stock = Self {
-            width,
-            height,
-            thickness,
-            origin,
-            safe_z,
-        };
-        stock.normalize_safe_z();
-        stock
-    }
-
     /// Returns the minimum safe Z required for a given stock thickness.
     pub fn min_safe_z_for_thickness(thickness: f32) -> f32 {
         thickness.max(0.0) + Self::MIN_SAFE_Z_ABOVE_STOCK_MM
