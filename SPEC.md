@@ -4,6 +4,13 @@
 **Last Updated**: 2026-11-27
 **Status**: Alpha Release
 
+### Unreleased (2026-11-28) - Gerber Regions, Aperture Macros and Clear Polarity
+- ✅ **Gerber to G-Code**
+  - G36/G37 regions (copper pours) are filled, with linear and circular (G74/G75) contour edges and cut-in holes.
+  - Aperture macros (`%AM`) are flashed: primitives 1, 4, 5, 7, 20 and 21, comments, `$n` variables and arithmetic expressions.
+  - Clear polarity (`%LPC`) cuts its objects out of the dark copper before it, in file order.
+  - The page still warns about what is not drawn: macros with moire (6) or unreadable content, and step and repeat (`%SR`).
+
 ### Unreleased (2026-11-28) - Excellon Drilling
 - ✅ **CAM Tools**
   - Gerber page Drill Holes layer: `gcodekit5_camtools::excellon` parses Excellon drill files (M48 header, METRIC/INCH, LZ/TZ, `000.000` pattern or `FILE_FORMAT`/`FORMAT={a:b}` comment, default 3.3 metric / 2.4 inch TZ, tool table, G90/G91, modal coordinates, G85 and M15/G01/M16 routed slots) and drills them in one program: tools smallest first, each after `M5` + `M0` tool-change pause and `M3`; one plain `G1` plunge per hole to the Drill Depth (Z) field (`alignment_hole_depth`), slots routed; the Gerber X/Y offset applies.

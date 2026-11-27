@@ -1,6 +1,7 @@
 ## [Unreleased]
 
 ### Added
+- **Gerber regions, aperture macros and clear polarity**: copper pours (G36/G37 regions, including arc edges and cut-in holes) are filled, aperture macro pads such as KiCad's rounded rectangles and thermals are flashed at their real shape, and clear-polarity (`%LPC`) objects are cut out of the copper, so isolation and rubout follow them instead of milling pours away. The Gerber page now warns only about macros it cannot draw (moire, unreadable) and step and repeat (`%SR`)
 - **Gerber Drill Holes layer drills Excellon files**: the layer reads the project's Excellon drill file (KiCad, Eagle, Altium: METRIC/INCH, LZ/TZ, explicit or FILE_FORMAT number formats, tool table, G85 and routed slots) and drills every hole to the Drill Depth (Z) field at the feed rate, smallest drill first, with a spindle stop and `M0` pause naming each drill. Holes get the same X/Y offset as the other layers so they line up with the isolation cut. Slots are routed (plunge at the start, cut to the end). `.drl`, `.xln`, `.exc` and `*drill*` files are drill files, and a `.txt` whose content starts with `M48`; before, the layer was refused
 
 ### Fixed
