@@ -134,7 +134,7 @@ pub fn apply(cx: &mut Ctx<'_>, key: &str, text: &str) -> Option<Check> {
     if !key.starts_with("image_") {
         return None;
     }
-    let Some(Shape::RasterImage(r)) = &cx.summary.single else {
+    let Some(Shape::RasterImage(r)) = cx.summary.single() else {
         return Some(Ok(()));
     };
     let n = numerics(r).into_iter().find(|n| n.key == key)?;
@@ -146,7 +146,7 @@ pub fn apply(cx: &mut Ctx<'_>, key: &str, text: &str) -> Option<Check> {
 
 /// The Laser Engraving section.
 pub fn show(ui: &mut egui::Ui, cx: &mut Ctx<'_>) {
-    let Some(Shape::RasterImage(r)) = &cx.summary.single else {
+    let Some(Shape::RasterImage(r)) = cx.summary.single() else {
         return;
     };
     let tr = cx.tr;

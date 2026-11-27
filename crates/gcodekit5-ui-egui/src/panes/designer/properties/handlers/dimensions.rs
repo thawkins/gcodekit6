@@ -34,13 +34,13 @@ pub fn msgids() -> Vec<&'static str> {
 /// Whether the selection's aspect is locked (by the user, or forced).
 fn locked(cx: &Ctx<'_>) -> bool {
     let s = cx.summary;
-    forced_lock(cx) || (s.single.is_some() && s.first.lock_aspect_ratio)
+    forced_lock(cx) || (s.single().is_some() && s.first.lock_aspect_ratio)
 }
 
 /// Whether the selection's aspect is locked whatever the checkbox says.
 fn forced_lock(cx: &Ctx<'_>) -> bool {
     let s = cx.summary;
-    s.rotated() || s.raster || matches!(s.single, Some(Shape::Text(_)))
+    s.rotated() || s.raster || matches!(s.single(), Some(Shape::Text(_)))
 }
 
 /// Applies the committed `text` of field `key`, if it is one of these sections'.
@@ -115,7 +115,7 @@ pub fn size(ui: &mut egui::Ui, cx: &mut Ctx<'_>) {
     let forced = forced_lock(cx);
     let lock = locked(cx);
     let sizable = !s.rotated();
-    let polygon = matches!(s.single, Some(Shape::Polygon(_)));
+    let polygon = matches!(s.single(), Some(Shape::Polygon(_)));
     let tr = cx.tr;
     section(ui, &tr.tr("Size"), |ui| {
         let unit = length_unit(units);

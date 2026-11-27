@@ -134,7 +134,7 @@ pub fn show(ui: &mut egui::Ui, cx: &mut Ctx<'_>) {
         return;
     };
     let tr = cx.tr;
-    let editable = if cx.summary.single.is_some() {
+    let editable = if cx.summary.single().is_some() {
         !sum.all_use_global
     } else {
         sum.any_override

@@ -11,7 +11,7 @@ use std::time::Duration;
 use gcodekit5_app::i18n::Translator;
 
 use super::bitmap_engraving::job::{EngraveJob, JobState, PreviewLoad};
-use super::{CamDelivery, CamError, CamTool, CamToolsPane, Output};
+use super::{CamDelivery, CamError, CamTool, CamToolsPane, Output, PageInput};
 
 /// Notice: a new engraving waits for a cancelled one's worker.
 pub(super) const CANCELLED_BUSY: &str =
@@ -28,7 +28,7 @@ struct Running {
     /// Where the program goes: the page (`None`), or the editor.
     delivery: Option<CamDelivery>,
     /// The page's input it was started from.
-    input: String,
+    input: PageInput,
 }
 
 /// The Laser Image Engraver's work off the UI thread.
@@ -133,7 +133,7 @@ impl CamToolsPane {
                 self.bitmap_run.running = Some(Running {
                     job,
                     delivery,
-                    input: self.input_key(CamTool::BitmapEngraving),
+                    input: self.input_snapshot(CamTool::BitmapEngraving),
                 });
             }
             Err(error) => self.notice = Some(CamError::Generator(error).message(tr)),
