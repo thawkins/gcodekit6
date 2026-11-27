@@ -1,4 +1,4 @@
-//! gcodekit5-communication/src/communication/src/communication/mod.rs
+//! gcodekit5-communication/src/communication/mod.rs
 //! Communication layer for serial, TCP, and WebSocket protocols
 //!
 //! Provides trait-based communication interface for different connection types.
@@ -15,8 +15,6 @@ pub mod reply_ledger;
 pub mod serial;
 pub mod tcp;
 
-use crate::firmware::ControllerProtocol;
-use crate::firmware::repetier::processor::RepetierEvent;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::sync::Arc;
@@ -384,17 +382,6 @@ pub struct SerialCommunicator {
     params: Option<ConnectionParams>,
     listeners: Vec<CommunicatorListenerHandle>,
 
-    /// Protocol configured by the user via Device Manager
-    ///
-    /// **Source of truth** for the communicator's operating mode
-    /// It is set using `set_configured_protocol()`
-    pub configured_protocol: ControllerProtocol,
-
-    /// Protocol detected via autodetect while reading incoming bytes
-    pub detected_protocol: ControllerProtocol,
-
-    pub repetier_processor: crate::firmware::repetier::processor::RepetierProcessor,
-
     /// Lines written on the GRBL path that await their `ok` / `error:N`.
     reply_ledger: reply_ledger::ReplyLedger,
 
@@ -410,9 +397,6 @@ impl SerialCommunicator {
             port: None,
             params: None,
             listeners: Vec::new(),
-            configured_protocol: ControllerProtocol::Unknown,
-            detected_protocol: ControllerProtocol::Unknown,
-            repetier_processor: crate::firmware::repetier::processor::RepetierProcessor::new(),
             reply_ledger: reply_ledger::ReplyLedger::new(),
             unread: Vec::new(),
         }
@@ -508,72 +492,6 @@ impl SerialCommunicator {
             }
         }
     }
-
-    /// Returns the current value of Repetier's line counter N
-    pub fn repetier_line_counter(&self) -> u32 {
-        self.repetier_processor.line_counter
-    }
-
-    /// Sets the Repetier line counter N (used by the sender during rewind)
-    pub fn repetier_set_line_counter(&mut self, n: u32) {
-        self.repetier_processor.line_counter = n;
-    }
-
-    /// Answers a firmware `Resend:N` by writing the numbered lines from
-    /// `from` onwards again, exactly as they were first sent.
-    ///
-    /// # Returns
-    /// The number of lines written (each needs one ack), or an error when
-    /// a requested line is no longer known or the port write fails.
-    pub fn repetier_resend(&mut self, from: u32) -> gcodekit5_core::Result<usize> {
-        let lines = self.repetier_processor.resend_lines(from).ok_or_else(|| {
-            gcodekit5_core::Error::other(format!("line N{from} is not available to re-send"))
-        })?;
-        let port = self
-            .port
-            .as_mut()
-            .ok_or_else(|| gcodekit5_core::Error::other("Not connected to serial port"))?;
-        let payload = lines.concat();
-        let mut bytes_to_send = payload.as_bytes();
-        while !bytes_to_send.is_empty() {
-            match port.write(bytes_to_send) {
-                Ok(0) => return Err(gcodekit5_core::Error::other("Full port".to_string())),
-                Ok(n) => bytes_to_send = &bytes_to_send[n..],
-                Err(e) => return Err(gcodekit5_core::Error::other(e.to_string())),
-            }
-        }
-        if !lines.is_empty() {
-            self.repetier_processor.mark_buffer_full();
-            self.notify_listeners(CommunicatorEvent::DataSent, &payload);
-        }
-        Ok(lines.len())
-    }
-
-    /// Sets the protocol configured by the user (via Device Manager)
-    ///
-    /// The CONFIGURATION is the source of truth for the operating mode
-    /// - `Repetier`: activates the `RepetierProcessor`
-    /// - Anything else: deactivates it
-    ///
-    /// Must be called **after `connect()`** and **before** the first
-    /// command (reset, $I, etc.)
-    pub fn set_configured_protocol(&mut self, protocol: ControllerProtocol) {
-        self.configured_protocol = protocol;
-        if protocol == ControllerProtocol::Repetier {
-            self.repetier_processor.activate();
-        }
-        tracing::debug!("SerialCommunicator: protocolo configurado a {:?}", protocol);
-    }
-
-    /// User-configured protocol. Source of truth
-    pub fn configured_protocol(&self) -> ControllerProtocol {
-        self.configured_protocol
-    }
-
-    /// Protocol detected via auto-detection. For information only
-    pub fn detected_protocol(&self) -> ControllerProtocol {
-        self.detected_protocol
-    }
 }
 
 impl Default for SerialCommunicator {
@@ -658,11 +576,9 @@ impl Communicator for SerialCommunicator {
             )),
         };
 
-        // Reset emulation flags upon connection
+        // Forget the previous connection's pending replies and unread bytes
         self.reply_ledger.clear();
         self.unread.clear();
-        self.configured_protocol = ControllerProtocol::Unknown;
-        self.detected_protocol = ControllerProtocol::Unknown;
 
         match opened {
             Ok(port) => {
@@ -686,8 +602,6 @@ impl Communicator for SerialCommunicator {
     fn disconnect(&mut self) -> gcodekit5_core::Result<()> {
         self.reply_ledger.clear();
         self.unread.clear();
-        self.configured_protocol = ControllerProtocol::Unknown;
-        self.detected_protocol = ControllerProtocol::Unknown;
 
         match self.port.take() {
             Some(mut port) => match port.close() {
@@ -714,89 +628,6 @@ impl Communicator for SerialCommunicator {
 
     fn send(&mut self, data: &[u8]) -> gcodekit5_core::Result<usize> {
         if let Some(port) = &mut self.port {
-            let raw_str = String::from_utf8_lossy(data);
-            let cleaned = raw_str.trim().to_ascii_uppercase();
-
-            if self.configured_protocol == ControllerProtocol::Repetier {
-                // Drop only truly empty payloads. Line terminators (`\n`,
-                // `\r`) must reach the port: `send_command` issues them
-                // separately, and if they are dropped the command is left
-                // unterminated and the firmware silently ignores it.
-                if data.is_empty() {
-                    return Ok(data.len());
-                }
-
-                if data == b"!" {
-                    tracing::debug!("[REPETIER] Pause requested; not written");
-                    return Ok(0);
-                }
-                if data == b"~" {
-                    tracing::debug!("[REPETIER] Resume requested; not written");
-                    return Ok(0);
-                }
-                // 0x18 = Ctrl-X (soft reset)
-                // 0x18 = Ctrl-X (soft reset). Es un comando UNIVERSAL:
-                // todos los firmwares lo entienden. Debe salir al puerto
-                // tal cual, sin pasar por el processor Repetier (que lo
-                // descartaría porque no encaja en su formato N<num>*ck).
-                if data == [0x18u8] {
-                    tracing::debug!("[REPETIER] Soft reset (sent without the processor)");
-
-                    // Enviar directo al puerto.
-                    let mut bytes_to_send = data;
-                    while !bytes_to_send.is_empty() {
-                        match port.write(bytes_to_send) {
-                            Ok(0) => {
-                                return Err(gcodekit5_core::Error::other("Full port".to_string()));
-                            }
-                            Ok(n) => bytes_to_send = &bytes_to_send[n..],
-                            Err(e) => return Err(self.write_failed(e)),
-                        }
-                    }
-                    return Ok(data.len());
-                }
-
-                if let Some(translated_bytes) = self.repetier_processor.process_outgoing(data) {
-                    // Trace: the exact command written to the port.
-                    // Format: "[TX] N<num> <gcode> *<checksum>"
-                    for tx_line in translated_bytes.split(|&b| b == b'\n') {
-                        if !tx_line.is_empty() {
-                            tracing::debug!(
-                                "[TX] {:?}",
-                                String::from_utf8_lossy(&translated_bytes)
-                            );
-                        }
-                    }
-
-                    let mut bytes_to_send = translated_bytes.as_slice();
-                    while !bytes_to_send.is_empty() {
-                        match port.write(bytes_to_send) {
-                            Ok(0) => {
-                                return Err(gcodekit5_core::Error::other("Full port".to_string()));
-                            }
-                            Ok(n) => bytes_to_send = &bytes_to_send[n..],
-                            Err(e) => return Err(self.write_failed(e)),
-                        }
-                    }
-
-                    if cleaned.starts_with("$J=")
-                        || cleaned.starts_with('G')
-                        || cleaned.starts_with('X')
-                    {
-                        self.repetier_processor.mark_buffer_full();
-                    }
-
-                    self.notify_listeners(
-                        CommunicatorEvent::DataSent,
-                        &String::from_utf8_lossy(&translated_bytes),
-                    );
-                    return Ok(data.len());
-                } else {
-                    tracing::debug!("[TX-DROPPED] {:?}", cleaned);
-                    return Ok(0);
-                }
-            }
-
             match port.write(data) {
                 Ok(n) => {
                     tracing::debug!("[TX] (raw) {:?}", String::from_utf8_lossy(data));
@@ -823,49 +654,12 @@ impl Communicator for SerialCommunicator {
             let mut buf = [0u8; 4096];
             match port.read(&mut buf) {
                 Ok(n) => {
-                    let mut data = buf[..n].to_vec();
+                    let data = buf[..n].to_vec();
 
                     if !data.is_empty() {
-                        let incoming_text = String::from_utf8_lossy(&data);
-                        tracing::debug!("[RX] {}", incoming_text.trim_end().replace('\n', " | "));
-
-                        // ─── Auto-detection (informational only) ───
-                        // Uses the PROTOCOLS table from protocol_registry to
-                        // determine which protocol is transmitting. It does NOT
-                        // activate the processor. The protocol is determined by
-                        // `configured_protocol`.
-                        //
-                        // If something has already been detected, detection is
-                        // not performed again (prevents overwriting due to
-                        // false positives from subsequent messages).
-                        if self.detected_protocol == ControllerProtocol::Unknown
-                            && let Some(detected) =
-                                crate::firmware::protocol_registry::detect_protocol(&incoming_text)
-                        {
-                            tracing::debug!("Auto-detected protocol: {:?}.", detected);
-                            self.detected_protocol = detected;
-                        }
-
-                        // ─── Operating mode based on configuration ───
-                        if self.configured_protocol == ControllerProtocol::Repetier {
-                            let result = self.repetier_processor.process_incoming(data.clone());
-
-                            for event in &result.events {
-                                match event {
-                                    RepetierEvent::Ack => {
-                                        self.repetier_processor.mark_ack();
-                                    }
-                                    RepetierEvent::Resend(_n) => {
-                                        self.repetier_processor.mark_buffer_full();
-                                    }
-                                }
-                            }
-
-                            data = result.display;
-                        } else {
-                            let data_str = String::from_utf8_lossy(&data);
-                            self.notify_listeners(CommunicatorEvent::DataReceived, &data_str);
-                        }
+                        let data_str = String::from_utf8_lossy(&data);
+                        tracing::debug!("[RX] {}", data_str.trim_end().replace('\n', " | "));
+                        self.notify_listeners(CommunicatorEvent::DataReceived, &data_str);
                     }
                     Ok(data)
                 }

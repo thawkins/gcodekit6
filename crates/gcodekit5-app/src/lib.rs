@@ -42,6 +42,14 @@ pub mod unsaved_changes;
 pub mod work_zero;
 
 pub use gcodekit5_settings::{tr, trn};
+// Controller types and serial-port listing the front ends use, re-exported so a front
+// end reaches the communication layer only through the application layer.
+pub use gcodekit5_communication::firmware::ControllerProtocol;
+pub use gcodekit5_communication::firmware::grbl::settings::SettingsManager;
+pub use gcodekit5_communication::firmware::grbl::status_parser::{
+    FullStatus, OverrideState, WorkCoordinateOffset, parse_probe_report_in,
+};
+pub use gcodekit5_communication::{SerialPortInfo, list_ports};
 pub use types::{
     BitmapEngravingParams, JigsawPuzzleParams, TabbedBoxParams, VectorEngravingParams,
 };

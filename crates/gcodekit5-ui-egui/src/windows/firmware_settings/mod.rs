@@ -31,6 +31,7 @@ use std::collections::{BTreeSet, HashMap};
 use std::path::Path;
 use std::time::{Duration, Instant};
 
+use gcodekit5_app::SettingsManager;
 use gcodekit5_app::device_identity::DeviceIdentity;
 use gcodekit5_app::firmware_settings::{
     ConfigSettingRow, GrblFamily, REPETIER_OFFSET, SETTING_CATEGORIES, SettingsBlocked, ValueError,
@@ -39,7 +40,6 @@ use gcodekit5_app::firmware_settings::{
 };
 use gcodekit5_app::i18n::Translator;
 use gcodekit5_app::machine::MachineEvent;
-use gcodekit5_communication::firmware::grbl::settings::SettingsManager;
 
 use super::setting_write::{self, PendingWrite, WriteOutcome};
 

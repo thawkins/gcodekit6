@@ -68,7 +68,7 @@ impl ConnectionForm {
     /// Lists the serial ports again. A failure leaves the list empty and is logged. An
     /// `"Auto"` or empty port becomes the first port found, as the GTK front end chose it.
     fn refresh_ports(&mut self) {
-        let ports: Vec<String> = match gcodekit5_communication::list_ports() {
+        let ports: Vec<String> = match gcodekit5_app::list_ports() {
             Ok(ports) => ports.into_iter().map(|p| p.port_name).collect(),
             Err(error) => {
                 tracing::warn!(%error, "cannot list serial ports");

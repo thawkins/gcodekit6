@@ -23,9 +23,8 @@ use gcodekit5_app::machine::grbl_stream::{
 };
 use gcodekit5_app::machine::{MachineController, MachineEvent, REPETIER_ESTOP_LABEL, worker_text};
 use gcodekit5_app::work_zero::{Wcs, WcsWord, parser_state_wcs, wcs_in_line};
-use gcodekit5_communication::firmware::ControllerProtocol;
-use gcodekit5_communication::firmware::grbl::status_parser::{
-    FullStatus, OverrideState, WorkCoordinateOffset, parse_probe_report_in,
+use gcodekit5_app::{
+    ControllerProtocol, FullStatus, OverrideState, WorkCoordinateOffset, parse_probe_report_in,
 };
 use gcodekit5_core::ProbeResult;
 
