@@ -1,14 +1,12 @@
 //! The Drill Press page: plunge, peck or helical drilling of one hole.
 //!
 //! GTK's defaults: a 10 mm hole with a 6 mm tool from Z 0 to -10 in 2 mm pecks, safe Z 5,
-//! 100 / 500 mm/min and 10000 RPM, centred in the machine's travel (GRBL `$130` / `$131`,
-//! 200 mm when unknown). GTK ran the program on the machine straight away; here it goes to
+//! 100 / 500 mm/min and 10000 RPM, centred in a 200 mm travel (GTK's
+//! fallback when GRBL `$130` / `$131` are unknown). GTK ran the program on the machine straight away; here it goes to
 //! the editor like the other tools.
 //!
-//! Dependencies: `egui`, `gcodekit5-camtools` (generator), `gcodekit5-app` (translations,
-//! device status), `gcodekit5-core` (units).
+//! Dependencies: `egui`, `gcodekit5-camtools` (generator), `gcodekit5-app` (translations), `gcodekit5-core` (units).
 
-use gcodekit5_app::device_status;
 use gcodekit5_app::i18n::Translator;
 use gcodekit5_camtools::drill_press::{DrillPressGenerator, DrillPressParameters};
 use gcodekit5_core::units::{self, MeasurementSystem};
@@ -94,29 +92,22 @@ pub struct DrillPressParams {
     pub safe_z: String,
     /// Home the machine before drilling.
     pub home_before: bool,
-    /// The active device's axis count (the pane refreshes it from the device status).
+    /// The active device's axis count (the pane refreshes it from the device profile).
     pub num_axes: u8,
-    /// The device is in laser mode, GRBL `$32=1` (the pane refreshes it from the device
-    /// status). The program starts the spindle with `M3` and plunges: a laser would fire in
+    /// The device is in laser mode, GRBL `$32=1` (the pane refreshes it from the
+    /// controller's reported settings). The program starts the spindle with `M3` and plunges: a laser would fire in
     /// place, so GTK refused to drill.
     pub laser_mode: bool,
 }
 
-/// Whether the device status says the machine is in laser mode (GRBL `$32=1`).
-pub fn device_in_laser_mode() -> bool {
-    device_status::get_grbl_setting_numeric(32).unwrap_or(0.0) > 0.5
-}
-
 impl DrillPressParams {
-    /// GTK's initial values in `units`, the hole centred in the machine's travel as far as
-    /// the GRBL settings tell (`$130` / `$131`, 200 mm when unknown).
+    /// GTK's initial values in `units`, the hole centred in a 200 mm travel (GTK's fallback
+    /// when `$130` / `$131` are unknown).
     ///
     /// # Arguments
     /// * `units` - The display units.
     pub fn new(units: MeasurementSystem) -> Self {
-        let half =
-            |setting: u16| device_status::get_grbl_setting_numeric(setting).unwrap_or(200.0) / 2.0;
-        Self::with_center(units, (half(130), half(131)))
+        Self::with_center(units, (100.0, 100.0))
     }
 
     /// GTK's initial values in `units` with the hole at `center` (mm).
@@ -140,8 +131,8 @@ impl DrillPressParams {
             spindle_speed: "10000".into(),
             safe_z: len(5.0),
             home_before: false,
-            num_axes: device_status::get_active_num_axes(),
-            laser_mode: device_in_laser_mode(),
+            num_axes: 3,
+            laser_mode: false,
         }
     }
 

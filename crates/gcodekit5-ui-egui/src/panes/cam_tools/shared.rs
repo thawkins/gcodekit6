@@ -8,6 +8,7 @@ use std::rc::Rc;
 
 use gcodekit5_app::i18n::Translator;
 use gcodekit5_app::machine::MachineEvent;
+use gcodekit5_devicedb::DeviceProfile;
 use gcodekit5_settings::config::Config;
 
 use super::CamToolsPane;
@@ -22,6 +23,8 @@ use crate::workspace::{Pane, PaneContext, PaneId};
 pub struct SharedCamTools {
     pane: Rc<RefCell<CamToolsPane>>,
     waiting: Vec<MachineEvent>,
+    /// An axis count that arrived while the pane was borrowed elsewhere.
+    waiting_axes: Option<u8>,
 }
 
 impl SharedCamTools {
@@ -33,6 +36,7 @@ impl SharedCamTools {
         Self {
             pane,
             waiting: Vec::new(),
+            waiting_axes: None,
         }
     }
 
@@ -44,6 +48,9 @@ impl SharedCamTools {
 
     /// Hands the waiting machine events to `pane`.
     fn deliver_waiting(&mut self, pane: &mut CamToolsPane, tr: &Translator) {
+        if let Some(axes) = self.waiting_axes.take() {
+            pane.set_num_axes(axes);
+        }
         if !self.waiting.is_empty() {
             let waiting = std::mem::take(&mut self.waiting);
             pane.probe_events(&waiting, tr);
@@ -89,6 +96,20 @@ impl Pane for SharedCamTools {
         match self.pane.try_borrow_mut() {
             Ok(mut pane) => pane.set_units(config.ui.measurement_system),
             Err(error) => tracing::warn!(%error, "CAM tools busy; settings not applied"),
+        }
+    }
+
+    /// Device facts reach the CAM pages through this call, never through a process-wide
+    /// static: the axis count comes from the active profile (3 without one). Laser mode
+    /// comes from the controller's reported `$32` ([`crate::machine::MachineStatus`]).
+    fn set_device(&mut self, profile: Option<&DeviceProfile>) {
+        let axes = profile.map_or(3, |p| p.num_axes);
+        match self.pane.try_borrow_mut() {
+            Ok(mut pane) => pane.set_num_axes(axes),
+            Err(error) => {
+                tracing::debug!(%error, "CAM tools busy; device waits");
+                self.waiting_axes = Some(axes);
+            }
         }
     }
 }

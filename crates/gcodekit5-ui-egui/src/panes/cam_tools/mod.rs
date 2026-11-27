@@ -35,7 +35,6 @@ pub mod spoilboard_surfacing;
 pub mod tabbed_box;
 pub mod tools;
 
-use gcodekit5_app::device_status;
 use gcodekit5_app::i18n::Translator;
 use gcodekit5_core::units::MeasurementSystem;
 
@@ -228,6 +227,9 @@ pub struct CamToolsPane {
     preset_request: Option<PresetRequest>,
     /// The Load / Save whose file dialog is up.
     preset: Option<PendingPreset>,
+    /// The active device's axis count, from its profile ([`CamToolsPane::set_num_axes`]);
+    /// 3 until a profile says otherwise.
+    num_axes: u8,
 }
 
 impl Default for CamToolsPane {
@@ -241,6 +243,7 @@ impl CamToolsPane {
     pub fn new() -> Self {
         let units = MeasurementSystem::Metric;
         Self {
+            num_axes: 3,
             units,
             open: None,
             selected: None,
@@ -357,6 +360,14 @@ impl CamToolsPane {
     /// The display units of the pages' lengths.
     pub fn units(&self) -> MeasurementSystem {
         self.units
+    }
+
+    /// Takes the active device's axis count; the pages that need Z refuse below 3.
+    ///
+    /// # Arguments
+    /// * `num_axes` - The axis count from the active device profile.
+    pub fn set_num_axes(&mut self, num_axes: u8) {
+        self.num_axes = num_axes;
     }
 
     /// Shows the pages' lengths in `units`, converting what is typed.
@@ -561,7 +572,7 @@ impl CamToolsPane {
     /// Draws the pane.
     fn ui(&mut self, ui: &mut egui::Ui, tr: &Translator, machine: Option<&Machine>) {
         // GTK checked the device's axes when Generate was pressed.
-        let axes = device_status::get_active_num_axes();
+        let axes = self.num_axes;
         self.drill_press.num_axes = axes;
         self.spoilboard_surfacing.num_axes = axes;
         self.tabbed_box.num_axes = axes;
@@ -569,7 +580,7 @@ impl CamToolsPane {
         self.bitmap_engraving.num_axes = axes;
         self.poll_bitmap(ui.ctx(), tr);
         self.track_probe_position(machine);
-        self.drill_press.laser_mode = drill_press::device_in_laser_mode();
+        self.drill_press.laser_mode = machine.is_some_and(|m| m.status().laser_mode);
         if let Some(notice) = self.notice.clone() {
             ui.horizontal(|ui| {
                 ui.colored_label(ui.visuals().error_fg_color, notice);
