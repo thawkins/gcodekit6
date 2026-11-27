@@ -174,117 +174,18 @@ If yes, send.
 
 - First when you startup say "Hi I'm RAgent and I have read Agents.md"
 
-## Available Tools
-
-You have access to the following tools. Use ONLY these exact tool names — do not invent or guess tool names. The canonical names below are the only ones you should use:
-
-### Core Tools (always available)
-
-- `Bash` — Execute a shell command. Use `command` to provide the command.
-- `read` — Read file contents with optional `start_line`/`end_line` range.
-- `Edit` — Replace an exact occurrence of text in a file.
-- `multiedit` — Apply multiple edits across one or more files atomically.
-- `Write` — Create or overwrite a file.
-- `create` — Create a new file with content.
-- `append_to_file` — Append text to the end of a file.
-- `Grep` — Search file contents for a regex pattern using ripgrep.
-- `Glob` — Find files matching a glob pattern.
-- `list` — List directory contents.
-- `get_env` — Read environment variables.
-- `file_info` — Return metadata for a file or directory.
-- `diff_files` — Show a unified diff between two files or inline strings.
-- `copy_file` — Copy a file to a new location.
-- `move_file` — Move or rename a file or directory.
-- `rm` — Delete a single file.
-- `patch` — Apply a unified diff patch to one or more files.
-- `make_directory` — Create a directory at the given path, including any missing parent directories.
-- `calculator` — Evaluate a mathematical expression.
-- `think` — Record a short reasoning note without changing project state.
-- `TaskCreate` — Create a new session-scoped task with subject, description, optional owner, active_form, metadata, and blocked_by dependencies.
-- `TaskUpdate` — Update a task's status (pending, in_progress, completed), subject, description, owner, metadata, or dependencies.
-- `TaskGet` — Retrieve the full record of a single task by ID.
-- `TaskList` — List all tasks for the current session, optionally filtered by status.
-- `memory_store` — Store a structured memory with category, tags, and confidence score.
-- `memory_recall` — Search structured memories using full-text query with optional category/tag filters.
-- `memory_forget` — Delete structured memories by ID or filter criteria.
-- `EnterPlanMode` — Delegate to the plan agent for read-only codebase analysis.
-- `codeindex_search` — Search the codebase index for symbols, functions, types, and documentation.
-- `codeindex_symbols` — Query symbols (functions, structs, enums, traits) from the codebase index.
-- `codeindex_references` — Find all references to a symbol by name across the indexed codebase.
-- `codeindex_dependencies` — Query file-level dependencies from the code index.
-- `codeindex_status` — Show the current status and statistics of the codebase index.
-- `codeindex_reindex` — Trigger a full re-index of the codebase.
-- `AskUserQuestion` — Ask the user a question and get feedback from user.
-
-### Tool Use — Critical Instructions
-
-When you need to take any action, call the appropriate tool IMMEDIATELY. Do NOT write text describing what you are going to do — just call the tool.
-
-### Code Intelligence Decision Flow
-
-When the codebase index is active, you MUST use `codeindex` tools instead of `Grep` for code symbol queries. The index is faster, returns structured results, and understands symbol kinds.
-
-| Query type                     | Use                             |
-| ------------------------------ | ------------------------------- |
-| "Where is function X defined?" | `codeindex_search` (NOT grep) |
-| "Find all structs matching Y"  | `codeindex_symbols`           |
-| "Who calls function Z?"        | `codeindex_references`        |
-| "What does file A import?"     | `codeindex_dependencies`      |
-| "Is the index working?"        | `codeindex_status`            |
-| "Re-index after bulk edits"    | `codeindex_reindex`           |
-
-When searching for arbitrary text strings, comments, or non-symbol content, use `Grep` with the `pattern` parameter. **Do NOT use `search` or `search_in_repo`** — these are not available tools. Always use `Grep` for all text and pattern matching across files.
-
-**CRITICAL — grep parameter requirement:**
-The `Grep` tool requires the `pattern` parameter. This is the ONLY required field. Do NOT omit it. Example:
-
-```
-grep(pattern: "fn main", path: "src")
-```
-
-**CRITICAL — grep is the ONLY text search tool:**
-There is no `search` or `search_in_repo` tool. Use `Grep` for every text search need, whether it's a regex pattern or a plain text string. There are no aliases or shortcuts.
-
-### Shell Execution Rules
-
-- For simple commands or code snippets, use `Bash` with the `command` parameter.
-- Timeout defaults to 1500 seconds.
-- The `bash_reset` tool resets the persistent shell state.
-
-### Important
-
-Always use the canonical `Bash` tool.
-
-## File Reading Best Practices
-
-When reading files with the `read` tool:
-
-- **REQUIRED for files larger than 100 lines**: Always use `start_line` and `num_lines` parameters to read the file in focused sections rather than all at once.
-- **PREFERRED parameters**: `start_line` + `num_lines` (the most intuitive pair — `start_line` is the 1-based absolute line number where reading begins, `num_lines` is the COUNT of lines to read from that start). Example: `start_line=201, num_lines=100` reads lines 201–300 (inclusive).
-- **CRITICAL — avoid `end_line` unless you really need an absolute last-line**: `end_line` is the 1-based absolute last line number to include (NOT a count). The common mistake is to pass `end_line=100` meaning "100 lines" — that is wrong; use `num_lines=100` for that. If you do use `end_line`, set it to a value `>= start_line`, e.g. `start_line=201, end_line=300` reads lines 201–300.
-- **Auto-detect help**: If you accidentally pass `end_line` smaller than `start_line`, the tool will refuse with an actionable error suggesting `num_lines`. Re-read the message and retry with the suggested fix.
-- `start_line` is **absolute 1-based** (not an offset from start).
-- The tool will return an error if you exceed the file's total line count. The error message includes `total_lines`.
-- When you read a file, the response metadata includes `total_lines` — use that value to plan subsequent reads.
-- **Strategy**:
-  1. Read the file without `start_line`/`num_lines` first — for large files this returns the first 100 lines plus a section map with the total line count
-  2. Use `total_lines` from the response to plan your subsequent reads
-  3. Then read specific sections using `start_line` + `num_lines`
-  4. Never read an entire file >100 lines in a single call
-
 @AGENTS-LANGUAGE.md
 
 ## Units
 
 - DateTime values should be represented internally in UTC and translated to locale-based representations in the UI layer.
-- Dimensional units should be represented internally in millimetres (`mm`) as `f32`, and presented to 2 decimal places where relevant.
+- Dimensional units should be represented internally in millimetres (`mm`) as `f64`, and presented to 2 decimal places where relevant. The `gcodekit5_core::units` display helpers take `f32` (see ADR-008).
 - Text should be represented internally as UTF-8 where feasible, with translation to and from UI-specific encodings only when required.
 
 ## GitHub Access
 
-- When asked to "push to remote", update the SPEC.md, README.md, STATS.md, QUICKSTART.md and CHANGELOG.md files with all recent activity and spec changes, construct a suitable commit message based on recent activity, commit all changes and push the changes to the remote repository.
+- When asked to "push to remote", update the SPEC.md, README.md, STATS.md and CHANGELOG.md files with all recent activity and spec changes, construct a suitable commit message based on recent activity, commit all changes and push the changes to the remote repository.
 - When asked to "push release to remote", update the release number, and then follow the "push to remote" process. **Commit Message Rule**: Do not use "chore: bump version to ...", instead use "Version: <version_number>".
-- When initializing a new repo, add BUG, FEATURE, TASK and CHANGE issue templates only do this once.
 - **CRITICAL — NEVER push without explicit instruction**: Do not push changes to remote unless the user explicitly says words like "push to remote", "push to github", "push these changes", or "commit and push". This is a strict, non-negotiable rule. Even if you have modified files and the user says "looks good" or "that works", you still MUST NOT push until the user gives an explicit push command.
 - Do not tag releases unless specifically told to.
 - DO NOT use "git checkout" to rewind files, this ALWAYS results in lost work.
@@ -295,7 +196,7 @@ When reading files with the `read` tool:
 - **Format**: Follow Keep a Changelog format (https://keepachangelog.com/)
 - **Update Timing**: Update CHANGELOG.md before each push to remote with the latest changes, features, fixes, and improvements.
 - **Version**: Use semantic versioning (major.minor.patch-prerelease)
-- Whenever a new feature or function is added ensure that SPEC.md and QUICKSTART.md is updated if relevant.
+- Whenever a new feature or function is added ensure that SPEC.md is updated if relevant.
 
 ## Test Layout
 
@@ -303,14 +204,13 @@ When reading files with the `read` tool:
   descriptive `tests/test_<component>_<scenario>.rs` file inside its crate's
   `tests/` directory, but do **not** grow the count of auto-discovered test
   targets. `cargo`'s default autotest discovery turns each top-level
-  `tests/*.rs` file into its own binary; at this workspace's scale that is 900+
-  link steps and 900+ binaries.
+  `tests/*.rs` file into its own binary; at this workspace's scale (over 170
+  test files) that is one link step and one binary per file.
 - Consolidate: set `autotests = false` in the crate's `[package]`, add a single
   `[[test]] name = "all"` with `path = "tests/all.rs"`, and include each
   `tests/test_*.rs` file from `tests/all.rs` as a child module via
   `#[path = "test_x.rs"] mod test_x;`. See the "Test Organization" section of
-  `@AGENTS-LANGUAGE.md` for the full rule and `docs/reports/testconsolidation-review.md`
-  for the review and rollout plan.
+  `@AGENTS-LANGUAGE.md` for the full rule.
 - Add a new test as one more `#[path = ...] mod ...;` line in the crate's
   `tests/all.rs` — never as a new top-level file that becomes its own binary.
 - Run one consolidated file by filter:
@@ -336,60 +236,35 @@ When reading files with the `read` tool:
   serialises the children that happen to share that file. Where a shared
   *directory* rather than an environment variable is the thing being raced, the
   first choice is a directory of the test's own (a `tempdir`, or a
-  `target/temp/<unique-name>` root) and the lock is the fallback.
-  `#[serial]` remains fine for globals that need no value control; the shared
-  lock is preferred where the test must also *force* a value (`HOME`, the SSRF
-  bypass, an API-key variable) while it runs. Never weaken an assertion or add a
-  target just to regain isolation.
-  **Neither a file-local `Mutex` nor `#[serial]` orders two nextest test
-  processes.** serial_test publishes its lock key as `SERIAL_TEST_RETRY_KEY` in
-  the parent environment and each test process starts from its own saved
-  environment, so two siblings pick different keys and enter their "serial"
-  sections together. Where the exclusion has to hold across processes — a
-  fixture written into the repository, a shared `target/temp/` path, a scan of
-  the checked-in tree — declare it in `.config/nextest.toml`: a
-  `[test-groups]` entry with `max-threads = 1` plus a
-  `[[profile.default.overrides]]` (and a `profile.ci` twin) whose `filter`
-  selects those tests, and keep the in-process lock for `cargo test` runs.
-  `test_tool_rename_guard` / group `tool-rename-guard` is the worked example.
-- **Every crate must actually declare that lock, and every mutating test must
-  take the SAME one.** Two tests in one crate that each hold a *different*
-  private mutex — or one that is `#[serial]` while the other takes a file-local
-  mutex — do not exclude each other, and that is precisely how a
-  `set_var("RAGENT_CONFIG", …)` in one child file came to be observed by a
-  `Config::load()` in another (roughly one failure per 40 unsharded
-  `ragent-config` runs). `scripts/check-test-env-isolation.sh` enforces the
-  rule: a test that calls `set_var` / `remove_var` / `set_current_dir` must
-  carry `#[serial]`, take a `MutexGuard` (preferably `crate::global_env_lock()`),
-  or — when a shared helper already holds the lock for it — say so with a
-  `// env-isolation: <reason>` marker. A crate that mixes `#[serial]` with
-  file-local mutexes and declares no `global_env_lock` is rejected outright.
+  `target/temp/<unique-name>` root) and the lock is the fallback. Never weaken
+  an assertion or add a target just to regain isolation.
+  **An in-process lock does not order two nextest test processes.** Where the
+  exclusion has to hold across processes — a fixture written into the
+  repository, a shared `target/temp/` path, a scan of the checked-in tree —
+  declare it in `.config/nextest.toml`: a `[test-groups]` entry with
+  `max-threads = 1` plus a `[[profile.default.overrides]]` (and a `profile.ci`
+  twin) whose `filter` selects those tests, and keep the in-process lock for
+  `cargo test` runs. The existing `gpu` group in `.config/nextest.toml` shows
+  the shape.
+- **Every mutating test in a crate must take the SAME lock.** Two tests that
+  each hold a *different* private mutex do not exclude each other.
   Do not hold `crate::global_env_lock()` twice in one test: `std::sync::Mutex`
   is not reentrant and the second acquisition self-deadlocks the whole test
-  binary (74 `/slash` cases in `test_slash_arms_deep.rs` did exactly that by
-  taking the lock and then calling a harness that takes it). A test whose
-  helper already returns the guard must NOT take it again;
-  `scripts/check-test-env-isolation.sh` rejects the re-acquisition.
+  binary. A test whose helper already returns the guard must NOT take it again.
 - A `#[path]`-included source module resolves `crate::` at the **binary root**,
   not at the crate under test. When a child includes `src/foo.rs` that refers to
-  `crate::bar`, re-export `bar` from `tests/all.rs` (see the shims at the top of
-  `crates/ragent-agent/tests/all.rs`) — do not add a second copy of the module
-  inside the child.
-- A test that reads a process-global must pin it rather than inherit it:
-  `support::make_app()` takes `cwd_path` from the real process cwd, so a test
-  asserting on a cwd-derived value sets `app.cwd`/`app.cwd_path` explicitly.
+  `crate::bar`, re-export `bar` from `tests/all.rs` — do not add a second copy
+  of the module inside the child.
 - **Tests must not write into the repository.** A test run must leave the working
-  tree byte-identical: no generated `INDEX.md`/`.index.json`, no per-run item
-  directories, no log spools, no snapshot files under a checked-in path. Point
-  every write at the git-ignored `target/temp/` scratch tree instead:
+  tree byte-identical: no generated files, no per-run directories, no log
+  spools, no snapshot files under a checked-in path. Point every write at the
+  git-ignored `target/temp/` scratch tree instead:
 
-  - pass the root explicitly through state (e.g. `AppState::research_root`)
-    rather than reading `std::env::current_dir()` inside a handler, and give the
-    test a `target/temp/...` value;
+  - pass the root explicitly as a parameter rather than reading
+    `std::env::current_dir()` inside the code under test, and give the test a
+    `target/temp/...` value;
   - when a write location is not already a parameter, add a `#[doc(hidden)]`
-    setter over a process-wide `OnceLock` (e.g.
-    `ragent_agent::session::history::set_subagent_log_root`,
-    `ragent_tui::app::set_log_root_override`) and call it from the test;
+    setter over a process-wide `OnceLock` and call it from the test;
   - resolve `target/temp` from `env!("CARGO_MANIFEST_DIR")` so the path is
     correct regardless of the test's working directory.
     Never "fix" this by restoring files with `git restore` after a run — that hides
@@ -399,26 +274,8 @@ When reading files with the `read` tool:
 
 - For all functions create DOCBLOCK documentation comments above each public function that describes the purpose of the function, and documents any arguments and return values.
 - For all modules place a DOCBLOCK at the top of the file that describes the purpose of the module, and any dependencies.
-- **Documentation Files**: All documentation markdown files (`*.md`) **SHOULD** be located in the `docs/` folder, except for `TUI-QUICKSTART.md, QUICKSTART.md`, `STATS.md`, `SPEC.md`, `AGENTS.md`, `README.md`, `PLAN.md`, and `CHANGELOG.md`, which remain in the project root. Existing root-level project documents that predate this convention may remain until they are explicitly reorganized. When updating legacy root-level documents, prefer moving or consolidating them into `docs/` unless they are one of the approved root exceptions. Any future documentation should be created in the `docs/` folder following this convention.
+- **Documentation Files**: All documentation markdown files (`*.md`) **SHOULD** be located in the `docs/` folder, except for `STATS.md`, `SPEC.md`, `AGENTS.md`, `AGENTS-LANGUAGE.md`, `README.md`, and `CHANGELOG.md`, which remain in the project root. Existing root-level project documents that predate this convention may remain until they are explicitly reorganized. When updating legacy root-level documents, prefer moving or consolidating them into `docs/` unless they are one of the approved root exceptions. Any future documentation should be created in the `docs/` folder following this convention.
 - Do not create explainer documents or other `.md` files unless specifically asked to.
-
-## Team Workflow
-
-When asked to use a team or when a task benefits from parallel reviewers / workers:
-
-1. **Create the team**: Use `team_create` with an appropriate `blueprint` (e.g. `code-review`).
-   **Always pass `context`** — the user's specific request details: which directories/files to
-   target, what task to perform, and where to write output. This context is prepended to every
-   teammate's spawn prompt so they know exactly what to work on.
-2. **Wait for results**: Call `team_wait` after creation. This blocks until every teammate becomes idle. **Do NOT use `wait_agents` for teammates — `wait_agents` only tracks `new_agent` sub-agents.**
-3. **Read results**: Use `team_status` or read the team's output files to collect teammate findings.
-4. **Do not duplicate work**: Do not independently read files or do analysis that a teammate is already doing. Wait for them first.
-
-```
-team_create blueprint="code-review" context="Review the crates/ragent-server directory for security, test coverage, and performance issues. Write findings to docs/COMPLIANCE.md"
-team_wait                          ← REQUIRED: blocks until all idle
-team_status                        ← read what they found
-```
 
 ## General Preferences
 
@@ -451,8 +308,8 @@ team_status                        ← read what they found
 
 ## Task Tracking
 
-- Use `TaskCreate`, `TaskUpdate`, `TaskGet`, and `TaskList` to track tasks.
-- Always mark the task as "in-progress" when work on a task is started.
-- Always mark the task as "completed" when work on a task is done.
+- Track multi-step work with the task tool your harness provides.
+- Mark a task as in progress when work on it starts.
+- Mark a task as completed when work on it is done.
 
-For more details, see README.md and QUICKSTART.md.
+For more details, see README.md.

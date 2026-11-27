@@ -35,7 +35,7 @@ know rustfmt style." YOU DO NOT. RUN IT.
    from Python/JS conventions. You cannot reproduce these by hand reliably.
 3. **You will get import ordering wrong.** `rustfmt` reorders `use` statements.
    Hand-ordering them will fail `cargo fmt --check`.
-4. **`cargo fmt --check` is enforced.** A file that does not pass `cargo fmt --check`
+4. **`cargo fmt --all -- --check` is enforced in CI.** A file that does not pass `cargo fmt --check`
    is a broken file, period. It does not matter if the code compiles.
 5. **Broken formatting wastes review cycles.** Every time you submit a Rust file that
    fails `cargo fmt --check`, a human or CI must fix your mistake. This is
@@ -66,8 +66,8 @@ source of truth for Rust formatting is the `cargo fmt` command itself. Use it.
 ## Technology Stack
 
 - **Language**: Rust edition 2024 or greater. Verified: the root `Cargo.toml` and
-  all crates declare `edition = "2024"` (workspace-inherited), which requires
-  Rust 1.85+.
+  all crates declare `edition = "2024"` (workspace-inherited); the minimum
+  toolchain is `rust-version = "1.95"` (root `Cargo.toml`).
 
 ## Build Commands
 
@@ -116,13 +116,13 @@ The configuration lives in `.config/nextest.toml`.
 
 All tests **MUST** be located in the `tests/` directory inside each crate. If a test is at the workspace root, it should be placed in the root `tests/` folder, not inline in source files.
 
-- Use `#[test]` for sync tests and `#[tokio::test]` for async tests.
-- Import from the relevant public crate for the crate under test rather than assuming a single `ragent` crate path.
+- Use `#[test]`. There is no async runtime, so there are no async tests.
+- Import from the relevant public crate for the crate under test (e.g. `gcodekit5_core`) rather than assuming a single crate path.
 - Organize related tests together.
 - Follow the naming convention: `test_<component>_<scenario>` (e.g. `test_jog_x_positive`).
 - For each project crate, migrate related tests into suitable subfolders within that crate's `tests/` directory. Review both inline and external tests for migration candidates, and relocate inline tests from `.rs` files into separate files under the appropriate `tests/` subfolder where practical.
-- **Migration strategies** (see `docs/reports/testconsolidation-review.md` for the migration review and plan):
-  - **Public-API tests**: use `use ragent_<crate>::module::Item;` — no source changes needed.
+- **Migration strategies**:
+  - **Public-API tests**: use `use gcodekit5_<crate>::module::Item;` — no source changes needed.
   - **Private-item tests**: widen the tested items to `pub(crate)` where necessary and re-import the source module via `#[path = "../src/<module>.rs"] mod <module>;`. Provide shims for `super::` and `crate::` references at the test file root.
   - **Complex cases** (`//!` doc comments + `crate::` cross-module deps): use `#[cfg(test)] #[path = "../../tests/test_<module>.rs"] mod test_<module>;` in the source file to compile the external test within the crate's module tree.
 - **Do not add new inline `#[cfg(test)]` modules** to library source files. All new tests go in `tests/`.
@@ -132,8 +132,8 @@ All tests **MUST** be located in the `tests/` directory inside each crate. If a 
 Keep **one file per unit of test** (descriptive `test_*.rs` names, as above), but
 **one test binary per crate**. Do not create a new auto-discovered top-level
 `[[test]]` target for every file: `cargo`'s default autotest discovery makes each
-top-level `tests/*.rs` file its own binary, and at this workspace's scale (900+
-files) that is 900+ link steps and 900+ separate test binaries. This is **not**
+top-level `tests/*.rs` file its own binary, and at this workspace's scale (over 170
+files) that is one link step and one test binary per file. This is **not**
 the layout to grow further.
 
 Instead, each crate exposes a small, fixed number of integration targets, and
@@ -151,8 +151,8 @@ path = "tests/all.rs"
 
 ```rust
 // crates/<crate>/tests/all.rs
-#[path = "test_activity_event.rs"] mod test_activity_event;
-#[path = "test_automation_run.rs"] mod test_automation_run;
+#[path = "test_gcode_words_arc.rs"]
+mod test_gcode_words_arc;
 // ... one `#[path = ...] mod ...;` line per former top-level test file
 ```
 
@@ -183,31 +183,29 @@ Rules for this model:
   share a mutable global: a `static` registry or a shared scratch directory is
   still one object per binary, and tests within one crate can still interleave
   over a filesystem path. When two files touch the same global, serialise the
-  mutating tests with `#[serial]` (`serial_test`) or the crate's
-  `global_env_lock()` — never by weakening an assertion or by splitting into more
+  mutating tests with the crate's `crate::global_env_lock()` (defined in every
+  `tests/all.rs`; never take it twice in one test) — never by weakening an assertion or by splitting into more
   targets just to regain isolation. Prefer giving a test its own directory (a
   per-test temp dir or a `target/temp/<unique-name>` path) over serialising.
-- **`#[serial]` orders one process; nextest runs one process per test.** Where a
-  test's exclusion must hold across *processes* — a fixture written into the
-  repository, a shared `target/temp/` path, a scan of the checked-in tree — a
-  `Mutex` or `#[serial]` in the test file does not provide it: serial_test
-  publishes its lock key as `SERIAL_TEST_RETRY_KEY` in the parent environment
-  and each nextest test process starts from its own saved environment, so two
-  siblings take different keys and run together. Define the exclusion in
+- **An in-process lock orders one process; nextest runs one process per test.**
+  Where a test's exclusion must hold across *processes* — a fixture written into
+  the repository, a shared `target/temp/` path, a scan of the checked-in tree —
+  a `Mutex` in the test file does not provide it. Define the exclusion in
   `.config/nextest.toml` instead: a `[test-groups]` table with
   `max-threads = 1` plus a `[[profile.default.overrides]]` (and a `profile.ci`
-  twin) whose `filter` selects the tests. `test_tool_rename_guard` is the worked
-  example (`tool-rename-guard` group). A file-local `Mutex` is still correct for
-  an in-process run (`cargo test`), which is why it stays alongside the group.
+  twin) whose `filter` selects the tests. The existing `gpu` group shows the
+  shape. The in-process lock is still correct for an in-process run
+  (`cargo test`), which is why it stays alongside the group.
 - **Do not weaken an assertion to make a consolidated build pass.** A cross-file
-  failure is a real test-isolation bug; mark `#[serial]` or fix the shared state.
+  failure is a real test-isolation bug; take `crate::global_env_lock()` or fix the
+  shared state.
 - **`crate::` in a `#[path]`-included source module resolves at the target root.**
   A test file that does `#[path = "../src/<module>.rs"] mod <module>;` and whose
   module body refers to `crate::<x>` worked when the file was a binary root, but
   as a child module of `all` those paths resolve against `all`'s root, not the
-  crate under test. Provide the shim (`pub use ragent_<crate>::<x>;`) at the top
-  of `all.rs` — a `tests/all_prelude.rs` inlined there is the convention — or
-  rewrite the reference to the crate-absolute path (`ragent_<crate>::<x>`).
+  crate under test. Provide the shim (`pub use gcodekit5_<crate>::<x>;`) at the top
+  of `all.rs`, or rewrite the reference to the crate-absolute path
+  (`gcodekit5_<crate>::<x>`).
 - **Expect a narrow `#[allow(clippy::duplicate_mod)]` on `all.rs`.** When two
   child files each declare the same `#[path = "support/mod.rs"] mod support;`,
   the shared helper is loaded as a module of several children; clippy's
@@ -225,22 +223,26 @@ Use the `Bash` tool to run the following cargo commands:
 
 - `cargo clippy` — Run linter with clippy
 - `cargo fmt` — Format code with rustfmt. **MANDATORY** to run after editing any `.rs` file. See the top of this file for the full procedure.
-- `cargo fmt --check` — Check formatting without changes. Fails if any file is unformatted. This is the CI gate.
+- `cargo fmt --all -- --check` — Check formatting without changes. Fails if any file is unformatted. This is the CI gate.
 
 ## Workspace Layout
 
 - Keep all crates under the `crates/` directory.
-- Place each crate in its own subfolder under `crates/`, named after the crate (e.g. `crates/ragent-core`).
+- Place each crate in its own subfolder under `crates/`, named after the crate (e.g. `crates/gcodekit5-core`).
 - Keep the root `Cargo.toml` configured as a workspace manifest. It may also
-  host the primary `ragent` binary package (`[package] name = "ragent"`,
+  host the primary binary package (here `[package] name = "gcodekit5-design"`
+  with `[[bin]] name = "gcodekit5"`,
   `[dependencies]`, `[[bin]]`, `[features]`, `[profile.release]`) alongside the
   `[workspace]` block — a standard single-binary monorepo pattern. Do not
   declare package metadata or dependencies in the root `Cargo.toml` *for
-  library crates*; list workspace members instead:
+  library crates*; list workspace members explicitly instead:
 
   ```toml
   [workspace]
-  members = ["crates/*"]
+  members = [
+      "crates/gcodekit5-core",
+      # ... one line per crate
+  ]
   resolver = "2"
   ```
 - Define crate-specific metadata, dependencies, and targets in each crate's own `Cargo.toml`.
@@ -253,7 +255,7 @@ Use the `Bash` tool to run the following cargo commands:
 - **Imports**: Group std, external crates, then local modules.
 - **Error Handling**: Use `Result<T, E>` with `?`, `anyhow::Result` for main, and `thiserror` for custom errors.
 - **Types**: Prefer explicit types, and use type aliases for complex types.
-- **Logging**: Use the `tracing` crate with structured logging; avoid `println!` or `eprintln!` in application code. For performance profiling, use `debug!()` for non-hot paths and `trace!()` for debug scenarios. **Documented exception:** the root `ragent` binary's *CLI presentation surface* is allowed to use `println!`/`eprintln!` for user-facing command output (help text, tables, JSON reports, and the interactive TUI's stdout) and for panic/abort diagnostics that must be emitted before the tracing subscriber is installed (`src/panic_hook.rs`, `src/stderr_spool.rs`, the crash-marker warnings, and the `--log-level` parse fallback in `src/main.rs`). The CLI presentation surface comprises `src/main.rs`, `src/cli.rs`, `src/cli_surface.rs`, and the slash-command parity surfaces `src/connectors.rs`, `src/plugins.rs` and `src/acp_server.rs` (their `[err]`/usage/table output is the CLI contract, not a diagnostic). Any diagnostic emitted *after* tracing is initialised must use `tracing` instead (ANTIPAT M2.16 R-05).
+- **Logging**: Use the `tracing` crate with structured logging; avoid `println!` or `eprintln!` in application code. For performance profiling, use `debug!()` for non-hot paths and `trace!()` for debug scenarios.
 - **Logging Cleanliness**: After an issue has been resolved, remove temporary `debug!()` and `tracing::debug!()` calls in the relevant code.
 - **Documentation**: Use `//!` for crate/module docs, `///` for public APIs, and `//` for internal comments.
 - **Linting**: No wildcard imports in production code. This rule does not apply
@@ -279,7 +281,7 @@ Use the `Bash` tool to run the following cargo commands:
   `std::env::set_var`/`remove_var` migration; that is the only sanctioned test use.
 * **Exhaustive Pattern Matching:** Always match enums and results exhaustively; avoid wildcard `_` fallbacks unless handling non-exhaustive external types.
 * **Explicit Cloning:** Call `.clone()` explicitly on non-`Copy` types; forbid hidden or cascading clones inside intensive iterators or closures.
-* **No Silent Error Swallowing:** Never use `.unwrap()` or `.expect()` in production code paths on user-facing paths; always propagate or handle `Result` and `Option`. Test and bench code may use them freely. The workspace clippy config sets `unwrap_used = "allow"` so the compiler does not enforce this; treat it as a review-enforced rule and keep the T-006 sites fixed.
+* **No Silent Error Swallowing:** Never use `.unwrap()` or `.expect()` in production code paths on user-facing paths; always propagate or handle `Result` and `Option`. `.unwrap()` is denied in every target by CI (`cargo clippy --workspace --all-targets -- -D warnings -W clippy::unwrap_used`); tests use `.expect("why")`; production user-facing paths use neither.
 
 ### Code Style & Formatting
 
@@ -292,7 +294,7 @@ Use the `Bash` tool to run the following cargo commands:
 
 * **Zero Warnings Policy:** Generated code must compile cleanly without warnings under standard compiler checks.
 * **Clippy Compliance:** Run and pass `cargo clippy` with standard lints on all proposed changes.
-* **Automated Formatting Check (MANDATORY):** You MUST run `cargo fmt` on every Rust file you edit before finishing. See the "MANDATORY: Run `cargo fmt`" section at the top of this file for the full procedure. `cargo fmt` is idempotent and safe — run it freely. A task is NOT complete if any edited `.rs` file has not been formatted with `cargo fmt`. This is enforced by `cargo fmt --check` in CI; unformatted files are build failures.
+* **Automated Formatting Check (MANDATORY):** You MUST run `cargo fmt` on every Rust file you edit before finishing. See the "MANDATORY: Run `cargo fmt`" section at the top of this file for the full procedure. `cargo fmt` is idempotent and safe — run it freely. A task is NOT complete if any edited `.rs` file has not been formatted with `cargo fmt`. This is enforced by `cargo fmt --all -- --check` in CI; unformatted files are build failures.
 
 ## Idiomatic Rust Practices
 
@@ -324,11 +326,10 @@ and the broader Rust community at [users.rust-lang.org](https://users.rust-lang.
 - Handle errors properly using `?`, `match`, or `if let`.
 - Use `serde` for serialization and `thiserror` or `anyhow` for custom errors.
 - Implement traits to abstract services or external dependencies.
-- Structure async code using `async/await` on `tokio` (the async runtime used across this workspace).
+- No async runtime: device I/O runs on a worker thread fed by `std::sync::mpsc` (gcodekit5-app `MachineController`).
 - Prefer enums over flags and states for type safety.
 - Use builders for complex object creation.
 - Split binary and library code (`main.rs` vs `lib.rs`) for testability and reuse.
-- Use `rayon` for data parallelism and CPU-bound tasks.
 - Use iterators instead of index-based loops as they're often faster and safer.
 - Use `&str` instead of `String` for function parameters when you don't need ownership.
 - Prefer borrowing and zero-copy operations to avoid unnecessary allocations.
