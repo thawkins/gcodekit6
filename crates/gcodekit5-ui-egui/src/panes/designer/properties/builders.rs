@@ -330,7 +330,6 @@ pub fn length(text: &str, system: MeasurementSystem) -> Result<f64, &'static str
     }
     units::parse_length(&text, system)
         .ok()
-        .map(f64::from)
         .filter(|v| v.is_finite())
         .ok_or(E_NUMBER)
 }

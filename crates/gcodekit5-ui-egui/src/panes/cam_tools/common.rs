@@ -161,7 +161,6 @@ pub fn parse_len(text: &str, units: MeasurementSystem) -> Result<f64, &'static s
     units::parse_length(text, units)
         .ok()
         .filter(|v| v.is_finite())
-        .map(f64::from)
         .ok_or(NOT_A_LENGTH)
 }
 
@@ -200,7 +199,7 @@ pub fn parse_whole(text: &str) -> Result<f64, &'static str> {
 /// * `mm` - The length in millimetres.
 /// * `units` - The display units.
 pub fn format_len(mm: f64, units: MeasurementSystem) -> String {
-    units::format_length(mm as f32, units)
+    units::format_length(mm, units)
 }
 
 /// Rewrites a length field's text from `from` units to `to` units; text that is not a

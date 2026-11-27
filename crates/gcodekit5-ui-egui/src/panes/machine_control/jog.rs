@@ -656,7 +656,7 @@ impl JogPanel {
     /// Draws the feed field in the user's feed units.
     fn show_feed(&mut self, ui: &mut egui::Ui, tr: &Translator) {
         let label = ui.label(tr.tr("Jog Feed:"));
-        let mut shown = feed_to_display(self.feed_mm_min, self.feed_units);
+        let mut shown = feed_to_display(f64::from(self.feed_mm_min), self.feed_units);
         let max = feed_to_display(100_000.0, self.feed_units);
         let response = ui
             .add(
@@ -667,7 +667,7 @@ impl JogPanel {
             )
             .labelled_by(label.id);
         if response.changed() {
-            self.feed_mm_min = feed_from_display(shown, self.feed_units);
+            self.feed_mm_min = feed_from_display(shown, self.feed_units) as f32;
         }
     }
 

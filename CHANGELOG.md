@@ -5,6 +5,14 @@ All notable changes to this project are documented here. The format follows
 [Semantic Versioning](https://semver.org/). Release notes are generated from the
 `## [x.y.z]` sections by `scripts/release_notes.py`.
 
+## [Unreleased]
+
+### Changed
+- **Units helpers use `f64`**: `gcodekit5_core::units::{format_length, format_feed_rate, parse_length, parse_feed_rate, feed_rate_from_mm_per_min, feed_rate_to_mm_per_min}` take and return `f64`, matching the `f64` mm dimensions (owner decision OD-2); callers no longer cast to and from `f32`. Displayed strings are unchanged. Imperial lengths convert exactly (`1 1/2` in is 38.1 mm, not 38.099999999999994), and the tabbed box G-code header shows the burn of a 0.004 in setting as `0.1016 mm` instead of `0.101600006 mm`
+
+### Fixed
+- **Spoilboard surfacing far edge**: a row within 1e-6 mm of the far edge counts as the last row, so step drift (e.g. 16 x 12.7 mm summing to 203.19999999999996) no longer adds a duplicate pass along the far edge
+
 ## [2.0.0-alpha.4] - 2026-11-28
 
 ### Added

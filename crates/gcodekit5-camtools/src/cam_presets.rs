@@ -424,7 +424,7 @@ impl<'a> LegacyReader<'a> {
                 _ => None,
             };
             match parsed {
-                Some(v) if v.is_finite() => *out = v,
+                Some(v) if v.is_finite() => *out = v as f32,
                 _ => self.bad(key, raw),
             }
         }

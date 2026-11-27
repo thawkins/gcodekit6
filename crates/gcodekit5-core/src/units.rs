@@ -104,14 +104,14 @@ impl fmt::Display for FeedRateUnits {
 ///
 /// * `value_mm` - Value in millimeters
 /// * `system` - Target measurement system
-pub fn format_length(value_mm: f32, system: MeasurementSystem) -> String {
+pub fn format_length(value_mm: f64, system: MeasurementSystem) -> String {
     match system {
         MeasurementSystem::Metric => {
             // Format to 3 decimal places
             format!("{:.3}", value_mm)
         }
         MeasurementSystem::Imperial => {
-            let inches = value_mm / MM_PER_INCH_F32;
+            let inches = value_mm / MM_PER_INCH;
             // Format to 3 decimal places
             format!("{:.3}", inches)
         }
@@ -122,7 +122,7 @@ pub fn format_length(value_mm: f32, system: MeasurementSystem) -> String {
 ///
 /// * `value_mm_per_min` - Feed rate in mm/min
 /// * `units` - Target feed rate units
-pub fn format_feed_rate(value_mm_per_min: f32, units: FeedRateUnits) -> String {
+pub fn format_feed_rate(value_mm_per_min: f64, units: FeedRateUnits) -> String {
     format!("{:.3}", feed_rate_from_mm_per_min(value_mm_per_min, units))
 }
 
@@ -130,12 +130,12 @@ pub fn format_feed_rate(value_mm_per_min: f32, units: FeedRateUnits) -> String {
 ///
 /// * `value_mm_per_min` - Feed rate in mm/min
 /// * `units` - Target feed rate units
-pub fn feed_rate_from_mm_per_min(value_mm_per_min: f32, units: FeedRateUnits) -> f32 {
+pub fn feed_rate_from_mm_per_min(value_mm_per_min: f64, units: FeedRateUnits) -> f64 {
     match units {
         FeedRateUnits::MmPerMin => value_mm_per_min,
         FeedRateUnits::MmPerSec => value_mm_per_min / 60.0,
-        FeedRateUnits::InPerMin => value_mm_per_min / MM_PER_INCH_F32,
-        FeedRateUnits::InPerSec => (value_mm_per_min / MM_PER_INCH_F32) / 60.0,
+        FeedRateUnits::InPerMin => value_mm_per_min / MM_PER_INCH,
+        FeedRateUnits::InPerSec => (value_mm_per_min / MM_PER_INCH) / 60.0,
     }
 }
 
@@ -143,13 +143,22 @@ pub fn feed_rate_from_mm_per_min(value_mm_per_min: f32, units: FeedRateUnits) ->
 ///
 /// * `value` - Feed rate in `units`
 /// * `units` - Units of `value`
-pub fn feed_rate_to_mm_per_min(value: f32, units: FeedRateUnits) -> f32 {
+pub fn feed_rate_to_mm_per_min(value: f64, units: FeedRateUnits) -> f64 {
     match units {
         FeedRateUnits::MmPerMin => value,
         FeedRateUnits::MmPerSec => value * 60.0,
-        FeedRateUnits::InPerMin => value * MM_PER_INCH_F32,
-        FeedRateUnits::InPerSec => value * MM_PER_INCH_F32 * 60.0,
+        FeedRateUnits::InPerMin => value * MM_PER_INCH,
+        FeedRateUnits::InPerSec => value * MM_PER_INCH * 60.0,
     }
+}
+
+/// Converts inches to mm as `inches * 254 / 10`.
+///
+/// For the short decimals and fractions people type, `inches * 254` is exact, so the one
+/// division rounds once and `1.5` in gives exactly `38.1`; `inches * 25.4` rounds twice
+/// (25.4 itself is inexact) and gives `38.099999999999994`.
+fn inches_to_mm(inches: f64) -> f64 {
+    inches * (MM_PER_INCH * 10.0) / 10.0
 }
 
 /// Parse length string to millimeters.
@@ -167,14 +176,14 @@ pub fn feed_rate_to_mm_per_min(value: f32, units: FeedRateUnits) -> f32 {
 /// - A fraction has an invalid numerator or denominator
 /// - A fraction has a zero denominator (division by zero)
 /// - A fraction has more than one `/` separator
-pub fn parse_length(input: &str, system: MeasurementSystem) -> Result<f32, String> {
+pub fn parse_length(input: &str, system: MeasurementSystem) -> Result<f64, String> {
     let input = input.trim();
     if input.is_empty() {
         return Ok(0.0);
     }
 
     match system {
-        MeasurementSystem::Metric => input.parse::<f32>().map_err(|e| e.to_string()),
+        MeasurementSystem::Metric => input.parse::<f64>().map_err(|e| e.to_string()),
         MeasurementSystem::Imperial => {
             // Check for fraction
             if input.contains('/') {
@@ -192,10 +201,10 @@ pub fn parse_length(input: &str, system: MeasurementSystem) -> Result<f32, Strin
                         let frac_parts: Vec<&str> = part.split('/').collect();
                         if frac_parts.len() == 2 {
                             let num = frac_parts[0]
-                                .parse::<f32>()
+                                .parse::<f64>()
                                 .map_err(|_| "Invalid numerator")?;
                             let den = frac_parts[1]
-                                .parse::<f32>()
+                                .parse::<f64>()
                                 .map_err(|_| "Invalid denominator")?;
                             if den == 0.0 {
                                 return Err("Division by zero".to_string());
@@ -205,14 +214,14 @@ pub fn parse_length(input: &str, system: MeasurementSystem) -> Result<f32, Strin
                             return Err("Invalid fraction format".to_string());
                         }
                     } else {
-                        total_inches += part.parse::<f32>().map_err(|_| "Invalid number part")?;
+                        total_inches += part.parse::<f64>().map_err(|_| "Invalid number part")?;
                     }
                 }
-                Ok(sign * total_inches * MM_PER_INCH_F32)
+                Ok(inches_to_mm(sign * total_inches))
             } else {
                 // Decimal inches
-                let inches = input.parse::<f32>().map_err(|e| e.to_string())?;
-                Ok(inches * MM_PER_INCH_F32)
+                let inches = input.parse::<f64>().map_err(|e| e.to_string())?;
+                Ok(inches_to_mm(inches))
             }
         }
     }
@@ -229,13 +238,13 @@ pub fn parse_length(input: &str, system: MeasurementSystem) -> Result<f32, Strin
 ///
 /// # Errors
 /// Returns `Err` if the input is not a valid floating-point number.
-pub fn parse_feed_rate(input: &str, units: FeedRateUnits) -> Result<f32, String> {
+pub fn parse_feed_rate(input: &str, units: FeedRateUnits) -> Result<f64, String> {
     let input = input.trim();
     if input.is_empty() {
         return Ok(0.0);
     }
 
-    let value = input.parse::<f32>().map_err(|e| e.to_string())?;
+    let value = input.parse::<f64>().map_err(|e| e.to_string())?;
 
     Ok(feed_rate_to_mm_per_min(value, units))
 }
