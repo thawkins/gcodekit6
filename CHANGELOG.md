@@ -5,7 +5,7 @@ All notable changes to this project are documented here. The format follows
 [Semantic Versioning](https://semver.org/). Release notes are generated from the
 `## [x.y.z]` sections by `scripts/release_notes.py`.
 
-## [Unreleased]
+## [2.0.0-alpha.6] - 2026-11-28
 
 ### Changed
 - **Renamed to GCodeKit6**: the product, window, About box, help, installers and packages are named GCodeKit6. The binary is `gcodekit6` (`gcodekit6.exe`), the crates are `gcodekit6-*` (Rust paths `gcodekit6_*`), the Flatpak and desktop id is `com.github.thawkins.gcodekit6`, the translation template is `po/gcodekit6.pot`, and the repository is https://github.com/thawkins/gcodekit6. The Windows installer keeps its UpgradeCode, so it upgrades a GCodeKit5 install. `.gck5` files still open; `.gckd` stays the save format
