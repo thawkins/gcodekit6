@@ -9,7 +9,7 @@ use gcodekit5_app::machine::{MachineController, MachineEvent};
 use gcodekit5_app::test_support::Wrote;
 use gcodekit5_communication::firmware::grbl::status_parser::StatusParser;
 use gcodekit5_ui_egui::machine::Machine;
-use gcodekit5_ui_egui::panes::console::{ConsolePane, MAX_CONSOLE_LINES};
+use gcodekit5_ui_egui::panes::console::{ConsolePane, MAX_CONSOLE_LINES, response_meaning};
 
 use crate::machine_support::{step_until, wait_until};
 use crate::test_machine_pane::pane_app;
@@ -411,4 +411,50 @@ fn test_console_program_end_lines_and_a_later_manual_m2() {
         Some("[MSG:Pgm End]"),
         "a typed M2 after the job reports no stale time"
     );
+}
+
+/// `error:N` / `ALARM:N` replies decode to the GRBL 1.1 (or grblHAL) text; other lines and
+/// codes without a known text have no meaning.
+#[test]
+fn test_console_response_meaning_decodes_errors_and_alarms() {
+    assert_eq!(
+        response_meaning("error:22").as_deref(),
+        Some("Feed rate has not yet been set or is undefined.")
+    );
+    assert!(
+        response_meaning("ALARM:1")
+            .expect("alarm 1 has a meaning")
+            .starts_with("Hard limit")
+    );
+    assert_eq!(
+        response_meaning("ALARM:10").as_deref(),
+        Some("EStop asserted. Clear and reset")
+    );
+    // The worker logs a rejected line as an error, possibly with its program line.
+    assert_eq!(
+        response_meaning("Error: error:22 on program line 3").as_deref(),
+        Some("Feed rate has not yet been set or is undefined.")
+    );
+    assert_eq!(response_meaning("error:200"), None);
+    assert_eq!(response_meaning("ok"), None);
+    assert_eq!(response_meaning("[MSG:error:22]"), None);
+}
+
+/// An `error:N` reply is shown with its meaning next to its row, and is logged unchanged.
+#[test]
+fn test_console_shows_error_meaning_in_app() {
+    let (mut harness, shared) = pane_app(Duration::from_millis(1), true);
+    shared.inject("error:22\n");
+    let meaning = "Feed rate has not yet been set or is undefined.";
+    let deadline = std::time::Instant::now() + crate::machine_support::EVENTUALLY;
+    while harness.query_by_label(meaning).is_none() && std::time::Instant::now() < deadline {
+        harness.step();
+        std::thread::sleep(Duration::from_millis(2));
+    }
+    assert!(
+        harness.query_by_label(meaning).is_some(),
+        "the meaning of error:22 is not shown"
+    );
+    // The logged row itself is unchanged.
+    assert!(harness.query_by_label("Error: error:22").is_some());
 }

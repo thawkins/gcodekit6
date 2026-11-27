@@ -1,5 +1,9 @@
 //! GRBL Error and Alarm Code Decoder
-//! Converts numeric error and alarm codes to human-readable messages
+//! Converts numeric error and alarm codes to human-readable messages.
+//!
+//! Codes 1-38 (errors) and 1-9 (alarms) are the GRBL 1.1 texts. Higher codes are grblHAL's
+//! extensions, transcribed from grblHAL/core at commit
+//! a53a16a4d756f12a27006152ba3a99b5ec46b2c7 (`errors.h`/`errors.c`, `alarms.h`/`alarms.c`).
 
 /// Decode GRBL error code to human-readable message
 pub fn decode_error(code: u8) -> String {
@@ -41,44 +45,50 @@ pub fn decode_error(code: u8) -> String {
         37 => "The G43.1 dynamic tool length offset command cannot apply an offset to an axis other than its configured axis.".to_string(),
         38 => "Tool number greater than max supported value.".to_string(),
 
-        // grblHAL Extended Error Codes (39-75)
-        39 => "Canned cycle is not active. G-code requires an active canned cycle (G81-G89) context.".to_string(),
-        40 => "Value word (N, P, R) is missing or undefined.".to_string(),
-        41 => "Value word conflict. L word cannot be used with canned cycle P word.".to_string(),
-        42 => "Invalid canned cycle retract mode. R-plane must be above Z-datum for G98 or current position for G99.".to_string(),
-        43 => "G-code requires RPM to be set (S-word) when spindle is enabled.".to_string(),
-        44 => "PID log is full. Cannot add more data to the PID tuning log.".to_string(),
-        45 => "Max step rate exceeded. Motion rate would exceed maximum step rate for any axis.".to_string(),
-        46 => "Safety door already opened. Attempting to open an already open safety door.".to_string(),
-        47 => "Illegal operation. Cannot jog or use G28/G30 from within a program.".to_string(),
-        48 => "Unsupported P-parameter. P-value not within valid range for specific command.".to_string(),
-        49 => "Value out of range. Numerical value is outside acceptable range for command.".to_string(),
-        50 => "Setting step pulse min > step pulse time. Minimum step pulse time must be less than or equal to pulse time.".to_string(),
-        51 => "Limits check failed. Sensor not detected at expected position during homing.".to_string(),
-        52 => "Limit switch pull-off failed. Unable to clear limit switch when pulling off.".to_string(),
-        53 => "Invalid file number. File number specified does not exist or is invalid.".to_string(),
-        54 => "File is read-only. Cannot write to or delete a read-only file.".to_string(),
-        55 => "File is empty. Cannot execute empty file or no valid G-code found.".to_string(),
-        56 => "File not found. Specified file does not exist on storage device.".to_string(),
-        57 => "File read failed. Error reading from storage device.".to_string(),
-        58 => "Spindle at speed timeout. Spindle failed to reach commanded speed within timeout period.".to_string(),
-        59 => "Spindle not running. Command requires spindle to be running (e.g., M3 or M4).".to_string(),
-        60 => "Value out of range or invalid. Parameter value outside valid range or inappropriate for context.".to_string(),
-        61 => "Configuration failed. Error loading or applying configuration settings.".to_string(),
-        62 => "Illegal home state. Attempting to home when already in a homed state or unsafe condition.".to_string(),
-        63 => "Max travel exceeded. Motion would exceed maximum travel distance for axis.".to_string(),
-        64 => "Max feed rate exceeded. Commanded feed rate exceeds maximum configured feed rate.".to_string(),
-        65 => "Disabled. Feature or function is disabled in configuration.".to_string(),
-        66 => "Password required. Command requires authentication but no password provided.".to_string(),
-        67 => "Invalid password. Provided password is incorrect.".to_string(),
-        68 => "Bluetooth initialization failed. Error initializing Bluetooth hardware or stack.".to_string(),
-        69 => "Homing is required. Command cannot execute until machine is homed.".to_string(),
-        70 => "Invalid plane selected. G17/G18/G19 plane selection conflict or invalid for command.".to_string(),
-        71 => "Tool change required. M6 tool change command required before continuing.".to_string(),
-        72 => "Not allowed. Command not permitted in current state or mode.".to_string(),
-        73 => "Self-test failed. Controller hardware self-test reported failure.".to_string(),
-        74 => "Busy. Controller busy processing previous command.".to_string(),
-        75 => "Command requires single axis. Multi-axis movement not allowed for this command.".to_string(),
+        // grblHAL extended status codes (`status_code_t`, errors.h; texts from errors.c at
+        // grblHAL/core a53a16a4d756f12a27006152ba3a99b5ec46b2c7). Codes upstream defines
+        // without a description (59-70, 85, 89) fall through to "Unknown error code".
+        39 => "Value out of range.".to_string(),
+        40 => "G-code command not allowed when tool change is pending.".to_string(),
+        41 => "Spindle not running when motion commanded in CSS or spindle sync mode.".to_string(),
+        42 => "Plane must be ZX for threading and lathe cycles.".to_string(),
+        43 => "Max. feed rate exceeded.".to_string(),
+        44 => "RPM out of range.".to_string(),
+        45 => "Only homing is allowed when a limit switch is engaged.".to_string(),
+        46 => "Home machine to continue.".to_string(),
+        47 => "ATC: current tool is not set. Set current tool with M61.".to_string(),
+        48 => "Value word conflict.".to_string(),
+        49 => "Power on self test failed. A hard reset is required.".to_string(),
+        50 => "Emergency stop active.".to_string(),
+        51 => "Motor fault.".to_string(),
+        52 => "Setting value is out of range.".to_string(),
+        53 => "Setting is not available, possibly due to limited driver support.".to_string(),
+        54 => "Retract position is less than drill depth.".to_string(),
+        55 => "Attempt to home two auto squared axes at the same time.".to_string(),
+        56 => "Coordinate system is locked.".to_string(),
+        57 => "Unexpected file demarcation.".to_string(),
+        58 => "Port is not available".to_string(),
+        71 => "Unknown operation found in expression.".to_string(),
+        72 => "Divide by zero in expression attempted.".to_string(),
+        73 => "Too large or too small argrument provided.".to_string(),
+        74 => "Argument is not valid for the operation".to_string(),
+        75 => "Expression is not valid.".to_string(),
+        76 => "Either NAN (not a number) or infinity was returned from expression.".to_string(),
+        77 => "Authentication required.".to_string(),
+        78 => "Access denied.".to_string(),
+        79 => "Not allowed while critical event is active.".to_string(),
+        80 => "Flow statement only allowed in filesystem macro.".to_string(),
+        81 => "Unknown or invalid flow statement.".to_string(),
+        82 => "Stack overflow while executing flow statement.".to_string(),
+        83 => "Out of memory while executing flow statement.".to_string(),
+        84 => "Could not open file.".to_string(),
+        86 => "Port is not usable.".to_string(),
+        87 => "Tool in spindle.".to_string(),
+        88 => "No tool in spindle.".to_string(),
+        90 => "Cutter compensation is already active.".to_string(),
+        91 => "Command not allowed while cutter compensation is active.".to_string(),
+        92 => "Cutter compensation is not valid for current move.".to_string(),
+        253 => "User defined error occured.".to_string(),
 
         _ => format!("Unknown error code: {}", code),
     }
@@ -97,18 +107,21 @@ pub fn decode_alarm(code: u8) -> String {
         8 => "Homing fail. Cycle failed to clear limit switch when pulling off. Try increasing pull-off setting or check wiring.".to_string(),
         9 => "Homing fail. Could not find limit switch within search distance. Defined as 1.5 * max_travel on search and 5 * pulloff on locate phases.".to_string(),
 
-        // grblHAL Extended Alarm Codes (10-20)
-        10 => "Limit switch engaged. Cannot complete homing cycle because limit switch is already triggered.".to_string(),
-        11 => "Homing required. Machine must be homed before performing this operation.".to_string(),
-        12 => "E-stop asserted. Emergency stop has been triggered.".to_string(),
-        13 => "Motor fault. Stepper driver reported a fault condition.".to_string(),
-        14 => "Homing configuration error. Invalid homing settings or configuration.".to_string(),
-        15 => "Self-test failed. Controller hardware self-test reported failure during startup.".to_string(),
-        16 => "Spindle at speed timeout. Spindle failed to reach commanded speed.".to_string(),
-        17 => "Probe protection triggered. Probe circuit detected unsafe condition.".to_string(),
-        18 => "Spindle sync error. Spindle synchronization lost during threading or rigid tapping.".to_string(),
-        19 => "Power supply fault. Input power issue detected.".to_string(),
-        20 => "Controller error. Internal controller error or malfunction.".to_string(),
+        // grblHAL extended alarm codes (`alarm_code_t`, alarms.h; texts from alarms.c at
+        // grblHAL/core a53a16a4d756f12a27006152ba3a99b5ec46b2c7).
+        10 => "EStop asserted. Clear and reset".to_string(),
+        11 => "Homing required. Execute homing command ($H) to continue.".to_string(),
+        12 => "Limit switch engaged. Clear before continuing.".to_string(),
+        13 => "Probe protection triggered. Clear before continuing.".to_string(),
+        14 => "Spindle at speed timeout. Clear before continuing.".to_string(),
+        15 => "Homing fail. Could not find second limit switch for auto squared axis within search distances. Try increasing max travel, decreasing pull-off distance, or check wiring.".to_string(),
+        16 => "Power on selftest (POS) failed.".to_string(),
+        17 => "Motor fault.".to_string(),
+        18 => "Homing fail. Bad configuration.".to_string(),
+        19 => "Modbus exception. Timeout or message error.".to_string(),
+        20 => "I/O expander communication failed.".to_string(),
+        21 => "Non Volatile Storage (EEPROM) failure.".to_string(),
+        22 => "Buffer overflow.".to_string(),
 
         _ => format!("Unknown alarm code: {}", code),
     }

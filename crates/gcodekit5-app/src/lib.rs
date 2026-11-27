@@ -46,6 +46,7 @@ pub mod work_zero;
 // Controller types and serial-port listing the front ends use, re-exported so a front
 // end reaches the communication layer only through the application layer.
 pub use gcodekit5_communication::firmware::ControllerProtocol;
+pub use gcodekit5_communication::firmware::grbl::error_decoder::{decode_alarm, decode_error};
 pub use gcodekit5_communication::firmware::grbl::settings::SettingsManager;
 pub use gcodekit5_communication::firmware::grbl::status_parser::{
     FullStatus, OverrideState, WorkCoordinateOffset, parse_probe_report_in,

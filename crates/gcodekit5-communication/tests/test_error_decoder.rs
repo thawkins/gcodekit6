@@ -14,12 +14,9 @@ fn test_decode_error() {
     );
     assert_eq!(
         decode_error(53),
-        "Invalid file number. File number specified does not exist or is invalid."
+        "Setting is not available, possibly due to limited driver support."
     );
-    assert_eq!(
-        decode_error(69),
-        "Homing is required. Command cannot execute until machine is homed."
-    );
+    assert!(decode_error(69).contains("Unknown error code"));
     assert!(decode_error(255).contains("Unknown error code"));
 }
 
@@ -27,8 +24,8 @@ fn test_decode_error() {
 fn test_decode_alarm() {
     assert!(decode_alarm(1).contains("Hard limit"));
     assert!(decode_alarm(2).contains("Soft limit"));
-    assert!(decode_alarm(12).contains("E-stop"));
-    assert!(decode_alarm(15).contains("Self-test failed"));
+    assert!(decode_alarm(12).contains("Limit switch engaged"));
+    assert!(decode_alarm(15).contains("auto squared axis"));
     assert!(decode_alarm(255).contains("Unknown alarm code"));
 }
 
@@ -44,4 +41,27 @@ fn test_format_alarm() {
     let msg = format_alarm(1);
     assert!(msg.starts_with("ALARM:1"));
     assert!(msg.contains("Hard limit"));
+}
+
+/// grblHAL extended codes return the upstream texts (grblHAL/core
+/// a53a16a4d756f12a27006152ba3a99b5ec46b2c7, errors.c / alarms.c).
+#[test]
+fn test_decode_grblhal_extended_codes_match_upstream() {
+    assert_eq!(decode_error(39), "Value out of range.");
+    assert_eq!(
+        decode_error(45),
+        "Only homing is allowed when a limit switch is engaged."
+    );
+    assert_eq!(
+        decode_error(79),
+        "Not allowed while critical event is active."
+    );
+    assert!(decode_error(60).contains("Unknown error code"));
+    assert_eq!(decode_alarm(10), "EStop asserted. Clear and reset");
+    assert_eq!(
+        decode_alarm(11),
+        "Homing required. Execute homing command ($H) to continue."
+    );
+    assert_eq!(decode_alarm(22), "Buffer overflow.");
+    assert!(decode_alarm(23).contains("Unknown alarm code"));
 }
