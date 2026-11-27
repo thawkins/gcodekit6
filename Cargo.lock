@@ -2247,6 +2247,7 @@ dependencies = [
  "criterion",
  "csgrs",
  "fontdb",
+ "gcodekit5-camtools",
  "gcodekit5-core",
  "image",
  "lyon",

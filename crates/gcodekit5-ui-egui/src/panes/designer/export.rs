@@ -28,7 +28,7 @@ use gcodekit5_app::i18n::Translator;
 use gcodekit5_designer::DesignerState;
 use gcodekit5_designer::designer_state::MachineMode;
 use gcodekit5_designer::engraving::image_engraver::{
-    EngravingParams, HalftoneMethod, ImageEngraver, OVERSCAN_MM, RotationAngle, ScanDirection,
+    EngravingParams, HalftoneMethod, ImageEngraver, RotationAngle, ScanDirection,
 };
 use gcodekit5_designer::gcode_gen::MachineLimits;
 use gcodekit5_designer::model::{DesignerShape, RasterImage, Shape};
@@ -367,8 +367,7 @@ impl DesignerPane {
     }
 
     /// The toolbox's Frame: a low-power laser frame around the visible selection, or the
-    /// visible shapes, for the editor; nothing when there is nothing to frame. A selected raster
-    /// image's frame is moved by its overscan, as its engraving is.
+    /// visible shapes, for the editor; nothing when there is nothing to frame.
     pub fn frame_to_editor(&mut self) {
         let union = |a: (f64, f64, f64, f64), b: (f64, f64, f64, f64)| {
             (a.0.min(b.0), a.1.min(b.1), a.2.max(b.2), a.3.max(b.3))
@@ -388,18 +387,7 @@ impl DesignerPane {
             tracing::debug!("frame requested but the canvas is empty");
             return;
         };
-        let (dx, dy) = match self.selected_image() {
-            Some(img) => {
-                let (ox, oy) = (
-                    img.center.x - img.width_mm / 2.0,
-                    img.center.y - img.height_mm / 2.0,
-                );
-                let overscan = f64::from(OVERSCAN_MM);
-                (ox.max(overscan) - ox, oy.max(overscan) - oy)
-            }
-            None => (0.0, 0.0),
-        };
-        self.editor_gcode = Some(frame_gcode(x1 + dx, y1 + dy, x2 + dx, y2 + dy));
+        self.editor_gcode = Some(frame_gcode(x1, y1, x2, y2));
     }
 
     /// Takes the G-code waiting for the editor, once.

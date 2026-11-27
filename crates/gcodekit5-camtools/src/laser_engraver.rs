@@ -41,6 +41,20 @@ pub enum HalftoneMethod {
     Atkinson,
 }
 
+impl HalftoneMethod {
+    /// The method for a designer raster image's `dithering` name (`"none"`, `"threshold"`,
+    /// `"floyd"`, `"atkinson"`, `"bayer"`); unknown names are treated as `None`.
+    pub fn from_name(name: &str) -> Self {
+        match name {
+            "threshold" => Self::Threshold,
+            "bayer" => Self::Bayer4x4,
+            "floyd" => Self::FloydSteinberg,
+            "atkinson" => Self::Atkinson,
+            _ => Self::None,
+        }
+    }
+}
+
 /// Scan direction for laser engraving
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum ScanDirection {
