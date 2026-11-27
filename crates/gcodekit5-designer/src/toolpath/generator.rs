@@ -3,8 +3,9 @@
 use super::*;
 
 use crate::Ellipse;
+use crate::model::TextLayout;
 use lyon::path::iterator::PathIterator;
-use rusttype::{GlyphId, OutlineBuilder, Scale};
+use rusttype::OutlineBuilder;
 use smallvec::SmallVec;
 
 /// Generates toolpaths from design shapes.
@@ -947,51 +948,22 @@ impl ToolpathGenerator {
     ) -> Vec<ToolpathSegment> {
         let mut all_segments = Vec::new();
 
-        let font =
-            font_manager::get_font_for(&text_shape.font_family, text_shape.bold, text_shape.italic);
-        let scale = Scale::uniform(text_shape.font_size as f32);
-        let v_metrics = font.v_metrics(scale);
-        let line_height = v_metrics.ascent - v_metrics.descent - v_metrics.line_gap;
+        // The one text layout the canvas painter and the bounds also use.
+        let Some(layout) = text_shape.layout() else {
+            return all_segments;
+        };
 
-        let (left, bottom, right, top) = text_shape.bounds();
-        let baseline_y0 = bottom as f32 + v_metrics.line_gap;
-        let rotation_center = Point::new((left + right) / 2.0, (bottom + top) / 2.0);
-
-        let mut caret_x = left as f32;
-        let mut baseline_y = baseline_y0;
-        let mut prev: Option<GlyphId> = None;
         let mut last_position = Point::new(0.0, 0.0);
         let mut is_first = true;
 
-        for ch in text_shape.text.chars() {
-            if ch == '\n' {
-                caret_x = left as f32;
-                baseline_y -= line_height;
-                prev = None;
-                is_first = true;
-                continue;
-            }
-
-            if ch == ' ' {
-                let base = font.glyph(' ');
-                let scaled = base.scaled(scale);
-                let advance = scaled.h_metrics().advance_width;
-                caret_x += advance;
-                continue;
-            }
-
-            let base = font.glyph(ch);
-            let base_id = base.id();
-
-            if let Some(prev_id) = prev {
-                caret_x += font.pair_kerning(scale, prev_id, base_id);
-            }
-
-            let scaled = base.scaled(scale);
-            let advance = scaled.h_metrics().advance_width;
-
+        // Glyphs without an outline (spaces) only advance the caret, which the layout did.
+        for glyph in layout
+            .glyphs
+            .iter()
+            .filter(|g| g.unpositioned().exact_bounding_box().is_some())
+        {
             // Posición de inicio para esta letra
-            let start_pos = Point::new(caret_x as f64, baseline_y as f64);
+            let start_pos = layout.glyph_origin(glyph);
 
             // Si no es la primera letra, mover a la nueva posición
             if !is_first {
@@ -1005,17 +977,17 @@ impl ToolpathGenerator {
             }
 
             // Crear builder para esta letra
+            let origin = glyph.position();
             let mut builder = ToolpathBuilder::new(
                 feed_rate,
                 spindle_speed,
-                start_pos, // Punto inicial
-                start_pos, // Offset
-                rotation_center,
-                text_shape.rotation,
+                start_pos,
+                &layout,
+                (f64::from(origin.x), f64::from(origin.y)),
             );
 
             // Construir el outline de la letra
-            scaled.build_outline(&mut builder);
+            glyph.unpositioned().build_outline(&mut builder);
 
             // Tomar los segmentos de la letra
             let letter_segments = builder.take_segments();
@@ -1038,8 +1010,6 @@ impl ToolpathGenerator {
                 last_position = first_point;
             }
 
-            caret_x += advance;
-            prev = Some(base_id);
             is_first = false;
         }
 
@@ -1677,26 +1647,27 @@ impl ToolpathGenerator {
     }
 }
 
-struct ToolpathBuilder {
+/// Collects one glyph's outline as toolpath segments in world mm.
+struct ToolpathBuilder<'a> {
     segments: Vec<ToolpathSegment>,
     current_point: Point,
     start_point: Point,
     started: bool,
     feed_rate: f64,
     spindle_speed: u32,
-    offset: Point,
-    rotation_center: Point,
-    rotation_deg: f64,
+    /// The text layout that maps layout space to world mm.
+    layout: &'a TextLayout,
+    /// The glyph's origin in layout space; outline points are relative to it.
+    glyph_origin: (f64, f64),
 }
 
-impl ToolpathBuilder {
+impl<'a> ToolpathBuilder<'a> {
     fn new(
         feed_rate: f64,
         spindle_speed: u32,
         initial_point: Point,
-        offset: Point,
-        rotation_center: Point,
-        rotation_deg: f64,
+        layout: &'a TextLayout,
+        glyph_origin: (f64, f64),
     ) -> Self {
         Self {
             segments: Vec::new(),
@@ -1705,9 +1676,8 @@ impl ToolpathBuilder {
             started: false,
             feed_rate,
             spindle_speed,
-            offset,
-            rotation_center,
-            rotation_deg,
+            layout,
+            glyph_origin,
         }
     }
 
@@ -1724,12 +1694,14 @@ impl ToolpathBuilder {
     }
 
     fn map_point(&self, x: f32, y: f32) -> Point {
-        let p = Point::new(x as f64 + self.offset.x, self.offset.y - y as f64);
-        rotate_point(p, self.rotation_center, -self.rotation_deg)
+        self.layout.to_world(
+            self.glyph_origin.0 + f64::from(x),
+            self.glyph_origin.1 + f64::from(y),
+        )
     }
 }
 
-impl OutlineBuilder for ToolpathBuilder {
+impl OutlineBuilder for ToolpathBuilder<'_> {
     fn move_to(&mut self, x: f32, y: f32) {
         let p = self.map_point(x, y);
         if !self.started {

@@ -6,6 +6,7 @@
 use egui_kittest::Harness;
 use egui_kittest::kittest::Queryable;
 use gcodekit5_designer::model::{DesignText, DesignerShape, Shape};
+use gcodekit5_designer::toolpath::{ToolpathGenerator, ToolpathSegment, ToolpathSegmentType};
 use gcodekit5_ui_egui::panes::designer::DesignerPane;
 use gcodekit5_ui_egui::panes::designer::canvas::DesignerTool;
 use gcodekit5_ui_egui::panes::designer::canvas::text_outline::text_path;
@@ -176,6 +177,67 @@ fn test_text_is_painted_as_glyph_outlines_inside_its_bounds() {
     // "A" has an outer and an inner contour, "g" at least one more.
     assert!(contours >= 3, "{contours} contours");
     assert!(text_path(&DesignText::new(" ".to_string(), 0.0, 0.0, 10.0)).is_none());
+}
+
+/// Rotated text with descenders is cut where it is painted: each contour of the G-code
+/// starts where the painter's matching contour starts, and each glyph's G-code origin is the
+/// layout's glyph origin (P2DES-3).
+#[test]
+fn test_rotated_text_gcode_glyphs_match_the_painted_glyphs() {
+    let mut text = DesignText::new("gyp".to_string(), 30.0, 20.0, 10.0);
+    text.font_family = "GCodeKit5 Bundled Fallback".to_string();
+    text.rotation = 30.0;
+
+    let painted: Vec<(f64, f64)> = text_path(&text)
+        .expect("glyphs")
+        .iter()
+        .filter_map(|event| match event {
+            lyon::path::Event::Begin { at } => Some((f64::from(at.x), f64::from(at.y))),
+            lyon::path::Event::Line { .. }
+            | lyon::path::Event::Quadratic { .. }
+            | lyon::path::Event::Cubic { .. }
+            | lyon::path::Event::End { .. } => None,
+        })
+        .collect();
+
+    let toolpaths = ToolpathGenerator::new().generate_text_toolpath(&text, 0.0);
+    let segments = &toolpaths.first().expect("a pass").segments;
+    let is_rapid = |s: &ToolpathSegment| s.segment_type == ToolpathSegmentType::RapidMove;
+    // A rapid followed by a cut starts a contour; a rapid followed by a rapid goes to the
+    // next glyph's origin.
+    let mut contour_starts = Vec::new();
+    let mut glyph_origins = Vec::new();
+    for pair in segments.windows(2) {
+        if is_rapid(&pair[0]) {
+            let end = (pair[0].end.x, pair[0].end.y);
+            if is_rapid(&pair[1]) {
+                glyph_origins.push(end);
+            } else {
+                contour_starts.push(end);
+            }
+        }
+    }
+
+    let near = |a: (f64, f64), b: (f64, f64)| (a.0 - b.0).hypot(a.1 - b.1) < 0.01;
+    assert_eq!(painted.len(), contour_starts.len());
+    for (p, g) in painted.iter().zip(&contour_starts) {
+        assert!(near(*p, *g), "painted {p:?} vs G-code {g:?}");
+    }
+
+    let layout = text.layout().expect("layout");
+    let expected: Vec<(f64, f64)> = layout
+        .glyphs
+        .iter()
+        .skip(1)
+        .map(|g| {
+            let o = layout.glyph_origin(g);
+            (o.x, o.y)
+        })
+        .collect();
+    assert_eq!(glyph_origins.len(), expected.len());
+    for (g, e) in glyph_origins.iter().zip(&expected) {
+        assert!(near(*g, *e), "G-code origin {g:?} vs layout {e:?}");
+    }
 }
 
 #[test]

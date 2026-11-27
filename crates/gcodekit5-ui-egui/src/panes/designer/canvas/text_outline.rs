@@ -1,18 +1,17 @@
 //! The outline of a text shape's glyphs, in world millimetres, for painting.
 //!
 //! The model's `DesignText::render` is only the text's bounding box. GTK draws the glyphs
-//! with Cairo; here they are the outlines of the font the model cuts with
-//! (`font_manager::get_font_for`), laid out as the model lays them out: the glyphs' box is
-//! centred on the text's point, then rotated about it (counter-clockwise positive).
+//! with Cairo; here they are the outlines of the font the model cuts with, placed by the
+//! model's one text layout (`DesignText::layout`), which the bounds and the G-code
+//! generator also use: the glyphs' box is centred on the text's point, then rotated about
+//! it (counter-clockwise positive).
 //!
-//! Dependencies: `rusttype` (glyph outlines), `lyon` (path), `gcodekit5-designer` (model,
-//! fonts).
+//! Dependencies: `rusttype` (glyph outlines), `lyon` (path), `gcodekit5-designer` (model).
 
-use gcodekit5_designer::font_manager;
 use gcodekit5_designer::model::DesignText;
 use lyon::math::{Point as LyonPoint, point};
 use lyon::path::Path;
-use rusttype::{OutlineBuilder, Scale};
+use rusttype::OutlineBuilder;
 
 /// Collects glyph outlines into a lyon path, mapping each layout point to world mm.
 struct Outline<F: Fn(f32, f32) -> LyonPoint> {
@@ -60,38 +59,15 @@ impl<F: Fn(f32, f32) -> LyonPoint> OutlineBuilder for Outline<F> {
 /// # Arguments
 /// * `text` - The text shape.
 pub fn text_path(text: &DesignText) -> Option<Path> {
-    let font = font_manager::get_font_for(&text.font_family, text.bold, text.italic);
-    let scale = Scale::uniform(text.font_size as f32);
-    let ascent = font.v_metrics(scale).ascent;
-    let glyphs: Vec<_> = font
-        .layout(&text.text, scale, rusttype::point(0.0, ascent))
-        .collect();
-    // The glyphs' box in layout space (Y down), as the model's bounds compute it.
-    let (mut x0, mut y0, mut x1, mut y1) = (f32::MAX, f32::MAX, f32::MIN, f32::MIN);
-    for glyph in &glyphs {
-        if let Some(bb) = glyph.unpositioned().exact_bounding_box() {
-            let p = glyph.position();
-            x0 = x0.min(p.x + bb.min.x);
-            y0 = y0.min(p.y + bb.min.y);
-            x1 = x1.max(p.x + bb.max.x);
-            y1 = y1.max(p.y + bb.max.y);
-        }
-    }
-    if x0 > x1 || y0 > y1 {
-        return None;
-    }
-    let (cx, cy) = ((x0 + x1) / 2.0, (y0 + y1) / 2.0);
-    let (sin, cos) = (text.rotation.to_radians() as f32).sin_cos();
-    let (ox, oy) = (text.x as f32, text.y as f32);
+    let layout = text.layout()?;
     let mut path = Path::builder();
-    for glyph in &glyphs {
+    for glyph in &layout.glyphs {
         let p = glyph.position();
         let mut outline = Outline {
             builder: path,
             map: |x: f32, y: f32| {
-                // Centre the box on the text's point, flip Y up, then rotate about it.
-                let (dx, dy) = (p.x + x - cx, cy - (p.y + y));
-                point(ox + dx * cos - dy * sin, oy + dx * sin + dy * cos)
+                let w = layout.to_world(f64::from(p.x + x), f64::from(p.y + y));
+                point(w.x as f32, w.y as f32)
             },
             open: false,
         };

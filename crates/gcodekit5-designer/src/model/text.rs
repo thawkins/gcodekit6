@@ -11,7 +11,7 @@ use serde::{Deserialize, Serialize};
 use csgrs::sketch::Sketch;
 use csgrs::traits::CSG;
 use nalgebra::{Matrix4, Vector3};
-use rusttype::{Scale, point as rt_point};
+use rusttype::{PositionedGlyph, Scale, point as rt_point};
 
 use super::{DesignerShape, LaserParams, Point, Property, PropertyValue};
 use crate::font_manager;
@@ -29,6 +29,51 @@ pub struct DesignText {
     pub laser_params: LaserParams,
 }
 
+/// The laid-out glyphs of a [`DesignText`] and the map from layout space to world mm.
+///
+/// Built by [`DesignText::layout`]. Layout space is `rusttype`'s: millimetres, Y down,
+/// the first line's top at y = 0. A glyph's outline point `(x, y)` (relative to the glyph
+/// origin) lies at layout point `glyph.position() + (x, y)`.
+#[derive(Debug, Clone)]
+pub struct TextLayout {
+    /// The glyphs in layout order, positioned in layout space.
+    pub glyphs: Vec<PositionedGlyph<'static>>,
+    /// Width of the glyphs' ink box, mm.
+    pub width: f64,
+    /// Height of the glyphs' ink box, mm.
+    pub height: f64,
+    /// Centre of the ink box in layout space.
+    centre: (f64, f64),
+    /// The text's point in world mm, where the ink box centre lands.
+    origin: (f64, f64),
+    sin: f64,
+    cos: f64,
+}
+
+impl TextLayout {
+    /// Maps a layout-space point (Y down) to world millimetres (Y up): the ink box centre
+    /// goes to the text's point, then the point is rotated about it counter-clockwise.
+    ///
+    /// # Arguments
+    /// * `x`, `y` - The layout-space point.
+    pub fn to_world(&self, x: f64, y: f64) -> Point {
+        let (dx, dy) = (x - self.centre.0, self.centre.1 - y);
+        Point::new(
+            self.origin.0 + dx * self.cos - dy * self.sin,
+            self.origin.1 + dx * self.sin + dy * self.cos,
+        )
+    }
+
+    /// The world position of glyph `glyph`'s origin (its pen position on the baseline).
+    ///
+    /// # Arguments
+    /// * `glyph` - A glyph of this layout.
+    pub fn glyph_origin(&self, glyph: &PositionedGlyph<'_>) -> Point {
+        let p = glyph.position();
+        self.to_world(f64::from(p.x), f64::from(p.y))
+    }
+}
+
 impl DesignText {
     pub fn new(text: String, x: f64, y: f64, font_size: f64) -> Self {
         Self {
@@ -44,42 +89,61 @@ impl DesignText {
         }
     }
 
-    /// Calcula el bounding box del texto asumiendo que (x, y) es el CENTRO.
-    fn calculate_bounds(&self) -> (f64, f64, f64, f64) {
+    /// Lays out the text's glyphs: the one layout the canvas painter, the bounds and the
+    /// G-code generator all use, so what is cut is what is drawn.
+    ///
+    /// Each line is laid out by `rusttype` (with kerning) from x = 0; line `i` has its
+    /// baseline at `ascent + i * (ascent - descent + line_gap)` (layout space, Y down).
+    /// The glyphs' ink box is centred on `(x, y)` and rotated about it, counter-clockwise
+    /// positive, like every other shape.
+    ///
+    /// # Returns
+    /// The layout, or `None` when no glyph has an outline (empty or blank text).
+    pub fn layout(&self) -> Option<TextLayout> {
         let font = font_manager::get_font_for(&self.font_family, self.bold, self.italic);
         let scale = Scale::uniform(self.font_size as f32);
         let v_metrics = font.v_metrics(scale);
+        let line_advance = v_metrics.ascent - v_metrics.descent + v_metrics.line_gap;
 
-        let start = rt_point(0.0, v_metrics.ascent);
-        let glyphs: Vec<_> = font.layout(&self.text, scale, start).collect();
+        let glyphs: Vec<PositionedGlyph<'static>> = self
+            .text
+            .split('\n')
+            .enumerate()
+            .flat_map(|(i, line)| {
+                let baseline = v_metrics.ascent + i as f32 * line_advance;
+                font.layout(line, scale, rt_point(0.0, baseline))
+            })
+            .collect();
 
-        if glyphs.is_empty() {
-            let approx_width = self.text.len() as f64 * self.font_size * 0.6;
-            let height = self.font_size;
-            return (
-                self.x - approx_width / 2.0,
-                self.y - height / 2.0,
-                self.x + approx_width / 2.0,
-                self.y + height / 2.0,
-            );
-        }
-
-        let mut min_x = f32::MAX;
-        let mut min_y = f32::MAX;
-        let mut max_x = f32::MIN;
-        let mut max_y = f32::MIN;
-
+        let (mut x0, mut y0, mut x1, mut y1) = (f32::MAX, f32::MAX, f32::MIN, f32::MIN);
         for glyph in &glyphs {
             if let Some(bb) = glyph.unpositioned().exact_bounding_box() {
                 let pos = glyph.position();
-                min_x = min_x.min(pos.x + bb.min.x);
-                min_y = min_y.min(pos.y + bb.min.y);
-                max_x = max_x.max(pos.x + bb.max.x);
-                max_y = max_y.max(pos.y + bb.max.y);
+                x0 = x0.min(pos.x + bb.min.x);
+                y0 = y0.min(pos.y + bb.min.y);
+                x1 = x1.max(pos.x + bb.max.x);
+                y1 = y1.max(pos.y + bb.max.y);
             }
         }
+        if x0 > x1 || y0 > y1 {
+            return None;
+        }
 
-        if !min_x.is_finite() || !max_x.is_finite() || !min_y.is_finite() || !max_y.is_finite() {
+        let (sin, cos) = self.rotation.to_radians().sin_cos();
+        Some(TextLayout {
+            glyphs,
+            width: f64::from(x1 - x0),
+            height: f64::from(y1 - y0),
+            centre: (f64::from(x0 + x1) / 2.0, f64::from(y0 + y1) / 2.0),
+            origin: (self.x, self.y),
+            sin,
+            cos,
+        })
+    }
+
+    /// Calcula el bounding box del texto asumiendo que (x, y) es el CENTRO.
+    fn calculate_bounds(&self) -> (f64, f64, f64, f64) {
+        let Some(layout) = self.layout() else {
             let approx_width = self.text.len() as f64 * self.font_size * 0.6;
             let height = self.font_size;
             return (
@@ -88,11 +152,11 @@ impl DesignText {
                 self.x + approx_width / 2.0,
                 self.y + height / 2.0,
             );
-        }
+        };
 
         // Ancho y alto reales del bloque de glifos (rusttype, Y-down).
-        let rel_width = (max_x - min_x) as f64;
-        let rel_height = (max_y - min_y) as f64;
+        let rel_width = layout.width;
+        let rel_height = layout.height;
 
         // Centrar el AABB real en (self.x, self.y) en coords canvas (Y-up).
         // No importa dónde esté la baseline: el bloque de glifos (su AABB)
