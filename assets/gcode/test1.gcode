@@ -1,6 +1,6 @@
 ; Laser Vector Engraving G-code
 ; Generated: 2025-12-20 11:21:51 UTC
-; Input file: /home/thawkins/Projects/gcodekit5/assets/svg/tigershead.svg
+; Input file: /home/thawkins/Projects/gcodekit6/assets/svg/tigershead.svg
 ; File type: SVG
 ; Feed rate: 600 mm/min
 ; Travel rate: 3000 mm/min

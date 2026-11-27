@@ -1,5 +1,5 @@
 {
-    "name": "GCodeKit5 Development",
+    "name": "GCodeKit6 Development",
     "build": {
         "dockerfile": "Containerfile",
         "context": ".."

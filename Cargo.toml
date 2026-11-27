@@ -1,14 +1,14 @@
 [workspace]
 members = [
-    "crates/gcodekit5-core",
-    "crates/gcodekit5-communication",
-    "crates/gcodekit5-camtools",
-    "crates/gcodekit5-designer",
-    "crates/gcodekit5-visualizer",
-    "crates/gcodekit5-settings",
-    "crates/gcodekit5-devicedb",
-    "crates/gcodekit5-app",
-    "crates/gcodekit5-ui-egui",
+    "crates/gcodekit6-core",
+    "crates/gcodekit6-communication",
+    "crates/gcodekit6-camtools",
+    "crates/gcodekit6-designer",
+    "crates/gcodekit6-visualizer",
+    "crates/gcodekit6-settings",
+    "crates/gcodekit6-devicedb",
+    "crates/gcodekit6-app",
+    "crates/gcodekit6-ui-egui",
 ]
 resolver = "2"
 
@@ -53,7 +53,7 @@ craft-quit = { git = "https://github.com/storytold/craft-libs", rev = "d15bf1f35
 craft-settings = { git = "https://github.com/storytold/craft-libs", rev = "d15bf1f35b17b759870f9e5111b9a5d243f64888" }
 
 [package]
-name = "gcodekit5-design"
+name = "gcodekit6-design"
 autotests = false
 version.workspace = true
 edition.workspace = true
@@ -69,7 +69,7 @@ workspace = true
 # The binary keeps the product name that the release workflow, the
 # Windows installer, the flatpak and the desktop file expect.
 [[bin]]
-name = "gcodekit5"
+name = "gcodekit6"
 path = "src/main.rs"
 
 [profile.release]
@@ -81,7 +81,7 @@ codegen-units = 1
 opt-level = 1
 
 [dependencies]
-gcodekit5-ui-egui = { path = "crates/gcodekit5-ui-egui" }
+gcodekit6-ui-egui = { path = "crates/gcodekit6-ui-egui" }
 
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
 anyhow = { workspace = true }
@@ -94,16 +94,16 @@ depends = "$auto, libxkbcommon-x11-0, libvulkan1 | libegl1"
 section = "utility"
 priority = "optional"
 assets = [
-    ["target/release/gcodekit5", "usr/bin/", "755"],
-    ["assets/pictures/com.github.thawkins.gcodekit5.png", "usr/share/icons/hicolor/256x256/apps/com.github.thawkins.gcodekit5.png", "644"],
-    ["flatpak/com.github.thawkins.gcodekit5.desktop", "usr/share/applications/com.github.thawkins.gcodekit5.desktop", "644"],
+    ["target/release/gcodekit6", "usr/bin/", "755"],
+    ["assets/pictures/com.github.thawkins.gcodekit6.png", "usr/share/icons/hicolor/256x256/apps/com.github.thawkins.gcodekit6.png", "644"],
+    ["flatpak/com.github.thawkins.gcodekit6.desktop", "usr/share/applications/com.github.thawkins.gcodekit6.desktop", "644"],
 ]
 
 [package.metadata.generate-rpm]
 assets = [
-    { source = "target/release/gcodekit5", dest = "/usr/bin/gcodekit5", mode = "755" },
-    { source = "assets/pictures/com.github.thawkins.gcodekit5.png", dest = "/usr/share/icons/hicolor/256x256/apps/com.github.thawkins.gcodekit5.png", mode = "644" },
-    { source = "flatpak/com.github.thawkins.gcodekit5.desktop", dest = "/usr/share/applications/com.github.thawkins.gcodekit5.desktop", mode = "644" },
+    { source = "target/release/gcodekit6", dest = "/usr/bin/gcodekit6", mode = "755" },
+    { source = "assets/pictures/com.github.thawkins.gcodekit6.png", dest = "/usr/share/icons/hicolor/256x256/apps/com.github.thawkins.gcodekit6.png", mode = "644" },
+    { source = "flatpak/com.github.thawkins.gcodekit6.desktop", dest = "/usr/share/applications/com.github.thawkins.gcodekit6.desktop", mode = "644" },
 ]
 
 # Libraries winit and wgpu dlopen at run time (not in the ELF NEEDED list, so

@@ -2,7 +2,7 @@
 
 use std::ffi::OsString;
 
-use gcodekit5_design::{CliAction, HELP_TEXT, parse_args, version_line};
+use gcodekit6_design::{CliAction, HELP_TEXT, parse_args, version_line};
 
 fn args(list: &[&str]) -> Vec<OsString> {
     list.iter().map(OsString::from).collect()
@@ -13,7 +13,7 @@ fn test_cli_args_version_flag() {
     assert_eq!(parse_args(args(&["--version"])), CliAction::PrintVersion);
     assert_eq!(
         version_line(),
-        format!("gcodekit5 {}", env!("CARGO_PKG_VERSION"))
+        format!("gcodekit6 {}", env!("CARGO_PKG_VERSION"))
     );
 }
 
@@ -22,7 +22,7 @@ fn test_cli_args_help_flags() {
     assert_eq!(parse_args(args(&["--help"])), CliAction::PrintHelp);
     assert_eq!(parse_args(args(&["-h"])), CliAction::PrintHelp);
     assert_eq!(parse_args(args(&["part.nc", "-h"])), CliAction::PrintHelp);
-    assert!(HELP_TEXT.contains("gcodekit5 [FILE...]"));
+    assert!(HELP_TEXT.contains("gcodekit6 [FILE...]"));
     assert!(HELP_TEXT.contains("--help") && HELP_TEXT.contains("--version"));
 }
 

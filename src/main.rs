@@ -5,7 +5,7 @@
     windows_subsystem = "windows"
 )]
 
-use gcodekit5_design::{CliAction, HELP_TEXT, init_logging, parse_args, version_line};
+use gcodekit6_design::{CliAction, HELP_TEXT, init_logging, parse_args, version_line};
 
 #[cfg_attr(test, mutants::skip)]
 fn main() -> anyhow::Result<()> {
@@ -26,7 +26,7 @@ fn main() -> anyhow::Result<()> {
     init_logging()?;
 
     // Launch the egui + craft-libs front end, opening any files named on the command line.
-    gcodekit5_ui_egui::run(gcodekit5_ui_egui::LaunchOptions {
+    gcodekit6_ui_egui::run(gcodekit6_ui_egui::LaunchOptions {
         files: files.into_iter().map(Into::into).collect(),
     })?;
 

@@ -1,10 +1,10 @@
-# GCodeKit5 Development Container
+# GCodeKit6 Development Container
 # Uses Podman-compatible Containerfile (also works with Docker)
 
 FROM fedora:40
 
-LABEL maintainer="GCodeKit5 Development Team"
-LABEL description="Development environment for GCodeKit5 - Rust + egui"
+LABEL maintainer="GCodeKit6 Development Team"
+LABEL description="Development environment for GCodeKit6 - Rust + egui"
 
 # Install system dependencies
 RUN dnf update -y && dnf install -y \

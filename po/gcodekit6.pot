@@ -1,0 +1,4719 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the GCodeKit6 package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: GCodeKit6 2.0.0-alpha.5\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-11-11 07:12+0700\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid "Measurement System"
+msgstr ""
+
+msgid "Units for display and input (Metric/mm or Imperial/inch)"
+msgstr ""
+
+msgid "Feed Rate Units"
+msgstr ""
+
+msgid "Units for feed rate display and input"
+msgstr ""
+
+msgid "Default Directory"
+msgstr ""
+
+msgid "Default directory for file operations"
+msgstr ""
+
+msgid "Theme"
+msgstr ""
+
+msgid "Application color theme (Light, Dark, or System default)"
+msgstr ""
+
+msgid "Language"
+msgstr ""
+
+msgid "User interface language (requires restart)"
+msgstr ""
+
+msgid "Startup Tab"
+msgstr ""
+
+msgid "Tab to show when application starts"
+msgstr ""
+
+msgid "Show About on Startup"
+msgstr ""
+
+msgid "Show the About dialog for 15 seconds when the application starts"
+msgstr ""
+
+msgid "Grid Major Line Width (px)"
+msgstr ""
+
+msgid "Thickness in pixels for coarse grid lines (default: 2)"
+msgstr ""
+
+msgid "Grid Minor Line Width (px)"
+msgstr ""
+
+msgid "Thickness in pixels for fine grid lines (default: 1)"
+msgstr ""
+
+msgid "Preserve Comments"
+msgstr ""
+
+msgid "Keep G-code comments during file processing"
+msgstr ""
+
+msgid "the machine must be idle"
+msgstr ""
+
+msgid "Language saved"
+msgstr ""
+
+msgid ""
+"A job is running. The new language will be used the next time GCodeKit6 "
+"starts."
+msgstr ""
+
+msgid "Restart to change language?"
+msgstr ""
+
+msgid ""
+"GCodeKit6 must restart to use the new language. The machine connection will "
+"be closed. Restart now?"
+msgstr ""
+
+msgid "GCodeKit6"
+msgstr ""
+
+msgid "New 2D"
+msgstr ""
+
+msgid "New 3D"
+msgstr ""
+
+msgid "Open"
+msgstr ""
+
+msgid "Save"
+msgstr ""
+
+msgid "Save As..."
+msgstr ""
+
+msgid "Import"
+msgstr ""
+
+msgid "Import Image..."
+msgstr ""
+
+msgid "Export G-Code..."
+msgstr ""
+
+msgid "Export SVG..."
+msgstr ""
+
+msgid "Run"
+msgstr ""
+
+msgid "Quit"
+msgstr ""
+
+msgid "File"
+msgstr ""
+
+msgid "Undo"
+msgstr ""
+
+msgid "Redo"
+msgstr ""
+
+#. Edit - only show items that are actionable
+msgid "Cut"
+msgstr ""
+
+msgid "Copy"
+msgstr ""
+
+msgid "Paste"
+msgstr ""
+
+msgid "Preferences"
+msgstr ""
+
+msgid "Edit"
+msgstr ""
+
+msgid "Connect"
+msgstr ""
+
+msgid "Disconnect"
+msgstr ""
+
+msgid "Home"
+msgstr ""
+
+msgid "Reset"
+msgstr ""
+
+msgid "Machine"
+msgstr ""
+
+msgid "Documentation"
+msgstr ""
+
+msgid "About"
+msgstr ""
+
+#. Título
+msgid "Help"
+msgstr ""
+
+#. ==========================================
+#. AÑADIR PESTAÑAS AL STACK (ORDEN)
+#. ==========================================
+#. 1. Diseñador
+msgid "Designer"
+msgstr ""
+
+#. 2. Visualizador
+msgid "Visualizer"
+msgstr ""
+
+msgid "Machine Control"
+msgstr ""
+
+#. 4. Herramientas CAM
+msgid "CAM Tools"
+msgstr ""
+
+msgid "Device Manager"
+msgstr ""
+
+msgid "Device Config"
+msgstr ""
+
+#. 7. Herramientas CNC
+msgid "CNC Tools"
+msgstr ""
+
+msgid "Materials"
+msgstr ""
+
+msgid "CNC Device"
+msgstr ""
+
+msgid "Unknown"
+msgstr ""
+
+msgid "No G-code to run"
+msgstr ""
+
+msgid "Generate or open G-code before using Run."
+msgstr ""
+
+msgid "No motion commands found"
+msgstr ""
+
+msgid "The loaded G-code has no G0/G1/G2/G3 movement to preview."
+msgstr ""
+
+msgid "No preview trajectory generated"
+msgstr ""
+
+msgid "Run could not build a visible preview path from the current G-code."
+msgstr ""
+
+msgid "GCode Toolkit for CNC/Laser Machines"
+msgstr ""
+
+msgid ""
+"Tim Hawkins and GCodeKit Contributors: \n"
+" (feveal)"
+msgstr ""
+
+msgid "Settings could not be loaded"
+msgstr ""
+
+msgid ""
+"Default settings are in use. The settings file will be backed up before it "
+"is replaced."
+msgstr ""
+
+msgid "Laser Image Engraver"
+msgstr ""
+
+msgid ""
+"Convert bitmap images to G-code for laser engraving. Supports various "
+"halftoning methods and image transformations."
+msgstr ""
+
+msgid "No image selected"
+msgstr ""
+
+#. Widgets
+msgid "Width:"
+msgstr ""
+
+#. Groups
+msgid "Image File"
+msgstr ""
+
+msgid "Image Path:"
+msgstr ""
+
+msgid "Browse..."
+msgstr ""
+
+msgid "Output Settings"
+msgstr ""
+
+#. Feed Rate
+msgid "Feed Rate:"
+msgstr ""
+
+#. Travel Rate
+msgid "Travel Rate:"
+msgstr ""
+
+msgid "Laser Power"
+msgstr ""
+
+msgid "Min Power (%):"
+msgstr ""
+
+msgid "Max Power (%):"
+msgstr ""
+
+msgid "Power Scale (S):"
+msgstr ""
+
+msgid "Scanning"
+msgstr ""
+
+msgid "Scan Direction:"
+msgstr ""
+
+msgid "Pixels per mm:"
+msgstr ""
+
+msgid "Line Spacing:"
+msgstr ""
+
+#. Bidirectional
+msgid "Bidirectional:"
+msgstr ""
+
+msgid "Image Transformations"
+msgstr ""
+
+msgid ""
+"Off (default): dark areas get more laser power, so a photo engraves as a "
+"positive. On: engrave the light areas instead (negative)."
+msgstr ""
+
+#. Invert
+msgid "Invert:"
+msgstr ""
+
+msgid "Engrave light areas instead of dark ones"
+msgstr ""
+
+msgid "Mirror X:"
+msgstr ""
+
+msgid "Mirror Y:"
+msgstr ""
+
+msgid "Rotation:"
+msgstr ""
+
+msgid "Halftoning"
+msgstr ""
+
+msgid "Method:"
+msgstr ""
+
+msgid "Dot Size:"
+msgstr ""
+
+msgid "Threshold:"
+msgstr ""
+
+msgid "Work Offsets"
+msgstr ""
+
+msgid "Home Device Before Start"
+msgstr ""
+
+msgid ""
+"Runs $H, then engraves from the G54 work zero you set. The engraver never "
+"moves Z."
+msgstr ""
+
+msgid "Load"
+msgstr ""
+
+msgid "Cancel"
+msgstr ""
+
+msgid "Generate"
+msgstr ""
+
+msgid "Select Image"
+msgstr ""
+
+msgid "No Image Selected"
+msgstr ""
+
+msgid "Please select an image file first."
+msgstr ""
+
+msgid "Generating Engraving"
+msgstr ""
+
+msgid "Processing image..."
+msgstr ""
+
+msgid "Loading image..."
+msgstr ""
+
+msgid "Generating G-code..."
+msgstr ""
+
+msgid "Finalizing..."
+msgstr ""
+
+msgid "Engraving Generation Failed"
+msgstr ""
+
+msgid "Failed to generate engraving"
+msgstr ""
+
+msgid "Save Error"
+msgstr ""
+
+msgid "Save Parameters"
+msgstr ""
+
+msgid "Load Parameters"
+msgstr ""
+
+msgid "Load Error"
+msgstr ""
+
+msgid "E-STOP"
+msgstr ""
+
+msgid "Emergency stop (soft reset Ctrl-X)"
+msgstr ""
+
+msgid "Emergency stop"
+msgstr ""
+
+msgid "Jigsaw Puzzle Generator"
+msgstr ""
+
+msgid ""
+"Create custom jigsaw puzzle patterns from images or blank material. Features "
+"Draradech's algorithm for unique pieces."
+msgstr ""
+
+msgid "Height:"
+msgstr ""
+
+msgid "Corner Radius:"
+msgstr ""
+
+msgid "Puzzle Dimensions"
+msgstr ""
+
+msgid "Grid Configuration"
+msgstr ""
+
+msgid "Pieces Across:"
+msgstr ""
+
+msgid "Pieces Down:"
+msgstr ""
+
+msgid "Puzzle Parameters"
+msgstr ""
+
+msgid "Tab Size (%):"
+msgstr ""
+
+msgid "Jitter (%):"
+msgstr ""
+
+msgid "Random Seed:"
+msgstr ""
+
+msgid "Generating Puzzle"
+msgstr ""
+
+msgid "Generating puzzle pieces..."
+msgstr ""
+
+msgid "Cancelled by user"
+msgstr ""
+
+msgid "Puzzle Generation Failed"
+msgstr ""
+
+msgid "Failed to generate puzzle"
+msgstr ""
+
+msgid "Create custom jigsaw puzzle patterns from images"
+msgstr ""
+
+msgid "Tabbed Box Maker"
+msgstr ""
+
+msgid "Generate G-code for laser/CNC cut boxes with finger joints"
+msgstr ""
+
+msgid "Convert raster images to G-code for laser engraving"
+msgstr ""
+
+msgid "Speeds and Feeds Calculator"
+msgstr ""
+
+msgid "Calculate cutting speeds and feeds for your materials"
+msgstr ""
+
+msgid "Spoilboard Surfacing"
+msgstr ""
+
+msgid "Generate surfacing toolpaths to flatten your spoilboard"
+msgstr ""
+
+msgid "Create Spoilboard Grid"
+msgstr ""
+
+msgid "Generate grid patterns for spoilboard alignment"
+msgstr ""
+
+msgid "Gerber to G-Code"
+msgstr ""
+
+msgid "Convert Gerber files to G-Code for PCB milling"
+msgstr ""
+
+msgid "Drill Press"
+msgstr ""
+
+msgid "Emulate a drill press with peck drilling and helical cycles"
+msgstr ""
+
+msgid "Probe Tools"
+msgstr ""
+
+msgid ""
+"Touch probe routines for WCS setup: Z-touch, edge find, corner find, bore/"
+"boss center, tool length"
+msgstr ""
+
+msgid "Select a tool"
+msgstr ""
+
+msgid "Choose a tool from the list to see details."
+msgstr ""
+
+msgid ""
+"Configure and run touch probe routines for work coordinate setup. Includes Z-"
+"touch, edge find, corner find, bore/boss center, and tool length measurement."
+msgstr ""
+
+msgid "Device connection required to use Probe Tools"
+msgstr ""
+
+msgid "Generate G-code"
+msgstr ""
+
+msgid "Probe"
+msgstr ""
+
+msgid "Invalid Parameters"
+msgstr ""
+
+msgid "Probe Generation Error"
+msgstr ""
+
+msgid "Save Probe Preset"
+msgstr ""
+
+msgid "Load Probe Preset"
+msgstr ""
+
+msgid "The machine is not connected."
+msgstr ""
+
+msgid "A probe run is still in progress."
+msgstr ""
+
+msgid "A job is running."
+msgstr ""
+
+msgid "A quick probe from the machine panel is in progress."
+msgstr ""
+
+msgid "The machine must be Idle"
+msgstr ""
+
+msgid "Machine control is not available."
+msgstr ""
+
+msgid "The device console is needed to read probe reports."
+msgstr ""
+
+msgid "Cannot Probe"
+msgstr ""
+
+msgid "The probe program was not started."
+msgstr ""
+
+msgid "Probing"
+msgstr ""
+
+msgid "Probe aborted: the machine was disconnected."
+msgstr ""
+
+msgid "Controller reported"
+msgstr ""
+
+msgid "Probe failed"
+msgstr ""
+
+msgid ""
+"Clear any alarm ($X); absolute mode (G90) is restored once the machine is "
+"Idle."
+msgstr ""
+
+msgid "Apply to WCS"
+msgstr ""
+
+msgid "Run a probe first."
+msgstr ""
+
+msgid "Cannot Apply"
+msgstr ""
+
+#. Add active machine name to status bar
+msgid "No device selected"
+msgstr ""
+
+msgid "Calculated Results"
+msgstr ""
+
+msgid "Spindle Speed (RPM):"
+msgstr ""
+
+msgid "Feed Rate (mm/min):"
+msgstr ""
+
+msgid "Surface Speed (SFM):"
+msgstr ""
+
+msgid "Chip Load (mm/tooth):"
+msgstr ""
+
+msgid "MRR (mm³/min):"
+msgstr ""
+
+msgid "Power (W):"
+msgstr ""
+
+msgid "Est. Deflection (mm):"
+msgstr ""
+
+#. Warnings Section
+msgid "Warnings"
+msgstr ""
+
+msgid "No warnings"
+msgstr ""
+
+msgid "Active Device"
+msgstr ""
+
+msgid "Device:"
+msgstr ""
+
+msgid "Loading..."
+msgstr ""
+
+msgid "Max RPM:"
+msgstr ""
+
+msgid "Spindle Power:"
+msgstr ""
+
+msgid "Max Feed Rate:"
+msgstr ""
+
+#. Selection Group
+msgid "Selections"
+msgstr ""
+
+#. Tool Selection Row
+msgid "Select Tool..."
+msgstr ""
+
+msgid "No tool selected"
+msgstr ""
+
+msgid "Tool:"
+msgstr ""
+
+#. Material Selection Row
+msgid "Select Material..."
+msgstr ""
+
+msgid "No material selected"
+msgstr ""
+
+msgid "Material:"
+msgstr ""
+
+#. Operation Group
+msgid "Operation"
+msgstr ""
+
+msgid "Slotting"
+msgstr ""
+
+msgid "Pocketing"
+msgstr ""
+
+msgid "Profiling"
+msgstr ""
+
+msgid "Adaptive / HSM"
+msgstr ""
+
+msgid "Drilling"
+msgstr ""
+
+msgid "Plunging"
+msgstr ""
+
+msgid "Operation Type:"
+msgstr ""
+
+msgid "Cutting Parameters"
+msgstr ""
+
+msgid "Depth of Cut (mm):"
+msgstr ""
+
+msgid "0 = Use operation default"
+msgstr ""
+
+msgid "Stepover (mm):"
+msgstr ""
+
+msgid "Tool Stick-out (mm):"
+msgstr ""
+
+#. Options Group
+msgid "Options"
+msgstr ""
+
+#. Coolant - disabled if device doesn't support coolant
+msgid "Coolant Enabled"
+msgstr ""
+
+msgid "Device does not support coolant"
+msgstr ""
+
+msgid "Coolant:"
+msgstr ""
+
+#. Conservative calculation - default to ON (true)
+msgid "Conservative Calculation"
+msgstr ""
+
+msgid "Safety Factor:"
+msgstr ""
+
+msgid "Reduce calculated values by 20%"
+msgstr ""
+
+msgid "Calculate"
+msgstr ""
+
+msgid ""
+"The active device does not have a spindle configured. Please configure a "
+"spindle in the Device Manager."
+msgstr ""
+
+msgid "No Spindle Configured"
+msgstr ""
+
+msgid "Spindle Configuration Required"
+msgstr ""
+
+msgid "Select Tool"
+msgstr ""
+
+msgid "Select"
+msgstr ""
+
+msgid "Search tools..."
+msgstr ""
+
+msgid "No tools available"
+msgstr ""
+
+msgid "Add tools in the CNC Tools manager"
+msgstr ""
+
+msgid "Select Material"
+msgstr ""
+
+msgid "Search materials..."
+msgstr ""
+
+msgid "All Categories"
+msgstr ""
+
+msgid "Metals"
+msgstr ""
+
+msgid "Wood"
+msgstr ""
+
+msgid "Plastics"
+msgstr ""
+
+msgid "Composites"
+msgstr ""
+
+msgid "No materials available"
+msgstr ""
+
+msgid "Add materials in the Materials manager"
+msgstr ""
+
+msgid ""
+"Generate G-code for laser/CNC cut boxes with finger joints based on the "
+"boxes.py algorithm. For more cases involving boxes and other objects, it is "
+"recommended to use the "
+msgstr ""
+
+msgid "Boxes"
+msgstr ""
+
+msgid ""
+". Install the Extension in Inkscape. There, generate the models and save "
+"them as SVG files. Then import the SVG file into the Designer, rearrange the "
+"objects as needed, and generate the G-code to send to the machine."
+msgstr ""
+
+msgid "X (Width):"
+msgstr ""
+
+msgid "Y (Depth):"
+msgstr ""
+
+msgid "H (Height):"
+msgstr ""
+
+msgid "Thickness:"
+msgstr ""
+
+msgid "Burn / Tool Dia:"
+msgstr ""
+
+msgid "Play (fit tolerance):"
+msgstr ""
+
+msgid "Extra Length:"
+msgstr ""
+
+msgid "Full Box"
+msgstr ""
+
+msgid "No Top"
+msgstr ""
+
+msgid "No Bottom"
+msgstr ""
+
+msgid "No Sides"
+msgstr ""
+
+msgid "No Front/Back"
+msgstr ""
+
+msgid "No Left/Right"
+msgstr ""
+
+msgid "Finger Style:"
+msgstr ""
+
+msgid "Rectangular"
+msgstr ""
+
+msgid "Springs"
+msgstr ""
+
+msgid "Barbs"
+msgstr ""
+
+msgid "Snap Fit"
+msgstr ""
+
+msgid "Walls and Floor"
+msgstr ""
+
+msgid "Walls Only"
+msgstr ""
+
+msgid "Floor Only"
+msgstr ""
+
+msgid "None"
+msgstr ""
+
+msgid "Z Step Down:"
+msgstr ""
+
+msgid "Offset X:"
+msgstr ""
+
+msgid "Offset Y:"
+msgstr ""
+
+msgid "Box Dimensions"
+msgstr ""
+
+msgid "Outside Dims:"
+msgstr ""
+
+msgid "Box Configuration"
+msgstr ""
+
+msgid "Box Type:"
+msgstr ""
+
+msgid "Dividers X:"
+msgstr ""
+
+msgid "Dividers Y:"
+msgstr ""
+
+msgid "Divider Keying:"
+msgstr ""
+
+msgid "Optimize Layout:"
+msgstr ""
+
+msgid "Material Settings"
+msgstr ""
+
+msgid "Finger Joint Settings (multiples of thickness)"
+msgstr ""
+
+msgid "Finger Width:"
+msgstr ""
+
+msgid "Space Width:"
+msgstr ""
+
+msgid "Laser Settings"
+msgstr ""
+
+#. Passes
+msgid "Passes:"
+msgstr ""
+
+msgid "Power (S):"
+msgstr ""
+
+msgid "Work Origin Offsets"
+msgstr ""
+
+msgid ""
+"Runs $H, then cuts from the G54 work zero you set. Travel/retract moves then "
+"use machine Z-1 (G53), never above the homed position. Off: uses the work "
+"zero you set."
+msgstr ""
+
+msgid "Generate Shapes"
+msgstr ""
+
+msgid "Generating Box"
+msgstr ""
+
+msgid "Generating box panels..."
+msgstr ""
+
+msgid "Close"
+msgstr ""
+
+msgid "No"
+msgstr ""
+
+msgid "Yes"
+msgstr ""
+
+#. `Ok` and any future variant of this non-exhaustive GTK enum.
+msgid "OK"
+msgstr ""
+
+#. / Setting categories offered by the category filter (also the filter ids).
+
+#. /
+
+#. / Each is marked with `n_!` so it is extracted for translation: the labels
+
+#. / are translated through a variable (`t!(*category)`), which `xgettext`
+
+#. / cannot follow.
+
+msgid "All"
+msgstr ""
+
+msgid "System"
+msgstr ""
+
+msgid "Motion"
+msgstr ""
+
+msgid "Steps Per Unit"
+msgstr ""
+
+msgid "Max Rate"
+msgstr ""
+
+msgid "Acceleration"
+msgstr ""
+
+msgid "Max Travel"
+msgstr ""
+
+msgid "Homing"
+msgstr ""
+
+msgid "Spindle"
+msgstr ""
+
+msgid "Network"
+msgstr ""
+
+msgid "Drivers"
+msgstr ""
+
+msgid "Tool"
+msgstr ""
+
+msgid "I/O"
+msgstr ""
+
+msgid "Startup"
+msgstr ""
+
+msgid "Plasma"
+msgstr ""
+
+msgid "Encoder"
+msgstr ""
+
+msgid "Modbus"
+msgstr ""
+
+msgid "RS485"
+msgstr ""
+
+msgid "Other"
+msgstr ""
+
+msgid "Retrieve"
+msgstr ""
+
+msgid "Retrieve Settings from Device ($$)"
+msgstr ""
+
+msgid "Save Settings to File"
+msgstr ""
+
+msgid "Load Settings from File"
+msgstr ""
+
+msgid "Restore"
+msgstr ""
+
+msgid "Restore Settings to Device"
+msgstr ""
+
+msgid "Filter:"
+msgstr ""
+
+msgid "Search settings..."
+msgstr ""
+
+msgid "Category:"
+msgstr ""
+
+msgid "ID"
+msgstr ""
+
+#. Compact info rows
+msgid "Name"
+msgstr ""
+
+msgid "Value"
+msgstr ""
+
+msgid "Unit"
+msgstr ""
+
+msgid "Category"
+msgstr ""
+
+msgid "Description"
+msgstr ""
+
+msgid "Not connected"
+msgstr ""
+
+msgid "settings"
+msgstr ""
+
+msgid "Connected - settings loaded"
+msgstr ""
+
+msgid "Connected - loading settings..."
+msgstr ""
+
+msgid "Cannot retrieve settings:"
+msgstr ""
+
+msgid "Retrieving settings from device..."
+msgstr ""
+
+msgid "Error sending $$:"
+msgstr ""
+
+msgid "Settings retrieved from device:"
+msgstr ""
+
+msgid "Not connected - showing defaults"
+msgstr ""
+
+msgid "Edit Setting"
+msgstr ""
+
+msgid "Name:"
+msgstr ""
+
+msgid "Description:"
+msgstr ""
+
+msgid "Value:"
+msgstr ""
+
+msgid "not connected"
+msgstr ""
+
+msgid "Setting not changed"
+msgstr ""
+
+msgid "Setting stored with another value"
+msgstr ""
+
+msgid "Export Settings"
+msgstr ""
+
+msgid "Exported settings to"
+msgstr ""
+
+msgid "Export failed:"
+msgstr ""
+
+msgid "Import Settings"
+msgstr ""
+
+msgid "Imported settings from"
+msgstr ""
+
+msgid "Import failed:"
+msgstr ""
+
+msgid "Unsaved changes"
+msgstr ""
+
+msgid "The current design has unsaved changes. Save them before continuing?"
+msgstr ""
+
+msgid "The tool has unsaved changes. Save them before continuing?"
+msgstr ""
+
+msgid "Could not save the tool:"
+msgstr ""
+
+msgid "Delete Failed"
+msgstr ""
+
+msgid "Could not delete the tool:"
+msgstr ""
+
+msgid "The G-code in the editor has unsaved changes. Save them before continuing?"
+msgstr ""
+
+msgid "Discard"
+msgstr ""
+
+msgid "New 2D design created"
+msgstr ""
+
+msgid "New 3D design created"
+msgstr ""
+
+msgid "Open Design File"
+msgstr ""
+
+msgid "GCodeKit Design Files"
+msgstr ""
+
+msgid "All Files"
+msgstr ""
+
+msgid "Loaded:"
+msgstr ""
+
+msgid "Shapes not loaded (a save removes them):"
+msgstr ""
+
+msgid "Images whose file is missing:"
+msgstr ""
+
+msgid "Open Failed"
+msgstr ""
+
+msgid "Import SVG File"
+msgstr ""
+
+msgid "Import DXF File"
+msgstr ""
+
+msgid "Import STL File (3D Shadow)"
+msgstr ""
+
+msgid "Import Design File"
+msgstr ""
+
+msgid "SVG Files"
+msgstr ""
+
+msgid "DXF Files"
+msgstr ""
+
+msgid "STL Files"
+msgstr ""
+
+msgid "Supported Files"
+msgstr ""
+
+msgid "Imported:"
+msgstr ""
+
+msgid "3D depth detected"
+msgstr ""
+
+msgid "Object with depth: Switching to CNC 3D mode."
+msgstr ""
+
+msgid "Unsupported DXF entities discarded"
+msgstr ""
+
+msgid ""
+"This DXF file contains entity types that are not supported and were "
+"discarded:"
+msgstr ""
+
+msgid "Invalid numbers replaced"
+msgstr ""
+
+msgid ""
+"values in this DXF file were not numbers and were replaced by defaults, so "
+"some geometry may be wrong."
+msgstr ""
+
+msgid "Error importing file:"
+msgstr ""
+
+msgid "Save Design File"
+msgstr ""
+
+msgid "Saved:"
+msgstr ""
+
+msgid "Save Failed"
+msgstr ""
+
+msgid "Export G-Code"
+msgstr ""
+
+msgid "Export blocked: objects at/above Safe Z"
+msgstr ""
+
+msgid "Invalid Z positioning"
+msgstr ""
+
+msgid "One or more objects are positioned at or above the Safe Z height."
+msgstr ""
+
+msgid "Lower object Z positions before exporting G-code."
+msgstr ""
+
+msgid "Safe Z"
+msgstr ""
+
+msgid "Objects in conflict"
+msgstr ""
+
+msgid "highest start Z"
+msgstr ""
+
+msgid "Out of limits warning"
+msgstr ""
+
+msgid ""
+"The generated G-code contains coordinates outside the machine working area "
+"(Negative values). Review the path before sending it to the machine."
+msgstr ""
+
+msgid "Exported G-Code:"
+msgstr ""
+
+msgid "Export Failed"
+msgstr ""
+
+msgid "Export SVG"
+msgstr ""
+
+msgid "Nothing to export"
+msgstr ""
+
+msgid "Exported SVG:"
+msgstr ""
+
+msgid "Raster image import is only available in 2D mode"
+msgstr ""
+
+msgid "Inspector"
+msgstr ""
+
+msgid "Hide Properties"
+msgstr ""
+
+msgid "Hide"
+msgstr ""
+
+msgid "Unhide Properties"
+msgstr ""
+
+msgid "Unhide"
+msgstr ""
+
+msgid "G-Code generated for image"
+msgstr ""
+
+msgid "Image Engraving Failed"
+msgstr ""
+
+msgid "Image Load Failed"
+msgstr ""
+
+msgid "G-code blocked: objects at/above Safe Z"
+msgstr ""
+
+msgid "Lower object Z positions before generating G-code."
+msgstr ""
+
+msgid "G-Code generated"
+msgstr ""
+
+msgid "Untitled"
+msgstr ""
+
+#. Grid toggle
+msgid "Show Grid"
+msgstr ""
+
+msgid "Grid spacing"
+msgstr ""
+
+#. Snap controls
+msgid "Snap"
+msgstr ""
+
+msgid "Snap to grid"
+msgstr ""
+
+msgid "Snap threshold"
+msgstr ""
+
+msgid "View Controls"
+msgstr ""
+
+msgid "Zoom Out"
+msgstr ""
+
+msgid "Fit to Content"
+msgstr ""
+
+msgid "Fit to Viewport"
+msgstr ""
+
+msgid "Fit to Device Working Area"
+msgstr ""
+
+msgid "Toggle Scrollbars"
+msgstr ""
+
+msgid "Keyboard Shortcuts"
+msgstr ""
+
+msgid "Designer shortcuts"
+msgstr ""
+
+msgid "Right click for context menu"
+msgstr ""
+
+msgid "Zoom In"
+msgstr ""
+
+msgid "No shapes yet"
+msgstr ""
+
+msgid "Use the toolbox on the left to start drawing."
+msgstr ""
+
+msgid "Load Design"
+msgstr ""
+
+msgid "Import SVG"
+msgstr ""
+
+msgid "Import DXF"
+msgstr ""
+
+msgid "Import STL"
+msgstr ""
+
+msgid "Import Image"
+msgstr ""
+
+msgid "Constraint"
+msgstr ""
+
+msgid "Array"
+msgstr ""
+
+msgid "Create"
+msgstr ""
+
+msgid "Linear"
+msgstr ""
+
+msgid "Grid"
+msgstr ""
+
+msgid "Circular"
+msgstr ""
+
+msgid "Count"
+msgstr ""
+
+msgid "Rows"
+msgstr ""
+
+msgid "Columns"
+msgstr ""
+
+msgid "Spacing X"
+msgstr ""
+
+msgid "Spacing Y"
+msgstr ""
+
+msgid "Centre X"
+msgstr ""
+
+msgid "Centre Y"
+msgstr ""
+
+msgid "Angle"
+msgstr ""
+
+msgid "Delete"
+msgstr ""
+
+msgid "Group"
+msgstr ""
+
+msgid "Ungroup"
+msgstr ""
+
+msgid "Union"
+msgstr ""
+
+msgid "Diff"
+msgstr ""
+
+msgid "Inter"
+msgstr ""
+
+msgid "Mirror on X"
+msgstr ""
+
+msgid "Mirror on Y"
+msgstr ""
+
+msgid "Array..."
+msgstr ""
+
+msgid "Align ▸"
+msgstr ""
+
+msgid "Align Left"
+msgstr ""
+
+msgid "Align Right"
+msgstr ""
+
+msgid "Align Top"
+msgstr ""
+
+msgid "Align Bottom"
+msgstr ""
+
+msgid "Align Center X"
+msgstr ""
+
+msgid "Align Center Y"
+msgstr ""
+
+msgid "Add Text"
+msgstr ""
+
+msgid "Add"
+msgstr ""
+
+msgid "Text"
+msgstr ""
+
+msgid "Enter text"
+msgstr ""
+
+msgid "Font:"
+msgstr ""
+
+msgid "Size:"
+msgstr ""
+
+msgid "Bold"
+msgstr ""
+
+msgid "Italic"
+msgstr ""
+
+msgid "Style:"
+msgstr ""
+
+msgid "Image files"
+msgstr ""
+
+msgid "Importing image..."
+msgstr ""
+
+msgid "Image imported successfully"
+msgstr ""
+
+msgid "Import error"
+msgstr ""
+
+msgid "Click to position shape"
+msgstr ""
+
+msgid "Objects"
+msgstr ""
+
+msgid "Group (Ctrl+G)"
+msgstr ""
+
+msgid "Ungroup (Ctrl+Shift+G)"
+msgstr ""
+
+msgid "Move to start"
+msgstr ""
+
+msgid "Move up"
+msgstr ""
+
+msgid "Move down"
+msgstr ""
+
+msgid "Move to end"
+msgstr ""
+
+msgid "Rect"
+msgstr ""
+
+msgid "Circ"
+msgstr ""
+
+msgid "Line"
+msgstr ""
+
+msgid "Ellip"
+msgstr ""
+
+msgid "Path"
+msgstr ""
+
+msgid "Tri"
+msgstr ""
+
+msgid "Poly"
+msgstr ""
+
+msgid "Gear"
+msgstr ""
+
+msgid "Spro"
+msgstr ""
+
+msgid "Image"
+msgstr ""
+
+msgid "Pocket operation"
+msgstr ""
+
+msgid "Profile operation"
+msgstr ""
+
+msgid "Click to select the whole group"
+msgstr ""
+
+msgid "It cannot be moved"
+msgstr ""
+
+msgid ""
+"The move would split a group. The members of a group must remain contiguous."
+msgstr ""
+
+msgid "Position"
+msgstr ""
+
+msgid "X:"
+msgstr ""
+
+msgid "Y:"
+msgstr ""
+
+msgid "(-Z:)"
+msgstr ""
+
+msgid "Size"
+msgstr ""
+
+msgid "Lock Aspect:"
+msgstr ""
+
+msgid "Angle:"
+msgstr ""
+
+msgid "Corner"
+msgstr ""
+
+msgid "Radius:"
+msgstr ""
+
+msgid "Slot Mode:"
+msgstr ""
+
+msgid "Text:"
+msgstr ""
+
+msgid "Content:"
+msgstr ""
+
+msgid "Polygon"
+msgstr ""
+
+msgid "Sides:"
+msgstr ""
+
+msgid "Closed:"
+msgstr ""
+
+msgid "Module:"
+msgstr ""
+
+msgid "Teeth:"
+msgstr ""
+
+msgid "Pressure Angle:"
+msgstr ""
+
+msgid "Sprocket"
+msgstr ""
+
+msgid "Pitch:"
+msgstr ""
+
+msgid "Roller Dia:"
+msgstr ""
+
+msgid "Timing Pulley"
+msgstr ""
+
+msgid "Belt Width:"
+msgstr ""
+
+msgid "Hole Radius:"
+msgstr ""
+
+msgid "Geometry Operations"
+msgstr ""
+
+msgid "Offset:"
+msgstr ""
+
+msgid "Chamfer:"
+msgstr ""
+
+msgid "CAM Properties"
+msgstr ""
+
+#. Operation Type
+msgid "Operation:"
+msgstr ""
+
+msgid "Profile"
+msgstr ""
+
+msgid "Pocket"
+msgstr ""
+
+msgid "Use global values"
+msgstr ""
+
+#. Step Down
+msgid "Step Down:"
+msgstr ""
+
+#. Step In (for pockets)
+msgid "Step In:"
+msgstr ""
+
+#. Ramp Angle
+msgid "Ramp Angle:"
+msgstr ""
+
+#. Pocket Strategy - Solo para Pocket
+msgid "Strategy:"
+msgstr ""
+
+msgid "Raster"
+msgstr ""
+
+msgid "Offset"
+msgstr ""
+
+msgid "Adaptive"
+msgstr ""
+
+#. Raster Fill
+msgid "Raster Fill (%):"
+msgstr ""
+
+msgid "Laser Engraving"
+msgstr ""
+
+#. Min Power
+msgid "Min Power:"
+msgstr ""
+
+#. Max Power
+msgid "Max Power:"
+msgstr ""
+
+#. PPI
+msgid "Resolution:"
+msgstr ""
+
+#. Scan Direction
+msgid "Scan:"
+msgstr ""
+
+msgid "Horizontal"
+msgstr ""
+
+msgid "Vertical"
+msgstr ""
+
+#. Dithering
+msgid "Dithering:"
+msgstr ""
+
+msgid "Threshold"
+msgstr ""
+
+msgid "Floyd-Ste."
+msgstr ""
+
+msgid "Atkinson"
+msgstr ""
+
+msgid "Bayer"
+msgstr ""
+
+#. Halftone_threshold
+msgid "Halftone:"
+msgstr ""
+
+msgid "Laser Config (Object)"
+msgstr ""
+
+#. Feed Rate
+msgid "Feed rate:"
+msgstr ""
+
+msgid "Global"
+msgstr ""
+
+#. Power
+msgid "Power:"
+msgstr ""
+
+#. Header (kept for internal state, not shown in UI)
+msgid "Properties"
+msgstr ""
+
+#. Empty state message
+msgid "Select a shape to edit its properties"
+msgstr ""
+
+msgid "shapes"
+msgstr ""
+
+msgid "Rotation angle (degrees). Applied on Enter or when leaving the field."
+msgstr ""
+
+msgid ""
+"Rotate the selection by this angle (degrees). Applied on Enter or when "
+"leaving the field."
+msgstr ""
+
+msgid "Rectangle"
+msgstr ""
+
+msgid "Circle"
+msgstr ""
+
+msgid "Ellipse"
+msgstr ""
+
+msgid "Polyline"
+msgstr ""
+
+msgid "Pan"
+msgstr ""
+
+msgid "Triangle"
+msgstr ""
+
+msgid "Select (S)"
+msgstr ""
+
+msgid "Rectangle (R)"
+msgstr ""
+
+msgid "Circle (C)"
+msgstr ""
+
+msgid "Line (L)"
+msgstr ""
+
+msgid "Ellipse (E)"
+msgstr ""
+
+msgid "Polyline (P)"
+msgstr ""
+
+msgid "Text (T)"
+msgstr ""
+
+msgid "Pan (Space)"
+msgstr ""
+
+msgid ""
+"Click to add points. Enter finishes an open polyline; double-click or right-"
+"click finishes a closed shape. Esc cancels."
+msgstr ""
+
+msgid "Active tool:"
+msgstr ""
+
+#. Fast Shapes Section
+msgid "Fast Shapes"
+msgstr ""
+
+msgid "Shape Gallery…"
+msgstr ""
+
+#. ===== ADD SELECTOR LASER/CNC =====
+#. 1. Crear el Frame (contenedor con borde y título)
+msgid "Machine Mode"
+msgstr ""
+
+#. 3. Crear los botones (CheckButton)
+msgid "Laser 2D"
+msgstr ""
+
+msgid "CNC 3D"
+msgstr ""
+
+#. Tool Settings popup button
+msgid "Tool Settings…"
+msgstr ""
+
+msgid "Stock Width"
+msgstr ""
+
+msgid "Stock material width"
+msgstr ""
+
+msgid "Stock Height"
+msgstr ""
+
+msgid "Stock material height"
+msgstr ""
+
+msgid "Stock Thickness"
+msgstr ""
+
+msgid "Stock material thickness"
+msgstr ""
+
+msgid "Safe Z Height"
+msgstr ""
+
+msgid "Safe height above stock for rapid moves"
+msgstr ""
+
+msgid "Depth per pass"
+msgstr ""
+
+msgid "Step Down"
+msgstr ""
+
+msgid "Stock Settings…"
+msgstr ""
+
+msgid "Stock Settings"
+msgstr ""
+
+msgid "Stock Parameters"
+msgstr ""
+
+#. Botones de G-code y Frame
+msgid "Generate G-Code"
+msgstr ""
+
+msgid "Frame "
+msgstr ""
+
+msgid "Generate low-power frame to position material"
+msgstr ""
+
+msgid "Laser Speed"
+msgstr ""
+
+msgid "Feed Rate"
+msgstr ""
+
+msgid "Spindle Speed"
+msgstr ""
+
+msgid "Passes"
+msgstr ""
+
+msgid "Laser Width"
+msgstr ""
+
+msgid "Tool Dia"
+msgstr ""
+
+msgid "Tool Diameter"
+msgstr ""
+
+msgid "Continuous Z"
+msgstr ""
+
+msgid "Keep tool at cutting depth between passes when XY start is unchanged"
+msgstr ""
+
+msgid "Tool Settings"
+msgstr ""
+
+msgid "Tool Parameters"
+msgstr ""
+
+msgid "Enter G-code command..."
+msgstr ""
+
+#. or document-send-symbolic
+msgid "Send Command"
+msgstr ""
+
+#. Device Type Section (at the very top)
+msgid "Device Type"
+msgstr ""
+
+msgid "CNC"
+msgstr ""
+
+msgid "Spindle-based machining (laser mode off, $32=0)"
+msgstr ""
+
+msgid "Laser"
+msgstr ""
+
+msgid "Laser cutter/engraver (laser mode on, $32=1)"
+msgstr ""
+
+msgid "Other device type ($32 unchanged)"
+msgstr ""
+
+msgid "Device"
+msgstr ""
+
+msgid "Refresh device info"
+msgstr ""
+
+msgid "Copy device info"
+msgstr ""
+
+msgid "No device"
+msgstr ""
+
+msgid "Firmware"
+msgstr ""
+
+msgid "Version"
+msgstr ""
+
+msgid "Capabilities"
+msgstr ""
+
+msgid "Firmware:"
+msgstr ""
+
+msgid "Version:"
+msgstr ""
+
+msgid "Enabled ($22=1)"
+msgstr ""
+
+msgid "Disabled ($22=0)"
+msgstr ""
+
+msgid "Unknown (settings not loaded)"
+msgstr ""
+
+msgid "Enabled ($32=1)"
+msgstr ""
+
+msgid "Disabled ($32=0)"
+msgstr ""
+
+msgid "Variable Spindle"
+msgstr ""
+
+msgid "PWM spindle control"
+msgstr ""
+
+msgid "Homing Cycle"
+msgstr ""
+
+msgid "Laser Mode"
+msgstr ""
+
+msgid "cannot change $32:"
+msgstr ""
+
+msgid "no connection"
+msgstr ""
+
+msgid "Could not set laser mode:"
+msgstr ""
+
+msgid "Sent"
+msgstr ""
+
+msgid "Search..."
+msgstr ""
+
+msgid "Previous Match"
+msgstr ""
+
+msgid "Next Match"
+msgstr ""
+
+msgid "Replace with ..."
+msgstr ""
+
+msgid "Replace"
+msgstr ""
+
+msgid "Replace All"
+msgstr ""
+
+msgid "Calculating..."
+msgstr ""
+
+msgid "0 matches"
+msgstr ""
+
+msgid "Open G-Code File"
+msgstr ""
+
+msgid "Error Reading File"
+msgstr ""
+
+msgid "Could not open"
+msgstr ""
+
+msgid "Error Saving File"
+msgstr ""
+
+msgid "Could not save"
+msgstr ""
+
+msgid "Save G-Code File"
+msgstr ""
+
+msgid "Fast Shape Gallery"
+msgstr ""
+
+msgid "Click on a shape to quickly insert it with default parameters."
+msgstr ""
+
+msgid "Spur Gear"
+msgstr ""
+
+msgid "Standard involute spur gear"
+msgstr ""
+
+msgid "Chain sprocket for #40 chain"
+msgstr ""
+
+msgid "XL timing belt pulley"
+msgstr ""
+
+msgid "Slot"
+msgstr ""
+
+msgid "Rectangular slot/cutout"
+msgstr ""
+
+msgid "L-Bracket"
+msgstr ""
+
+msgid "L-shaped bracket with holes"
+msgstr ""
+
+msgid "U-Bracket"
+msgstr ""
+
+msgid "U-shaped channel bracket"
+msgstr ""
+
+msgid "🏠 Index"
+msgstr ""
+
+msgid "🛠️ Preferences"
+msgstr ""
+
+msgid "✏️ Designer"
+msgstr ""
+
+msgid "👁️ Visualizer"
+msgstr ""
+
+msgid "⚙️ Machine Control"
+msgstr ""
+
+msgid "      •📝 G-code Editor"
+msgstr ""
+
+msgid "      •💻 Device console"
+msgstr ""
+
+msgid "🧰 CAM Tools"
+msgstr ""
+
+msgid "      •📦 Tabbed Box Maker"
+msgstr ""
+
+msgid "      •🧩 Jigsaw Puzzle Generator"
+msgstr ""
+
+msgid "      •🖼️ Laser Image Engraver"
+msgstr ""
+
+msgid "      •🖩 Speed and Feeds Calculator"
+msgstr ""
+
+msgid "      •🔧 Spoilboard Surfacing"
+msgstr ""
+
+msgid "      •📏 Create Spoilboard Grid"
+msgstr ""
+
+msgid "      •📠 Gerber To G-code"
+msgstr ""
+
+msgid "      •🔧 Dirll Press"
+msgstr ""
+
+msgid "🔌 Device Manager"
+msgstr ""
+
+msgid "⚙️ Device Config"
+msgstr ""
+
+msgid "🔨 CNC Tools"
+msgstr ""
+
+msgid "📦 Materials"
+msgstr ""
+
+msgid "GCodeKit6 Help"
+msgstr ""
+
+msgid "Back"
+msgstr ""
+
+msgid "Forward"
+msgstr ""
+
+msgid "Help (F1)"
+msgstr ""
+
+msgid "Host:"
+msgstr ""
+
+msgid ""
+"The active device profile connects over the network; change it in the Device "
+"Manager to use a serial port."
+msgstr ""
+
+msgid "Baud:"
+msgstr ""
+
+msgid "Port: -"
+msgstr ""
+
+msgid "Error disconnecting"
+msgstr ""
+
+msgid "State: Disconnected"
+msgstr ""
+
+#. Port
+msgid "Disconnected"
+msgstr ""
+
+msgid "Connect to enable controls."
+msgstr ""
+
+#, rust-format
+msgid ""
+"Connection rejected: active machine is configured as {} but the device "
+"responded as {}. Change the active machine in the Device Manager."
+msgstr ""
+
+msgid "Connecting…"
+msgstr ""
+
+msgid "State: Connecting…"
+msgstr ""
+
+msgid "Port:"
+msgstr ""
+
+msgid "the connection thread failed"
+msgstr ""
+
+msgid "Error connecting"
+msgstr ""
+
+msgid "State: Connected"
+msgstr ""
+
+msgid "Connected"
+msgstr ""
+
+msgid "Connected to"
+msgstr ""
+
+#, rust-format
+msgid ""
+"→ Protocol: {}\n"
+"  sender: {}"
+msgstr ""
+
+msgid "Connection lost (cable disconnected or firmware reset)."
+msgstr ""
+
+msgid "✅ Work completed in:"
+msgstr ""
+
+msgid "Streaming Completed."
+msgstr ""
+
+msgid "Probe contact:"
+msgstr ""
+
+msgid ""
+"Probe failed: no contact within the probe distance. Unlock ($X) to continue; "
+"absolute mode (G90) is restored afterwards."
+msgstr ""
+
+msgid "Probe failed:"
+msgstr ""
+
+msgid "Probe rejected by the controller:"
+msgstr ""
+
+msgid "restore absolute mode after failed probe"
+msgstr ""
+
+msgid "Controller error"
+msgstr ""
+
+msgid "Jog ignored: a job is running."
+msgstr ""
+
+msgid "Jog ignored: invalid jog feed rate."
+msgstr ""
+
+msgid "Continuous jog"
+msgstr ""
+
+msgid "Continuous jog stopped: the controller rejected a move (travel limit?)"
+msgstr ""
+
+msgid "Jog cancel (0x85)"
+msgstr ""
+
+msgid "no G-code lines to send"
+msgstr ""
+
+msgid "line too long for the controller buffer:"
+msgstr ""
+
+msgid "> Starting job:"
+msgstr ""
+
+msgid "lines"
+msgstr ""
+
+#. / Stops the job: no further line is sent once this returns.
+
+#. /
+
+#. / The worker re-checks the flag while holding the communicator lock, so a caller
+
+#. / that sends a soft reset after this (under the lock) cannot be followed by a line.
+
+msgid "Stopping..."
+msgstr ""
+
+msgid "Paused"
+msgstr ""
+
+msgid "Resuming"
+msgstr ""
+
+msgid "connection lost"
+msgstr ""
+
+msgid "send failed:"
+msgstr ""
+
+msgid "receive failed:"
+msgstr ""
+
+msgid "controller was reset"
+msgstr ""
+
+msgid "Baud: 115200"
+msgstr ""
+
+msgid "No ports available"
+msgstr ""
+
+msgid "Refresh ports"
+msgstr ""
+
+msgid "Connection"
+msgstr ""
+
+msgid "Feed: -"
+msgstr ""
+
+msgid "Spindle: -"
+msgstr ""
+
+msgid "Buffer: -"
+msgstr ""
+
+msgid "Home machine ($H)"
+msgstr ""
+
+msgid "Unlock"
+msgstr ""
+
+msgid "Unlock from ALARM ($X)"
+msgstr ""
+
+msgid "Machine State"
+msgstr ""
+
+msgid "Work Coordinates"
+msgstr ""
+
+#. Create limit labels for all axes
+msgid "Machine Limits:"
+msgstr ""
+
+msgid "Machine Limits"
+msgstr ""
+
+msgid "Send"
+msgstr ""
+
+msgid "Send G-code from the editor"
+msgstr ""
+
+msgid "Stop"
+msgstr ""
+
+msgid ""
+"Stop job: feed hold, then reset the controller once stopped (keeps position)"
+msgstr ""
+
+msgid "Pause"
+msgstr ""
+
+msgid "Pause streaming (!)"
+msgstr ""
+
+msgid "Resume"
+msgstr ""
+
+msgid "Resume streaming (~)"
+msgstr ""
+
+msgid "Stop holds the feed, then resets; E‑Stop resets the controller at once."
+msgstr ""
+
+msgid "Job Control"
+msgstr ""
+
+msgid "Current Feed & Spindle"
+msgstr ""
+
+msgid "Feed:"
+msgstr ""
+
+msgid "Decrease feed rate by 10%"
+msgstr ""
+
+msgid "Decrease feed rate by 1%"
+msgstr ""
+
+msgid "Reset feed rate to 100%"
+msgstr ""
+
+msgid "Increase feed rate by 1%"
+msgstr ""
+
+msgid "Increase feed rate by 10%"
+msgstr ""
+
+msgid "Target feed override (%)"
+msgstr ""
+
+msgid "Set the feed override to exactly the target percentage"
+msgstr ""
+
+msgid "Spindle:"
+msgstr ""
+
+msgid "Decrease spindle speed by 10%"
+msgstr ""
+
+msgid "Decrease spindle speed by 1%"
+msgstr ""
+
+msgid "Reset spindle speed to 100%"
+msgstr ""
+
+msgid "Stop spindle"
+msgstr ""
+
+msgid "Increase spindle speed by 1%"
+msgstr ""
+
+msgid "Increase spindle speed by 10%"
+msgstr ""
+
+msgid "Target spindle override (%)"
+msgstr ""
+
+msgid "Set the spindle override to exactly the target percentage"
+msgstr ""
+
+msgid "Work Coordinates (WPos)"
+msgstr ""
+
+msgid "Jog"
+msgstr ""
+
+msgid "Zero All Axes"
+msgstr ""
+
+msgid "Set active work position to 0 for X/Y/Z"
+msgstr ""
+
+msgid "Go to Work Zero"
+msgstr ""
+
+msgid "Rapid move to work origin (X/Y, or X/Y/Z if Include Z is checked)"
+msgstr ""
+
+#. Checkbox for including Z axis in go to work zero
+msgid "Include Z"
+msgstr ""
+
+msgid "When checked, Go to Work Zero will also move to Z0"
+msgstr ""
+
+#. Quick Probe Z button (Milestone 6)
+msgid "Probe Z"
+msgstr ""
+
+msgid "Quick Z-touch probe at current XY position"
+msgstr ""
+
+msgid "Quick edge find in direction"
+msgstr ""
+
+msgid "Probe X- edge"
+msgstr ""
+
+msgid "Probe X+ edge"
+msgstr ""
+
+msgid "Probe Y- edge"
+msgstr ""
+
+msgid "Probe Y+ edge"
+msgstr ""
+
+msgid "Edge:"
+msgstr ""
+
+msgid "Machine Coordinates (MPos)"
+msgstr ""
+
+msgid "Continuous"
+msgstr ""
+
+msgid ""
+"Hold a jog button or numpad key to jog continuously; release to stop. Moves "
+"in short increments, so a soft limit stops the jog safely."
+msgstr ""
+
+msgid "Jog Feed:"
+msgstr ""
+
+msgid "Keyboard jog: 8/2/4/6 (XY), 9/3 (Z)"
+msgstr ""
+
+msgid "Jog Y+"
+msgstr ""
+
+msgid "Jog X-"
+msgstr ""
+
+msgid "Jog X+"
+msgstr ""
+
+msgid "Jog Y-"
+msgstr ""
+
+msgid "Jog Z+"
+msgstr ""
+
+msgid "Jog Z-"
+msgstr ""
+
+msgid "Editor not available"
+msgstr ""
+
+msgid "G-Code Editor"
+msgstr ""
+
+msgid "Clear editor"
+msgstr ""
+
+msgid "Save G-code"
+msgstr ""
+
+msgid "Device Console"
+msgstr ""
+
+msgid "Clear console"
+msgstr ""
+
+msgid "Copy last error"
+msgstr ""
+
+msgid "Device Console not available"
+msgstr ""
+
+msgid "Clear the editor?"
+msgstr ""
+
+msgid "All G-code in the editor will be removed."
+msgstr ""
+
+msgid "Step"
+msgstr ""
+
+msgid "Invalid jog feed; still using"
+msgstr ""
+
+msgid "Quick Z-touch probe"
+msgstr ""
+
+msgid "Command ignored: a job is running."
+msgstr ""
+
+msgid "Command ignored: the machine is stopping."
+msgstr ""
+
+msgid "not sent"
+msgstr ""
+
+msgid "Error sending"
+msgstr ""
+
+msgid "A job is already running."
+msgstr ""
+
+msgid "No G-Code to Send"
+msgstr ""
+
+msgid "Please load or type G-Code into the editor first."
+msgstr ""
+
+msgid "Cannot Send G-Code"
+msgstr ""
+
+msgid "The limit is set in Preferences > File Processing > Max Line Length."
+msgstr ""
+
+msgid "Work coordinate change ignored: a job is running."
+msgstr ""
+
+msgid "Zero all work axes?"
+msgstr ""
+
+msgid ""
+"This sets the active work coordinate system so the current X/Y/Z becomes 0."
+msgstr ""
+
+msgid "Command not sent:"
+msgstr ""
+
+msgid "A probe is already in progress."
+msgstr ""
+
+msgid "Job Completed"
+msgstr ""
+
+msgid "Job stopped:"
+msgstr ""
+
+msgid "stopped by user"
+msgstr ""
+
+msgid "Restoring absolute mode (G90) before the job (a probe failed)."
+msgstr ""
+
+msgid "Job not started:"
+msgstr ""
+
+msgid "No valid G-Code lines found."
+msgstr ""
+
+msgid "Emergency stop (M112)"
+msgstr ""
+
+msgid "Emergency stop (Ctrl-X)"
+msgstr ""
+
+msgid "Set %"
+msgstr ""
+
+msgid "Buffer:"
+msgstr ""
+
+msgid "State:"
+msgstr ""
+
+msgid "ALARM: Unlock required."
+msgstr ""
+
+msgid "Zero"
+msgstr ""
+
+msgid "Set work axis to zero"
+msgstr ""
+
+msgid "Zoom"
+msgstr ""
+
+msgid "Center"
+msgstr ""
+
+msgid "Cursor"
+msgstr ""
+
+msgid "General"
+msgstr ""
+
+msgid "Controller"
+msgstr ""
+
+msgid "User Interface"
+msgstr ""
+
+msgid "File Processing"
+msgstr ""
+
+msgid "Shortcuts"
+msgstr ""
+
+msgid "Advanced"
+msgstr ""
+
+msgid "Select Directory"
+msgstr ""
+
+#. eStop Button
+msgid "eStop"
+msgstr ""
+
+msgid "Elapsed:"
+msgstr ""
+
+msgid "Remaining:"
+msgstr ""
+
+msgid "Hide Sidebar"
+msgstr ""
+
+msgid "2D"
+msgstr ""
+
+msgid "Top-down 2D view"
+msgstr ""
+
+msgid "3D"
+msgstr ""
+
+msgid "Rotatable 3D view"
+msgstr ""
+
+msgid "Show Rapid Moves"
+msgstr ""
+
+msgid "Show Cutting Moves"
+msgstr ""
+
+msgid "Show Machine Bounds"
+msgstr ""
+
+msgid "Show Laser/Spindle"
+msgstr ""
+
+msgid "Show Stock Removal"
+msgstr ""
+
+msgid "The simulation has a resolution of "
+msgstr ""
+
+msgid "mm. Cuts smaller than "
+msgstr ""
+
+msgid ""
+"mm will not be visually displayed, but the G-code will execute correctly."
+msgstr ""
+
+msgid "Width"
+msgstr ""
+
+msgid "Height"
+msgstr ""
+
+msgid "Thickness"
+msgstr ""
+
+msgid "Top"
+msgstr ""
+
+msgid "Bottom"
+msgstr ""
+
+msgid ""
+"Which face of the stock the program's work Z0 is set on. Top: material is "
+"-thickness to 0 (most CAM output). Bottom: material is 0 to thickness "
+"(GCodeKit designer output)."
+msgstr ""
+
+msgid "Toolpath"
+msgstr ""
+
+msgid "Guides"
+msgstr ""
+
+msgid "Stock"
+msgstr ""
+
+msgid "Stock Z0 at:"
+msgstr ""
+
+msgid "Lower left"
+msgstr ""
+
+msgid ""
+"Where on the stock the program's work X0 Y0 is set: the lower-left corner or "
+"the centre of the stock."
+msgstr ""
+
+msgid "Stock XY0 at:"
+msgstr ""
+
+msgid "Simulation"
+msgstr ""
+
+msgid "N/A"
+msgstr ""
+
+msgid "Bounds"
+msgstr ""
+
+msgid "Min S:"
+msgstr ""
+
+msgid "Max S:"
+msgstr ""
+
+msgid "Avg S:"
+msgstr ""
+
+msgid "3D View"
+msgstr ""
+
+msgid "No G-code loaded"
+msgstr ""
+
+msgid "Open a file to preview toolpaths."
+msgstr ""
+
+msgid "Top View"
+msgstr ""
+
+msgid "Mouse Controls"
+msgstr ""
+
+msgid "* Use mouse to orbit, pan and zoom *"
+msgstr ""
+
+msgid "Shift+Left button+Drag: Pan"
+msgstr ""
+
+msgid "Mouse wheel: Zoom+/-"
+msgstr ""
+
+msgid "Left Button+Drag: Orbit"
+msgstr ""
+
+msgid "Speed"
+msgstr ""
+
+msgid "Slow"
+msgstr ""
+
+msgid "Normal"
+msgstr ""
+
+msgid "Fast"
+msgstr ""
+
+msgid "Turbo"
+msgstr ""
+
+msgid "Preview playback speed"
+msgstr ""
+
+msgid "Play preview"
+msgstr ""
+
+msgid "Pause preview"
+msgstr ""
+
+msgid "Stop preview"
+msgstr ""
+
+#. Sidebar show panel (floating) — matches Device Console UX
+msgid "Show Sidebar"
+msgstr ""
+
+msgid "Simulating stock removal…"
+msgstr ""
+
+msgid "Copy cursor coordinates"
+msgstr ""
+
+msgid "Stock Simulation"
+msgstr ""
+
+msgid "to"
+msgstr ""
+
+msgid "Repetier EEPROM"
+msgstr ""
+
+msgid "Tpulley"
+msgstr ""
+
+msgid "Edit EEPROM Pos"
+msgstr ""
+
+msgid "Error sending M205:"
+msgstr ""
+
+msgid "Connection Notice"
+msgstr ""
+
+msgid "Please connect the machine before retrieving parameters."
+msgstr ""
+
+msgid "Operation cancelled: Device not connected"
+msgstr ""
+
+msgid "Retrieving settings and device info..."
+msgstr ""
+
+msgid "Settings retrieval incomplete (timed out), settings received:"
+msgstr ""
+
+msgid "the controller replied"
+msgstr ""
+
+msgid "no reply from the controller"
+msgstr ""
+
+msgid "Layers"
+msgstr ""
+
+msgid "Minimize"
+msgstr ""
+
+msgid "Maximize"
+msgstr ""
+
+msgid "View"
+msgstr ""
+
+msgid "Tools"
+msgstr ""
+
+msgid "Start Streaming"
+msgstr ""
+
+msgid "Pause Streaming"
+msgstr ""
+
+msgid "Stop Streaming"
+msgstr ""
+
+msgid "Feed Hold"
+msgstr ""
+
+msgid "Cycle Start"
+msgstr ""
+
+msgid "Zoom to Fit"
+msgstr ""
+
+msgid "Reset View"
+msgstr ""
+
+msgid "Front"
+msgstr ""
+
+msgid "Isometric"
+msgstr ""
+
+msgid "Materials Manager"
+msgstr ""
+
+msgid "About {app}"
+msgstr ""
+
+msgid "Settings…"
+msgstr ""
+
+msgid "Settings"
+msgstr ""
+
+msgid "Appearance"
+msgstr ""
+
+msgid "Hide {app}"
+msgstr ""
+
+msgid "Hide Others"
+msgstr ""
+
+msgid "Quit {app}"
+msgstr ""
+
+msgid "Preferences…"
+msgstr ""
+
+msgid "Exit"
+msgstr ""
+
+msgid "Window"
+msgstr ""
+
+msgid "Services"
+msgstr ""
+
+msgid "Show All"
+msgstr ""
+
+msgid "Bring All to Front"
+msgstr ""
+
+msgid "Close Window"
+msgstr ""
+
+msgid "Menu"
+msgstr ""
+
+msgid "Scroll menu up"
+msgstr ""
+
+msgid "Scroll menu down"
+msgstr ""
+
+msgid "Apply"
+msgstr ""
+
+msgid "Metric"
+msgstr ""
+
+msgid "Imperial"
+msgstr ""
+
+msgid "Jog Step Size (Linear)"
+msgstr ""
+
+msgid "Jog Feed Rate"
+msgstr ""
+
+msgid "X Axis Limit"
+msgstr ""
+
+msgid "Y Axis Limit"
+msgstr ""
+
+msgid "Z Axis Limit"
+msgstr ""
+
+msgid "Light"
+msgstr ""
+
+msgid "Dark"
+msgstr ""
+
+msgid "Use system title bar"
+msgstr ""
+
+msgid "Arc Segment Length"
+msgstr ""
+
+msgid "Max Line Length"
+msgstr ""
+
+msgid "3D Stock Removal Visualization"
+msgstr ""
+
+msgid "STL File Import"
+msgstr ""
+
+msgid "License:"
+msgstr ""
+
+msgid "G-Code Files"
+msgstr ""
+
+msgid "Restart to apply settings?"
+msgstr ""
+
+msgid "GCodeKit6 must restart to use the new settings. The machine connection will be closed. Restart now?"
+msgstr ""
+
+msgid "Stop job and quit?"
+msgstr ""
+
+msgid "A job is running. Quitting stops it and closes the machine connection."
+msgstr ""
+
+msgid "Rapid:"
+msgstr ""
+
+msgid "No program loaded"
+msgstr ""
+
+msgid "Emergency stop (soft reset, {shortcut})"
+msgstr ""
+
+msgid "Jog refused: the machine position is unknown."
+msgstr ""
+
+msgid "Jog refused: no travel left in that direction."
+msgstr ""
+
+msgid "Jog refused: the machine is not idle."
+msgstr ""
+
+msgid "Clear"
+msgstr ""
+
+msgid "Type a command and press Enter..."
+msgstr ""
+
+msgid "Device connected"
+msgstr ""
+
+msgid "Device disconnected"
+msgstr ""
+
+msgid "Error"
+msgstr ""
+
+msgid "Matches:"
+msgstr ""
+
+msgid "Line:"
+msgstr ""
+
+msgid "Edit anyway"
+msgstr ""
+
+msgid "Large file: shown read-only to stay fast."
+msgstr ""
+
+msgid "Could not open file"
+msgstr ""
+
+msgid "Could not save file"
+msgstr ""
+
+msgid "Cannot stream this program"
+msgstr ""
+
+msgid "Read-only while a job is running."
+msgstr ""
+
+msgid "Front View"
+msgstr ""
+
+msgid "Left View"
+msgstr ""
+
+msgid "Right View"
+msgstr ""
+
+msgid "Bottom View"
+msgstr ""
+
+msgid "Isometric (NW)"
+msgstr ""
+
+msgid "Isometric (NE)"
+msgstr ""
+
+msgid "Isometric (SW)"
+msgstr ""
+
+msgid "Isometric (SE)"
+msgstr ""
+
+msgid "Fit"
+msgstr ""
+
+msgid "Toolpath too large to display on this GPU."
+msgstr ""
+
+msgid "Bounds {axis}: {min} to {max} {unit}"
+msgstr ""
+
+msgid "Could not draw this toolpath."
+msgstr ""
+
+msgid "Stop the running job before opening a file."
+msgstr ""
+
+msgid "Rotate"
+msgstr ""
+
+msgid "90° CW"
+msgstr ""
+
+msgid "90° CCW"
+msgstr ""
+
+msgid "45° CW"
+msgstr ""
+
+msgid "45° CCW"
+msgstr ""
+
+msgid "180°"
+msgstr ""
+
+msgid "Show"
+msgstr ""
+
+msgid "Lock"
+msgstr ""
+
+msgid "Rotated object: Dimensions locked"
+msgstr ""
+
+msgid "0 = no raster, 100 = full length"
+msgstr ""
+
+msgid "Enter a number"
+msgstr ""
+
+msgid "Enter a value greater than 0"
+msgstr ""
+
+msgid "Enter a value of 0 or more"
+msgstr ""
+
+msgid "Enter an angle from 0 to 90"
+msgstr ""
+
+msgid "Enter a whole number of 1 or more"
+msgstr ""
+
+msgid "Value out of range"
+msgstr ""
+
+msgid "Text cannot be empty"
+msgstr ""
+
+msgid "The edited shapes were deleted or locked; the change was not applied."
+msgstr ""
+
+msgid "Enter a whole number of 2 or more"
+msgstr ""
+
+msgid "Enter a non-zero angle"
+msgstr ""
+
+msgid "The array would create more than 10000 objects"
+msgstr ""
+
+msgid "Show Toolpaths"
+msgstr ""
+
+msgid "Nothing to export: all shapes are hidden"
+msgstr ""
+
+msgid "Stop the running job before sending G-code to the editor."
+msgstr ""
+
+msgid "The file is too large to import."
+msgstr ""
+
+msgid "The file has no shapes to import."
+msgstr ""
+
+msgid "Generators"
+msgstr ""
+
+msgid "Engraving"
+msgstr ""
+
+msgid "Calculators"
+msgstr ""
+
+msgid "Maintenance"
+msgstr ""
+
+msgid "Generated G-Code"
+msgstr ""
+
+msgid "Not a valid length"
+msgstr ""
+
+msgid "Not a number"
+msgstr ""
+
+msgid "Must be greater than 0"
+msgstr ""
+
+msgid "Must not be negative"
+msgstr ""
+
+msgid "Out of range"
+msgstr ""
+
+msgid "This tool needs at least 3 axes (X, Y, Z); the active device has fewer."
+msgstr ""
+
+msgid "Send to Editor"
+msgstr ""
+
+msgid "Preview"
+msgstr ""
+
+msgid "Generation failed"
+msgstr ""
+
+msgid "Hole Diameter:"
+msgstr ""
+
+msgid "Tool Diameter:"
+msgstr ""
+
+msgid "Center X:"
+msgstr ""
+
+msgid "Center Y:"
+msgstr ""
+
+msgid "Top Z (Surface):"
+msgstr ""
+
+msgid "Bottom Z (Depth):"
+msgstr ""
+
+msgid "Peck Depth (0 for none):"
+msgstr ""
+
+msgid "Plunge Rate (mm/min):"
+msgstr ""
+
+msgid "Safe Z:"
+msgstr ""
+
+msgid "Must be below Top Z"
+msgstr ""
+
+msgid "Must be above Top Z"
+msgstr ""
+
+msgid "Emulate a drill press on your CNC. Supports standard drilling, peck drilling for chip clearing, and helical interpolation for holes larger than the tool."
+msgstr ""
+
+msgid "Hole Geometry"
+msgstr ""
+
+msgid "Depth and Pecking"
+msgstr ""
+
+msgid "Machine Settings"
+msgstr ""
+
+msgid "Cut Depth:"
+msgstr ""
+
+msgid "Outline Step Down:"
+msgstr ""
+
+msgid "Stepover (%):"
+msgstr ""
+
+msgid "Safe Z Height:"
+msgstr ""
+
+msgid "Generate G-code for surfacing your CNC spoilboard to ensure a flat, level work surface."
+msgstr ""
+
+msgid "Spoilboard Dimensions"
+msgstr ""
+
+msgid "Grid Spacing:"
+msgstr ""
+
+msgid "Laser Power (S):"
+msgstr ""
+
+msgid "Laser Mode:"
+msgstr ""
+
+msgid "M3 (Constant Power)"
+msgstr ""
+
+msgid "M4 (Dynamic Power)"
+msgstr ""
+
+msgid "Create a grid pattern on your spoilboard for easy workpiece alignment and fixturing."
+msgstr ""
+
+msgid "Set the spindle's maximum RPM and power in the Device Manager."
+msgstr ""
+
+msgid "Must not be larger than the hole"
+msgstr ""
+
+msgid "Too small: the hole would take more than 10000 pecks"
+msgstr ""
+
+msgid "The device is in laser mode ($32=1). Switch it to CNC mode to use the Drill Press."
+msgstr ""
+
+msgid "Another program is waiting to go to the editor; this one was not sent."
+msgstr ""
+
+msgid "Must be at least 50 mm"
+msgstr ""
+
+msgid "Must be a whole number from 2 to 20"
+msgstr ""
+
+msgid "Pieces would be narrower than 15 mm"
+msgstr ""
+
+msgid "Pieces would be shorter than 15 mm"
+msgstr ""
+
+msgid "Must be between 10 and 30"
+msgstr ""
+
+msgid "Must be between 0 and 13"
+msgstr ""
+
+msgid "Must be between 0 and 10 mm"
+msgstr ""
+
+msgid "Must be a whole number from 0 to 4294967295"
+msgstr ""
+
+msgid "Randomize"
+msgstr ""
+
+msgid "Not a whole number"
+msgstr ""
+
+msgid "Surrounding Spaces:"
+msgstr ""
+
+msgid "Must be at least 20 mm"
+msgstr ""
+
+msgid "Must be between 1 and 20 mm"
+msgstr ""
+
+msgid "Must be more than twice the thickness"
+msgstr ""
+
+msgid "Finger plus space must be at least 0.1"
+msgstr ""
+
+msgid "Must be at least 1"
+msgstr ""
+
+msgid "Layer Type:"
+msgstr ""
+
+msgid "Board Width:"
+msgstr ""
+
+msgid "Board Height:"
+msgstr ""
+
+msgid "Isolation Width:"
+msgstr ""
+
+msgid "Remove Excess Copper:"
+msgstr ""
+
+msgid "Use Board Outline for Rubout:"
+msgstr ""
+
+msgid "Generate Alignment Holes:"
+msgstr ""
+
+msgid "Margin:"
+msgstr ""
+
+msgid "Drill Depth (Z):"
+msgstr ""
+
+msgid "Convert standard Gerber files (PCB layers) into G-Code for CNC isolation routing. Supports copper clearing (rubout), alignment holes, and custom tool parameters."
+msgstr ""
+
+msgid "No directory selected"
+msgstr ""
+
+msgid "Layer not found in directory"
+msgstr ""
+
+msgid "Please select a Gerber directory."
+msgstr ""
+
+msgid "Selected layer not found in directory."
+msgstr ""
+
+msgid "Must be below the surface (negative)"
+msgstr ""
+
+msgid "Failed to read file"
+msgstr ""
+
+msgid "Unsupported Gerber content is left out of the program"
+msgstr ""
+
+msgid "Top Copper"
+msgstr ""
+
+msgid "Bottom Copper"
+msgstr ""
+
+msgid "Top Solder Mask"
+msgstr ""
+
+msgid "Bottom Solder Mask"
+msgstr ""
+
+msgid "Top Screen Print"
+msgstr ""
+
+msgid "Bottom Screen Print"
+msgstr ""
+
+msgid "Drill Holes"
+msgstr ""
+
+msgid "Board Outline"
+msgstr ""
+
+msgid "Gerber Project"
+msgstr ""
+
+msgid "Parameters"
+msgstr ""
+
+msgid "Alignment Holes"
+msgstr ""
+
+msgid "Negative Z for the alignment holes (through the board)"
+msgstr ""
+
+msgid "Open Gerber Directory"
+msgstr ""
+
+msgid "Too many dividers: they would not fit the side"
+msgstr ""
+
+msgid "Must be at most 100"
+msgstr ""
+
+msgid "Must be between 0 and 100"
+msgstr ""
+
+msgid "Must not be more than the maximum power"
+msgstr ""
+
+msgid "Must be between 0 and 255"
+msgstr ""
+
+msgid "The engraving is too large: at most 10000 pixels per line"
+msgstr ""
+
+msgid "Safe Height:"
+msgstr ""
+
+msgid "Fast Feed Rate:"
+msgstr ""
+
+msgid "Slow Feed Rate:"
+msgstr ""
+
+msgid "Backoff Distance:"
+msgstr ""
+
+msgid "Max Probe Depth"
+msgstr ""
+
+msgid "Probe Distance"
+msgstr ""
+
+msgid "Diameter (mm)"
+msgstr ""
+
+msgid "Setter Plate X"
+msgstr ""
+
+msgid "Setter Plate Y"
+msgstr ""
+
+msgid "Setter Plate Z"
+msgstr ""
+
+msgid "Probe Depth:"
+msgstr ""
+
+msgid "Probe Tip Radius:"
+msgstr ""
+
+msgid "Plate Thickness:"
+msgstr ""
+
+msgid "Z-Touch"
+msgstr ""
+
+msgid "Edge Find"
+msgstr ""
+
+msgid "Corner Find"
+msgstr ""
+
+msgid "Bore Center"
+msgstr ""
+
+msgid "Boss Center"
+msgstr ""
+
+msgid "Tool Length"
+msgstr ""
+
+msgid "Routine"
+msgstr ""
+
+msgid "Target WCS"
+msgstr ""
+
+msgid "Auto-Update WCS"
+msgstr ""
+
+msgid "Write the result into the selected WCS (G10 L20) from the generated G-code. Z-touch, edge and corner only; bore/boss centres are not set automatically."
+msgstr ""
+
+msgid "Probe Axis"
+msgstr ""
+
+msgid "Probe Direction"
+msgstr ""
+
+msgid "Status:"
+msgstr ""
+
+msgid "Probe:"
+msgstr ""
+
+msgid "Triggered"
+msgstr ""
+
+msgid "Not triggered"
+msgstr ""
+
+msgid "Stop Probe"
+msgstr ""
+
+msgid "Routine Selection"
+msgstr ""
+
+msgid "Routine Settings"
+msgstr ""
+
+msgid "Results"
+msgstr ""
+
+msgid "X Axis"
+msgstr ""
+
+msgid "Y Axis"
+msgstr ""
+
+msgid "Z Axis"
+msgstr ""
+
+msgid "Negative"
+msgstr ""
+
+msgid "Positive"
+msgstr ""
+
+msgid "X-min / Y-min"
+msgstr ""
+
+msgid "X-max / Y-min"
+msgstr ""
+
+msgid "X-min / Y-max"
+msgstr ""
+
+msgid "X-max / Y-max"
+msgstr ""
+
+msgid "The probe input is already triggered."
+msgstr ""
+
+msgid "Waiting for the machine's next status report."
+msgstr ""
+
+msgid "The probe program was stopped."
+msgstr ""
+
+msgid "Surface at machine"
+msgstr ""
+
+msgid "Edge at machine"
+msgstr ""
+
+msgid "Corner at machine"
+msgstr ""
+
+msgid "Centre at machine"
+msgstr ""
+
+msgid "Measured diameter:"
+msgstr ""
+
+msgid "Tool length offset:"
+msgstr ""
+
+msgid "probe report(s) received."
+msgstr ""
+
+msgid "Program halted (feed hold, then reset)"
+msgstr ""
+
+msgid "Diameter:"
+msgstr ""
+
+msgid "The engraving is too large: at most 25 million pixels"
+msgstr ""
+
+msgid "The cancelled engraving is still finishing; try again in a moment."
+msgstr ""
+
+msgid "A file is waiting to open in the editor; this program was not sent."
+msgstr ""
+
+msgid "Answer the question about the editor's unsaved changes before opening a file."
+msgstr ""
+
+msgid "Stop the running job before generating."
+msgstr ""
+
+msgid "Must be at most 2000 mm"
+msgstr ""
+
+msgid "connect failed"
+msgstr ""
+
+msgid "write failed"
+msgstr ""
+
+msgid "read failed"
+msgstr ""
+
+msgid "machine worker thread panicked"
+msgstr ""
+
+msgid "cycle start ignored: probe stream halting"
+msgstr ""
+
+msgid "line too long for the controller buffer"
+msgstr ""
+
+msgid "program line too long for the controller buffer"
+msgstr ""
+
+msgid "on program line"
+msgstr ""
+
+msgid "dropped: controller reset after probe error"
+msgstr ""
+
+msgid "jog ignored: invalid distance or feed"
+msgstr ""
+
+msgid "jog ignored: a program is streaming"
+msgstr ""
+
+msgid "Failed to load image file"
+msgstr ""
+
+msgid "The engraving worker stopped"
+msgstr ""
+
+msgid "already connected"
+msgstr ""
+
+msgid "a program is already streaming"
+msgstr ""
+
+msgid "Firmware Settings"
+msgstr ""
+
+msgid "Device Info"
+msgstr ""
+
+msgid "Protocol mismatch: No valid parameters received from device"
+msgstr ""
+
+msgid "Setting written:"
+msgstr ""
+
+msgid "a job is running"
+msgstr ""
+
+msgid "Build"
+msgstr ""
+
+msgid "waiting for the controller to answer earlier commands"
+msgstr ""
+
+msgid "unknown EEPROM value type"
+msgstr ""
+
+msgid "Enter a value"
+msgstr ""
+
+msgid "Enter a whole number"
+msgstr ""
+
+msgid "The value is out of range"
+msgstr ""
+
+msgid "Dimensions"
+msgstr ""
+
+msgid "Device profiles could not be read:"
+msgstr ""
+
+msgid "No settings folder: device profiles cannot be loaded or saved."
+msgstr ""
+
+msgid "Failed to save device"
+msgstr ""
+
+msgid "Device not changed"
+msgstr ""
+
+msgid "Device saved:"
+msgstr ""
+
+msgid "Device deleted:"
+msgstr ""
+
+msgid "Active device:"
+msgstr ""
+
+msgid "Please connect to a device first."
+msgstr ""
+
+msgid "No settings reported yet: Retrieve them in Firmware Settings first."
+msgstr ""
+
+msgid "Device dimensions, spindle speed, and capabilities have been updated from the connected device. Click Save to apply changes."
+msgstr ""
+
+msgid "Devices"
+msgstr ""
+
+msgid "Search devices..."
+msgstr ""
+
+msgid "Add Device"
+msgstr ""
+
+msgid "Active"
+msgstr ""
+
+msgid "Sync from Device"
+msgstr ""
+
+msgid "Update device information from connected device"
+msgstr ""
+
+msgid "Set Active"
+msgstr ""
+
+msgid "Please select or create a device entry to edit"
+msgstr ""
+
+msgid "Delete device?"
+msgstr ""
+
+msgid "Delete '{}'? This cannot be undone."
+msgstr ""
+
+msgid "Device Type:"
+msgstr ""
+
+msgid "Controller:"
+msgstr ""
+
+msgid "Connection Type:"
+msgstr ""
+
+msgid "Baud Rate:"
+msgstr ""
+
+msgid "TCP Host:"
+msgstr ""
+
+msgid "TCP Port:"
+msgstr ""
+
+msgid "Timeout (ms):"
+msgstr ""
+
+msgid "Auto Reconnect"
+msgstr ""
+
+msgid "X Axis:"
+msgstr ""
+
+msgid "Y Axis:"
+msgstr ""
+
+msgid "Z Axis:"
+msgstr ""
+
+msgid "Min:"
+msgstr ""
+
+msgid "Max:"
+msgstr ""
+
+msgid "Limits"
+msgstr ""
+
+msgid "Max S-Value:"
+msgstr ""
+
+msgid "No of Axes:"
+msgstr ""
+
+msgid "Has Spindle"
+msgstr ""
+
+msgid "Spindle Power (W):"
+msgstr ""
+
+msgid "Max Spindle Speed (RPM):"
+msgstr ""
+
+msgid "Has Laser"
+msgstr ""
+
+msgid "Laser Power (W):"
+msgstr ""
+
+msgid "Has Coolant"
+msgstr ""
+
+msgid "Pen Mode (Repetier: M3/M5 become pen down/up Z moves)"
+msgstr ""
+
+msgid "FluidNC (supported via GRBL)"
+msgstr ""
+
+msgid "grblHAL (supported via GRBL)"
+msgstr ""
+
+msgid "TinyG (not supported)"
+msgstr ""
+
+msgid "g2core (not supported)"
+msgstr ""
+
+msgid "Smoothieware (not supported)"
+msgstr ""
+
+msgid "Marlin (not supported)"
+msgstr ""
+
+msgid "Serial"
+msgstr ""
+
+msgid "CNC Mill"
+msgstr ""
+
+msgid "CNC Lathe"
+msgstr ""
+
+msgid "Laser Cutter"
+msgstr ""
+
+msgid "3D Printer"
+msgstr ""
+
+msgid "Plotter"
+msgstr ""
+
+msgid "Invalid TCP Port"
+msgstr ""
+
+msgid "TCP Port must be a number"
+msgstr ""
+
+msgid "Invalid Timeout"
+msgstr ""
+
+msgid "Timeout must be a number (ms)"
+msgstr ""
+
+msgid "Invalid TCP Host"
+msgstr ""
+
+msgid "TCP Host must not contain spaces"
+msgstr ""
+
+msgid "TCP Host must not be empty for network connections"
+msgstr ""
+
+msgid "Invalid X Min"
+msgstr ""
+
+msgid "Invalid X Max"
+msgstr ""
+
+msgid "Invalid Y Min"
+msgstr ""
+
+msgid "Invalid Y Max"
+msgstr ""
+
+msgid "Invalid Z Min"
+msgstr ""
+
+msgid "Invalid Z Max"
+msgstr ""
+
+msgid "Invalid No of Axes"
+msgstr ""
+
+msgid "Number of axes must be an integer between 1 and 6"
+msgstr ""
+
+msgid "Invalid Max Feed Rate"
+msgstr ""
+
+msgid "Invalid Max S-Value"
+msgstr ""
+
+msgid "Max S-Value must be a number"
+msgstr ""
+
+msgid "Invalid Spindle Power"
+msgstr ""
+
+msgid "Spindle power must be a number (W)"
+msgstr ""
+
+msgid "Invalid Max Spindle Speed"
+msgstr ""
+
+msgid "Max spindle speed must be an integer (RPM)"
+msgstr ""
+
+msgid "Invalid Laser Power"
+msgstr ""
+
+msgid "Laser power must be a number (W)"
+msgstr ""
+
+msgid "Unsupported controller"
+msgstr ""
+
+msgid "The selected controller '{}' is not supported yet. Please choose a supported one and try again."
+msgstr ""
+
+msgid "The active device cannot be deleted. Set another device active first."
+msgstr ""
+
+msgid "The only device cannot be deleted."
+msgstr ""
+
+msgid "Check that the active device's controller in the Device Manager matches the machine."
+msgstr ""
+
+msgid "A copy of the unreadable profiles file was kept in"
+msgstr ""
+
+msgid "Settings stored in device profile:"
+msgstr ""
+
+msgid "Settings not stored in a device profile: no profile matches the connected port."
+msgstr ""
+
+msgid "Basic Info"
+msgstr ""
+
+msgid "Geometry"
+msgstr ""
+
+msgid "Manufacturer"
+msgstr ""
+
+msgid "Notes"
+msgstr ""
+
+msgid "No settings folder: custom tools cannot be loaded or saved."
+msgstr ""
+
+msgid "The custom tools file could not be read:"
+msgstr ""
+
+msgid "A copy of the unreadable custom tools file was kept in"
+msgstr ""
+
+msgid "Tool ID already exists. Please choose a unique ID."
+msgstr ""
+
+msgid "Tool saved:"
+msgstr ""
+
+msgid "Tool deleted:"
+msgstr ""
+
+msgid "Custom tools removed."
+msgstr ""
+
+msgid "Reset failed:"
+msgstr ""
+
+msgid "Import complete."
+msgstr ""
+
+msgid "Skipped:"
+msgstr ""
+
+msgid "Errors:"
+msgstr ""
+
+msgid "Custom tools exported."
+msgstr ""
+
+msgid "Search (name, id, type, diameter)..."
+msgstr ""
+
+msgid "All Types"
+msgstr ""
+
+msgid "All Materials"
+msgstr ""
+
+msgid "Filters"
+msgstr ""
+
+msgid "Min diameter (mm)"
+msgstr ""
+
+msgid "Max diameter (mm)"
+msgstr ""
+
+msgid "New Tool"
+msgstr ""
+
+msgid "Create a new custom tool"
+msgstr ""
+
+msgid "Library"
+msgstr ""
+
+msgid "Import GTC (.zip)..."
+msgstr ""
+
+msgid "Import tool catalog from a GTC zip package"
+msgstr ""
+
+msgid "Import GTC (.json)..."
+msgstr ""
+
+msgid "Import tool catalog from a GTC JSON file"
+msgstr ""
+
+msgid "Export Custom Tools..."
+msgstr ""
+
+msgid "Export custom tools to a JSON file"
+msgstr ""
+
+msgid "Reset Custom Tools..."
+msgstr ""
+
+msgid "Remove all custom/imported tools and delete local storage"
+msgstr ""
+
+msgid "Please select or create a tool to edit"
+msgstr ""
+
+msgid "Save changes"
+msgstr ""
+
+msgid "Discard changes"
+msgstr ""
+
+msgid "Delete this tool"
+msgstr ""
+
+msgid "Only custom tools can be deleted."
+msgstr ""
+
+msgid "Delete tool?"
+msgstr ""
+
+msgid "Reset custom tools?"
+msgstr ""
+
+msgid "This will delete all custom/imported tools and remove local custom tools storage."
+msgstr ""
+
+msgid "ID:"
+msgstr ""
+
+msgid "Tool Number:"
+msgstr ""
+
+msgid "Tool Type:"
+msgstr ""
+
+msgid "Tool Material:"
+msgstr ""
+
+msgid "Coating:"
+msgstr ""
+
+msgid "Shank:"
+msgstr ""
+
+msgid "Diameter (mm):"
+msgstr ""
+
+msgid "Length (mm):"
+msgstr ""
+
+msgid "Flute Length (mm):"
+msgstr ""
+
+msgid "Shaft Diameter (mm):"
+msgstr ""
+
+msgid "Number of Flutes:"
+msgstr ""
+
+msgid "Corner Radius (mm):"
+msgstr ""
+
+msgid "Only for corner radius end mills"
+msgstr ""
+
+msgid "Tip Angle (deg):"
+msgstr ""
+
+msgid "Used for drills / V-bits"
+msgstr ""
+
+msgid "Manufacturer:"
+msgstr ""
+
+msgid "Part Number:"
+msgstr ""
+
+msgid "Additional Notes:"
+msgstr ""
+
+msgid "Flat End Mill"
+msgstr ""
+
+msgid "Ball End Mill"
+msgstr ""
+
+msgid "Corner Radius End Mill"
+msgstr ""
+
+msgid "V-Bit"
+msgstr ""
+
+msgid "Drill Bit"
+msgstr ""
+
+msgid "Spot Drill"
+msgstr ""
+
+msgid "Engraving Bit"
+msgstr ""
+
+msgid "Chamfer Tool"
+msgstr ""
+
+msgid "Specialty"
+msgstr ""
+
+msgid "Carbide"
+msgstr ""
+
+msgid "Coated Carbide"
+msgstr ""
+
+msgid "Diamond"
+msgstr ""
+
+msgid "Derived (Straight from shaft diameter)"
+msgstr ""
+
+msgid "Collet"
+msgstr ""
+
+msgid "Tapered"
+msgstr ""
+
+msgid "Tool ID is required"
+msgstr ""
+
+msgid "Tool name is required"
+msgstr ""
+
+msgid "Invalid diameter"
+msgstr ""
+
+msgid "Invalid length"
+msgstr ""
+
+msgid "Invalid flute length"
+msgstr ""
+
+msgid "Invalid shaft diameter"
+msgstr ""
+
+msgid "Invalid corner radius"
+msgstr ""
+
+msgid "Invalid tip angle"
+msgstr ""
+
+msgid "Import GTC Package"
+msgstr ""
+
+msgid "Import GTC JSON"
+msgstr ""
+
+msgid "Export Custom Tools"
+msgstr ""
+
+msgid "GTC Packages"
+msgstr ""
+
+msgid "Cannot Save Material"
+msgstr ""
+
+msgid "Could not save the material:"
+msgstr ""
+
+msgid "Could not delete the material:"
+msgstr ""
+
+msgid "Machining"
+msgstr ""
+
+msgid "Safety"
+msgstr ""
+
+msgid "No settings folder: custom materials cannot be loaded or saved."
+msgstr ""
+
+msgid "The custom materials file could not be read:"
+msgstr ""
+
+msgid "A copy of the unreadable custom materials file was kept in"
+msgstr ""
+
+msgid "A material with this ID already exists."
+msgstr ""
+
+msgid "Material saved:"
+msgstr ""
+
+msgid "Material deleted:"
+msgstr ""
+
+msgid "No materials found"
+msgstr ""
+
+msgid "New Material"
+msgstr ""
+
+msgid "Please select or create a material to edit"
+msgstr ""
+
+msgid "Machinability:"
+msgstr ""
+
+msgid "Only custom materials can be deleted."
+msgstr ""
+
+msgid "Delete material?"
+msgstr ""
+
+msgid "The material has unsaved changes. Save them before continuing?"
+msgstr ""
+
+msgid "Subcategory:"
+msgstr ""
+
+msgid "e.g., Hardwood, Alloy"
+msgstr ""
+
+msgid "Density (kg/m3):"
+msgstr ""
+
+msgid "Machinability (1-10):"
+msgstr ""
+
+msgid "Tensile Strength (MPa):"
+msgstr ""
+
+msgid "Melting Point (deg C):"
+msgstr ""
+
+msgid "Optional"
+msgstr ""
+
+msgid "Chip Type:"
+msgstr ""
+
+msgid "Heat Sensitivity:"
+msgstr ""
+
+msgid "Abrasiveness:"
+msgstr ""
+
+msgid "Surface Finish:"
+msgstr ""
+
+msgid "Dust Hazard:"
+msgstr ""
+
+msgid "Fume Hazard:"
+msgstr ""
+
+msgid "Coolant Required"
+msgstr ""
+
+msgid "Additional Notes and Tips:"
+msgstr ""
+
+msgid "Engineered Wood"
+msgstr ""
+
+msgid "Plastic"
+msgstr ""
+
+msgid "Non-Ferrous Metal"
+msgstr ""
+
+msgid "Ferrous Metal"
+msgstr ""
+
+msgid "Composite"
+msgstr ""
+
+msgid "Stone and Ceramic"
+msgstr ""
+
+msgid "Segmented"
+msgstr ""
+
+msgid "Granular"
+msgstr ""
+
+msgid "Small"
+msgstr ""
+
+msgid "Low"
+msgstr ""
+
+msgid "Moderate"
+msgstr ""
+
+msgid "High"
+msgstr ""
+
+msgid "Excellent"
+msgstr ""
+
+msgid "Good"
+msgstr ""
+
+msgid "Fair"
+msgstr ""
+
+msgid "Rough"
+msgstr ""
+
+msgid "Minimal"
+msgstr ""
+
+msgid "Name is required"
+msgstr ""
+
+msgid "Subcategory is required"
+msgstr ""
+
+msgid "Tensile strength must be a number"
+msgstr ""
+
+msgid "Melting point must be a number"
+msgstr ""
+
+msgid "ID is required"
+msgstr ""
+
+msgid "ID must not contain spaces"
+msgstr ""
+
+msgid "Index"
+msgstr ""
+
+msgid "the controller stored a different value:"
+msgstr ""
+
+msgid "written"
+msgstr ""
+
+msgid "stored"
+msgstr ""
+
+msgid "The device profile has unsaved changes. Save them before continuing?"
+msgstr ""
+
+msgid "Go to Work Zero refused: the machine is not idle."
+msgstr ""
+
+msgid "Waiting for the controller to report the active work coordinate system."
+msgstr ""
+
+msgid "Active work coordinate system is not G54-G59."
+msgstr ""
+
+msgid "Work zero needs a GRBL-family controller (set in the device profile)."
+msgstr ""
+
+msgid "Zero refused: the machine is not idle."
+msgstr ""
+
+msgid "Zero All refused: the work coordinate system changed."
+msgstr ""
+
+msgid "This sets work coordinate system {wcs} so the current X/Y/Z becomes 0."
+msgstr ""
+
+msgid "Cannot simulate stock removal: {reason}"
+msgstr ""
+
+msgid "Nothing to simulate: the program has no moves."
+msgstr ""
+
+msgid "Stock removal simulation failed."
+msgstr ""
+
+msgid "Stock removal too large to display on this GPU."
+msgstr ""
+
+msgid "The controller did not confirm the override change."
+msgstr ""
+
+msgid "Rotary calibration is not a number: check rotary_calibration under [machine] in config.toml."
+msgstr ""
+
+msgid "not sent: the controller was reset"
+msgstr ""
+
+msgid "Align"
+msgstr ""
+
+msgid "Convert to Path"
+msgstr ""
+
+msgid "Convert to Rectangle"
+msgstr ""
+
+msgid "Reset All"
+msgstr ""
+
+msgid "Command"
+msgstr ""
+
+msgid "Where"
+msgstr ""
+
+msgid "Shortcut"
+msgstr ""
+
+msgid "Everywhere"
+msgstr ""
+
+msgid "Press a key (Escape cancels)"
+msgstr ""
+
+msgid "Change"
+msgstr ""
+
+msgid "The E-STOP and feed hold keys cannot be changed"
+msgstr ""
+
+msgid "{key} is kept for {command}"
+msgstr ""
+
+msgid "A command that moves the machine cannot use the letter of the E-STOP or feed hold key"
+msgstr ""
+
+msgid "A jog key must be a letter, digit or symbol key without Ctrl or Alt, so it never jogs while you type"
+msgstr ""
+
+msgid "{key} opens a menu"
+msgstr ""
+
+msgid "{key} is already used by {command}"
+msgstr ""
+
+msgid "{key} is reserved by the system"
+msgstr ""
+
+msgid "Double presses are not supported"
+msgstr ""
+
+msgid "{key} works in the wrong place"
+msgstr ""
+
+msgid "Outside Machine Control a command that moves the machine needs Ctrl, Alt or a function key"
+msgstr ""
+
+msgid "Too many shortcuts are changed"
+msgstr ""
+
+msgid "These saved shortcuts broke a shortcut rule and use their default keys again: {commands}"
+msgstr ""
+
+msgid "Duplicate"
+msgstr ""
+
+msgid "Toggle Grid"
+msgstr ""
+
+msgid "Toggle Machine Bounds"
+msgstr ""
+
+msgid "Toggle Rapid Moves"
+msgstr ""
+
+msgid "Toggle Cutting Moves"
+msgstr ""
+
+msgid "Unlock ignored: the machine is not in ALARM."
+msgstr ""
+
+msgid "not supported by Repetier firmware"
+msgstr ""
+
+msgid "skipped: no Repetier equivalent"
+msgstr ""
+
+msgid "resend request could not be honoured; reconnect to the controller"
+msgstr ""
+
+msgid "Emergency stop (M112, {shortcut})"
+msgstr ""
+
+msgid "Overrides need GRBL's real-time commands; Repetier firmware has none."
+msgstr ""
+
+msgid "Continuous jog needs GRBL's jog cancel; Repetier firmware has none."
+msgstr ""
+
+msgid "Probing is not available on Repetier firmware."
+msgstr ""
+
+msgid "Work zero is not available for this controller type (set in the device profile)."
+msgstr ""
+
+msgid "Repetier firmware has no work coordinate systems; Zero sets the position with G92."
+msgstr ""
+
+msgid "This sets the work position (G92) so the current X/Y/Z becomes 0."
+msgstr ""
+
+msgid "Emergency stop (M112): reset the controller or reconnect to continue."
+msgstr ""
+
+msgid "the controller is emergency-stopped (M112): reset it or reconnect"
+msgstr ""
+
+msgid "Select the active work coordinate system: the program may have changed it."
+msgstr ""
+
+msgid "the command line is empty"
+msgstr ""
+
+msgid "Reconnecting… ({attempt}/{max})"
+msgstr ""
+
+msgid "connection lost: the job was stopped and will not resume"
+msgstr ""
+
+msgid "automatic reconnect failed"
+msgstr ""

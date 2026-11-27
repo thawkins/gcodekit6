@@ -1,4 +1,4 @@
-# Cargo configuration for GCodeKit5
+# Cargo configuration for GCodeKit6
 
 # Link the C runtime statically on MSVC so the release exe needs no
 # VC++ redistributable (VCRUNTIME140.dll) on a clean Windows install.

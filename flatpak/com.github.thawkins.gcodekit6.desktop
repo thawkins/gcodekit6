@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=gcodekit6
+Comment=Universal G-Code Sender for CNC machines
+Exec=gcodekit6
+Icon=com.github.thawkins.gcodekit6
+Terminal=false
+Type=Application
+Categories=Engineering;Graphics;
+Keywords=GCode;CNC;GRBL;
+StartupNotify=true

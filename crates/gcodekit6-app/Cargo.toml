@@ -1,0 +1,41 @@
+[package]
+name = "gcodekit6-app"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "Toolkit-free application state shared by the GCodeKit6 front ends"
+autotests = false
+
+[dependencies]
+gcodekit6-core = { path = "../gcodekit6-core" }
+gcodekit6-communication = { path = "../gcodekit6-communication" }
+gcodekit6-devicedb = { path = "../gcodekit6-devicedb" }
+gcodekit6-settings = { path = "../gcodekit6-settings" }
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tracing = { workspace = true }
+dirs = "7.0"
+
+[build-dependencies]
+# Parses po/*.po into the embedded translation tables (src/i18n.rs); no msgfmt.
+polib = "0.3"
+
+[features]
+# The loopback transport of `test_support`, for tests only (enabled from dev-dependencies).
+test-support = []
+
+[dev-dependencies]
+tempfile = { workspace = true }
+gcodekit6-app = { path = ".", features = ["test-support"] }
+
+[[test]]
+name = "all"
+path = "tests/all.rs"
+
+[lints]
+workspace = true

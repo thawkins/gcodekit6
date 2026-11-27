@@ -1,0 +1,29 @@
+[package]
+name = "gcodekit6-settings"
+autotests = false
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+description = "Configuration and settings management for GCodeKit6"
+
+[dependencies]
+gcodekit6-core = { path = "../gcodekit6-core" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+toml = "1.1"
+dirs = "7.0"
+thiserror = { workspace = true }
+craft-settings = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+
+[[test]]
+name = "all"
+path = "tests/all.rs"
+
+[lints]
+workspace = true
