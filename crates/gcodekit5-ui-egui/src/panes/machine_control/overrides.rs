@@ -1,6 +1,6 @@
 //! The override section: feed, rapid and spindle override buttons with the percentages the
 //! controller last reported. Each button sends its GRBL real-time override byte. Under them,
-//! GTK's "Set %" fields move the feed or spindle override to an exact percentage, one
+//! the "Set %" fields move the feed or spindle override to an exact percentage, one
 //! confirmed step at a time (`gcodekit5_app::override_target`, driven by the pane).
 //!
 //! Dependencies: `egui`, `gcodekit5-app` (real-time commands, override targets,
@@ -53,7 +53,7 @@ pub(super) struct Targets {
     pub feed: u16,
     /// The spindle override target, in percent.
     pub spindle: u16,
-    /// A target is being reached: the Set buttons wait (GTK disabled them too).
+    /// A target is being reached: the Set buttons wait (disabled).
     pub busy: bool,
 }
 
@@ -110,7 +110,7 @@ const FEED: [OverrideButton; 5] = [
     ),
 ];
 
-/// GTK's order: the stop button sits between reset and +1.
+/// The order: the stop button sits between reset and +1.
 const SPINDLE: [OverrideButton; 6] = [
     (
         Face::Text("-10"),
@@ -151,7 +151,7 @@ const RAPID: [(&str, RealtimeCommand); 3] = [
     ("100%", RealtimeCommand::RapidOverride100),
 ];
 
-/// Width and height of an override button (GTK's compact row).
+/// Width and height of an override button (a compact row).
 const BUTTON_SIZE: egui::Vec2 = egui::vec2(48.0, 26.0);
 
 /// The button of `face`.
@@ -188,7 +188,7 @@ fn row(
 
 /// The override percentage last reported, as text, and whether it is at a limit.
 ///
-/// GTK marks an override at its limit with " MAX" (200 % and over) or " MIN" (the feed at
+/// An override at its limit is marked with " MAX" (200 % and over) or " MIN" (the feed at
 /// 10 % and under, the spindle at 50 % and under) in the error colour; `limits` gives those
 /// bounds, `None` for the rapid override, which has none.
 ///
@@ -213,12 +213,12 @@ fn percent(
     (format!("{value}%{marker}"), !marker.is_empty())
 }
 
-/// GTK's feed override limits for the MIN/MAX marker, in percent.
+/// The feed override limits for the MIN/MAX marker, in percent.
 const FEED_LIMITS: (u16, u16) = (10, 200);
-/// GTK's spindle override limits for the MIN/MAX marker, in percent.
+/// The spindle override limits for the MIN/MAX marker, in percent.
 const SPINDLE_LIMITS: (u16, u16) = (50, 200);
 
-/// The percentage text, in the error colour at a limit (GTK's `error` style).
+/// The percentage text, in the error colour at a limit.
 fn value_text(ui: &egui::Ui, (text, limit): (String, bool)) -> egui::RichText {
     let text = egui::RichText::new(text);
     if limit {

@@ -7,12 +7,12 @@
 //! A real dwell of exactly [`MARKER_DWELL`] seconds would be miscounted; no program dwells for
 //! 12345.678 s.
 //!
-//! As in the GTK `ui/gtk/renderer_3d.rs`, rapids and moves made with the spindle/laser off
+//! Rapids and moves made with the spindle/laser off
 //! are travel (grey), powered feed moves and arcs are cuts coloured by spindle/laser power,
 //! and arcs are split into segments of at most 5 degrees and at most the Preferences "Arc
 //! Segment Length" long ([`arc_segment_count`]).
 //!
-//! The same pass takes GTK's inspector statistics of the S values ([`Intensity`]) and
+//! The same pass takes the inspector statistics of the S values ([`Intensity`]) and
 //! builds the run preview's path ([`super::preview::PathBuilder`]), so the
 //! preview needs no second parse.
 //!
@@ -28,7 +28,7 @@ use super::preview::PathBuilder;
 /// The dwell (seconds) of the marker placed after each program line.
 pub const MARKER_DWELL: f32 = 12345.678;
 
-/// Colour of travel: rapids and moves with the spindle/laser off (GTK's 50% grey).
+/// Colour of travel: rapids and moves with the spindle/laser off (50% grey).
 pub const TRAVEL_COLOR: [u8; 4] = [128, 128, 128, 255];
 
 /// The default "Arc Segment Length" (mm). Arcs are drawn in steps of at most 5 degrees
@@ -40,7 +40,7 @@ pub const DEFAULT_ARC_SEGMENT_LENGTH: f64 = 100.0;
 /// that is not a number falls back to [`DEFAULT_ARC_SEGMENT_LENGTH`].
 pub const ARC_SEGMENT_LENGTH_RANGE: std::ops::RangeInclusive<f64> = 0.01..=100.0;
 
-/// The longest arc step, in radians (5 degrees, as GTK draws arcs).
+/// The longest arc step, in radians (5 degrees).
 const ARC_MAX_STEP: f64 = std::f64::consts::PI / 36.0;
 
 /// The fewest and most segments one arc is drawn with, so a tiny segment length cannot
@@ -113,7 +113,7 @@ impl ToolpathVertex {
     }
 }
 
-/// GTK's inspector statistics of the spindle/laser power: over every move and arc that
+/// The inspector statistics of the spindle/laser power: over every move and arc that
 /// carries an S value, one value per command.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Intensity {
@@ -162,7 +162,7 @@ pub struct ToolpathMesh {
     pub vertices: Vec<ToolpathVertex>,
     /// The bounds of every move, or `None` when the program moves nowhere.
     pub bounds: Option<Aabb>,
-    /// The bounds of the cutting moves (GTK's inspector bounds), else `None`.
+    /// The bounds of the cutting moves (the inspector bounds), else `None`.
     pub cut_bounds: Option<Aabb>,
     /// The run preview's path.
     pub preview: Vec<Vec3>,
@@ -260,7 +260,7 @@ impl Builder {
     }
 }
 
-/// The colour of a cut at spindle/laser power `s`, as the GTK 3D view picks it.
+/// The colour of a cut at spindle/laser power `s`.
 fn cut_color(vis: &Visualizer, s: f32) -> [u8; 4] {
     let (r, g, b) = vis.get_color_for_intensity(s);
     let byte = |c: f32| (c.clamp(0.0, 1.0) * 255.0).round() as u8;

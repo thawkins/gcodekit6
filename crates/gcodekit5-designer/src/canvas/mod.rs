@@ -198,8 +198,8 @@ impl Canvas {
         }
     }
 
-    /// Calcula el nuevo orden si se mueven los seleccionados al principio.
-    /// Devuelve `None` si no hay selección, si no cambia nada, o si partiría un grupo.
+    /// Computes the new order with the selected shapes moved to the start.
+    /// Returns `None` with no selection, when nothing changes, or when it would split a group.
     pub fn move_selected_to_top(&self) -> Option<Vec<u64>> {
         let ids = self.shape_store.selected_ids();
         if ids.is_empty() {

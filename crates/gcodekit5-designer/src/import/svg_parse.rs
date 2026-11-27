@@ -4,14 +4,14 @@
 //! self-closing tags with quoted attributes; comments, processing instructions,
 //! doctypes and CDATA are skipped), an affine transform type with a parser for the
 //! SVG `transform` attribute (`matrix`, `translate`, `scale`, `rotate`, `skewX`,
-//! `skewY`), and the root `viewBox` → millimetre mapping.
+//! `skewY`), and the root `viewBox` to millimetre mapping.
 //!
 //! No external dependencies beyond `std`.
 
 use crate::model::Point;
 
 /// 2D affine transform in SVG `matrix(a b c d e f)` form:
-/// `x' = a·x + c·y + e`, `y' = b·x + d·y + f`.
+/// `x' = a*x + c*y + e`, `y' = b*x + d*y + f`.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub(crate) struct Affine {
     pub a: f64,
@@ -67,7 +67,7 @@ impl Affine {
         }
     }
 
-    /// Returns `self · other`: the transform that applies `other` first, then `self`.
+    /// Returns `self * other`: the transform that applies `other` first, then `self`.
     pub fn mul(&self, other: &Affine) -> Affine {
         Affine {
             a: self.a * other.a + self.c * other.b,
@@ -257,7 +257,7 @@ impl XmlTag {
     }
 }
 
-/// Strips a namespace prefix (`svg:rect` → `rect`).
+/// Strips a namespace prefix (`svg:rect` to `rect`).
 fn local_name(name: &str) -> &str {
     name.rsplit(':').next().unwrap_or(name)
 }

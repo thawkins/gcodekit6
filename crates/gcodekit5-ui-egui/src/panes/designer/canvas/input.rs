@@ -1,4 +1,4 @@
-//! Mouse and keyboard input of the design canvas, as the GTK canvas handles it:
+//! Mouse and keyboard input of the design canvas:
 //!
 //! - Select tool: a press selects the shape under the pointer (Shift adds, Ctrl/Cmd toggles,
 //!   empty space deselects); a plain click on a shape of a multi-selection keeps only that
@@ -13,13 +13,13 @@
 //! - With the canvas focused (after a press in it): Delete/Backspace delete the selection,
 //!   Escape cancels a polyline or deselects. A text field elsewhere owns the keyboard
 //!   instead, so these never fire while typing.
-//! - Right-click with a selection: GTK's context menu with Cut, Copy, Paste, Delete, Mirror
+//! - Right-click with a selection: a context menu with Cut, Copy, Paste, Delete, Mirror
 //!   on X / Y, Array... (the pane opens the Array dialog), Rotate, Align, Group / Ungroup
 //!   (also Ctrl+G / Ctrl+Shift+G), the boolean operations (Union, Diff, Inter) and Convert
 //!   to Path / Rectangle. With only a clipboard the same menu opens for Paste, the entries
 //!   that need a selection disabled. Cut, Copy and Paste use the design's own clipboard
-//!   (`DesignerState::clipboard`), as GTK did, not the system clipboard; Paste centres the
-//!   copies on the point right-clicked. Align also has GTK's Alt keys, through the app's
+//!   (`DesignerState::clipboard`), not the system clipboard; Paste centres the
+//!   copies on the point right-clicked. Align also has Alt keys, through the app's
 //!   keymap (`crate::commands`) while the canvas has the keyboard.
 //!
 //! Drawing tools and moves snap to the snap step; selection hit tests use the raw pointer.
@@ -83,7 +83,7 @@ pub struct CanvasInput {
     /// The context menu's "Array..." was chosen, until the pane opens the dialog.
     pub(crate) array_click: bool,
     /// The world point of the last right-click: where the context menu's Paste puts the
-    /// clipboard (GTK's pointer position).
+    /// clipboard (the pointer position).
     pub(crate) menu_at: (f64, f64),
 }
 
@@ -213,7 +213,7 @@ impl CanvasInput {
         let finished = response.secondary_clicked()
             && tool == DesignerTool::Polyline
             && self.finish_polyline(state, true);
-        // GTK: a menu for a selection, or for Paste while the clipboard holds shapes.
+        // A menu for a selection, or for Paste while the clipboard holds shapes.
         if !finished && (state.selected_count() > 0 || !state.clipboard.is_empty()) {
             let at = self.menu_at;
             response.context_menu(|ui| {
@@ -266,7 +266,7 @@ impl CanvasInput {
                     self.polyline.push(Point::new(x, y));
                 }
             }
-            // GTK: a click places text at the snapped point, through the Add Text dialog.
+            // A click places text at the snapped point, through the Add Text dialog.
             DesignerTool::Text => {
                 self.text_click = Some(editing::snap(state, at.0, at.1));
             }
@@ -378,7 +378,7 @@ impl CanvasInput {
     }
 }
 
-/// GTK's press with the Select tool: on a resize handle, or on an already selected shape
+/// A press with the Select tool: on a resize handle, or on an already selected shape
 /// without modifiers, the selection waits for the drag or release; otherwise the shape under
 /// the pointer is selected (Shift adds, Ctrl/Cmd toggles) and empty space deselects.
 fn press_select(
@@ -517,7 +517,7 @@ const ROTATIONS: [(&str, f64); 5] = [
 /// A designer model operation on the selection.
 type SelectionOp = fn(&mut DesignerState);
 
-/// The Align submenu: label msgid and the model's operation, in GTK's order.
+/// The Align submenu: label msgid and the model's operation, in menu order.
 const ALIGNMENTS: [(&str, SelectionOp); 6] = [
     (
         n_!("Align Left"),
@@ -542,7 +542,7 @@ const ALIGNMENTS: [(&str, SelectionOp); 6] = [
     ),
 ];
 
-/// The boolean operations: GTK's short labels and the model's operation. Each replaces the
+/// The boolean operations: short labels and the model's operation. Each replaces the
 /// selected shapes by one new shape (the operation's result), as one undo step.
 const BOOLEANS: [(&str, SelectionOp); 3] = [
     (n_!("Union"), DesignerState::perform_boolean_union),
@@ -550,7 +550,7 @@ const BOOLEANS: [(&str, SelectionOp); 3] = [
     (n_!("Inter"), DesignerState::perform_boolean_intersection),
 ];
 
-/// GTK's conversions: each replaces the selected shapes by one new shape, a path through
+/// The conversions: each replaces the selected shapes by one new shape, a path through
 /// all their outlines or the rectangle of their bounds, as one undo step.
 const CONVERSIONS: [(&str, SelectionOp); 2] = [
     (
@@ -586,7 +586,7 @@ pub fn msgids() -> Vec<&'static str> {
     ids
 }
 
-/// The right-click menu, in GTK's order: Cut, Copy, Paste (while the clipboard holds
+/// The right-click menu, in order: Cut, Copy, Paste (while the clipboard holds
 /// shapes), Delete, Group and Ungroup (when the selection can be), for two shapes or more
 /// Union, Diff and Inter, Mirror on X and Y, Array..., Rotate by a fixed angle, for two
 /// shapes or more Align, then Convert to Path and Convert to Rectangle. Without a selection
@@ -605,7 +605,7 @@ fn context_menu(
     at: (f64, f64),
 ) -> bool {
     let selection = state.selected_count() > 0;
-    // An entry that needs a selection is shown disabled without one, as GTK's whole menu.
+    // An entry that needs a selection is shown disabled without one.
     let item = |ui: &mut egui::Ui, enabled: bool, label: &str| {
         let clicked = ui
             .add_enabled(enabled, egui::Button::new(tr.tr(label)))
@@ -624,7 +624,7 @@ fn context_menu(
     if !state.clipboard.is_empty() && item(ui, true, "Paste") {
         state.paste_at_location(at.0, at.1);
     }
-    // GTK's Ctrl+D; the entry is the key's place in a menu (GTK's menu had none).
+    // The Ctrl+D action; the entry gives the key a place in a menu.
     if item(ui, selection, "Duplicate") {
         state.duplicate_selected(crate::panes::designer::DUPLICATE_OFFSET_MM);
     }
@@ -643,7 +643,7 @@ fn context_menu(
     if can_group || can_ungroup {
         ui.separator();
     }
-    // GTK offers the boolean operations for two shapes or more.
+    // The boolean operations are offered for two shapes or more.
     if state.can_perform_boolean_op() {
         for (label, op) in BOOLEANS {
             if item(ui, true, label) {
@@ -668,7 +668,7 @@ fn context_menu(
             }
         });
     });
-    // GTK offers Align for two shapes or more.
+    // Align is offered for two shapes or more.
     if state.selected_count() >= 2 {
         ui.menu_button(tr.tr("Align"), |ui| {
             for (label, align) in ALIGNMENTS {

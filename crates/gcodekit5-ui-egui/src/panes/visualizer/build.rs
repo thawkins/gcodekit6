@@ -8,7 +8,7 @@
 //! at most one waits.
 //!
 //! Each build also says whether the program replaces the one shown (a newly opened file)
-//! rather than editing it, by the GTK rule ([`is_content_replacement`]), so the pane refits
+//! rather than editing it ([`is_content_replacement`]), so the pane refits
 //! the view only for a new program.
 //!
 //! Dependencies: `egui` (repaint), `gcodekit5-visualizer` (replacement rule).

@@ -2,7 +2,7 @@
 //!
 //! Locations of the configuration files, and loading and saving [`Config`]
 //! through the craft-settings store (`config.toml`). The first load imports
-//! the GTK build's `config.json` and data files once
+//! the legacy build's `config.json` and data files once
 //! ([`crate::migrate::import_legacy`]); `config.json` is never written again.
 //!
 //! A [`SettingsManager`] value holds the loaded settings and the folders they
@@ -84,7 +84,7 @@ impl SettingsManager {
         Ok(())
     }
 
-    /// The legacy (GTK build) config directory, which also holds the device,
+    /// The legacy config directory, which also holds the device,
     /// tool and material files.
     pub fn config_directory() -> Result<PathBuf> {
         // %APPDATA% on Windows, ~/Library/Application Support on macOS and

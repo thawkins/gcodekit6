@@ -2,11 +2,11 @@
 //! and raster images. The app asks for the files ([`crate::dialogs`]) and the unsaved-changes
 //! question; these run once it has the answer.
 //!
-//! Ported from the GTK `designer/file_ops.rs` and the canvas's `import_raster_image`:
+//! What each operation does:
 //!
 //! - New clears the design and its undo history in the chosen mode (2D laser, 3D CNC).
 //! - Open loads a `.gckd` / `.gck5` file through the model's serialization into a copy of
-//!   the design, so a file that cannot be read leaves the design as it was. Like GTK, a
+//!   the design, so a file that cannot be read leaves the design as it was. A
 //!   non-positive step down becomes 0.1 mm and the ids continue after the loaded shapes;
 //!   a stored zoom that is not usable fits the view instead. The notice names the shapes the
 //!   file could not restore (an unknown shape type) and the images whose file is missing.
@@ -14,7 +14,7 @@
 //!   then renames it (`crate::files`): a read-only target is refused and a failed save
 //!   leaves the design modified.
 //! - Import adds the shapes of an SVG or DXF file, or the shadow of an STL model when
-//!   Settings' "STL File Import" is on (GTK's switch; refused otherwise), as one undo step,
+//!   Settings' "STL File Import" is on (refused otherwise), as one undo step,
 //!   applies a DXF entity's elevation and thickness, switches to CNC mode when any shape has
 //!   depth, fits the view and reports discarded solids and replaced numbers. An image becomes a
 //!   raster shape, in laser mode only. Files over [`MAX_IMPORT_BYTES`] are refused before
@@ -22,7 +22,7 @@
 //!
 //! New and Open also forget the layers panel's hidden and locked shapes: they are view state
 //! keyed by shape id, and ids repeat between documents. The outcome is shown as the pane's
-//! notice ([`DesignerPane::notice`]), GTK's status label and warning dialogs.
+//! notice ([`DesignerPane::notice`]).
 //!
 //! Not ported: remembering the last folder in the settings, the window title's file name.
 //!
@@ -244,7 +244,7 @@ impl DesignerPane {
                 .map_err(|e| anyhow::anyhow!("Failed to read file: {e}"))
                 .and_then(|content| SvgImporter::new(1.0, 0.0, 0.0).import_string(&content)),
             Some("dxf") => DxfImporter::new(1.0, 0.0, 0.0).import_file(&path.to_string_lossy()),
-            // GTK: the model's shadow, unscaled and where the model is, only when the
+            // The model's shadow, unscaled and where the model is, only when the
             // settings allow STL import.
             Some("stl") if self.stl_import => StlImporter::new()
                 .with_scale(1.0)

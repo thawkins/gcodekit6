@@ -1,4 +1,4 @@
-//! Drawing of the Laser Image Engraver page: GTK's groups (image, output, power, scanning,
+//! Drawing of the Laser Image Engraver page: the groups (image, output, power, scanning,
 //! transformations, halftoning, offsets), the image preview and the actions.
 //!
 //! Dependencies: `egui`, `gcodekit5-camtools` (option types), `gcodekit5-app`
@@ -47,7 +47,7 @@ pub fn msgids() -> Vec<&'static str> {
     ]
 }
 
-/// The options of the drop-downs (names GTK did not translate are shown as they are).
+/// The options of the drop-downs (the untranslated angle names are shown as they are).
 const SCANS: [(ScanDirection, &str); 2] = [
     (ScanDirection::Horizontal, n_!("Horizontal")),
     (ScanDirection::Vertical, n_!("Vertical")),

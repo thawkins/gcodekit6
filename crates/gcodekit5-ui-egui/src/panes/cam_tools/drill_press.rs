@@ -1,8 +1,8 @@
 //! The Drill Press page: plunge, peck or helical drilling of one hole.
 //!
-//! GTK's defaults: a 10 mm hole with a 6 mm tool from Z 0 to -10 in 2 mm pecks, safe Z 5,
-//! 100 / 500 mm/min and 10000 RPM, centred in a 200 mm travel (GTK's
-//! fallback when GRBL `$130` / `$131` are unknown). GTK ran the program on the machine straight away; here it goes to
+//! Defaults: a 10 mm hole with a 6 mm tool from Z 0 to -10 in 2 mm pecks, safe Z 5,
+//! 100 / 500 mm/min and 10000 RPM, centred in a 200 mm travel (the
+//! fallback when GRBL `$130` / `$131` are unknown). The program goes to
 //! the editor like the other tools.
 //!
 //! Dependencies: `egui`, `gcodekit5-camtools` (generator), `gcodekit5-app` (translations), `gcodekit5-core` (units).
@@ -97,13 +97,13 @@ pub struct DrillPressParams {
     /// The active device's axis count (the pane refreshes it from the device profile).
     pub num_axes: u8,
     /// The device is in laser mode, GRBL `$32=1` (the pane refreshes it from the
-    /// controller's reported settings). The program starts the spindle with `M3` and plunges: a laser would fire in
-    /// place, so GTK refused to drill.
+    /// controller's reported settings). The program starts the spindle with `M3` and plunges:
+    /// a laser would fire in place, so drilling is refused.
     pub laser_mode: bool,
 }
 
 impl DrillPressParams {
-    /// GTK's initial values in `units`, the hole centred in a 200 mm travel (GTK's fallback
+    /// The initial values in `units`, the hole centred in a 200 mm travel (the fallback
     /// when `$130` / `$131` are unknown).
     ///
     /// # Arguments
@@ -112,7 +112,7 @@ impl DrillPressParams {
         Self::with_center(units, (100.0, 100.0))
     }
 
-    /// GTK's initial values in `units` with the hole at `center` (mm).
+    /// The initial values in `units` with the hole at `center` (mm).
     ///
     /// # Arguments
     /// * `units` - The display units.
@@ -231,14 +231,14 @@ impl DrillPressParams {
         })
     }
 
-    /// The page's input as GTK's preset file: [`DrillPressParameters`] as serde writes it,
+    /// The page's input as a preset file: [`DrillPressParameters`] as serde writes it,
     /// lengths in millimetres.
     ///
     /// # Arguments
     /// * `tr` - Translator for the current UI language.
     ///
     /// # Errors
-    /// The first field that does not parse (GTK refused to save then too).
+    /// The first field that does not parse (saving is refused then).
     pub fn preset_json(&self, tr: &Translator) -> Result<String, String> {
         let u = self.units;
         let len = |label, text: &str| common::preset_len(label, text, u).map(f64::from);
@@ -262,7 +262,7 @@ impl DrillPressParams {
         common::preset_text(preset, tr)
     }
 
-    /// Sets the page from a preset file in GTK's format ([`DrillPressParams::preset_json`]).
+    /// Sets the page from a preset file ([`DrillPressParams::preset_json`]).
     ///
     /// # Arguments
     /// * `json` - The file's text.

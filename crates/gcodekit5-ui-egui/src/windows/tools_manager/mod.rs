@@ -1,14 +1,14 @@
-//! The CNC Tools page (GTK's Tools Manager): the tool library searched and filtered by
+//! The CNC Tools page: the tool library searched and filtered by
 //! type, material and diameter, an edit form in four tabs (Basic Info, Geometry,
 //! Manufacturer, Notes), and the library actions (New Tool, GTC import, export, reset).
 //!
-//! - Custom tools are kept in the GTK build's `custom_tools.json` (legacy settings folder)
-//!   through `gcodekit5-app`'s `ToolsManagerBackend`, so a library written by either build
-//!   loads in the other. Saves are atomic; an unreadable file is reported when the window
+//! - Custom tools are kept in `custom_tools.json` (legacy settings folder)
+//!   through `gcodekit5-app`'s `ToolsManagerBackend`, so a library from earlier versions
+//!   loads unchanged. Saves are atomic; an unreadable file is reported when the window
 //!   opens and backed up (`custom_tools.json.bak-<time>`, named in the notice) before the
 //!   first save replaces it.
-//! - The form's rules and messages are GTK's ([`ToolForm`]); lengths are millimetres, as in
-//!   GTK. Switching away from an edited tool asks Save / Discard / Cancel, as GTK does.
+//! - The form's rules and messages are [`ToolForm`]'s; lengths are millimetres.
+//!   Switching away from an edited tool asks Save / Discard / Cancel.
 //! - Only custom tools can be deleted (a standard tool would come back on the next start);
 //!   deleting a custom tool that replaced a standard one brings the standard one back.
 //! - Every change is reported through [`ToolsManagerWindow::take_changed`], so the app hands
@@ -103,7 +103,7 @@ pub enum ToolsFileRequest {
     Export,
 }
 
-/// The CNC Tools settings GTK remembered (`config.ui.tools_manager_*`).
+/// The CNC Tools settings kept between runs (`config.ui.tools_manager_*`).
 #[derive(Debug, Clone, PartialEq)]
 struct UiState {
     search: String,
@@ -115,7 +115,7 @@ struct UiState {
 }
 
 impl UiState {
-    /// The values in `config`; an empty filter is GTK's "all", so untouched settings are
+    /// The values in `config`; an empty filter means "all", so untouched settings are
     /// not rewritten at startup.
     fn of(config: &Config) -> Self {
         let ui = &config.ui;
@@ -136,7 +136,7 @@ pub struct ToolsManagerWindow {
     /// The library and its file; `None` without a settings folder.
     backend: Option<ToolsManagerBackend>,
     filter: ToolFilter,
-    /// The tool last opened (remembered in the settings, as GTK does).
+    /// The tool last opened (remembered in the settings).
     last_selected: Option<String>,
     edit: Option<Edit>,
     question: Option<Question>,
@@ -160,7 +160,7 @@ impl std::fmt::Debug for ToolsManagerWindow {
 
 impl ToolsManagerWindow {
     /// The window over the custom tools in `file`, read now, with the search and filters
-    /// GTK remembered in `config`.
+    /// kept in `config`.
     ///
     /// # Arguments
     /// * `file` - The custom tools file; `None` without a settings folder.
@@ -295,7 +295,7 @@ impl ToolsManagerWindow {
         self.stored_ui != self.ui_state()
     }
 
-    /// Writes the search, filters and last opened tool into `config` (GTK keeps them in
+    /// Writes the search, filters and last opened tool into `config` (kept in
     /// the settings and stored them on every change).
     ///
     /// # Arguments
@@ -382,7 +382,7 @@ impl ToolsManagerWindow {
         });
     }
 
-    /// Saves the form (GTK's `save_tool`).
+    /// Saves the form.
     ///
     /// # Returns
     /// Whether the tool was saved.
@@ -476,7 +476,7 @@ impl ToolsManagerWindow {
         }
     }
 
-    /// Imports the tools of the GTC catalog `path` (GTK's Import GTC) and saves them.
+    /// Imports the tools of the GTC catalog `path` (Import GTC) and saves them.
     ///
     /// # Arguments
     /// * `path` - The catalog file.
@@ -514,7 +514,7 @@ impl ToolsManagerWindow {
         }
     }
 
-    /// Writes the custom tools to `path` (GTK's Export Custom Tools).
+    /// Writes the custom tools to `path` (Export Custom Tools).
     ///
     /// # Arguments
     /// * `path` - The file to write.

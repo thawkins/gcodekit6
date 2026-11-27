@@ -7,9 +7,9 @@
 //! [`Pane::command`] when the Designer is the pane the user works in. The app copies
 //! [`DesignerPane::is_modified`] into `AppState::dirty.designer` for the quit prompt.
 //!
-//! Ported from the GTK `ui/gtk/designer_canvas/*` and `designer_toolbox.rs` ([`toolbox`]);
+//! The canvas is [`canvas`] and the toolbox [`toolbox`];
 //! [`layers`] is the Layers pane and [`properties`] the Properties pane. The Text tool opens
-//! the Add Text dialog ([`canvas::text_tool`]). The toolbox's "Shape Gallery…" opens
+//! the Add Text dialog ([`canvas::text_tool`]). The toolbox's "Shape Gallery..." opens
 //! [`shape_gallery`]; the shape it arms is placed by the next canvas click. New, Open, Save
 //! and Import are [`file_ops`]; the shapes a CAM page generates are added by
 //! [`DesignerPane::add_generated_paths`]; G-code and SVG output (Export, the toolbox's
@@ -53,7 +53,7 @@ use shape_gallery::ShapeGallery;
 use crate::commands::Command;
 use crate::workspace::{Pane, PaneContext, PaneId};
 
-/// How far Duplicate moves the copies right and up, in mm (GTK's Ctrl+D offset).
+/// How far Duplicate moves the copies right and up, in mm (the Ctrl+D offset).
 pub const DUPLICATE_OFFSET_MM: f64 = 10.0;
 
 /// The msgids the pane shows, for the translation check.
@@ -360,13 +360,13 @@ impl DesignerPane {
     }
 
     /// The work area outlined on the canvas and fitted by Fit to Device: the active device
-    /// profile's X/Y limits (GTK's `compute_device_bbox`), else GTK's 250 x 250 mm.
+    /// profile's X/Y limits, else 250 x 250 mm.
     pub fn work_area(&self) -> editing::Bounds {
         self.device.unwrap_or_else(editing::default_work_area)
     }
 
     /// The XY limits exported G-code is checked against: the active device profile's, else
-    /// Preferences > Machine's X/Y limits from 0 (GTK's `designer_machine_limits`), if set.
+    /// Preferences > Machine's X/Y limits from 0, if set.
     pub fn machine_limits(&self) -> Option<&MachineLimits> {
         self.limits.as_ref()
     }
@@ -450,7 +450,7 @@ impl DesignerPane {
         self.touch();
     }
 
-    /// Cut, Copy or Paste of shapes through the design's own clipboard, as GTK's Edit
+    /// Cut, Copy or Paste of shapes through the design's own clipboard, as the Edit
     /// actions on the Designer page: Paste centres the copies on the pointer's last point
     /// on the canvas, with new ids, as one undo step. Ignored during a canvas drag.
     ///
@@ -578,7 +578,7 @@ impl DesignerPane {
             ViewAction::ZoomOut => self.state.zoom_out(),
             ViewAction::FitContent => editing::zoom_fit(&mut self.state, area),
             ViewAction::FitWorkArea => editing::fit_work_area(&mut self.state, area),
-            // GTK's reset: 100% with the origin at the canvas's bottom-left corner.
+            // Reset: 100% with the origin at the canvas's bottom-left corner.
             ViewAction::FitViewport => {
                 self.state.canvas.set_zoom(1.0);
                 self.state.canvas.set_pan(0.0, 0.0);
@@ -587,7 +587,7 @@ impl DesignerPane {
     }
 
     /// The canvas while a gallery shape is armed: the pointer moves its ghost, a primary
-    /// click places it (snapped unless the Select tool is active, as GTK), Escape drops it.
+    /// click places it (snapped unless the Select tool is active), Escape drops it.
     /// Other input waits, so the click selects nothing.
     fn place_gallery_shape(&mut self, ui: &egui::Ui, response: &egui::Response, view: &CanvasView) {
         let world = |p: egui::Pos2| {
@@ -615,7 +615,7 @@ impl DesignerPane {
     }
 }
 
-/// A hint at the top centre of the canvas `rect` (GTK's "Click to position shape"); it does
+/// A hint at the top centre of the canvas `rect` ("Click to position shape"); it does
 /// not take the pointer.
 fn hint(ui: &mut egui::Ui, rect: egui::Rect, text: &str) {
     let strip = egui::Rect::from_min_size(
@@ -768,7 +768,7 @@ impl Pane for DesignerPane {
     fn configure(&mut self, config: &Config) {
         self.units = config.ui.measurement_system;
         self.stl_import = config.ui.enable_stl_import;
-        // GTK's fallback when no device profile is active: the Preferences limits.
+        // The fallback when no device profile is active: the Preferences limits.
         let machine = &config.machine;
         self.config_limits =
             (machine.x_limit > 0.0 && machine.y_limit > 0.0).then_some(MachineLimits {

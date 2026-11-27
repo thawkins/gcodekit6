@@ -2,15 +2,14 @@
 //! parameters, and the active device's spindle give the spindle speed, feed, surface speed,
 //! chip load, removal rate, power and deflection.
 //!
-//! The calculation is GTK's: `SpeedsFeedsCalculator` on a device with the active spindle's
+//! The calculation: `SpeedsFeedsCalculator` on a device with the active spindle's
 //! maximum RPM, the RPM clamped to that maximum and the feed scaled with it, the values
-//! formatted as GTK's results panel showed them. GTK's panel defaults: slotting, 3.0 mm
+//! formatted as the results panel shows them. Panel defaults: slotting, 3.0 mm
 //! depth, 1.0 mm stepover (0 = the operation's default), 25 mm stick-out, coolant as the
-//! device has it, conservative on. Lengths are millimetres whatever the display units, as
-//! in GTK.
+//! device has it, conservative on. Lengths are millimetres whatever the display units.
 //!
-//! GTK warned in a dialog when the device had no spindle or its RPM or power was unset;
-//! here that, an unchosen tool or material, and values outside GTK's spin ranges are shown
+//! A device with no spindle or with its RPM or power unset,
+//! an unchosen tool or material, and values outside the spin ranges are shown
 //! on the page and Calculate waits.
 //!
 //! Dependencies: `egui`, `gcodekit5-camtools` (calculator), `gcodekit5-core` (tool and
@@ -59,7 +58,7 @@ pub fn msgids() -> Vec<&'static str> {
     ids
 }
 
-/// The calculated values as the results panel shows them (GTK's formatting).
+/// The calculated values as the results panel shows them.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct SpeedsFeedsResults {
     /// Spindle speed (RPM), with the unclamped value when it was clamped.
@@ -101,9 +100,9 @@ pub(super) struct Picker {
 /// The calculator's input and its last results.
 #[derive(Clone, Debug)]
 pub struct SpeedsFeedsParams {
-    /// The tool library, in GTK's order (numbered names first).
+    /// The tool library, in display order (numbered names first).
     pub tools: Vec<Tool>,
-    /// The material library, in GTK's order.
+    /// The material library, in display order.
     pub materials: Vec<Material>,
     /// The active device profile, if any.
     pub device: Option<DeviceProfile>,
@@ -129,7 +128,7 @@ pub struct SpeedsFeedsParams {
     pub(super) picker: Option<Picker>,
 }
 
-/// GTK's order: names that start with a number first, by that number, then by name.
+/// Display order: names that start with a number first, by that number, then by name.
 fn gtk_order(a: &str, b: &str) -> std::cmp::Ordering {
     let number = |name: &str| {
         name.chars()
@@ -147,7 +146,7 @@ fn gtk_order(a: &str, b: &str) -> std::cmp::Ordering {
 }
 
 impl SpeedsFeedsParams {
-    /// GTK's panel defaults over the libraries and the active device.
+    /// The panel defaults over the libraries and the active device.
     ///
     /// # Arguments
     /// * `tools` - The tool library.
@@ -178,7 +177,7 @@ impl SpeedsFeedsParams {
         }
     }
 
-    /// Back to the panel defaults (GTK's Reset), keeping the libraries and the device.
+    /// Back to the panel defaults (Reset), keeping the libraries and the device.
     pub fn reset(&mut self) {
         *self = Self::new(
             std::mem::take(&mut self.tools),
@@ -285,7 +284,7 @@ impl SpeedsFeedsParams {
     /// The calculator's input, or every problem with it.
     ///
     /// # Errors
-    /// No tool or material, a tool without a diameter, values outside GTK's ranges, and a
+    /// No tool or material, a tool without a diameter, values outside the ranges, and a
     /// device without a configured spindle.
     pub fn input(&self) -> Result<CalculationInput, Vec<FieldError>> {
         let mut errors = Vec::new();
@@ -354,7 +353,7 @@ impl SpeedsFeedsParams {
         Ok(CalculationInput {
             material,
             tool,
-            // GTK's calculation device: the spindle's maximum RPM, a 5000 mm/min feed.
+            // The calculation device: the spindle's maximum RPM, a 5000 mm/min feed.
             device: DeviceProfile {
                 max_spindle_speed_rpm: max_rpm,
                 max_feed_rate: 5000.0,
@@ -369,7 +368,7 @@ impl SpeedsFeedsParams {
         })
     }
 
-    /// Calculates, as GTK's Calculate did.
+    /// Calculates.
     ///
     /// # Errors
     /// The input's problems ([`SpeedsFeedsParams::input`]).

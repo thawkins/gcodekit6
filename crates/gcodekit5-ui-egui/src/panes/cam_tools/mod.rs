@@ -1,14 +1,14 @@
-//! The CAM Tools pane: GTK's tool picker (search, category filter, a list and the chosen
+//! The CAM Tools pane: the tool picker (search, category filter, a list and the chosen
 //! tool's details with Open) and the tool pages, each with a Back button.
 //!
 //! A G-code page's Generate shows the program on the page; Send to Editor replaces the
 //! editor's program with it and Preview does that and brings the visualizer to the front
-//! (GTK's Generate did the latter). The app takes the request
+//! as well. The app takes the request
 //! ([`CamToolsPane::take_editor_request`]) and runs the designer's editor handoff: refused
 //! while a job runs, asking first about unsaved editor edits.
 //!
 //! What a page asks the app for (preset files, shapes for the designer, a folder) is in
-//! [`requests`]. Load and Save read and write a page's input as a JSON preset in GTK's file
+//! [`requests`]. Load and Save read and write a page's input as a JSON preset in a fixed file
 //! format.
 //!
 //! The Laser Image Engraver engraves on a worker thread (`bitmap_pane`); the Probe Tools
@@ -262,7 +262,7 @@ impl Default for CamToolsPane {
 }
 
 impl CamToolsPane {
-    /// The pane with the picker showing and every page at GTK's defaults, in millimetres.
+    /// The pane with the picker showing and every page at its defaults, in millimetres.
     pub fn new() -> Self {
         let units = MeasurementSystem::Metric;
         Self {
@@ -611,7 +611,7 @@ impl CamToolsPane {
 
     /// Draws the pane.
     fn ui(&mut self, ui: &mut egui::Ui, tr: &Translator, machine: Option<&Machine>) {
-        // GTK checked the device's axes when Generate was pressed.
+        // The device's axis count is passed to the pages before they draw.
         let axes = self.num_axes;
         self.drill_press.num_axes = axes;
         self.spoilboard_surfacing.num_axes = axes;
@@ -644,7 +644,7 @@ impl CamToolsPane {
         tr: &Translator,
         machine: Option<&Machine>,
     ) {
-        // GTK's header: the go-previous button, the title, and the help button on the right.
+        // The header: the go-previous button, the title, and the help button on the right.
         ui.horizontal(|ui| {
             if crate::icons::icon_only_button(ui, crate::icons::Icon::JogLeft, &tr.tr("Back"))
                 .clicked()

@@ -91,7 +91,7 @@ pub fn apply(cx: &mut Ctx<'_>, key: &str, text: &str) -> Check {
 }
 
 /// Applies `modify` to a copy of every selected shape and records the changed ones as one
-/// undo step named `name` (GTK's `change_selected_with_undo`).
+/// undo step named `name`.
 ///
 /// # Arguments
 /// * `state` - The design.

@@ -1,4 +1,4 @@
-//! The status bar at the bottom of the window, laid out as GTK's: the eStop button, the
+//! The status bar at the bottom of the window, laid out as: the eStop button, the
 //! connection, machine state and position, the active device profile
 //! (`<name> | <firmware> | <type>`), and on the right the job progress and the last error.
 //!
@@ -7,10 +7,10 @@
 //! the user's measurement system (two decimals for mm, three for inches, through
 //! `format_length` as the DRO does).
 //!
-//! Ported from the GTK `ui/gtk/status_bar.rs`; the remaining time is estimated as GTK's
-//! `update_progress` does, from the average time per acknowledged line. The feed comes from
+//! The remaining time is estimated
+//! from the average time per acknowledged line. The feed comes from
 //! the status report (as the Machine Control DRO's) with two decimals and its unit, where
-//! GTK showed the commanded feed with three decimals and no unit. Not ported: the timed
+//! the original showed the commanded feed with three decimals and no unit. Not shown: timed
 //! notices; the connected port is not known to the status.
 //!
 //! Dependencies: `egui`, `gcodekit5-app` (translations), `gcodekit5-core` (units),
@@ -71,7 +71,7 @@ pub fn position_text(xyz: Xyz, units: MeasurementSystem) -> String {
     )
 }
 
-/// A job time as GTK's status bar shows it: `HH:MM:SS`, seconds truncated.
+/// A job time as the status bar shows it: `HH:MM:SS`, seconds truncated.
 ///
 /// # Arguments
 /// * `time` - The duration to show.
@@ -87,7 +87,7 @@ pub fn format_time(time: Duration) -> String {
 
 /// The job's elapsed and estimated remaining time, formatted by [`format_time`].
 ///
-/// The estimate is GTK's: the average time per acknowledged line so far, times the lines
+/// The estimate is the average time per acknowledged line so far, times the lines
 /// not yet acknowledged; zero until a line has been acknowledged.
 ///
 /// # Arguments
@@ -105,7 +105,7 @@ pub fn job_times(progress: Progress, elapsed: Duration) -> (String, String) {
 }
 
 /// The feed and spindle readout, `F: 1500.00 mm/min  S: 12000 RPM`, from the latest status
-/// report; `None` while disconnected or until a report gives both, as GTK.
+/// report; `None` while disconnected or until a report gives both.
 ///
 /// # Arguments
 /// * `status` - The app's machine status.
@@ -166,7 +166,7 @@ pub fn summary(status: &MachineStatus, units: MeasurementSystem, tr: &Translator
     }
 }
 
-/// The active device profile as GTK's status bar shows it: `<name> | <firmware> | <type>`,
+/// The active device profile as the status bar shows it: `<name> | <firmware> | <type>`,
 /// or "No device selected".
 ///
 /// # Arguments

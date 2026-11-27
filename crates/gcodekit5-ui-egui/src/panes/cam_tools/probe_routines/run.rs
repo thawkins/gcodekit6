@@ -1,6 +1,6 @@
-//! A probe routine run on the machine, as GTK's Probe button did it, without blocking the UI.
+//! A probe routine run on the machine (the Probe button), without blocking the UI.
 //!
-//! - **Guards** ([`not_ready`]): GTK's (connected, no run in progress, no job, Idle), and
+//! - **Guards** ([`not_ready`]): connected, no run in progress, no job, Idle, and
 //!   two more: the probe input must not already be triggered, and the status report must
 //!   be fresh (read after every command line sent), as jogging requires.
 //! - **Start** ([`ProbeRun::start`]): the routine's program, without comments, is streamed
@@ -9,7 +9,7 @@
 //! - **Progress** ([`ProbeRun::handle`]): the run reads the machine events in order: each
 //!   `[PRB:...]` report in mm (following `$13` through the `$$` lines, as the DRO does), the
 //!   first `ALARM:` / `error:`, and the stream's end. The routine streams in the
-//!   controller's `StreamMode::StopOnError` (beyond GTK, which streamed on): on an
+//!   controller's `StreamMode::StopOnError`: on an
 //!   `error:` reply the worker stops feeding at once, feed-holds, then soft-resets, because
 //!   the routine's remaining lines are relative moves (and maybe a `G10 L20`) that must not
 //!   run after a refused probe line. If the stream is somehow still running after the
@@ -19,7 +19,7 @@
 //!   the user's Stop, feed hold then reset, or E-STOP end the stream in the controller, so
 //!   no further line of the routine is sent.
 //! - **After a failure** the controller was left in incremental mode (G91): once it is
-//!   Idle again (the user cleared the alarm) and nothing streams, `G90` is sent, as GTK did.
+//!   Idle again (the user cleared the alarm) and nothing streams, `G90` is sent.
 //!   A disconnect ends the run without it.
 //!
 //! Dependencies: `gcodekit5-app` (controller, events, program preparation),
@@ -53,7 +53,7 @@ pub const UNCONFIRMED_BACKSTOP_DELAY: Duration = Duration::from_secs(2);
 
 const NOT_CONNECTED: &str = n_!("The machine is not connected.");
 /// A probe refused on a Repetier connection: Repetier acknowledges a refused line with `ok`,
-/// so a probe run could not stop on its error (GTK probed GRBL only).
+/// so a probe run could not stop on its error (probing supports GRBL only).
 pub const PROBE_NOT_ON_REPETIER: &str = n_!("Probing is not available on Repetier firmware.");
 const RUN_IN_PROGRESS: &str = n_!("A probe run is still in progress.");
 const JOB_RUNNING: &str = n_!("A job is running.");
@@ -458,7 +458,7 @@ fn controller_reported(message: &str, tr: &Translator) -> String {
     )
 }
 
-/// The text shown for a successful run (GTK's wording).
+/// The text shown for a successful run.
 ///
 /// # Arguments
 /// * `success` - The run's result.
@@ -506,7 +506,7 @@ pub fn aborted_text(tr: &Translator) -> String {
 }
 
 /// Sends the WCS (or tool-length) command for `success` into `wcs` (54 to 59): `G10 L2`
-/// with the probed machine coordinates, only the axes the routine measured (GTK's Apply to
+/// with the probed machine coordinates, only the axes the routine measured (Apply to
 /// WCS, through `WcsUpdateService`).
 ///
 /// # Arguments

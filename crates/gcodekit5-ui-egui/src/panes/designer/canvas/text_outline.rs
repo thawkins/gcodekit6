@@ -1,7 +1,7 @@
 //! The outline of a text shape's glyphs, in world millimetres, for painting.
 //!
-//! The model's `DesignText::render` is only the text's bounding box. GTK draws the glyphs
-//! with Cairo; here they are the outlines of the font the model cuts with, placed by the
+//! The model's `DesignText::render` is only the text's bounding box. The glyphs drawn
+//! here are the outlines of the font the model cuts with, placed by the
 //! model's one text layout (`DesignText::layout`), which the bounds and the G-code
 //! generator also use: the glyphs' box is centred on the text's point, then rotated about
 //! it (counter-clockwise positive).

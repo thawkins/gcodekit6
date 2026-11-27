@@ -1,5 +1,5 @@
 //! The icon catalog: the Tabler outline icons (MIT, `resources/icons/tabler/`) that replace the
-//! GTK front end's Adwaita symbolic icons, plus the buttons that draw them.
+//! Adwaita symbolic icons the app used before, plus the buttons that draw them.
 //!
 //! Icons are embedded SVGs prepared once by `craft_ui::icons::SvgIconSet` (`currentColor`
 //! becomes white) and tinted at draw time with the theme's text colour, so they follow the
@@ -103,7 +103,7 @@ icons! {
     Shuffle => "arrows-shuffle",
 }
 
-/// Edge length of an icon in points, matching GTK's 16 px symbolic icons plus padding.
+/// Edge length of an icon in points, a 16 px symbolic icon plus padding.
 pub const ICON_SIZE: f32 = 18.0;
 
 /// The prepared catalog, built on first use.

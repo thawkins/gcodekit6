@@ -40,7 +40,7 @@ pub(super) fn progress_text(progress: Progress) -> String {
 }
 
 /// Draws the section: Send and Stop, then Pause and Resume, two to a row and of equal
-/// width as in GTK, then the progress bar.
+/// width, then the progress bar.
 pub(super) fn show(
     ui: &mut egui::Ui,
     tr: &Translator,

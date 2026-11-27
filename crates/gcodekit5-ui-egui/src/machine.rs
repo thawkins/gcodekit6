@@ -74,7 +74,7 @@ pub struct MachineStatus {
     /// X, Y and Z max travel in mm (`$130`-`$132`), once the controller reported them.
     pub grbl_travel: [Option<f32>; 3],
     /// Whether the controller reports positions in inches (`$13=1`). Until a `$$` line says
-    /// so, reports are taken as mm, GRBL's default (as the GTK front end does).
+    /// so, reports are taken as mm, GRBL's default.
     pub report_inches: bool,
     /// Whether the controller is in laser mode (GRBL `$32=1`), once a `$$` line said so.
     /// The CAM pages that plunge with `M3` refuse to generate while it is set.
@@ -226,7 +226,7 @@ impl MachineStatus {
     }
 
     /// The planner blocks and RX bytes free of the latest report's `Bf:` field, as
-    /// `plan/rx` (GTK's "Buffer:" readout); `None` when the controller does not send it.
+    /// `plan/rx` (the "Buffer:" readout); `None` when the controller does not send it.
     pub fn buffer_text(&self) -> Option<String> {
         let buffer = self.report.as_ref()?.buffer?;
         Some(format!("{}/{}", buffer.plan, buffer.rx))
@@ -313,7 +313,7 @@ impl MachineStatus {
                         && inches != self.report_inches
                     {
                         // A cached offset (and report) in the old units would be wrong:
-                        // drop them and wait for the controller's next report, as GTK does.
+                        // drop them and wait for the controller's next report.
                         self.report_inches = inches;
                         self.wco = None;
                         self.report = None;
@@ -387,13 +387,13 @@ pub fn coalesce_progress(events: Vec<MachineEvent>) -> Vec<MachineEvent> {
         .collect()
 }
 
-/// GTK's notice when the controller identified as another firmware than the active machine's
+/// The notice when the controller identified as another firmware than the active machine's
 /// (`{}` the configured, then the detected protocol).
 pub const PROTOCOL_MISMATCH: &str = n_!(
     "Connection rejected: active machine is configured as {} but the device responded as {}. Change the active machine in the Device Manager."
 );
 
-/// The notice for [`MachineEvent::ProtocolMismatch`], naming both protocols, as GTK's
+/// The notice for [`MachineEvent::ProtocolMismatch`], naming both protocols, as the
 /// `protocol_mismatch` worded it.
 ///
 /// # Arguments

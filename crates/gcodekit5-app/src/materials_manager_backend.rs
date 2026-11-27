@@ -1,14 +1,14 @@
 //! Materials Manager Backend
 //!
 //! The material library the Materials Manager edits and its custom materials file, plus
-//! the id conversions the GTK window uses.
+//! the id conversions the window uses.
 
 use crate::tools_manager_backend::{CustomLibraryFile, storage_dir};
 use gcodekit5_core::data::materials::{Material, MaterialId, MaterialLibrary};
 use gcodekit5_core::types::aliases::BoxedError;
 use std::path::{Path, PathBuf};
 
-/// The file, in the settings folder of the GTK build, that holds the custom materials.
+/// The file, in the settings folder, that holds the custom materials.
 pub const MATERIALS_FILE: &str = "custom_materials.json";
 
 /// The material library (the standard materials plus the user's custom materials) and the
@@ -47,8 +47,8 @@ impl MaterialsManagerBackend {
         Self { library, file }
     }
 
-    /// The custom materials file both builds use: `custom_materials.json` in the GTK
-    /// build's settings folder ([`gcodekit5_settings::SettingsManager::config_directory`]),
+    /// The custom materials file: `custom_materials.json` in the settings folder
+    /// ([`gcodekit5_settings::SettingsManager::config_directory`]),
     /// or in `~/gcodekit5` on a platform without a configuration folder.
     pub fn default_storage_path() -> PathBuf {
         storage_dir().join(MATERIALS_FILE)

@@ -1,8 +1,8 @@
 //! What a CAM page asks the app for: a preset file to load or save, shapes for the designer
 //! and a folder to choose.
 //!
-//! Load and Save read and write a page's input as a JSON preset in GTK's file format, so
-//! presets saved by either front end load in the other: the pane asks
+//! Load and Save read and write a page's input as a JSON preset in a fixed file format, so
+//! presets saved by earlier releases still load: the pane asks
 //! ([`CamToolsPane::take_preset_request`]), the app shows the file dialog and hands the
 //! answer back ([`CamToolsPane::load_preset`], [`CamToolsPane::save_preset`]). A preset that
 //! cannot be read or written leaves the page as it was, with a notice.
@@ -25,7 +25,7 @@ use super::{CamTool, CamToolsPane};
 pub enum PresetRequest {
     /// Choose a preset file to load.
     Load,
-    /// Choose where to save; the dialog suggests `file_name` (GTK's).
+    /// Choose where to save; the dialog suggests `file_name`.
     Save {
         /// The suggested file name.
         file_name: &'static str,
@@ -86,11 +86,11 @@ impl CamToolsPane {
                 CamTool::Gerber => self.gerber.apply_preset(&json),
                 CamTool::BitmapEngraving => self.bitmap_engraving.apply_preset(&json),
                 CamTool::ProbeRoutines => self.probe.params.apply_preset(&json),
-                // The calculator has no presets (GTK's had none).
+                // The calculator has no presets.
                 CamTool::SpeedsFeeds => Ok(()),
             });
         if tool == CamTool::BitmapEngraving {
-            // A preset names its image; show it (GTK loaded its preview too).
+            // A preset names its image; show it (its preview is loaded too).
             self.refresh_bitmap_preview();
         }
         match loaded {

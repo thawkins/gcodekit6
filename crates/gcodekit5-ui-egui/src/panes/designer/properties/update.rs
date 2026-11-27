@@ -1,8 +1,8 @@
-//! What the properties panel shows for the current selection: GTK's
-//! `refresh_from_selection`, as a value read from the design each frame.
+//! What the properties panel shows for the current selection,
+//! as a value read from the design each frame.
 //!
 //! One selected shape shows its own properties; several show their common box (centre and
-//! size), a relative rotation, and the CAM and effect values of the first one (as GTK). The
+//! size), a relative rotation, and the CAM and effect values of the first one. The
 //! laser override of several shapes shows each value they share, and nothing ("---") where
 //! they differ.
 //!
@@ -15,7 +15,7 @@ use gcodekit5_designer::model::{
     DesignerShape, LaserParams, ParametricPathSource, RasterImage, Shape,
 };
 
-/// A shape's rotation (degrees) counts as rotated above this, as in GTK.
+/// A shape's rotation (degrees) counts as rotated above this.
 const ROTATED_DEG: f64 = 0.01;
 
 /// The laser values of the selection after resolving "use global values"; each is `None`
@@ -183,7 +183,7 @@ impl Summary {
     }
 
     /// Whether the one selected shape is rotated: its size fields are then read-only and
-    /// its aspect ratio locked (GTK's "Rotated object" notice).
+    /// its aspect ratio locked (the "Rotated object" notice).
     pub fn rotated(&self) -> bool {
         self.single().is_some() && self.rotation.abs() > ROTATED_DEG
     }
@@ -235,7 +235,7 @@ fn light_clone(obj: &DrawingObject) -> DrawingObject {
     }
 }
 
-/// The size and rotation GTK shows for one shape: the shape's own width and height where
+/// The size and rotation shown for one shape: the shape's own width and height where
 /// it has them, otherwise its bounds (with no rotation lock).
 fn shape_size_and_rotation(shape: &Shape) -> ((f64, f64), f64) {
     let (x0, y0, x1, y1) = shape.bounds();

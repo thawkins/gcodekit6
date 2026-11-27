@@ -1,4 +1,4 @@
-// Grid, origin axes and tool marker (port of the GTK `shaders.rs` line shader): position
+// Grid, origin axes and tool marker (the line shader): position
 // and colour per vertex. Colours arrive in sRGB and leave premultiplied, converted to linear
 // when the target is an sRGB format.
 

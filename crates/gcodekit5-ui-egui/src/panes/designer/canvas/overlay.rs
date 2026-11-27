@@ -1,13 +1,13 @@
-//! The canvas's floating controls, as GTK's on-screen display: the view toolbar at the top
-//! centre (zoom out, fit to content, fit to viewport, fit to the work area, GTK's "?"
+//! The canvas's floating controls (an on-screen display): the view toolbar at the top
+//! centre (zoom out, fit to content, fit to viewport, fit to the work area, the "?"
 //! keyboard-shortcut popover, zoom in) and the status line at the bottom left (zoom, view
 //! centre, cursor, snap and constraint, units).
 //!
-//! While the design has no shapes, GTK's empty state sits in the middle of the canvas: "No
+//! While the design has no shapes, an empty state sits in the middle of the canvas: "No
 //! shapes yet", a hint, and Load Design, Import SVG, Import DXF, Import STL (when STL import
-//! is on) and Import Image (disabled in CNC mode, as GTK).
+//! is on) and Import Image (disabled in CNC mode).
 //!
-//! Not ported: GTK's scrollbar toggle (the canvas has no scrollbars).
+//! There is no scrollbar toggle (the canvas has no scrollbars).
 //!
 //! Dependencies: `egui`, `gcodekit5-core` (units), `gcodekit5-app` (translations).
 
@@ -50,7 +50,7 @@ pub fn msgids() -> Vec<&'static str> {
     ]
 }
 
-/// The "?" popover's lines, as GTK's: the default keys (craft-keymap chord text) and the
+/// The "?" popover's lines: the default keys (craft-keymap chord text) and the
 /// msgid of what each does on the canvas.
 pub const SHORTCUTS: [(&[&str], &str); 10] = [
     (&["Cmd+Z"], n_!("Undo")),
@@ -80,7 +80,7 @@ pub enum ViewAction {
     ZoomIn,
 }
 
-/// The toolbar's buttons: action, icon and tooltip msgid, in GTK's order.
+/// The toolbar's buttons: action, icon and tooltip msgid, in display order.
 const BUTTONS: [(ViewAction, Icon, &str); 5] = [
     (ViewAction::ZoomOut, Icon::ZoomOut, n_!("Zoom Out")),
     (ViewAction::FitContent, Icon::Fit, n_!("Fit to Content")),
@@ -134,7 +134,7 @@ pub fn toolbar(ui: &mut egui::Ui, rect: egui::Rect, tr: &Translator) -> Option<V
             osd_frame(ui).show(ui, |ui| {
                 ui.horizontal(|ui| {
                     for (action, icon, msgid) in BUTTONS {
-                        // GTK's "?" sits just before Zoom In.
+                        // The "?" sits just before Zoom In.
                         if action == ViewAction::ZoomIn {
                             shortcuts_button(ui, tr);
                         }
@@ -166,7 +166,7 @@ pub fn shortcut_line(keys: &[&str], msgid: &str, tr: &Translator) -> String {
     format!("{}  -  {}", keys.join(" / "), tr.tr(msgid))
 }
 
-/// GTK's "?" button: a popover listing the canvas's keys.
+/// The "?" button: a popover listing the canvas's keys.
 fn shortcuts_button(ui: &mut egui::Ui, tr: &Translator) {
     let response = ui
         .menu_button("?", |ui| {
@@ -197,7 +197,7 @@ pub struct Status {
     pub cursor: (f64, f64),
     /// Whether snapping is on.
     pub snap: bool,
-    /// Whether Shift is held, constraining the drawing or resizing (GTK's "Constraint").
+    /// Whether Shift is held, constraining the drawing or resizing ("Constraint").
     pub constraint: bool,
     /// The display units.
     pub units: MeasurementSystem,
@@ -212,7 +212,7 @@ fn length(mm: f64, system: MeasurementSystem) -> String {
     format!("{shown:.2}")
 }
 
-/// The status line's text, as GTK's `format_zoom_center_cursor` plus the snap flag and the
+/// The status line's text: zoom, view centre and cursor, plus the snap flag and the
 /// unit label.
 ///
 /// # Arguments
@@ -231,7 +231,7 @@ pub fn status_text(status: &Status, tr: &Translator) -> String {
         length(status.cursor.0, u),
         length(status.cursor.1, u),
     );
-    // GTK: "Snap", "Constraint" or "Snap / Constraint".
+    // "Snap", "Constraint" or "Snap / Constraint".
     let flags: Vec<String> = [(status.snap, "Snap"), (status.constraint, "Constraint")]
         .into_iter()
         .filter(|(on, _)| *on)
@@ -273,9 +273,9 @@ pub fn status_line(ui: &mut egui::Ui, rect: egui::Rect, status: &Status, tr: &Tr
     );
 }
 
-/// GTK's empty state in the middle of the canvas `rect`: a title, a hint and the open and
+/// The empty state in the middle of the canvas `rect`: a title, a hint and the open and
 /// import buttons. Import SVG, DXF and STL open the import dialog, which offers each of
-/// those file types (GTK opened one dialog per type).
+/// those file types.
 ///
 /// # Arguments
 /// * `ui` - The canvas's `Ui`.

@@ -1,7 +1,7 @@
 //! Rotation, Corner (radius and slot mode), Polygon (sides) and Path (closed).
 //!
 //! One shape's rotation is its absolute angle; several shapes show 0 and the value rotates
-//! the whole selection about its centre once (GTK's relative rotation). A rotated shape
+//! the whole selection about its centre once (a relative rotation). A rotated shape
 //! shows the "Rotated object" notice. The corner radius is a rectangle's corner radius or a
 //! path's fillet; a polygon's sides need at least 3 and are read-only while it is rotated.
 //!

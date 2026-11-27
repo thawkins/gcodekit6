@@ -9,7 +9,7 @@
 
 /// Marks a string literal for translation extraction without translating it, for msgids
 /// returned from a `match` and translated later through a variable. `scripts/update-po.sh`
-/// passes `--keyword=n_!`, as for the GTK crate's macro of the same name.
+/// passes `--keyword=n_!` so these msgids are extracted.
 macro_rules! n_ {
     ($s:literal) => {
         $s

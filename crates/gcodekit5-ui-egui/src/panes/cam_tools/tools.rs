@@ -1,4 +1,4 @@
-//! The CAM tools the pane's picker lists, in GTK's order, and the picker's category
+//! The CAM tools the pane's picker lists, in their fixed order, and the picker's category
 //! filter.
 //!
 //! Dependencies: `egui`, `gcodekit5-app` (translations).
@@ -34,7 +34,7 @@ pub enum CamTool {
 }
 
 impl CamTool {
-    /// Every tool, in GTK's list order.
+    /// Every tool, in list order.
     pub const ALL: [CamTool; 9] = [
         CamTool::Jigsaw,
         CamTool::TabbedBox,
@@ -47,7 +47,7 @@ impl CamTool {
         CamTool::ProbeRoutines,
     ];
 
-    /// The help topic of the tool's page (GTK's page help button); Probe Tools has none.
+    /// The help topic of the tool's page (its help button); Probe Tools has none.
     pub fn help_topic(self) -> Option<HelpTopic> {
         match self {
             CamTool::Jigsaw => Some(HelpTopic::JigsawPuzzle),
@@ -62,7 +62,7 @@ impl CamTool {
         }
     }
 
-    /// The tool's list icon (GTK's): an app SVG for the jigsaw and the box, else a symbolic
+    /// The tool's list icon: an app SVG for the jigsaw and the box, else a symbolic
     /// icon, `size` points square in the theme's text colour.
     ///
     /// # Arguments
@@ -137,7 +137,7 @@ impl CamTool {
     }
 }
 
-/// The picker's category filter (GTK's ids).
+/// The picker's category filter (the ids presets and settings use).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Category {
     /// Every tool.
@@ -211,7 +211,7 @@ impl CamToolsPane {
         self.category = category;
     }
 
-    /// Draws the picker as GTK lays it out: the page title, search and category, then the
+    /// Draws the picker: the page title, search and category, then the
     /// boxed list of tools (icon, title, description) beside the chosen tool's details.
     pub(super) fn show_picker(&mut self, ui: &mut egui::Ui, tr: &Translator) {
         crate::theme::title(
@@ -243,7 +243,7 @@ impl CamToolsPane {
         });
         ui.add_space(12.0);
         let listed = self.listed_tools(tr);
-        // GTK's paned starts the list at 45% of the width.
+        // The list starts at 45% of the width.
         let list_width = (ui.available_width() * 0.45).max(320.0);
         ui.horizontal_top(|ui| {
             ui.vertical(|ui| {
@@ -308,13 +308,13 @@ impl CamToolsPane {
     }
 }
 
-/// Room around a row's contents (GTK: 10 px top and bottom, 12 px at the sides).
+/// Room around a row's contents: 10 px top and bottom, 12 px at the sides.
 const ROW_MARGIN: egui::Vec2 = egui::vec2(12.0, 10.0);
-/// Edge of a tool list icon (GTK: 24 px).
+/// Edge of a tool list icon: 24 px.
 const ROW_ICON: f32 = 24.0;
 /// Gap between a row's title and its description.
 const ROW_GAP: f32 = 4.0;
-/// Font size of a row's description (GTK's `caption`).
+/// Font size of a row's description (a caption).
 pub const CAPTION_SIZE: f32 = 12.0;
 
 /// One row of the tool list: icon, bold title and the description under it, the row as
@@ -368,7 +368,7 @@ fn tool_row(ui: &mut egui::Ui, tr: &Translator, tool: CamTool, chosen: bool) -> 
         );
         tool.icon(ui, ROW_ICON).paint_at(ui, icon_rect);
         let title_pos = egui::pos2(rect.left() + text_left, top);
-        // Bold like GTK's `heading` rows: the same faux bold as `theme::section_heading`.
+        // Bold heading rows: the same faux bold as `theme::section_heading`.
         ui.painter()
             .galley(title_pos, title_galley.clone(), text_color);
         let title_height = title_galley.size().y;

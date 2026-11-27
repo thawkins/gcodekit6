@@ -1,7 +1,7 @@
 //! The canvas's toolpath preview: the toolpaths the G-code is made from, drawn over the
 //! shapes while the toolbox's "Show Toolpaths" is on.
 //!
-//! Ported from the GTK `designer_canvas/toolpath_preview.rs`. Each shape's toolpaths come
+//! Each shape's toolpaths come
 //! from the designer crate's CAM dispatch ([`CamSettings::shape_toolpaths`]), the same code
 //! G-code export runs, so the effective parameters (defaults for shapes without custom
 //! values, depths from the stock top, global laser feed and power) cannot drift from the
@@ -14,13 +14,13 @@
 //! finishes. No build starts during a canvas drag; the release starts one. A build that
 //! panics clears the preview and is not retried until the design changes again.
 //! Rapid moves are dashed in the warning colour at 50%; cuts and arcs are in the success
-//! colour at 70% (GTK's colours).
+//! colour at 70%.
 //!
-//! While a build runs, the toolbox's View Controls show GTK's spinner with the share of
+//! While a build runs, the toolbox's View Controls show a spinner with the share of
 //! shapes done and a Cancel button ([`ToolpathPreview::progress`], [`ToolpathPreview::cancel`]):
-//! the worker stops at the next shape, the preview is cleared (GTK kept a stale one) and no
-//! build starts again until the design changes. GTK also showed the progress in the status
-//! bar; egui shows it only beside Show Toolpaths.
+//! the worker stops at the next shape, the preview is cleared (no stale one) and no
+//! build starts again until the design changes. The progress is not in the status
+//! bar; it shows only beside Show Toolpaths.
 //!
 //! Dependencies: `egui`, `gcodekit5-designer` (CAM dispatch, toolpath generator).
 
@@ -137,7 +137,7 @@ impl ToolpathPreview {
         })
     }
 
-    /// GTK's Cancel: stops the running build at its next shape and clears the preview; no
+    /// Cancel: stops the running build at its next shape and clears the preview; no
     /// build starts again until the design changes from `revision`. Does nothing when no
     /// build runs.
     ///

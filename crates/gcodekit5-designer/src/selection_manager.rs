@@ -314,7 +314,7 @@ impl SelectionManager {
         };
         let rect_bounds = Bounds::new(rx, ry, rx + rw, ry + rh);
 
-        // Query spatial index for candidates — use HashSet for O(1) lookups
+        // Query spatial index for candidates; use HashSet for O(1) lookups
         let candidates: HashSet<u64> = spatial_index.query(&rect_bounds).into_iter().collect();
 
         let mut groups_to_select = Vec::new();

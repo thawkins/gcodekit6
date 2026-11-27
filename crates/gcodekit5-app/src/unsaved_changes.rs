@@ -1,6 +1,6 @@
-//! The user's answer to an unsaved-changes prompt, shared by the GTK and egui front ends.
+//! The user's answer to an unsaved-changes prompt.
 //!
-//! The prompt itself is toolkit code (the GTK crate's `show_unsaved_changes`, the egui
+//! The prompt itself is toolkit code (the egui
 //! crate's `Dialogs::confirm`); this module holds only the answer and the button order.
 //!
 //! No dependencies.

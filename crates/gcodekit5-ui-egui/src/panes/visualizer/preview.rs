@@ -1,16 +1,16 @@
-//! The visualizer's run preview: GTK's play, pause and stop with a speed choice, moving a
+//! The visualizer's run preview: play, pause and stop with a speed choice, moving a
 //! preview marker along the toolpath. It only animates the view; nothing is sent to the
 //! machine.
 //!
-//! As in GTK's `build_run_preview_points`, each move is split into points about 3 mm apart
+//! Each move is split into points about 3 mm apart
 //! (2 to 24 per move), a dwell holds the marker for 8 points a second (1 to 24), and the
-//! path stops at [`MAX_POINTS`]. Unlike GTK, an arc's points follow the arc (its segments as
+//! path stops at [`MAX_POINTS`]. An arc's points follow the arc (its segments as
 //! the toolpath draws them) instead of the chord. Every [`TICK`] the marker moves on by the
 //! speed's step (Slow 1, Normal 2, Fast 5, Turbo 20 points); at the end it stays on the last
-//! point (GTK left it on the last one its step reached) until Play starts again from the
+//! point until Play starts again from the
 //! beginning.
 //!
-//! The bar ([`show_bar`]) sits at the bottom left of the view, as GTK's does.
+//! The bar ([`show_bar`]) sits at the bottom left of the view.
 //!
 //! Dependencies: `egui`, `glam`, `gcodekit5-app` (translations).
 
@@ -20,9 +20,9 @@ use glam::Vec3;
 
 use crate::icons::{Icon, icon_only_button};
 
-/// How often the marker moves on (GTK's 33 ms timer).
+/// How often the marker moves on (33 ms).
 pub const TICK: Duration = Duration::from_millis(33);
-/// Most points in a preview path (GTK's cap).
+/// Most points in a preview path.
 pub const MAX_POINTS: usize = 40_000;
 /// Distance between preview points along a move, in mm.
 const POINT_SPACING: f32 = 3.0;
@@ -55,7 +55,7 @@ pub fn msgids() -> Vec<&'static str> {
 pub enum PreviewSpeed {
     /// One point per tick.
     Slow,
-    /// Two points per tick (GTK's default).
+    /// Two points per tick (the default).
     #[default]
     Normal,
     /// Five points per tick.
@@ -73,7 +73,7 @@ impl PreviewSpeed {
         PreviewSpeed::Turbo,
     ];
 
-    /// Points the marker moves on per [`TICK`] (GTK's values).
+    /// Points the marker moves on per [`TICK`].
     pub fn step(self) -> usize {
         match self {
             PreviewSpeed::Slow => 1,
@@ -116,7 +116,7 @@ pub struct PathBuilder {
 
 impl PathBuilder {
     /// Adds the points of a move from `from` to `to`: about 3 mm apart, at least `min` of
-    /// them (GTK takes 2 per move; an arc's short segments take 1) and at most 24.
+    /// them (2 per move; an arc's short segments take 1) and at most 24.
     ///
     /// # Arguments
     /// * `from` - Where the move starts.
@@ -200,7 +200,7 @@ impl RunPreview {
         self.state == PreviewState::Playing
     }
 
-    /// Starts from the first point (GTK's Run), whatever the state.
+    /// Starts from the first point (File > Run), whatever the state.
     ///
     /// # Returns
     /// Whether the preview plays (`false` when the path is empty).
@@ -288,7 +288,7 @@ enum BarAction {
     Stop,
 }
 
-/// Draws GTK's run preview bar (Play, Pause, Stop, Speed) at the bottom left of the view
+/// Draws the run preview bar (Play, Pause, Stop, Speed) at the bottom left of the view
 /// `rect` and runs what was clicked on `preview`.
 ///
 /// # Arguments

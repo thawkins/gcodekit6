@@ -1,9 +1,9 @@
-//! Settings storage on `craft-settings` and the one-shot import of the GTK
-//! front end's files (D3).
+//! Settings storage on `craft-settings` and the one-shot import of the legacy
+//! build's files (D3).
 //!
 //! The settings ([`Config`]) live in `config.toml`, written by
 //! `craft-settings` (atomic save, `config.toml.bak` backup, broken-file
-//! recovery, schema migration). The GTK build kept them in `config.json` and
+//! recovery, schema migration). The legacy build kept them in `config.json` and
 //! its user data (machine profiles, tool library, materials, command history)
 //! in JSON files beside it, all in `<platform config dir>/gcodekit5/`.
 //!
@@ -21,14 +21,14 @@ use craft_settings::{LoadReport, Location, Portable, SettingsStore, Source};
 use std::path::{Path, PathBuf};
 
 /// Application id: the settings folder name and the `GCODEKIT5_CONFIG_DIR`
-/// override variable. Matches the GTK build's folder, so on every platform the
+/// override variable. Matches the legacy build's folder, so on every platform the
 /// new files land beside the legacy ones.
 pub const APP_ID: &str = "gcodekit5";
 
-/// The GTK build's settings file, in the legacy folder.
+/// The legacy build's settings file, in the legacy folder.
 pub const LEGACY_CONFIG_FILE: &str = "config.json";
 
-/// The GTK build's data files (machine profiles, tool library, materials,
+/// The legacy build's data files (machine profiles, tool library, materials,
 /// console history), carried over unchanged.
 pub const LEGACY_DATA_FILES: &[&str] = &[
     "devices.json",
@@ -90,7 +90,7 @@ pub enum MigrationReport {
 /// The folders the import reads from and writes to.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ConfigDirs {
-    /// The GTK build's folder (`config.json` and the data files).
+    /// The legacy build's folder (`config.json` and the data files).
     pub legacy: PathBuf,
     /// The craft-settings folder (`config.toml` and the data files).
     pub config: PathBuf,
@@ -100,7 +100,7 @@ impl ConfigDirs {
     /// Folders given explicitly (tests, a `--config-dir` flag).
     ///
     /// # Arguments
-    /// * `legacy` - the folder holding the GTK build's files
+    /// * `legacy` - the folder holding the legacy build's files
     /// * `config` - the folder for `config.toml` and the data files
     pub fn new(legacy: impl Into<PathBuf>, config: impl Into<PathBuf>) -> Self {
         Self {
@@ -127,7 +127,7 @@ impl ConfigDirs {
     }
 }
 
-/// Imports the GTK build's settings and data files into `dirs.config`, once.
+/// Imports the legacy build's settings and data files into `dirs.config`, once.
 ///
 /// `config.json` becomes `config.toml` unless a valid one exists already
 /// (a damaged one is moved aside by craft-settings and replaced); each data

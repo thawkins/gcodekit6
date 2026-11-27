@@ -1,19 +1,18 @@
-//! The visualizer's left sidebar, laid out as the GTK one: a toolbar (Fit to Content,
-//! Reset View, Fit to Device Working Area and Hide), GTK's 2D / 3D view mode pair, and
+//! The visualizer's left sidebar: a toolbar (Fit to Content,
+//! Reset View, Fit to Device Working Area and Hide), the 2D / 3D view mode pair, and
 //! collapsible sections: Toolpath
 //! (Show Rapid Moves, Show Cutting Moves, Show Laser/Spindle), Guides (Show Grid, Grid
 //! spacing, Show Machine Bounds), Simulation and the
 //! Inspector with the program's bounds. The toggles are [`Display`], which the pane hands to
-//! the renderer; they start on, with a 50 mm grid, as in GTK.
+//! the renderer; they start on, with a 50 mm grid.
 //!
-//! Ported from the GTK `ui/gtk/visualizer/mod.rs` sidebar. GTK's Fit to Viewport button
-//! (`view-restore`) is Reset View here, which `Cmd+0` also runs. Left out, because the
-//! egui visualizer lacks the feature: none. The Inspector has GTK's Bounds X/Y and the S-value
+//! Reset View (the `view-restore` icon)
+//! is also run by `Cmd+0`. The Inspector has the Bounds X/Y and the S-value
 //! statistics (Min S, Max S, Avg S with one decimal, N/A when no move sets a power).
 //!
 //! The Simulation section ("Show Stock Removal", and the stock, tool and zero references
-//! while it is checked) is shown only while the `enable_stock_removal_3d` setting is on, as
-//! in GTK. GTK's stock fields are read-only copies of the Designer's stock; here they are
+//! while it is checked) is shown only while the `enable_stock_removal_3d` setting is on.
+//! The stock fields start from the Designer's stock and are
 //! edited in place.
 //!
 //! Dependencies: `egui`, `gcodekit5-app` (translations), `gcodekit5-core` (units),
@@ -33,7 +32,7 @@ use crate::workspace::named_icon_button;
 
 /// The sidebar's default width in points.
 pub const WIDTH: f32 = 250.0;
-/// The sidebar's least width in points (GTK's width request).
+/// The sidebar's least width in points.
 pub const MIN_WIDTH: f32 = 200.0;
 
 /// The msgids the sidebar shows, for the translation check.
@@ -85,7 +84,7 @@ pub fn msgids() -> Vec<&'static str> {
     ]
 }
 
-/// The grid spacings offered, in mm (GTK's list).
+/// The grid spacings offered, in mm.
 pub const GRID_SPACINGS: [f32; 5] = [1.0, 5.0, 10.0, 25.0, 50.0];
 
 /// What the view draws: the sidebar's Toolpath and Guides toggles.
@@ -106,7 +105,7 @@ pub struct Display {
 }
 
 impl Default for Display {
-    /// GTK's start: everything shown, a 50 mm grid.
+    /// The start: everything shown, a 50 mm grid.
     fn default() -> Self {
         Self {
             rapids: true,
@@ -220,7 +219,7 @@ fn choice_row<T: PartialEq + Copy>(
     });
 }
 
-/// GTK's tooltip on "Show Stock Removal": the simulation's resolution and the smallest cut
+/// The tooltip on "Show Stock Removal": the simulation's resolution and the smallest cut
 /// it shows, in mm with two decimals.
 ///
 /// # Arguments
@@ -429,7 +428,7 @@ pub fn show(
 }
 
 /// The floating Show Sidebar button at the top left of the view `rect` while the sidebar
-/// is hidden (GTK's `view-reveal` button).
+/// is hidden (the `view-reveal` button).
 ///
 /// # Returns
 /// Whether it was clicked.

@@ -52,7 +52,7 @@ impl EditorPane {
                 egui::Rect::from_min_size(content.min, size),
                 egui::Sense::click(),
             );
-            // A click in the gutter makes its line current, as GTK's source view does.
+            // A click in the gutter makes its line current.
             let clicked = response
                 .clicked()
                 .then(|| response.interact_pointer_pos())

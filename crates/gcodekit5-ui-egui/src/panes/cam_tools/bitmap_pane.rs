@@ -174,7 +174,7 @@ impl CamToolsPane {
         }
     }
 
-    /// The running engraving's stage, progress and Cancel (GTK's progress window).
+    /// The running engraving's stage, progress and Cancel.
     pub(super) fn show_bitmap_progress(&mut self, ui: &mut egui::Ui, tr: &Translator) {
         let Some(run) = self.bitmap_run.running.as_ref() else {
             return;

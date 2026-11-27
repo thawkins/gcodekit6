@@ -1,5 +1,5 @@
-//! The main window's pages and the panes on them, arranged as the GTK front end does: a row
-//! of eight page tabs ([`Page`], in GTK's order) above one page at a time, each page a fixed
+//! The main window's pages and the panes on them, arranged as: a row
+//! of eight page tabs ([`Page`]) above one page at a time, each page a fixed
 //! layout of panes. The four manager pages (Device Manager, Device Config, CNC Tools,
 //! Materials) hold no pane: the app draws them ([`Workspace::show`] leaves them to it).
 //! Switching pages keeps every pane's state; nothing about the arrangement is saved, so a
@@ -95,7 +95,7 @@ impl PaneId {
     }
 }
 
-/// One page of the main window, as GTK's top row of tabs names them.
+/// One page of the main window, as the top row of tabs names them.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Page {
     /// Toolbox, canvas, and the inspector over the objects list.
@@ -117,7 +117,7 @@ pub enum Page {
 }
 
 impl Page {
-    /// Every page, in GTK's tab order.
+    /// Every page, in tab order.
     pub const ALL: [Page; 8] = [
         Page::Designer,
         Page::Visualizer,
@@ -572,7 +572,7 @@ const SIDE_COLUMN: f32 = 0.3;
 const EDITOR_MIN: f32 = 160.0;
 
 impl Workspace {
-    /// The pages with placeholder panes, showing Machine Control (GTK's default start page).
+    /// The pages with placeholder panes, showing Machine Control (the default start page).
     pub fn new() -> Workspace {
         Workspace {
             panes: placeholder_panes(),
@@ -605,8 +605,8 @@ impl Workspace {
     pub fn set_page(&mut self, page: Page) {
         if page != self.page {
             // Leaving a page ends its keyboard and pointer holds at once, and its panes lose
-            // the keyboard. The pane that had it is remembered and gets it back on return, as
-            // in GTK, where a page's keys worked again once it was shown, but not when a text
+            // the keyboard. The pane that had it is remembered and gets it back on return, so
+            // a page's keys work again once it is shown, but not when a text
             // field had the keyboard there: that focus is lost while the page is hidden, and a
             // digit typed on return must not jog. A press in the pane gives it back then.
             self.cancel_holds();
@@ -1022,7 +1022,7 @@ pub fn overlay_layers(ctx: &egui::Context) -> Vec<egui::LayerId> {
 }
 
 /// The Designer inspector's header: the "Inspector" heading and, on the right, the Hide
-/// button (GTK's `view-conceal` button).
+/// button (the `view-conceal` button).
 ///
 /// # Returns
 /// Whether Hide was clicked.
@@ -1042,7 +1042,7 @@ fn inspector_header(ui: &mut egui::Ui, tr: &Translator) -> bool {
     .inner
 }
 
-/// An icon button showing `label` whose tooltip and accessible name is `name` (GTK's
+/// An icon button showing `label` whose tooltip and accessible name is `name` (the
 /// accessible labels for Hide and Unhide).
 ///
 /// # Returns
@@ -1060,7 +1060,7 @@ pub(crate) fn named_icon_button(
 }
 
 /// The floating Unhide button at the top right of the Designer canvas `canvas` while the
-/// inspector is hidden (GTK's `view-reveal` button).
+/// inspector is hidden (the `view-reveal` button).
 ///
 /// # Returns
 /// Whether it was clicked.

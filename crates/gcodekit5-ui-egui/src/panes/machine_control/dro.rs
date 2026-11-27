@@ -1,12 +1,12 @@
 //! The digital readout (DRO): machine state, work and machine positions of X, Y and Z (and
-//! of A, B and C in degrees when the machine reports them, as GTK shows them), and the
+//! of A, B and C in degrees when the machine reports them), and the
 //! current feed rate and spindle speed, from the latest status report, with a Zero button
 //! beside each work axis (`G10 L20 P<n> X0` in the active work coordinate system; a rotary
 //! axis takes its calibration value instead of 0).
 //!
 //! Positions are millimetres internally, shown in the user's measurement system (two
-//! decimals for mm, three for inches); ported from the GTK
-//! `osd_format::format_length_with_unit` and the GTK status report's DRO. A report carries
+//! decimals for mm, three for inches).
+//! A report carries
 //! either `MPos` or `WPos`; the other is derived with the last work coordinate offset
 //! (`WCO`) when one is known.
 //!
@@ -34,7 +34,7 @@ pub(super) const MSGIDS: &[&str] = &[
     n_!("Machine Limits"),
 ];
 
-/// The degree sign rotary values are shown with, as GTK shows them.
+/// The degree sign rotary values are shown with.
 const DEGREES: &str = "\u{b0}";
 
 /// How the work position block offers its Zero buttons.
@@ -51,8 +51,7 @@ pub(super) struct ZeroButtons<'a> {
 /// with three (`0.049`).
 ///
 /// Three decimals for inches are a deliberate exception to the project's two-decimal rule,
-/// which is about mm values: 0.01 in is 0.254 mm, too coarse to see the 0.001 in jog steps,
-/// and the GTK front end showed inches with three decimals too.
+/// which is about mm values: 0.01 in is 0.254 mm, too coarse to see the 0.001 in jog steps.
 ///
 /// # Arguments
 /// * `value_mm` - Length in millimetres.
@@ -64,7 +63,7 @@ pub(crate) fn format_length(value_mm: f32, units: MeasurementSystem) -> String {
     }
 }
 
-/// The size of the work position readout's text (GTK's large DRO labels).
+/// The size of the work position readout's text (large DRO labels).
 const DRO_TEXT_SIZE: f32 = 22.0;
 
 /// The work position block's title with the length unit: "Work Coordinates (WPos) (mm)".
@@ -109,7 +108,7 @@ pub(super) fn show_work(
                 }
                 ui.end_row();
             }
-            // The rotary axes the machine reports, in degrees (GTK's A/B/C rows).
+            // The rotary axes the machine reports, in degrees (the A/B/C rows).
             let rotary = status.work_rotary();
             let reported = status.rotary_reported();
             for (i, axis) in [Axis::A, Axis::B, Axis::C].into_iter().enumerate() {
@@ -187,7 +186,7 @@ fn zero_button(ui: &mut egui::Ui, zero: &ZeroButtons, letter: char) -> bool {
 }
 
 /// Draws the Machine State section's readout: the state in large text (the connection
-/// state while offline, as GTK shows "Disconnected"), then the feed rate and spindle speed.
+/// state while offline, such as "Disconnected"), then the feed rate and spindle speed.
 pub(super) fn show_state(
     ui: &mut egui::Ui,
     tr: &Translator,
@@ -224,8 +223,7 @@ pub(super) type ConfiguredLimits = [f32; 6];
 
 /// The Machine Limits rows as `(axis, text)`: X, Y and Z from the controller's max travel
 /// (`$130`-`$132`) once read, else the configured limit, in `units`; then each rotary axis
-/// the machine reports, from its configured limit in degrees. As GTK's
-/// `refresh_limit_labels`.
+/// the machine reports, from its configured limit in degrees.
 ///
 /// # Arguments
 /// * `status` - The machine status.

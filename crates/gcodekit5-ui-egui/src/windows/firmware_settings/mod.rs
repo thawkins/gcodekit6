@@ -1,16 +1,16 @@
-//! The Firmware Settings page (GTK's Device Config settings list): the controller's
+//! The Firmware Settings page (the Device Config settings list): the controller's
 //! settings, filtered by search text and category, read from the controller (Retrieve),
 //! edited one at a time, and saved to or loaded from a JSON file.
 //!
 //! - **Retrieve** loads the GRBL (or, when the active device profile's controller is
 //!   Repetier or the controller said it runs Repetier, the Repetier) definitions and sends
-//!   `$$` then `$I` (`M205` then `M115`), as GTK chose. The identity reply follows the dump,
+//!   `$$` then `$I` (`M205` then `M115`). The identity reply follows the dump,
 //!   so it marks the dump complete; after 5 s the retrieval ends as incomplete. A dump with
 //!   no settings hints at the active profile's controller in the Device Manager.
 //! - The first complete GRBL dump of a connection with at least 10 settings is handed to
 //!   the app ([`FirmwareSettingsWindow::take_dump_for_profile`]), even when the connection
-//!   closes right after it, to keep in the device profile of that machine, as GTK's Device
-//!   Config page did; [`FirmwareSettingsWindow::note`] then says where it went.
+//!   closes right after it, to keep in the device profile of that machine;
+//!   [`FirmwareSettingsWindow::note`] then says where it went.
 //! - `$n=v` lines update the list whenever they arrive (a `$$` typed in the console too);
 //!   the GRBL definitions are loaded first when the list is empty.
 //! - Clicking a writable row the controller has reported (on this connection, since the
@@ -21,8 +21,8 @@
 //!   the machine is not Idle ([`setting_write::blocked`]).
 //! - **Save** and **Load** ask the app for a file dialog ([`FileRequest`]); the app hands
 //!   the answer to [`FirmwareSettingsWindow::save_to`] or
-//!   [`FirmwareSettingsWindow::load_from`]. Loading only fills the list (as in GTK, whose
-//!   Restore-to-device stayed hidden).
+//!   [`FirmwareSettingsWindow::load_from`]. Loading only fills the list (there is no
+//!   restore to the device).
 //!
 //! Dependencies: `egui`, `gcodekit5-app` (settings model, controller, translations),
 //! `gcodekit5-communication` (`SettingsManager`).
@@ -49,7 +49,7 @@ use crate::machine::Machine;
 /// How long a retrieval waits for the identity reply that ends the dump.
 pub const RETRIEVE_TIMEOUT: Duration = Duration::from_secs(5);
 
-/// How many settings a dump needs before it is kept in the device profile (GTK's rule).
+/// How many settings a dump needs before it is kept in the device profile.
 const PROFILE_DUMP_MIN: usize = 10;
 
 /// The file name the Save dialog suggests.
@@ -90,7 +90,7 @@ struct Write {
     value: String,
 }
 
-/// The Device Config page (GTK's name for the firmware settings).
+/// The Device Config page (the firmware settings).
 #[derive(Debug)]
 pub struct FirmwareSettingsWindow {
     table: SettingsManager,
@@ -324,7 +324,7 @@ impl FirmwareSettingsWindow {
     }
 
     /// Reads every setting from the controller; Repetier's when the active device profile or
-    /// the controller says Repetier (GTK's rule).
+    /// the controller says Repetier.
     fn retrieve(
         &mut self,
         machine: &Machine,

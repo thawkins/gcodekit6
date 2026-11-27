@@ -3,14 +3,14 @@
 //!
 //! The values shown resolve "use global values" to the toolbox's settings. Several shapes
 //! show each value they share and "---" where they differ; the fields are editable when one
-//! shape uses its own values (GTK). A change applies to every selected shape except raster
-//! images as one undo step, in both copies GTK keeps (the shape's own parameters, which the
+//! shape uses its own values. A change applies to every selected shape except raster
+//! images as one undo step, in both copies the model keeps (the shape's own parameters, which the
 //! 2D toolpaths read, and the object's, which are saved).
 //!
-//! Changes from GTK: committing one field of several shapes keeps each shape's other values
-//! (GTK read "---" as its defaults, 1000 mm/min, 100 %, 1 pass, and wrote those to all); a
-//! feed rate of 0 or less and passes below 1 are rejected with an inline error (GTK turned
-//! them into defaults).
+//! Committing one field of several shapes keeps each shape's other values
+//! (a "---" field is not written); a
+//! feed rate of 0 or less and passes below 1 are rejected with an inline error (not turned
+//! into defaults).
 //!
 //! Dependencies: `egui`, `gcodekit5-designer` (model).
 
@@ -111,7 +111,7 @@ fn apply_change(cx: &mut Ctx<'_>, change: Change) {
 /// * `key` - The field.
 /// * `text` - The committed text.
 pub fn apply(cx: &mut Ctx<'_>, key: &str, text: &str) -> Option<Check> {
-    // GTK: a value edit takes the switch as shown (off whenever the fields are editable).
+    // A value edit takes the switch as shown (off whenever the fields are editable).
     let mut change = Change {
         use_global: Some(cx.summary.laser.is_some_and(|s| s.all_use_global)),
         ..Change::default()

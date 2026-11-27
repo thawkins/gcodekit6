@@ -47,7 +47,7 @@ impl WorkerState {
     }
 
     /// Checks a received line against the protocol the connection was opened for, until the
-    /// controller names its firmware (GTK's `protocol_mismatch`). Another known firmware
+    /// controller names its firmware. Another known firmware
     /// rejects the connection: the line and [`MachineEvent::ProtocolMismatch`] are reported
     /// and the worker closes the connection.
     ///
@@ -246,7 +246,7 @@ impl WorkerState {
             if let Some(stream) = self.stream.as_mut() {
                 stream.sent += 1;
                 if written.is_none() {
-                    // Skipped, as GTK's sender did: nothing to acknowledge.
+                    // Skipped: nothing to acknowledge.
                     stream.acked += 1;
                 }
                 let event = MachineEvent::StreamProgress {
@@ -263,7 +263,7 @@ impl WorkerState {
         Ok(())
     }
 
-    /// The program line `line` as pen mode writes it (GTK's `apply_pen_mode`): `M3`/`M4`
+    /// The program line `line` as pen mode writes it: `M3`/`M4`
     /// lower the pen (`G0 Z0`), `M5` lifts it (`G0 Z5`), and `None` for one that repeats the
     /// pen's state. Without pen mode, `line` unchanged.
     fn pen_mode_line(&mut self, line: String) -> Option<String> {
@@ -326,7 +326,7 @@ impl WorkerState {
     }
 
     /// A `Resend:N`: writes the numbered lines from `N` again, exactly as first sent, and
-    /// waits for an acknowledgement of each (GTK's `RepetierSender`). A line no longer known
+    /// waits for an acknowledgement of each. A line no longer known
     /// cannot be sent again: the stream stops.
     fn on_repetier_resend(&mut self, from: u32) -> Result<(), String> {
         if self.halted.load(Ordering::SeqCst) {

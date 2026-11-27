@@ -3,7 +3,7 @@
 //! The console's command history: the commands typed in the console entry, newest last,
 //! with Up/Down navigation. It is kept across sessions in [`HISTORY_FILE`] (JSON) in the
 //! settings folder, written through the shared atomic writer, and bounded to
-//! [`MAX_HISTORY`] commands. The file is the GTK front end's, so its history carries over.
+//! [`MAX_HISTORY`] commands. The file is the legacy build's, so its history carries over.
 //!
 //! Dependencies: `serde`/`serde_json` (file format), `gcodekit5-core` (atomic write).
 
@@ -15,7 +15,7 @@ use std::path::Path;
 /// Most commands kept; older ones are dropped.
 pub const MAX_HISTORY: usize = 250;
 
-/// The history's file name in the settings folder (the GTK build's).
+/// The history's file name in the settings folder (the legacy build's).
 pub const HISTORY_FILE: &str = "command_history.json";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -152,7 +152,7 @@ impl CommandHistory {
     }
 
     /// Saves the history to `path` through the shared atomic writer, creating its folder
-    /// first when missing (as GTK's save did).
+    /// first when missing.
     ///
     /// # Arguments
     /// * `path` - The history file.

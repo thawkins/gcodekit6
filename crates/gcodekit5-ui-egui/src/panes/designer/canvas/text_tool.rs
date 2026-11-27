@@ -1,10 +1,10 @@
-//! The Text tool's Add Text dialog, as GTK's `open_text_tool_dialog`: a click with the Text
+//! The Text tool's Add Text dialog: a click with the Text
 //! tool opens it for the snapped point; it asks for the text, the font family, the size in
 //! points and bold/italic. Add (or Enter in the text or size field) places a text shape centred on
 //! the point as one undo step and selects it; Cancel or Escape places nothing, and empty
 //! text places nothing. The font, size and style are remembered for the next text.
 //!
-//! Sizes are typed in points and stored in millimetres (1 pt = 25.4 / 72 mm), as in GTK.
+//! Sizes are typed in points and stored in millimetres (1 pt = 25.4 / 72 mm).
 //! The font list is "Sans" followed by the system's families (`font_manager`), read once.
 //!
 //! Dependencies: `egui`, `gcodekit5-designer` (model, fonts), `gcodekit5-app`
@@ -19,7 +19,7 @@ use gcodekit5_designer::model::{DesignText, Shape};
 
 /// Millimetres per typographic point.
 pub const MM_PER_PT: f64 = 25.4 / 72.0;
-/// GTK's default text size, in points.
+/// The default text size, in points.
 const DEFAULT_SIZE_PT: f64 = 20.0;
 
 /// The msgids the dialog shows, for the translation check.
@@ -43,7 +43,7 @@ pub fn mm_to_pt(mm: f64) -> f64 {
     mm / MM_PER_PT
 }
 
-/// A size in millimetres shown in points with 2 decimals, as GTK shows it.
+/// A size in millimetres shown in points with 2 decimals.
 pub fn format_points(mm: f64) -> String {
     format!("{:.2}", mm_to_pt(mm))
 }
@@ -174,11 +174,11 @@ impl TextTool {
                             .desired_width(260.0),
                     )
                     .labelled_by(text_label.id);
-                // GTK focuses the text entry when the dialog opens.
+                // The text entry has the focus when the dialog opens.
                 if std::mem::take(&mut self.focus_text) {
                     field.request_focus();
                 }
-                // GTK's entry activates the default (Add) button.
+                // Enter in the entry activates the default (Add) button.
                 add = field.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter));
                 egui::Grid::new("gcodekit5-add-text-grid")
                     .num_columns(2)

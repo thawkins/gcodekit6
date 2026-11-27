@@ -1,23 +1,22 @@
 //! The Designer toolbox: the tool buttons, the grid and snap switches, the machine mode, and
 //! the tool and stock settings the toolpaths are made with.
 //!
-//! Ported from the GTK `designer_toolbox.rs`. The buttons drive the canvas's
+//! The buttons drive the canvas's
 //! [`DesignerTool`] (the caller applies the returned tool with `DesignerPane::set_tool`);
-//! the machine mode and settings write straight to the design's `DesignerState`, as in GTK.
+//! the machine mode and settings write straight to the design's `DesignerState`.
 //! The settings follow the display units of the Settings window ([`settings`]).
 //!
-//! The "Shape Gallery…", "Generate G-Code" and "Frame" buttons are reported in
+//! The "Shape Gallery...", "Generate G-Code" and "Frame" buttons are reported in
 //! [`ToolboxOutput`]; the pane acts on them.
 //!
-//! Laid out as GTK's sidebar: a 3-column grid of square icon buttons (the app SVGs; each
+//! Laid out as a sidebar: a 3-column grid of square icon buttons (the app SVGs; each
 //! button's tooltip and accessible name is the tool's name), Fast Shapes, the Machine Mode
 //! group, the tool and stock settings group, the Generate G-Code / Frame group, and the
 //! View Controls (grid, grid spacing, toolpaths, snap and snap step).
 //!
-//! Not ported: the stock dialog's second Step Down field (it is the tool settings' Step
-//! Down). GTK's tool and stock settings are buttons opening dialogs; here they are
-//! collapsible sections in the settings group. GTK's tooltips named shortcut keys (S, R,
-//! C ...) that no GTK code handled, so none are shown.
+//! The stock settings have no second Step Down field (it is the tool settings' Step
+//! Down). The tool and stock settings are
+//! collapsible sections in the settings group. The tooltips name no shortcut keys.
 //!
 //! Dependencies: `egui`, `gcodekit5-designer` (design state), `gcodekit5-core` (units),
 //! `gcodekit5-app` (translations).
@@ -65,7 +64,7 @@ pub fn msgids() -> Vec<&'static str> {
 pub struct ToolboxOutput {
     /// The tool the user picked, if any.
     pub tool: Option<DesignerTool>,
-    /// "Shape Gallery…" was clicked.
+    /// "Shape Gallery..." was clicked.
     pub gallery: bool,
     /// "Generate G-Code" was clicked.
     pub generate: bool,
@@ -75,7 +74,7 @@ pub struct ToolboxOutput {
     pub cancel_preview: bool,
 }
 
-/// The tools in GTK's grid order (three per row).
+/// The tools in grid order (three per row).
 const GRID_ORDER: [DesignerTool; 12] = [
     DesignerTool::Select,
     DesignerTool::Pan,
@@ -91,10 +90,10 @@ const GRID_ORDER: [DesignerTool; 12] = [
     DesignerTool::Sprocket,
 ];
 
-/// Edge length of a tool button in points (GTK's 40 px).
+/// Edge length of a tool button in points (40).
 const TOOL_BUTTON: f32 = 40.0;
 
-/// The grid spacings offered, in millimetres (GTK's list).
+/// The grid spacings offered, in millimetres.
 const GRID_SPACINGS: [f64; 5] = [1.0, 5.0, 10.0, 25.0, 50.0];
 
 /// Height of the toolbox's full-width buttons in points.
@@ -211,7 +210,7 @@ fn tool_buttons(ui: &mut egui::Ui, current: DesignerTool, tr: &Translator) -> Op
     picked
 }
 
-/// Show Grid, the grid spacing, Show Toolpaths (with GTK's spinner, progress and Cancel while
+/// Show Grid, the grid spacing, Show Toolpaths (with a spinner, progress and Cancel while
 /// the preview builds), then the snap switch and its step.
 ///
 /// # Returns
@@ -296,8 +295,8 @@ fn machine_mode(ui: &mut egui::Ui, state: &mut DesignerState, tr: &Translator) {
     });
 }
 
-/// Largest snap threshold, in millimetres (GTK: 0 to 10 in the display unit; egui keeps
-/// imperial to the same 10 mm).
+/// Largest snap threshold, in millimetres (0 to 10 in the display unit; imperial
+/// is kept to the same 10 mm).
 pub const SNAP_THRESHOLD_MAX_MM: f64 = 10.0;
 
 /// The largest snap threshold in `system`'s display unit: 10 mm, or the same length in

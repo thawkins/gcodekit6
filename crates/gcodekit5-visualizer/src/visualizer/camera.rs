@@ -149,7 +149,7 @@ impl Camera {
         let yaw_norm = ((yaw_deg % 360.0) + 360.0) % 360.0;
 
         // Detect every orthogonal view
-        // Esto determina qué proyección usar, NO el snap
+        // This picks the projection, NOT the snap
         let is_top = (pitch_deg - 90.0).abs() < 5.0;
         let is_bottom = (pitch_deg + 90.0).abs() < 5.0;
         let is_front = pitch_deg.abs() < 5.0 && (yaw_norm - 270.0).abs() < 5.0;
@@ -162,7 +162,7 @@ impl Camera {
             is_top || is_bottom || is_front || is_back || is_right || is_left || is_iso;
 
         if is_orthogonal {
-            // PROYECCIÓN ORTOGRÁFICA
+            // ORTHOGRAPHIC PROJECTION
             let half_height = self.distance * (self.fov.to_radians() / 2.0).tan();
             let half_width = half_height * self.aspect_ratio;
             glam::camera::rh::proj::directx::orthographic(
@@ -174,7 +174,7 @@ impl Camera {
                 self.far,
             )
         } else {
-            // PROYECCIÓN PERSPECTIVA
+            // PERSPECTIVE PROJECTION
             glam::camera::rh::proj::directx::perspective(
                 self.fov.to_radians(),
                 self.aspect_ratio,

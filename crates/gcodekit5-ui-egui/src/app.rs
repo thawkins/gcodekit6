@@ -88,7 +88,7 @@ use gcodekit5_app::tools_manager_backend::TOOLS_FILE;
 use managers::Managers;
 use text_focus::TextFocus;
 
-/// The GTK build's device profiles file, in the legacy settings folder.
+/// The device profiles file, in the legacy settings folder.
 const DEVICES_FILE: &str = "devices.json";
 
 /// How long quitting waits for a stopped job to be confirmed by the controller.
@@ -117,7 +117,6 @@ pub enum QuitSource {
     /// - Linux and the BSDs: the compositor closes the window (a close request, handled as
     ///   [`QuitSource::WindowClose`]) or the session ends the process.
     ///
-    /// The GTK front end did not handle session end either.
     #[doc(hidden)]
     Os,
 }
@@ -136,10 +135,10 @@ pub fn msgids() -> Vec<&'static str> {
     vec![SETTINGS_PROBLEM_TITLE, SETTINGS_PROBLEM_TEXT]
 }
 
-/// GTK's title of the warning shown when the settings could not be loaded.
+/// The title of the warning shown when the settings could not be loaded.
 const SETTINGS_PROBLEM_TITLE: &str = n_!("Settings could not be loaded");
 
-/// GTK's text of that warning, above the file and the problem.
+/// The text of that warning, above the file and the problem.
 const SETTINGS_PROBLEM_TEXT: &str =
     n_!("Default settings are in use. The settings file will be backed up before it is replaced.");
 
@@ -163,29 +162,29 @@ pub struct AppState {
     /// derived from them. Replace it (with [`AppState::with_machine`]) before the app is built
     /// from the state, since the Machine Control pane shares its controller.
     pub machine: Machine,
-    /// The device profiles file (the GTK build's `devices.json` in the legacy settings
+    /// The device profiles file (`devices.json` in the legacy settings
     /// folder); `None` without a settings folder. Replace it (with
     /// [`AppState::with_device_file`]) before the app is built from the state.
     pub device_file: Option<PathBuf>,
-    /// The custom tools file (the GTK build's `custom_tools.json` in the legacy settings
+    /// The custom tools file (`custom_tools.json` in the legacy settings
     /// folder, where `ToolsManagerBackend::default_storage_path` puts it); `None` without a
     /// settings folder. Replace it (with [`AppState::with_tools_file`]) before the app is
     /// built from the state.
     pub tools_file: Option<PathBuf>,
-    /// The custom materials file (the GTK build's `custom_materials.json` in the legacy
+    /// The custom materials file (`custom_materials.json` in the legacy
     /// settings folder); `None` without a settings folder. Replace it (with
     /// [`AppState::with_materials_file`]) before the app is built from the state.
     pub materials_file: Option<PathBuf>,
-    /// The console's command history file (the GTK build's `command_history.json` in the
+    /// The console's command history file (`command_history.json` in the
     /// legacy settings folder); `None` without a settings folder, which keeps the history
     /// for the session. Replace it (with [`AppState::with_history_file`]) before the app is
     /// built from the state.
     pub history_file: Option<PathBuf>,
     /// The Designer's stock and tool for the program it last generated, which the
-    /// visualizer's stock removal simulation takes (GTK's `sync_stock_from_designer`).
+    /// visualizer's stock removal simulation takes.
     pub stock_seed: Option<crate::panes::visualizer::StockSeed>,
     /// What went wrong loading the settings (the file and the problem), shown once at start
-    /// as GTK's "Settings could not be loaded" warning; set with
+    /// as the "Settings could not be loaded" warning; set with
     /// [`AppState::with_settings_problem`] before the app is built from the state.
     pub settings_problem: Option<String>,
 }
@@ -353,7 +352,7 @@ pub struct GcodeKitApp {
     help_window: HelpWindow,
     /// Saved shortcuts put back to their defaults at start, until the user closes the notice.
     shortcut_notice: Option<String>,
-    /// GTK's "Settings could not be loaded" warning, shown at start until OK.
+    /// The "Settings could not be loaded" warning, shown at start until OK.
     settings_notice: Option<String>,
     /// The manager pages (Device Config, Device Manager, CNC Tools, Materials).
     managers: Managers,
@@ -377,7 +376,7 @@ pub struct GcodeKitApp {
     /// [`PaneContext::with_jog_key`]).
     jog_keys: Vec<(Command, JogKey)>,
     /// The hideable panels' visibility last saved (or found at start), so a change is saved
-    /// once (GTK's `panel_visibility`).
+    /// once (the settings' `panel_visibility`).
     panel_visibility: Vec<(&'static str, bool)>,
     /// The `movable` flag last set on the macOS window (`title_bar::sync_movable`).
     #[cfg(target_os = "macos")]
@@ -971,7 +970,7 @@ impl GcodeKitApp {
         true
     }
 
-    /// Hands `cmd` to the designer when the Designer page is shown, as GTK routed its Edit
+    /// Hands `cmd` to the designer when the Designer page is shown, routing its Edit
     /// actions by page.
     ///
     /// # Returns
@@ -1067,7 +1066,7 @@ impl GcodeKitApp {
             Command::OpenDeviceInfo => self.show_page(Page::DeviceConfig),
             Command::OpenDeviceManager => self.show_page(Page::DeviceManager),
             Command::Quit => self.request_quit(QuitSource::MenuQuit),
-            // GTK's Edit actions: shapes on the Designer page (the design's own clipboard),
+            // The Edit actions: shapes on the Designer page (the design's own clipboard),
             // text elsewhere. A text field's own edits are handled before this
             // (`edit_text_from_menu`, the keymap's typing rule).
             Command::Cut | Command::Copy | Command::Paste => {
@@ -1086,9 +1085,9 @@ impl GcodeKitApp {
             | Command::FileImportImage
             | Command::FileExportGcode
             | Command::FileExportSvg => {}
-            // GTK's Run: the Visualizer's run preview of the program, which sends nothing.
+            // Run: the Visualizer's run preview of the program, which sends nothing.
             Command::FileRun => {
-                // GTK ran the editor's text: hand an edit still in its typing pause to the
+                // Run takes the editor's text: hand an edit still in its typing pause to the
                 // machine first.
                 self.sync_editor(true);
                 self.show_page(Page::Visualizer);
@@ -1211,7 +1210,7 @@ impl GcodeKitApp {
         }
     }
 
-    /// GTK's warning that the settings could not be loaded and defaults are in use, until OK.
+    /// The warning that the settings could not be loaded and defaults are in use, until OK.
     fn show_settings_notice(&mut self, ctx: &egui::Context) {
         let Some(message) = &self.settings_notice else {
             return;
@@ -1583,7 +1582,7 @@ impl GcodeKitApp {
     }
 
     /// Makes the folder of `file` the one the next file dialog starts in, and keeps it as
-    /// Preferences > General's default folder, as GTK did (a failed write leaves it for
+    /// Preferences > General's default folder (a failed write leaves it for
     /// this run only).
     fn remember_folder(&mut self, file: &std::path::Path) {
         let Some(folder) = self.dialogs.remember_folder(file) else {
@@ -1604,8 +1603,8 @@ impl GcodeKitApp {
     }
 
     /// Saves the hideable panels' visibility (the Visualizer sidebar, the Designer inspector)
-    /// in the settings when a Hide or Show changed it, so it is kept between runs as GTK kept
-    /// the sidebar's (a failed write is not retried until it changes again).
+    /// in the settings when a Hide or Show changed it, so it is kept between runs
+    /// (a failed write is not retried until it changes again).
     fn store_panel_visibility(&mut self) {
         let now = self.workspace.panel_visibility();
         if now == self.panel_visibility {

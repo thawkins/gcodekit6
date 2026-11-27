@@ -1,4 +1,4 @@
-//! Paints the design canvas with `egui::Painter`, as the GTK canvas draws it: the grid
+//! Paints the design canvas with `egui::Painter`: the grid
 //! (minor lines at a fifth of the spacing), the work-area bounds, the origin axes, the shapes
 //! (selected in the error colour, grouped in the success colour, with offset/fillet/chamfer
 //! in the warning colour), text as its glyph outlines, the properties panel's live effect
@@ -39,7 +39,7 @@ impl Default for LineWidths {
 
 /// Grid lines closer than this many points are not drawn (they would fill the canvas).
 const MIN_GRID_GAP_PT: f32 = 3.0;
-/// How far the origin axes reach, mm (GTK's world extent).
+/// How far the origin axes reach, mm (the world extent).
 const AXIS_EXTENT_MM: f64 = 2000.0;
 /// Flattening tolerance of curves, in points.
 const FLATTEN_PT: f32 = 0.25;
@@ -55,7 +55,7 @@ const FLATTEN_PT: f32 = 0.25;
 /// * `palette` - Theme colours.
 /// * `widths` - Grid line widths.
 /// * `preview` - The properties panel's live offset or chamfer preview, in the warning colour.
-/// * `work_area` - The device's work area (mm), outlined in GTK's device-bounds colour.
+/// * `work_area` - The device's work area (mm), outlined in the device-bounds colour.
 #[allow(clippy::too_many_arguments)] // the frame's whole paint context, called once
 pub fn paint(
     painter: &Painter,
@@ -239,7 +239,7 @@ fn outlines(view: &CanvasView, shape: &Shape) -> Vec<(Vec<Pos2>, bool)> {
     out
 }
 
-/// The gallery shape waiting to be placed: dashed, in the accent colour at 65%, as GTK.
+/// The gallery shape waiting to be placed: dashed, in the accent colour at 65%.
 ///
 /// # Arguments
 /// * `painter` - Painter clipped to the canvas.

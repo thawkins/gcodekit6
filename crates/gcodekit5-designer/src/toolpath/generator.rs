@@ -397,11 +397,11 @@ impl ToolpathGenerator {
             )
         };
 
-        // Obtener los vértices locales del triángulo usando get_local_vertices_f64()
-        // Esto respeta right_angle_corner
+        // The triangle's local vertices from get_local_vertices_f64()
+        // This honours right_angle_corner
         let [p1_local, p2_local, p3_local] = triangle.get_local_vertices_f64();
 
-        // Aplicar rotación y traslación
+        // Apply rotation and translation
         let rotation = triangle.rotation;
         let center = triangle.center;
 
@@ -900,10 +900,10 @@ impl ToolpathGenerator {
             .iter()
             .filter(|g| g.unpositioned().exact_bounding_box().is_some())
         {
-            // Posición de inicio para esta letra
+            // Start position of this glyph
             let start_pos = layout.glyph_origin(glyph);
 
-            // Si no es la primera letra, mover a la nueva posición
+            // After the first glyph, move to the new position
             if !is_first {
                 all_segments.push(ToolpathSegment::new(
                     ToolpathSegmentType::RapidMove,
@@ -914,7 +914,7 @@ impl ToolpathGenerator {
                 ));
             }
 
-            // Crear builder para esta letra
+            // Builder for this glyph
             let origin = glyph.position();
             let mut builder = ToolpathBuilder::new(
                 feed_rate,
@@ -924,17 +924,17 @@ impl ToolpathGenerator {
                 (f64::from(origin.x), f64::from(origin.y)),
             );
 
-            // Construir el outline de la letra
+            // Build the glyph outline
             glyph.unpositioned().build_outline(&mut builder);
 
-            // Tomar los segmentos de la letra
+            // Take the glyph's segments
             let letter_segments = builder.take_segments();
             all_segments.extend(letter_segments);
 
-            // Guardar la última posición
+            // Keep the last position
             last_position = builder.current_point;
 
-            // Cerrar el contorno si es necesario
+            // Close the contour if needed
             if let Some(first_point) = builder.start_point_opt()
                 && last_position.distance_to(&first_point) > 0.001
             {
@@ -954,7 +954,7 @@ impl ToolpathGenerator {
         all_segments
     }
 
-    // ==================== POCKET METHODS (sin cambios) ====================
+    // ==================== POCKET METHODS ====================
 
     pub fn generate_ellipse_pocket(
         &self,
@@ -1102,7 +1102,7 @@ impl ToolpathGenerator {
         step_down: f64,
         step_in: f64,
     ) -> Vec<Toolpath> {
-        // Generar toolpaths (el raster cleanup ya está desactivado en pocket_operations.rs)
+        // Generate the pocket toolpaths
         self.polyline_pocket_generator(pocket_depth, step_in)
             .generate_polygon_pocket(vertices, step_down)
     }
@@ -1281,7 +1281,7 @@ impl ToolpathGenerator {
             )
         };
 
-        // Generar segmentos de contorno para cada letra
+        // Contour segments for each glyph
         let outline_segments =
             self.build_text_outline_segments_with_params(text_shape, feed_rate, spindle_speed);
 
@@ -1289,11 +1289,11 @@ impl ToolpathGenerator {
             return Vec::new();
         }
 
-        // Extraer contornos individuales (cada letra es un contorno)
+        // Extract the individual contours (each glyph is a contour)
         let contours = self.extract_text_contours(&outline_segments);
 
         if contours.is_empty() {
-            // Fallback: usar contour normal
+            // Fallback: plain contour
             return self.generate_text_toolpath(text_shape, step_down);
         }
 
@@ -1315,7 +1315,7 @@ impl ToolpathGenerator {
         {
             let contour = &contours[outer_idx];
 
-            // Si el contorno es muy pequeño, usar contour en lugar de pocket
+            // A very small contour gets a profile instead of a pocket
             let area = self.polygon_area(contour);
             if area < tool_area || area < 0.01 {
                 let toolpaths = self.create_multipass_toolpaths_from_contour(
@@ -1328,7 +1328,7 @@ impl ToolpathGenerator {
                 continue;
             }
 
-            // Generar pocket para esta letra, dejando sus huecos sin cortar
+            // Pocket this glyph, leaving its holes uncut
             let op = PocketOperation::new(
                 format!("text_pocket_{}", i),
                 pocket_depth,
@@ -1349,7 +1349,7 @@ impl ToolpathGenerator {
             all_toolpaths.extend(pocket_toolpaths);
         }
 
-        // Si no se generó nada, usar contour como fallback
+        // If nothing was generated, fall back to a contour
         if all_toolpaths.is_empty() {
             return self.generate_text_toolpath(text_shape, step_down);
         }
@@ -1357,7 +1357,7 @@ impl ToolpathGenerator {
         all_toolpaths
     }
 
-    /// Extrae contornos individuales del texto (cada letra es un contorno separado)
+    /// Extracts the text's individual contours (each glyph is a separate contour)
     fn extract_text_contours(&self, segments: &[ToolpathSegment]) -> Vec<Vec<Point>> {
         let mut contours: Vec<Vec<Point>> = Vec::new();
         let mut current: Vec<Point> = Vec::new();
@@ -1365,9 +1365,9 @@ impl ToolpathGenerator {
         for seg in segments {
             match seg.segment_type {
                 ToolpathSegmentType::RapidMove => {
-                    // Si tenemos un contorno en progreso, guardarlo
+                    // Keep a contour in progress
                     if !current.is_empty() && current.len() >= 3 {
-                        // Cerrar el contorno
+                        // Close the contour
                         if let Some(first) = current.first()
                             && let Some(last) = current.last()
                             && last.distance_to(first) > 0.001
@@ -1377,7 +1377,7 @@ impl ToolpathGenerator {
                         contours.push(current.clone());
                         current.clear();
                     }
-                    // Iniciar nuevo contorno con el punto de destino
+                    // Start a new contour at the target point
                     current.push(seg.end);
                 }
                 ToolpathSegmentType::LinearMove => {
@@ -1394,7 +1394,7 @@ impl ToolpathGenerator {
                     }
                 }
                 ToolpathSegmentType::ArcCW | ToolpathSegmentType::ArcCCW => {
-                    // Aproximar arcos con líneas
+                    // Approximate arcs with lines
                     let steps = 12;
                     for i in 1..=steps {
                         let t = i as f64 / steps as f64;
@@ -1412,7 +1412,7 @@ impl ToolpathGenerator {
             }
         }
 
-        // Guardar el último contorno
+        // Keep the last contour
         if !current.is_empty() && current.len() >= 3 {
             if let Some(first) = current.first()
                 && let Some(last) = current.last()
@@ -1426,7 +1426,7 @@ impl ToolpathGenerator {
         contours
     }
 
-    /// Calcula el área de un polígono
+    /// Computes a polygon's area
     fn polygon_area(&self, polygon: &[Point]) -> f64 {
         if polygon.len() < 3 {
             return 0.0;
@@ -1440,7 +1440,7 @@ impl ToolpathGenerator {
         area.abs() / 2.0
     }
 
-    /// Genera toolpaths de contour para un contorno (cuando la letra es muy pequeña)
+    /// Generates contour toolpaths for a contour (when the glyph is very small)
     fn create_multipass_toolpaths_from_contour(
         &self,
         contour: &[Point],
@@ -1454,7 +1454,7 @@ impl ToolpathGenerator {
             return Vec::new();
         }
 
-        // Crear segmentos para el contorno
+        // Segments for the contour
         segments.push(ToolpathSegment::new(
             ToolpathSegmentType::RapidMove,
             contour[0],

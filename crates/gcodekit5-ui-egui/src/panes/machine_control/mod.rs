@@ -4,7 +4,7 @@
 //! probes, job control with stream progress, jogging (pad and keyboard), feed/rapid/spindle
 //! overrides with Set %, and a one-line command entry.
 //!
-//! Laid out as GTK's page: a sidebar (status strip, connection, machine state with homing,
+//! Laid out as a sidebar (status strip, connection, machine state with homing,
 //! the G54-G59 selector, job control, the command entry and notices) and a centre column
 //! (overrides, the work readout with Zero All Axes and Go to Work Zero beside it, the
 //! machine position, then the jog row and pad with the E-STOP picture button). The page puts
@@ -23,8 +23,6 @@
 //! The machine commands of the catalog ([`Command::Connect`], [`Command::FeedHold`],
 //! [`Command::JogXPos`], ...) are run here, whether they come from the pane's buttons, a key
 //! or a menu ([`Pane::command`]).
-//!
-//! Ported from the GTK `ui/gtk/machine_control` view (UI parts) and `ui/gtk/osd_format.rs`.
 //!
 //! Dependencies: `egui`, `gcodekit5-app` (controller, translations),
 //! `gcodekit5-settings` (connection settings).
@@ -121,10 +119,10 @@ const OVERRIDES_NOT_ON_REPETIER: &str =
 /// Unlock from the menu or its key refused outside ALARM.
 const UNLOCK_NOT_IN_ALARM: &str = n_!("Unlock ignored: the machine is not in ALARM.");
 
-/// GTK's hint while the machine is in ALARM.
+/// The hint while the machine is in ALARM.
 const ALARM_UNLOCK: &str = n_!("ALARM: Unlock required.");
 
-/// Whether the latest status report says ALARM (GTK enables Unlock only then).
+/// Whether the latest status report says ALARM (Unlock is enabled only then).
 fn in_alarm(status: &MachineStatus) -> bool {
     status
         .report
@@ -213,9 +211,9 @@ const CONTROLS_COMFORT: f32 = WIDE_ROWS + 50.0;
 /// Width the page gives this pane before the editor column may grow over it: the sidebar
 /// and the centre column with the emergency stop beside the pad.
 pub(crate) const COMFORT_WIDTH: f32 = SIDEBAR_MIN + CONTROLS_COMFORT;
-/// Width of the centre column's content, centred in the column as GTK centres it.
+/// Width of the centre column's content, centred in the column.
 const CONTROLS_WIDTH: f32 = 560.0;
-/// Size of the emergency stop button (GTK: 112 x 80 plus its picture).
+/// Size of the emergency stop button (112 x 80 plus its picture).
 const ESTOP_SIZE: egui::Vec2 = egui::vec2(112.0, 96.0);
 /// Edge of the emergency stop picture.
 const ESTOP_IMAGE: f32 = 60.0;
@@ -645,7 +643,7 @@ impl MachineControlPane {
             // Soft reset through `stop`: 0x18, and the queued lines are dropped with it.
             Command::StreamStop | Command::SoftReset => self.emergency_stop(),
             Command::Home => self.send_line("$H"),
-            // GTK enabled Unlock only in ALARM; the menu item and its key follow the button.
+            // Unlock is enabled only in ALARM; the menu item and its key follow the button.
             Command::Unlock => {
                 if ctx.machine().is_some_and(|m| in_alarm(m.status())) {
                     self.send_line("$X");
@@ -827,7 +825,7 @@ impl MachineControlPane {
             }
             let unlock = egui::Button::image_and_text(Icon::Unlock.themed(ui), tr.tr("Unlock"))
                 .min_size(egui::vec2(width, 0.0));
-            // GTK: Unlock is only useful in ALARM.
+            // Unlock is only useful in ALARM.
             if ui
                 .add_enabled(idle && in_alarm(status), unlock)
                 .on_hover_text(tr.tr("Unlock from ALARM ($X)"))
@@ -1015,7 +1013,7 @@ impl MachineControlPane {
         };
         let units = self.units;
         let wcs = &mut self.wcs;
-        // Quick probes: GTK's guards (connected, no job, one probe at a time); the run
+        // Quick probes: the guards (connected, no job, one probe at a time); the run
         // checks the rest (Idle, fresh report, probe input) when it starts.
         let probe_enabled = status.connected
             && !repetier
@@ -1181,7 +1179,7 @@ fn load_estop(ctx: &egui::Context) -> Option<egui::TextureHandle> {
     }
 }
 
-/// The emergency stop button: the GTK picture above "E-STOP", on a raised card. Its
+/// The emergency stop button: the picture above "E-STOP", on a raised card. Its
 /// accessible name is `label`.
 fn estop_button(
     ui: &mut egui::Ui,
@@ -1215,7 +1213,7 @@ fn estop_button(
             let at = egui::pos2(rect.center().x, text_y);
             ui.painter()
                 .text(at, egui::Align2::CENTER_CENTER, label, font.clone(), colour);
-            // Bold like GTK's title-4, painted twice as the theme's headings are.
+            // Bold like libadwaita's title-4, painted twice as the theme's headings are.
             ui.painter().text(
                 at + egui::vec2(0.6, 0.0),
                 egui::Align2::CENTER_CENTER,
@@ -1355,7 +1353,7 @@ impl Pane for MachineControlPane {
     }
 
     fn set_device(&mut self, profile: Option<&gcodekit5_devicedb::DeviceProfile>) {
-        // Read by the controller when a Repetier program streams, as GTK read the active
+        // Read by the controller when a Repetier program streams: the active
         // profile's pen mode at job start.
         let pen_mode = profile.is_some_and(|p| p.pen_mode);
         self.with_controller(|c| c.set_pen_mode(pen_mode));

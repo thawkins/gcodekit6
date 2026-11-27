@@ -4,7 +4,7 @@
 //! Every jog runs in the direction Preferences > Machine > Invert gives the axis
 //! ([`JogPanel::set_inverted`]). Step and feed are mm and mm/min
 //! internally and shown, and typed, in the user's measurement system and feed units; the `$J`
-//! line is always G21 (mm), as GTK sends it.
+//! line is always G21 (mm).
 //!
 //! In step mode a click jogs one step. In continuous mode a hold is GRBL's documented
 //! continuous jog: one `$J` move toward the end of travel, cancelled with jog cancel (0x85).
@@ -21,7 +21,7 @@
 //! focus loss, a hidden pane, disconnect, stream start, soft reset and exit
 //! ([`JogPanel::take_hold`], [`JogPanel::forget_hold`]).
 //!
-//! The keyboard jogs too (GTK's keypad keys, see [`crate::commands`]): a key press jogs one
+//! The keyboard jogs too (the keypad keys, see [`crate::commands`]): a key press jogs one
 //! step, or in continuous mode starts the same hold as a button ([`JogPanel::key_hold`]),
 //! which lasts while that key stays down ([`JogPanel::follow_key_hold`]); the pane also ends
 //! it when a widget takes the keyboard or the pointer is pressed, and the app ends it on
@@ -134,9 +134,9 @@ const X_NEG: JogButton = jog_button(Command::JogXNeg, "X-", Icon::JogLeft, Axis:
 const Z_POS: JogButton = jog_button(Command::JogZPos, "Z+", Icon::JogUp, Axis::Z, 1.0);
 const Z_NEG: JogButton = jog_button(Command::JogZNeg, "Z-", Icon::JogDown, Axis::Z, -1.0);
 
-/// Edge of a jog pad button (GTK: 56 px).
+/// Edge of a jog pad button (56 px).
 const PAD_BUTTON: f32 = 56.0;
-/// Gap between the pad's buttons (GTK: 5 px).
+/// Gap between the pad's buttons (5 px).
 const PAD_GAP: f32 = 5.0;
 /// Width of the X/Y pad, the gap, the Z column and the gap after it.
 pub(super) const PAD_ROW_WIDTH: f32 = 4.0 * PAD_BUTTON + 2.0 * PAD_GAP + 48.0 + 20.0 + 24.0;
@@ -159,8 +159,8 @@ fn axis_slot(axis: Axis) -> usize {
 /// axis runs from 0 to `-travel` (`$130`-`$132`); soft limits check exactly that range.
 /// Stock GRBL keeps this range whatever the homing direction (`$23`) or step direction
 /// (`$3`) masks say (only a build with `HOMING_FORCE_SET_ORIGIN` moves it), so moving `+`
-/// leaves `-mpos` and moving `-` leaves `travel + mpos`. Neither the GTK front end nor the
-/// app crate implements another convention.
+/// leaves `-mpos` and moving `-` leaves `travel + mpos`. The
+/// app crate implements no other convention.
 pub(super) fn remaining_travel(mpos_mm: f32, travel_mm: f32, direction: f32) -> f32 {
     if direction > 0.0 {
         -mpos_mm
@@ -579,7 +579,7 @@ impl JogPanel {
         }
     }
 
-    /// Draws the `-` and `+` jog buttons of the rotary `axis` (GTK's buttons in the axis's
+    /// Draws the `-` and `+` jog buttons of the rotary `axis` (the buttons in the axis's
     /// readout row), stepping by the rotary step in degrees, or in continuous mode holding
     /// a move of the axis's configured limit, under the pad's rules and guards.
     ///

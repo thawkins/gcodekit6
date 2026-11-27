@@ -1,10 +1,10 @@
-//! The visualizer's right-click menu, as GTK's: Fit to Content, Reset View (GTK's Fit to
-//! Viewport) and Fit to Device Working Area; Copy cursor coordinates; and the Toggle Grid,
+//! The visualizer's right-click menu: Fit to Content, Reset View
+//! and Fit to Device Working Area; Copy cursor coordinates; and the Toggle Grid,
 //! Toggle Machine Bounds, Toggle Rapid Moves and Toggle Cutting Moves switches of the
 //! sidebar's toggles.
 //!
 //! The cursor coordinates are where the pointer was when the menu opened, on the work plane
-//! (Z = 0) under it ([`cursor_on_plane`]); they are copied as GTK copied them,
+//! (Z = 0) under it ([`cursor_on_plane`]); they are copied as
 //! `X 12.345  Y 6.789` in the user's measurement system with three decimals.
 //!
 //! Dependencies: `egui`, `glam`, `gcodekit5-app` (translations), `gcodekit5-core` (units).
@@ -67,7 +67,7 @@ pub fn cursor_on_plane(camera: &Camera, rect: egui::Rect, pos: egui::Pos2) -> Op
     hit.is_finite().then(|| hit.truncate())
 }
 
-/// The clipboard text for the work-plane point `at`: GTK's `X <x>  Y <y>`.
+/// The clipboard text for the work-plane point `at`: `X <x>  Y <y>`.
 ///
 /// # Arguments
 /// * `at` - The point in mm.

@@ -1,10 +1,10 @@
 //! The Jigsaw Puzzle Generator page: a puzzle of interlocking pieces, made as outlines for
 //! the designer.
 //!
-//! GTK's defaults: 200 x 150 mm, 4 x 3 pieces, seed 42, tabs 20 %, jitter 4 % and a 2 mm
+//! Defaults: 200 x 150 mm, 4 x 3 pieces, seed 42, tabs 20 %, jitter 4 % and a 2 mm
 //! corner radius. The generator makes paths, not a program, so Generate adds them to the
-//! design (grouped, the border closed) and brings the designer to the front, as GTK's did.
-//! GTK silently used a default for a field it could not read; here the field shows the
+//! design (grouped, the border closed) and brings the designer to the front.
+//! A field that cannot be read shows the
 //! problem and Generate waits. The generator's limits are checked at the fields: pieces of
 //! at least 15 mm, 2 to 20 of them in each direction, a puzzle of 50 to 2000 mm, tabs of
 //! 10 to 30 %, jitter of 0 to 13 %, a corner radius of 0 to 10 mm.
@@ -116,7 +116,7 @@ pub struct JigsawParams {
 }
 
 impl JigsawParams {
-    /// GTK's initial values in `units`.
+    /// The initial values in `units`.
     ///
     /// # Arguments
     /// * `units` - The display units.
@@ -147,7 +147,7 @@ impl JigsawParams {
         self.units = units;
     }
 
-    /// Gives the seed GTK's shuffle button gave: the clock's nanoseconds below 100000.
+    /// Gives the shuffle button's seed: the clock's nanoseconds below 100000.
     pub fn randomize_seed(&mut self) {
         let nanos = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
@@ -227,18 +227,18 @@ impl JigsawParams {
         })
     }
 
-    /// The page's input as GTK's preset file: the generator's parameters as pretty JSON.
+    /// The page's input as a preset file: the generator's parameters as pretty JSON.
     ///
     /// # Arguments
     /// * `tr` - Translator for the current UI language.
     ///
     /// # Errors
-    /// The first field that does not parse (GTK refused to save then too).
+    /// The first field that does not parse (saving is refused then).
     pub fn preset_json(&self, tr: &Translator) -> Result<String, String> {
         common::preset_text(self.build(false).map_err(common::first_error), tr)
     }
 
-    /// Sets the page from a preset file in GTK's format ([`Self::preset_json`]).
+    /// Sets the page from a preset file ([`Self::preset_json`]).
     ///
     /// # Arguments
     /// * `json` - The file's text.

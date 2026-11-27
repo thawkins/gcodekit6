@@ -2,7 +2,7 @@
 //! continuous Z) and stock settings (width, height, thickness, safe Z).
 //!
 //! Values are millimetres in the design and are shown in the display units: inches in
-//! imperial mode, except a laser's passes and width (shown unconverted, as in GTK) and the
+//! imperial mode, except a laser's passes and width (shown unconverted) and the
 //! spindle speed (RPM, or a laser's power in percent: 10 units of the model per percent).
 //! The labels follow the machine mode ("Feed Rate" or "Laser Speed", and so on).
 //!

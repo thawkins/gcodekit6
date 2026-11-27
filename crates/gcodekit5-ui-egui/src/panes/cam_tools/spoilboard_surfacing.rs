@@ -1,8 +1,8 @@
 //! The Spoilboard Surfacing page: a raster toolpath that flattens the spoilboard.
 //!
-//! GTK's defaults: 400 x 300 mm with a 25 mm cutter, 0.5 mm deep at 40 % stepover, 1000
-//! mm/min and 18000 RPM, safe Z 5. GTK silently used a default for a field it could not
-//! read; here the field shows the problem and Generate waits.
+//! Defaults: 400 x 300 mm with a 25 mm cutter, 0.5 mm deep at 40 % stepover, 1000
+//! mm/min and 18000 RPM, safe Z 5. A field that cannot be
+//! read shows the problem and Generate waits.
 //!
 //! Dependencies: `egui`, `gcodekit5-camtools` (generator), `gcodekit5-app` (translations,
 //! device status), `gcodekit5-core` (units).
@@ -82,7 +82,7 @@ pub struct SpoilboardSurfacingParams {
 }
 
 impl SpoilboardSurfacingParams {
-    /// GTK's initial values in `units`.
+    /// The initial values in `units`.
     ///
     /// # Arguments
     /// * `units` - The display units.
@@ -163,14 +163,14 @@ impl SpoilboardSurfacingParams {
         })
     }
 
-    /// The page's input as GTK's preset file: lengths in millimetres, feed, speed and
-    /// stepover as typed (GTK's keys; Home is not kept).
+    /// The page's input as a preset file: lengths in millimetres, feed, speed and
+    /// stepover as typed (Home is not kept).
     ///
     /// # Arguments
     /// * `tr` - Translator for the current UI language.
     ///
     /// # Errors
-    /// The first length that does not parse (GTK refused to save then too).
+    /// The first length that does not parse (saving is refused then).
     pub fn preset_json(&self, tr: &Translator) -> Result<String, String> {
         let u = self.units;
         let len = |label, text: &str| common::preset_len(label, text, u);
@@ -189,7 +189,7 @@ impl SpoilboardSurfacingParams {
         common::preset_text(preset, tr)
     }
 
-    /// Sets the page from a preset file in GTK's format ([`Self::preset_json`]); keys it
+    /// Sets the page from a preset file ([`Self::preset_json`]); keys it
     /// does not hold leave their fields as they are.
     ///
     /// # Arguments

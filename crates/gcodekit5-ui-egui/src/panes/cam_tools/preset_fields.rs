@@ -1,5 +1,5 @@
-//! Reading and writing a CAM page's fields as GTK's preset files hold them: lengths in
-//! millimetres as `f32`, numbers as GTK parsed them, and the JSON object helpers of the
+//! Reading and writing a CAM page's fields as the preset files hold them: lengths in
+//! millimetres as `f32`, numbers as typed, and the JSON object helpers of the
 //! spoilboard presets. Re-exported from [`super::common`].
 //!
 //! Dependencies: `gcodekit5-core` (units), `serde` / `serde_json`, `gcodekit5-app`
@@ -10,7 +10,7 @@ use gcodekit5_core::units::MeasurementSystem;
 
 use super::common::{FieldError, format_len, parse_len, parse_number};
 
-/// A length field's text as GTK's preset files hold it: millimetres, as `f32`.
+/// A length field's text as the preset files hold it: millimetres, as `f32`.
 ///
 /// # Arguments
 /// * `field` - The msgid of the field's label.
@@ -29,7 +29,7 @@ pub fn preset_len(
         .map_err(|message| FieldError::field(field, message))
 }
 
-/// A number field's text as GTK's Drill Press preset holds it.
+/// A number field's text as the Drill Press preset holds it.
 ///
 /// # Arguments
 /// * `field` - The msgid of the field's label.
@@ -61,7 +61,7 @@ pub fn preset_text<T: serde::Serialize>(
     serde_json::to_string_pretty(&value).map_err(|e| e.to_string())
 }
 
-/// A spoilboard preset file's JSON object (GTK read the keys it knew and ignored the rest).
+/// A spoilboard preset file's JSON object (unknown keys are ignored).
 ///
 /// # Arguments
 /// * `json` - The file's text.

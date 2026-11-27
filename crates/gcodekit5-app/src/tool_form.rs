@@ -1,15 +1,15 @@
-//! The CNC Tools manager's rules, shared by the GTK and egui windows: the edit form (every
-//! field GTK's four tabs edit) with its validation and messages, the list's search and
+//! The CNC Tools manager's rules: the edit form (every field of its
+//! four tabs) with its validation and messages, the list's search and
 //! filters, and the order tools are listed in.
 //!
-//! Lengths are millimetres (as GTK's form, which never followed the unit setting); the tip
+//! Lengths are millimetres (the form does not follow the unit setting); the tip
 //! angle is degrees. Error and label strings are English msgids for the caller to translate.
 //!
 //! Dependencies: `gcodekit5-core` (tool types).
 
 use gcodekit5_core::data::tools::{ShankType, Tool, ToolCoating, ToolId, ToolMaterial, ToolType};
 
-/// The tool types in GTK's form and filter order.
+/// The tool types in form and filter order.
 pub const TOOL_TYPES: [ToolType; 9] = [
     ToolType::EndMillFlat,
     ToolType::EndMillBall,
@@ -22,7 +22,7 @@ pub const TOOL_TYPES: [ToolType; 9] = [
     ToolType::Specialty,
 ];
 
-/// The tool materials in GTK's order.
+/// The tool materials, in display order.
 pub const TOOL_MATERIALS: [ToolMaterial; 4] = [
     ToolMaterial::HSS,
     ToolMaterial::Carbide,
@@ -30,7 +30,7 @@ pub const TOOL_MATERIALS: [ToolMaterial; 4] = [
     ToolMaterial::Diamond,
 ];
 
-/// The coatings in GTK's order; `None` is GTK's "None".
+/// The coatings, in display order; `None` is shown as "None".
 pub const COATINGS: [Option<ToolCoating>; 5] = [
     None,
     Some(ToolCoating::TiN),
@@ -39,7 +39,7 @@ pub const COATINGS: [Option<ToolCoating>; 5] = [
     Some(ToolCoating::AlOx),
 ];
 
-/// The msgid of a tool type's name (GTK's labels).
+/// The msgid of a tool type's name.
 pub fn tool_type_label(tool_type: ToolType) -> &'static str {
     match tool_type {
         ToolType::EndMillFlat => n_!("Flat End Mill"),
@@ -54,7 +54,7 @@ pub fn tool_type_label(tool_type: ToolType) -> &'static str {
     }
 }
 
-/// GTK's filter id of a tool type, as kept in the settings (`tools_manager_type_filter`).
+/// The filter id of a tool type, as kept in the settings (`tools_manager_type_filter`).
 pub fn tool_type_filter_id(tool_type: ToolType) -> &'static str {
     match tool_type {
         ToolType::EndMillFlat => "endmill_flat",
@@ -69,14 +69,14 @@ pub fn tool_type_filter_id(tool_type: ToolType) -> &'static str {
     }
 }
 
-/// The tool type with GTK filter id `id`, if any (`"all"` and unknown ids have none).
+/// The tool type with filter id `id`, if any (`"all"` and unknown ids have none).
 pub fn tool_type_from_filter_id(id: &str) -> Option<ToolType> {
     TOOL_TYPES
         .into_iter()
         .find(|t| tool_type_filter_id(*t) == id)
 }
 
-/// The msgid of a tool material's name (GTK's form labels).
+/// The msgid of a tool material's name.
 pub fn tool_material_label(material: ToolMaterial) -> &'static str {
     match material {
         ToolMaterial::HSS => "HSS",
@@ -86,7 +86,7 @@ pub fn tool_material_label(material: ToolMaterial) -> &'static str {
     }
 }
 
-/// GTK's filter id of a tool material, as kept in the settings
+/// The filter id of a tool material, as kept in the settings
 /// (`tools_manager_material_filter`).
 pub fn tool_material_filter_id(material: ToolMaterial) -> &'static str {
     match material {
@@ -97,7 +97,7 @@ pub fn tool_material_filter_id(material: ToolMaterial) -> &'static str {
     }
 }
 
-/// The tool material with GTK filter id `id`, if any.
+/// The tool material with filter id `id`, if any.
 pub fn tool_material_from_filter_id(id: &str) -> Option<ToolMaterial> {
     TOOL_MATERIALS
         .into_iter()
@@ -115,7 +115,7 @@ pub fn coating_label(coating: Option<ToolCoating>) -> &'static str {
     }
 }
 
-/// The shank choices of GTK's form.
+/// The form's shank choices.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ShankChoice {
     /// A straight shank whose size is the shaft diameter.
@@ -127,7 +127,7 @@ pub enum ShankChoice {
 }
 
 impl ShankChoice {
-    /// Every choice, in GTK's order.
+    /// Every choice, in display order.
     pub const ALL: [Self; 3] = [Self::Derived, Self::Collet, Self::Tapered];
 
     /// The msgid of the choice's name.
@@ -149,7 +149,7 @@ impl ShankChoice {
 
     fn shank(self, shaft_diameter_mm: f32) -> ShankType {
         match self {
-            // GTK's rule: tenths of a millimetre, truncated.
+            // Tenths of a millimetre, truncated.
             Self::Derived => ShankType::Straight((shaft_diameter_mm * 10.0) as u32),
             Self::Collet => ShankType::Collet,
             Self::Tapered => ShankType::Tapered,
@@ -157,7 +157,7 @@ impl ShankChoice {
     }
 }
 
-/// Whether a tool type has a corner radius (GTK enables the field only for it).
+/// Whether a tool type has a corner radius (the field is enabled only for it).
 pub fn has_corner_radius(tool_type: ToolType) -> bool {
     tool_type == ToolType::EndMillCornerRadius
 }
@@ -176,7 +176,7 @@ pub fn can_delete(tool: &Tool) -> bool {
     tool.custom
 }
 
-/// The edit form: every field GTK's Basic Info, Geometry, Manufacturer and Notes tabs edit,
+/// The edit form: every field of the Basic Info, Geometry, Manufacturer and Notes tabs,
 /// lengths as typed (millimetres).
 #[derive(Debug, Clone, PartialEq)]
 pub struct ToolForm {
@@ -219,7 +219,7 @@ pub struct ToolForm {
 }
 
 impl Default for ToolForm {
-    /// GTK's form for a new tool (`clear_form`).
+    /// The form for a new tool.
     fn default() -> Self {
         Self {
             id: String::new(),
@@ -271,7 +271,7 @@ fn non_empty(text: &str) -> Option<String> {
 }
 
 impl ToolForm {
-    /// The form showing `tool` (GTK's `load_tool_for_edit`, three decimals).
+    /// The form showing `tool`, lengths to three decimals.
     ///
     /// # Arguments
     /// * `tool` - The tool to edit.
@@ -302,8 +302,7 @@ impl ToolForm {
         form
     }
 
-    /// Sets the tool type and clears the fields it does not use (GTK's
-    /// `update_type_dependent_fields`).
+    /// Sets the tool type and clears the fields it does not use.
     ///
     /// # Arguments
     /// * `tool_type` - The new type.
@@ -322,7 +321,7 @@ impl ToolForm {
         }
     }
 
-    /// The tool the form describes (GTK's `build_tool_from_form`), marked custom.
+    /// The tool the form describes, marked custom.
     ///
     /// Fields the form does not edit (cutting parameters, extended geometry, limits,
     /// features, cost) are kept from `base`, the tool being edited.
@@ -389,7 +388,7 @@ impl ToolForm {
         Ok(tool)
     }
 
-    /// Whether the form differs from `original` (GTK's `is_dirty`): a form that does not
+    /// Whether the form differs from `original`: a form that does not
     /// build counts as changed.
     ///
     /// # Arguments
@@ -406,8 +405,8 @@ impl ToolForm {
     }
 }
 
-/// Whether two tools hold the same values at the form's precision (GTK's
-/// `tool_contents_equal`): lengths within 0.0001 mm, a missing shaft diameter equal to the
+/// Whether two tools hold the same values at the form's precision:
+/// lengths within 0.0001 mm, a missing shaft diameter equal to the
 /// diameter, an empty manufacturer or part number equal to none.
 ///
 /// # Arguments
@@ -443,7 +442,7 @@ pub fn tool_contents_equal(a: &Tool, b: &Tool) -> bool {
         && a.notes == b.notes
 }
 
-/// The list's search text and filters (GTK's sidebar).
+/// The list's search text and filters (the sidebar).
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct ToolFilter {
     /// Matches the name, id, type name or diameter (three decimals), ignoring case.
@@ -469,17 +468,17 @@ fn bound(text: &str) -> Result<Option<f32>, ()> {
 }
 
 impl ToolFilter {
-    /// Whether the smallest-diameter text is not a number (GTK marks the field).
+    /// Whether the smallest-diameter text is not a number (the field is marked).
     pub fn dia_min_invalid(&self) -> bool {
         bound(&self.dia_min).is_err()
     }
 
-    /// Whether the largest-diameter text is not a number (GTK marks the field).
+    /// Whether the largest-diameter text is not a number (the field is marked).
     pub fn dia_max_invalid(&self) -> bool {
         bound(&self.dia_max).is_err()
     }
 
-    /// Whether `tool` is listed. An invalid diameter bound is ignored, as GTK does.
+    /// Whether `tool` is listed. An invalid diameter bound is ignored.
     ///
     /// # Arguments
     /// * `tool` - The tool to test.
@@ -514,7 +513,7 @@ impl ToolFilter {
         true
     }
 
-    /// The tools listed, by id then name (GTK's order).
+    /// The tools listed, by id then name.
     ///
     /// # Arguments
     /// * `tools` - Every tool.
@@ -525,7 +524,7 @@ impl ToolFilter {
     }
 }
 
-/// The one-line summary under a tool's name in the list (GTK's row), lengths in mm.
+/// The one-line summary under a tool's name in the list, lengths in mm.
 ///
 /// # Arguments
 /// * `tool` - The tool.

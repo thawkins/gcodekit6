@@ -1,15 +1,15 @@
-//! Toolkit-free model of the Device Manager, shared by the GTK and egui front ends.
+//! Toolkit-free model of the Device Manager.
 //!
 //! - [`ProfileForm`] holds a device profile's fields as the edit form shows them (lengths
 //!   and feed in the user's units) and [`ProfileForm::apply`] checks them and writes them
-//!   back into a [`DeviceProfile`], with the GTK Device Manager's Save rules and messages.
-//! - [`ReportedLimits`] reads the values a `$$` dump gives a profile (GTK's Sync from Device)
-//!   and [`store_reported_settings`] keeps a dump in a profile (GTK's Device Config page).
+//!   back into a [`DeviceProfile`], with the Device Manager's Save rules and messages.
+//! - [`ReportedLimits`] reads the values a `$$` dump gives a profile (Sync from Device)
+//!   and [`store_reported_settings`] keeps a dump in a profile (the Device Config page).
 //! - [`matches_search`] is the device list's search, [`delete_refusal`] the delete rule,
 //!   [`ensure_active_profile`] keeps a valid active profile, and [`dump_target`] picks the
-//!   profile a retrieved dump belongs to (GTK's port rule).
+//!   profile a retrieved dump belongs to (the port rule).
 //!
-//! Profiles are stored by `gcodekit5-devicedb`'s `DeviceManager` (`devices.json`, the GTK
+//! Profiles are stored by `gcodekit5-devicedb`'s `DeviceManager` (`devices.json`, the legacy
 //! build's file). Depends on `gcodekit5-core` (units), `gcodekit5-devicedb` (profile model)
 //! `gcodekit5-communication` (which controllers are supported) and `gcodekit5-settings`
 //! (the connection a dump came from).
@@ -23,7 +23,7 @@ use gcodekit5_core::units::{
 use gcodekit5_devicedb::{ControllerType, DeviceManager, DeviceProfile, DeviceType};
 use gcodekit5_settings::{ConnectionSettings, ConnectionType};
 
-/// The device types the form offers, in GTK's order.
+/// The device types the form offers, in display order.
 pub const DEVICE_TYPES: [DeviceType; 5] = [
     DeviceType::CncMill,
     DeviceType::CncLathe,
@@ -32,7 +32,7 @@ pub const DEVICE_TYPES: [DeviceType; 5] = [
     DeviceType::Plotter,
 ];
 
-/// The controllers the form offers with their labels (msgids), in GTK's order.
+/// The controllers the form offers with their labels (msgids), in display order.
 pub const CONTROLLER_CHOICES: [(ControllerType, &str); 8] = [
     (ControllerType::Grbl, "GRBL"),
     (ControllerType::Repetier, "Repetier"),
@@ -53,7 +53,7 @@ pub const CONNECTION_TYPES: [&str; 3] = [n_!("Serial"), "TCP/IP", "WebSocket"];
 /// The baud rates the form offers.
 pub const BAUD_RATES: [u32; 6] = [9600, 19200, 38400, 57600, 115200, 250000];
 
-/// The label (msgid) of a device type, as GTK lists it.
+/// The label (msgid) of a device type, as the form lists it.
 ///
 /// # Arguments
 /// * `device_type` - The device type.
@@ -67,7 +67,7 @@ pub fn device_type_label(device_type: &DeviceType) -> &'static str {
     }
 }
 
-/// The device type a GTK device-type label names, if any.
+/// The device type a device-type label names, if any.
 ///
 /// # Arguments
 /// * `label` - An untranslated label from [`device_type_label`].
@@ -77,7 +77,7 @@ pub fn device_type_from_label(label: &str) -> Option<DeviceType> {
         .find(|t| device_type_label(t) == label)
 }
 
-/// The label (msgid) of a controller, as GTK lists it.
+/// The label (msgid) of a controller, as the form lists it.
 ///
 /// # Arguments
 /// * `controller` - The controller type.
@@ -181,7 +181,7 @@ pub struct ProfileForm {
     pub laser_watts: String,
 }
 
-/// Rounds `value` to two decimals, as GTK stores a length.
+/// Rounds `value` to two decimals, as a length is stored.
 fn round2(value: f32) -> f64 {
     format!("{value:.2}").parse().unwrap_or(f64::from(value))
 }
@@ -198,7 +198,7 @@ fn length(text: &str, units: MeasurementSystem, title: &'static str) -> Result<f
         .map_err(|_| FormError::new(title, n_!("Enter a number")))
 }
 
-/// Orders a minimum and maximum (GTK swaps reversed limits).
+/// Orders a minimum and maximum (reversed limits are swapped).
 fn ordered(min: f64, max: f64) -> (f64, f64) {
     if min > max { (max, min) } else { (min, max) }
 }
@@ -254,7 +254,7 @@ impl ProfileForm {
     }
 
     /// Checks the form and writes it into a copy of `base` (which keeps its id, rotary
-    /// axes and stored settings), with the GTK Device Manager's rules: lengths rounded to
+    /// axes and stored settings), with the Device Manager's rules: lengths rounded to
     /// 0.01 mm and reversed limits swapped, 1 to 6 axes, spindle and laser values checked
     /// only when present (saved as 0 otherwise), a network connection needs a host without
     /// spaces, and an unsupported controller is refused.
@@ -377,7 +377,7 @@ impl ProfileForm {
         } else {
             0.0
         };
-        // GTK stores these whole.
+        // Stored as whole numbers.
         p.max_feed_rate = f64::from(feed).round();
         p.max_s_value = f64::from(max_s).round();
         p.cnc_spindle_watts = f64::from(spindle_watts).round();
@@ -397,7 +397,7 @@ impl ProfileForm {
         Ok(p)
     }
 
-    /// Fills in what a controller reported (GTK's Sync from Device): X/Y/Z maximum from
+    /// Fills in what a controller reported (Sync from Device): X/Y/Z maximum from
     /// `$130`-`$132`, maximum spindle speed and S value from `$30` (a spindle when above
     /// 0), the laser from `$32`.
     ///
@@ -490,7 +490,7 @@ fn parse_numeric_prefix(s: &str) -> Option<f64> {
 }
 
 /// Keeps a reported `$$` dump in `profile`, with its maximum S value (`$30`) and laser mode
-/// (`$32` at least 1), as GTK's Device Config page does.
+/// (`$32` at least 1), as the Device Config page does.
 ///
 /// # Arguments
 /// * `profile` - The profile to update.
@@ -518,7 +518,7 @@ fn on_connection(profile: &DeviceProfile, connection: &ConnectionSettings) -> bo
     }
 }
 
-/// The profile a `$$` dump read over `connection` belongs to (GTK's rule): the active
+/// The profile a `$$` dump read over `connection` belongs to: the active
 /// profile when it names that connection or its port is `"Auto"`, else the first profile by
 /// name that names the connection, else none.
 ///

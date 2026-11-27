@@ -1,4 +1,4 @@
-//! The Device Info panel, the left column of the Device Config page as in GTK: what the
+//! The Device Info panel, the left column of the Device Config page: what the
 //! controller reports about itself (name, firmware, version, build date, compile options),
 //! its capabilities (homing `$22`, laser mode `$32`), and the device type selector that
 //! writes `$32`.
@@ -7,7 +7,7 @@
 //!   startup banner, the `$I` reply (`[VER:...]`, `[OPT:...]`), Repetier's `M115` reply and
 //!   `$22`/`$32` from a `$$` dump. A disconnect forgets it.
 //! - **Refresh device info** sends `$I` then `$$`; **Copy device info** copies the name,
-//!   firmware and version (GTK's three lines).
+//!   firmware and version (three lines).
 //! - Choosing CNC or Laser writes `$32=0` or `$32=1` through [`PendingWrite`]; Other leaves
 //!   `$32` alone. The selector is enabled only while connected, and a write is refused with
 //!   a notice while a job runs or the machine is not Idle. The selector follows `$32` as
@@ -177,7 +177,7 @@ impl DeviceInfoPanel {
         }
     }
 
-    /// GTK's copied text: name, firmware and version.
+    /// The copied text: name, firmware and version.
     fn copy_text(&self, tr: &Translator) -> String {
         let shown = |value: &Option<String>| value.clone().unwrap_or_else(|| "-".to_string());
         format!(
@@ -261,9 +261,9 @@ impl DeviceInfoPanel {
             None => {}
         }
         ui.separator();
-        // GTK's header: the connection icon, "Device", and the refresh and copy buttons.
+        // The header: the connection icon, "Device", and the refresh and copy buttons.
         ui.horizontal(|ui| {
-            // The icon shows the state, as in GTK. Its tooltip and accessible name say it as
+            // The icon shows the state. Its tooltip and accessible name say it as
             // "Device: Not connected", not the bare state the page's status line names.
             let (icon, state) = if connected {
                 (Icon::Transfer, n_!("Connected"))
@@ -322,7 +322,7 @@ impl DeviceInfoPanel {
             });
     }
 
-    /// GTK's capability rows: variable spindle, homing (`$22`) and laser mode (`$32`).
+    /// The capability rows: variable spindle, homing (`$22`) and laser mode (`$32`).
     fn capabilities(&self, ui: &mut egui::Ui, tr: &Translator) {
         let unknown = n_!("Unknown (settings not loaded)");
         let homing = match self.identity.homing {

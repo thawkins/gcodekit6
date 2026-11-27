@@ -108,7 +108,7 @@ pub enum ProbeRoutine {
     },
     /// Find the centre of a circular bore (internal diameter).
     BoreCenter {
-        /// Approximate bore diameter (mm) — used to calculate probe start positions.
+        /// Approximate bore diameter (mm), used to calculate probe start positions.
         diameter: f64,
         /// Safe height to rapid above the surface (mm).
         safe_height: f64,
@@ -226,7 +226,7 @@ impl ProbeReport {
     /// suggestion needs the tool's current machine position as well, so none is
     /// produced here; use [`ProbeReport::build_commands_with_current`] for that.
     ///
-    /// * `wcs` — target work coordinate system number (54-59 for G54-G59).
+    /// * `wcs` - target work coordinate system number (54-59 for G54-G59).
     pub fn build_commands(&mut self, wcs: u8) {
         self.build_commands_with_current(wcs, None);
     }

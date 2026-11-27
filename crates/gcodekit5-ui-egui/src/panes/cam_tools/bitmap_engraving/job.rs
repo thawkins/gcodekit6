@@ -1,10 +1,10 @@
-//! Work the Laser Image Engraver does off the UI thread, as GTK did: the engraving itself
+//! Work the Laser Image Engraver does off the UI thread: the engraving itself
 //! ([`EngraveJob`], with progress and Cancel) and the decoding of the chosen image for the
 //! page's preview ([`PreviewLoad`]).
 //!
 //! Each runs on its own thread and reports over a channel that the pane polls once per
 //! frame, so a large image never stalls a frame. Cancel cannot interrupt the engraver (it
-//! has no stop point, as in GTK); the worker finishes and its program is dropped.
+//! has no stop point); the worker finishes and its program is dropped.
 //!
 //! Dependencies: `gcodekit5-camtools` (engraver), `image` (decoding), `egui` (preview
 //! texture).
@@ -140,7 +140,7 @@ impl EngraveJob {
         }
     }
 
-    /// The msgid of what the worker is doing, from its progress (GTK's stages).
+    /// The msgid of what the worker is doing, from its progress (the engraver's stages).
     pub fn stage_msgid(&self) -> &'static str {
         if self.progress < 0.1 {
             n_!("Loading image...")
@@ -183,7 +183,7 @@ impl std::fmt::Debug for PreviewLoad {
 
 impl PreviewLoad {
     /// Starts decoding `path` on a new thread; an image that cannot be read shows no
-    /// preview (as in GTK).
+    /// preview.
     ///
     /// # Arguments
     /// * `path` - The image file.

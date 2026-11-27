@@ -199,7 +199,7 @@ pub struct ToolCuttingParams {
 /// Advanced geometry parameters for feeds and speeds calculations.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ToolGeometry {
-    /// Helix angle in degrees (30-45° typical, higher = better chip evacuation)
+    /// Helix angle in degrees (30-45 deg typical, higher = better chip evacuation)
     #[serde(default)]
     pub helix_angle: Option<f32>,
     /// Tool core diameter in mm (for deflection calculations)
@@ -625,7 +625,7 @@ impl Tool {
         self
     }
 }
-/// Tool library — manages a collection of tools.
+/// Tool library: manages a collection of tools.
 ///
 /// Provides add, remove, search, and filter operations. Standard tools
 /// are loaded via [`init_standard_library`].

@@ -1,7 +1,7 @@
 //! Text: content, font family, bold, italic, and size in points (stored in millimetres).
 //!
 //! Each change applies to every selected text shape as one undo step. The family, bold
-//! and italic are applied together (GTK's "Change Font").
+//! and italic are applied together (one "Change Font" step).
 //!
 //! Dependencies: `egui`, `gcodekit5-designer` (model).
 

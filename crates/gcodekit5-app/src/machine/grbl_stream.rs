@@ -1,6 +1,6 @@
 //! # GRBL streaming helpers
 //!
-//! Pure, GTK-free logic used by the Machine Control panel to talk to a GRBL controller:
+//! Pure, toolkit-free logic used by the Machine Control panel to talk to a GRBL controller:
 //!
 //! * [`CharCountWindow`] implements GRBL's recommended *character-counting* streaming
 //!   protocol: a line is only sent when it fits, together with every line sent but not
@@ -248,7 +248,7 @@ pub struct JogStepPreset {
 
 /// Returns the jog step presets for a measurement system.
 ///
-/// Metric offers 0.001–100 mm; imperial offers 0.0001–1 in. Values are always stored
+/// Metric offers 0.001-100 mm; imperial offers 0.0001-1 in. Values are always stored
 /// in millimetres.
 ///
 /// # Arguments

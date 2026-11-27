@@ -161,7 +161,7 @@ pub struct ShapeData {
     pub use_global_laser: bool,
     #[serde(default)]
     pub laser_params: LaserParams,
-    // ========== PARÁMETROS LÁSER PARA IMÁGENES RÁSTER ==========
+    // ========== LASER PARAMETERS FOR RASTER IMAGES ==========
     #[serde(default = "default_feed_rate")]
     pub feed_rate: f64,
     #[serde(default = "default_travel_rate")]
@@ -196,7 +196,7 @@ fn default_raster_fill_ratio() -> f64 {
     0.5
 }
 
-// ========== FUNCIONES DEFAULT PARA PARÁMETROS LÁSER ==========
+// ========== DEFAULT FUNCTIONS FOR LASER PARAMETERS ==========
 fn default_travel_rate() -> f64 {
     3000.0
 }
@@ -439,7 +439,7 @@ impl DesignFile {
             lock_aspect_ratio: obj.lock_aspect_ratio,
             original_path: None,
             use_global_laser: obj.use_global_laser,
-            // ========== PARÁMETROS LÁSER ==========
+            // ========== LASER PARAMETERS ==========
             feed_rate: default_feed_rate(),
             travel_rate: default_travel_rate(),
             min_power: default_min_power(),
@@ -550,7 +550,7 @@ impl DesignFile {
                     .original_path
                     .clone()
                     .map(|p| p.display().to_string());
-                // ========== EXTRAER PARÁMETROS LÁSER ==========
+                // ========== EXTRACT LASER PARAMETERS ==========
                 data.feed_rate = raster.feed_rate;
                 data.travel_rate = raster.travel_rate;
                 data.min_power = raster.min_power;
@@ -568,7 +568,7 @@ impl DesignFile {
     }
 
     pub fn to_drawing_object(data: &ShapeData, next_id: i32) -> Result<DrawingObject> {
-        // Obtener laser_params una sola vez
+        // Read laser_params once
         let laser_params = data.laser_params;
 
         let shape: Shape = match data.shape_type.as_str() {
@@ -724,7 +724,7 @@ impl DesignFile {
                     original_path,
                 );
 
-                // Parámetros láser para raster
+                // Laser parameters for the raster
                 raster.feed_rate = data.feed_rate;
                 raster.travel_rate = data.travel_rate;
                 raster.min_power = data.min_power;

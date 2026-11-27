@@ -19,7 +19,7 @@ use crate::machine::Machine;
 use crate::windows::help::{self, HelpTopic};
 use crate::windows::manager_ui::{self, icon_text_button};
 
-/// GTK's column widths of the settings list: ID, Name, Value, Unit and Category; the
+/// The column widths of the settings list: ID, Name, Value, Unit and Category; the
 /// Description takes the rest.
 const COLUMNS: [f32; 5] = [50.0, 200.0, 100.0, 80.0, 150.0];
 /// Height of a row of the settings list.
@@ -98,7 +98,7 @@ impl FirmwareSettingsWindow {
         tr: &Translator,
     ) {
         let busy = self.retrieval.is_some() || self.write.is_some();
-        // GTK's toolbar: Retrieve, Save, Load, and the help button at the right end.
+        // The toolbar: Retrieve, Save, Load, and the help button at the right end.
         ui.horizontal(|ui| {
             let retrieve = ui
                 .add_enabled(
@@ -151,7 +151,7 @@ impl FirmwareSettingsWindow {
         });
         ui.add_space(6.0);
         let rows = self.visible_rows();
-        // The list's header row, then the boxed list; GTK's status line sits under it.
+        // The list's header row, then the boxed list; the status line sits under it.
         let status_height = ui.spacing().interact_size.y + 8.0;
         ui.horizontal(|ui| {
             ui.add_space(LIST_MARGIN);
@@ -207,7 +207,7 @@ impl FirmwareSettingsWindow {
             ui.horizontal(|ui| {
                 ui.set_min_height(ROW_HEIGHT);
                 ui.add_space(LIST_MARGIN);
-                // GTK's row colours: the name in the accent colour, the value green, the
+                // The row colours: the name in the accent colour, the value green, the
                 // rest dim.
                 cell(ui, COLUMNS[0], |ui| {
                     if row.read_only || !self.reported.contains(&row.number) {

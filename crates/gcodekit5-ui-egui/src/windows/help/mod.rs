@@ -1,8 +1,8 @@
 //! The help browser: the topic list on the left, the open topic on the right, Back and
-//! Forward through the topics visited. Ported from the GTK `help_browser`.
+//! Forward through the topics visited.
 //!
 //! Topics are the embedded markdown files ([`crate::resources`]) in the app language, or in
-//! English when that language has no help pages (as GTK). Links to `help:<id>` open that
+//! English when that language has no help pages. Links to `help:<id>` open that
 //! topic; web links open in the browser (egui's `open_url`). Windows open their own topic
 //! with [`help_button`]; the app takes the request with [`take_request`].
 //!
@@ -56,7 +56,7 @@ pub enum HelpTopic {
     DrillPress,
     /// The device manager.
     DeviceManager,
-    /// Firmware settings (GTK's "Device Config").
+    /// Firmware settings (the "Device Config" page).
     DeviceConfig,
     /// The CNC tools manager.
     ToolsManager,
@@ -65,7 +65,7 @@ pub enum HelpTopic {
 }
 
 impl HelpTopic {
-    /// Every topic, in the order the topic list shows them (as GTK).
+    /// Every topic, in the order the topic list shows them.
     pub const ALL: [HelpTopic; 20] = [
         Self::Index,
         Self::Settings,
@@ -255,7 +255,7 @@ impl std::fmt::Debug for HelpWindow {
 
 impl HelpWindow {
     /// Opens the window on `topic`. An open window goes to `topic` like a link (Back
-    /// returns); a closed one starts a new history, as GTK opened a new browser.
+    /// returns); a closed one starts a new history.
     ///
     /// # Arguments
     /// * `topic` - The topic to show.

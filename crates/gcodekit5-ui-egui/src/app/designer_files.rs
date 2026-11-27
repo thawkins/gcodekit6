@@ -2,7 +2,7 @@
 //! dialogs they ask, the unsaved-changes question, Save from the quit prompt, and the
 //! G-code the designer hands to the editor.
 //!
-//! Routing (GTK routed by the visible tab): File > Open, Save and Save As act on the design
+//! Routing: File > Open, Save and Save As act on the design
 //! while a designer pane (the canvas, Layers or Properties) is the active pane, otherwise on
 //! the G-code editor. New 2D / New 3D, Import, Import Image, Export G-Code and Export SVG are
 //! design commands and always reach the design.
@@ -15,15 +15,15 @@
 //!
 //! The editor handoff ([`Handoff`]): the designer's Generate G-Code and Frame, and a CAM
 //! tool's Send to Editor and Preview, replace the editor's program, and the editor forgets
-//! its file (GTK cleared it too), so the next editor Save asks where. Unsaved editor edits are
-//! asked about first (Save / Discard / Cancel; a deliberate change: GTK replaced them
+//! its file, so the next editor Save asks where. Unsaved editor edits are
+//! asked about first (Save / Discard / Cancel; they are never replaced
 //! silently). While a job streams the request is refused before anything is generated: it
 //! would swap the program under the running job, like File > Open. The refusal is shown on
 //! the pane that asked. A CAM Preview then brings the visualizer to the front.
 //!
 //! A designer handoff also records the Designer's stock size and tool diameter in
 //! [`super::AppState::stock_seed`], which the visualizer's stock removal simulation takes with
-//! the new program (GTK's `sync_stock_from_designer` and tool sync).
+//! the new program.
 //!
 //! Dependencies: `gcodekit5-designer` (machine mode), `gcodekit5-app` (translations).
 
@@ -116,7 +116,7 @@ fn stock_seed(state: &DesignerState, serial: u64) -> StockSeed {
     }
 }
 
-/// `path` with `extension` when it has none (GTK's default extensions).
+/// `path` with `extension` when it has none (the default extensions).
 fn with_default_extension(path: &Path, extension: &str) -> std::path::PathBuf {
     let mut path = path.to_path_buf();
     if path.extension().is_none() {
@@ -225,7 +225,7 @@ impl GcodeKitApp {
         self.ask_file(FilePurpose::SaveDesign, Some(&name));
     }
 
-    /// GTK's suggested file name: the design's file name with `extension`, else
+    /// The suggested file name: the design's file name with `extension`, else
     /// `untitled_design`.
     fn design_file_name(&self, extension: &str) -> String {
         let stem = self
@@ -381,8 +381,8 @@ impl GcodeKitApp {
 
     /// Runs the designer's Generate G-Code / Frame request and a CAM tool's Send to Editor /
     /// Preview: refused while a job streams (before anything is generated); with unsaved
-    /// editor edits it asks first (Save / Discard / Cancel, as the controller ruled: GTK
-    /// replaced them silently).
+    /// editor edits it asks first (Save / Discard / Cancel; never replaced
+    /// silently).
     pub(super) fn deliver_editor_gcode(&mut self) {
         let designer = self
             .designer
@@ -400,7 +400,7 @@ impl GcodeKitApp {
     }
 
     /// Adds the shapes a CAM page generated to the design and brings the designer to the
-    /// front (GTK switched to the designer tab).
+    /// front.
     pub(super) fn deliver_designer_shapes(&mut self) {
         let Some(generated) = self.cam_tools.borrow_mut().take_designer_request() else {
             return;

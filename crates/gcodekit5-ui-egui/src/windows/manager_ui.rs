@@ -1,5 +1,5 @@
-//! Shared pieces of the manager pages (Device Manager, CNC Tools, Materials), drawn as GTK
-//! drew them: a sidebar header with the page title and help button, a boxed list of
+//! Shared pieces of the manager pages (Device Manager, CNC Tools, Materials), drawn
+//! as: a sidebar header with the page title and help button, a boxed list of
 //! selectable rows, a centred tab switcher, framed form groups, the "select an entry"
 //! placeholder and the in-page question card, plus the pages' shared notice state
 //! ([`LibraryNotice`]).
@@ -14,7 +14,7 @@ use crate::icons::Icon;
 use crate::theme;
 use crate::windows::help::{HelpTopic, help_button};
 
-/// Width of the manager pages' left sidebar (GTK: 250 to 280 px).
+/// Width of the manager pages' left sidebar (250 to 280 px).
 pub(crate) const SIDEBAR_WIDTH: f32 = 270.0;
 
 /// The sidebar's header: the page title (Adwaita `title-4`) with the help button at the
@@ -34,7 +34,7 @@ pub(crate) fn sidebar_header(ui: &mut egui::Ui, title: &str, topic: HelpTopic, t
     });
 }
 
-/// A boxed list (GTK's `boxed-list`): a rounded, bordered card whose rows sit flush, one
+/// A boxed list (libadwaita's `boxed-list`): a rounded, bordered card whose rows sit flush, one
 /// under the other.
 ///
 /// # Arguments
@@ -124,7 +124,7 @@ pub(crate) fn list_row(
     response
 }
 
-/// GTK's stack switcher: the form's tabs as a row of linked toggle buttons, centred.
+/// A stack switcher: the form's tabs as a row of linked toggle buttons, centred.
 ///
 /// # Arguments
 /// * `ui` - Where the switcher goes.
@@ -156,7 +156,7 @@ pub(crate) fn tab_switcher<T: Copy + PartialEq>(
     });
 }
 
-/// A framed group of form rows (GTK's frames and `PreferencesGroup` cards) with an
+/// A framed group of form rows (like libadwaita's `PreferencesGroup` cards) with an
 /// optional bold heading above it.
 ///
 /// # Arguments
@@ -179,7 +179,7 @@ pub(crate) fn form_group<R>(
     inner.inner
 }
 
-/// The right panel's text while nothing is selected (GTK's dim `title-2` placeholder),
+/// The right panel's text while nothing is selected (a dim `title-2` placeholder),
 /// centred in the room left.
 ///
 /// # Arguments
@@ -292,7 +292,7 @@ pub(crate) fn notice(ui: &mut egui::Ui, notice: Option<&(String, bool)>) {
     }
 }
 
-/// A question asked in the page (GTK asked in a dialog): a framed card with a bold title,
+/// A question asked in the page, not in a dialog: a framed card with a bold title,
 /// the text and one button per choice.
 ///
 /// # Arguments

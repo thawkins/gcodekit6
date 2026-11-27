@@ -33,7 +33,7 @@ impl MaterialsManagerWindow {
     /// * `ui` - The page's `Ui`.
     /// * `tr` - Translates the labels.
     pub fn show(&mut self, ui: &mut egui::Ui, tr: &Translator) {
-        // GTK: the material list sidebar | the edit form.
+        // The material list sidebar | the edit form.
         ui.horizontal_top(|ui| {
             let size = egui::vec2(SIDEBAR_WIDTH, ui.available_height());
             ui.allocate_ui_with_layout(size, egui::Layout::top_down(egui::Align::Min), |ui| {
@@ -77,7 +77,7 @@ impl MaterialsManagerWindow {
                 }
             });
         ui.add_space(4.0);
-        // New Material sits under the list, as in GTK.
+        // New Material sits under the list.
         let new_height = ui.spacing().interact_size.y + 12.0;
         egui::ScrollArea::vertical()
             .id_salt("gcodekit5-materials-manager-list")
