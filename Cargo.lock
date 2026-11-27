@@ -2234,6 +2234,7 @@ name = "gcodekit5-design"
 version = "2.0.0-alpha.3"
 dependencies = [
  "anyhow",
+ "dirs",
  "gcodekit5-ui-egui",
  "mutants",
  "tracing",

@@ -7,7 +7,8 @@
 /// Initialize logging with the default configuration
 ///
 /// Sets up structured logging with:
-/// - Console output with pretty formatting
+/// - Console output with pretty formatting (Windows release: a compact, ANSI-free file in
+///   the per-user data directory)
 /// - RUST_LOG environment variable support
 /// - UTF timestamps
 #[cfg_attr(test, mutants::skip)]
@@ -19,38 +20,32 @@ pub fn init_logging() -> anyhow::Result<()> {
     // RUST_LOG wins when set; otherwise log at INFO.
     let env_filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
 
-    // In Windows GUI mode (release builds), log to a file instead of stdout
+    // In Windows GUI mode (release builds) there is no console, so log to a file in the
+    // per-user data directory (the install directory is often unwritable).
     #[cfg(all(target_os = "windows", not(debug_assertions)))]
     {
-        use std::fs::OpenOptions;
-
-        let log_dir = std::env::current_exe()
-            .ok()
-            .and_then(|p| p.parent().map(|p| p.to_path_buf()))
-            .unwrap_or_else(|| std::path::PathBuf::from("."));
-
-        let log_file = log_dir.join("gcodekit5.log");
-
-        // Try to open log file, but if it fails, just disable logging rather than crash
-        match OpenOptions::new().create(true).append(true).open(&log_file) {
-            Ok(file) => {
+        let opened = dirs::data_local_dir().and_then(|base| open_log_file(&base).ok());
+        match opened {
+            Some(file) => {
+                // No ANSI escapes and one record per line: the sink is a plain text file.
                 let fmt_layer = fmt::layer()
                     .with_writer(file)
+                    .with_ansi(false)
                     .with_target(true)
                     .with_level(true)
                     .with_thread_ids(true)
                     .with_thread_names(true)
                     .with_line_number(true)
-                    .pretty();
+                    .compact();
 
                 tracing_subscriber::registry()
                     .with(env_filter)
                     .with(fmt_layer)
-                    .init();
+                    .try_init()?;
             }
-            Err(_) => {
-                // If file creation fails, just use a no-op subscriber
-                tracing_subscriber::registry().with(env_filter).init();
+            None => {
+                // No writable log location: keep going without a sink rather than crash.
+                tracing_subscriber::registry().with(env_filter).try_init()?;
             }
         }
     }
@@ -70,8 +65,25 @@ pub fn init_logging() -> anyhow::Result<()> {
         tracing_subscriber::registry()
             .with(env_filter)
             .with(fmt_layer)
-            .init();
+            .try_init()?;
     }
 
     Ok(())
+}
+
+/// Opens (creating it and any missing directories) the append-only log file
+/// `<base>/gcodekit5/gcodekit5.log`.
+///
+/// # Arguments
+/// * `base` - the per-user data directory, for example `%LOCALAPPDATA%` on Windows.
+///
+/// # Errors
+/// Returns the I/O error if the directory or the file cannot be created.
+pub fn open_log_file(base: &std::path::Path) -> std::io::Result<std::fs::File> {
+    let dir = base.join("gcodekit5");
+    std::fs::create_dir_all(&dir)?;
+    std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(dir.join("gcodekit5.log"))
 }
