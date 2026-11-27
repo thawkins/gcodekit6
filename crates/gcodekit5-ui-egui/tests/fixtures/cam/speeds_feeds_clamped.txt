@@ -1,7 +1,7 @@
-spindle_speed=500 (clamped from 1000)
+spindle_speed=500 (clamped from 22497)
 feed_rate=54.7 (adjusted)
 surface_speed=300.0
 chip_load=0.0547
-mrr=328.2
-power=2
+mrr=164.1
+power=1
 deflection=0.0006
