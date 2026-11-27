@@ -12,9 +12,9 @@
 
 use crate::{ConnectionDriver, ConnectionParams, SerialParity};
 use gcodekit5_core::{Error, Result};
-use std::io::{self, Read, Write};
+use std::io::{self, Read};
 use std::sync::Mutex;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 /// Read timeout used by byte-stream ports that are polled through
 /// [`crate::Communicator::receive`].
@@ -306,9 +306,27 @@ impl<T: std::io::Read + std::io::Write + Send> ReadWrite for T {}
 /// Real serial port implementation using serialport crate
 pub struct RealSerialPort {
     port: Mutex<Box<dyn ReadWrite>>,
+    /// How long [`SerialPort::write`] keeps retrying a write that times out.
+    ///
+    /// The port's own timeout is the short [`POLL_READ_TIMEOUT`], which the
+    /// serialport crate applies to writes too; a write stalled by hardware
+    /// flow control or a slow USB bridge must not fail on that alone.
+    write_timeout: Duration,
 }
 
 impl RealSerialPort {
+    /// Wraps an already-open byte stream as a serial port.
+    ///
+    /// # Arguments
+    /// * `port` - the stream to read from and write to
+    /// * `write_timeout` - how long a write may keep timing out before it fails
+    pub fn from_port(port: Box<dyn ReadWrite>, write_timeout: Duration) -> Self {
+        Self {
+            port: Mutex::new(port),
+            write_timeout,
+        }
+    }
+
     /// Open a serial port with the given parameters
     pub fn open(params: &ConnectionParams) -> Result<Self> {
         if params.driver != ConnectionDriver::Serial {
@@ -347,9 +365,10 @@ impl RealSerialPort {
             });
 
         match builder.open_native() {
-            Ok(port) => Ok(RealSerialPort {
-                port: Mutex::new(Box::new(port)),
-            }),
+            Ok(port) => Ok(RealSerialPort::from_port(
+                Box::new(port),
+                Duration::from_millis(params.timeout_ms),
+            )),
             Err(e) => {
                 tracing::warn!("Failed to open serial port {}: {}", params.port, e);
                 Err(Error::other(format!(
@@ -361,11 +380,40 @@ impl RealSerialPort {
     }
 }
 
+/// Writes all of `data`, retrying a write that times out or would block until
+/// `timeout` has passed without the whole of `data` going out.
+///
+/// Unlike `write_all`, a timeout part-way through does not lose track of how
+/// much was written, so a retry never repeats or drops part of a G-code line.
+///
+/// # Returns
+/// `data.len()` once everything is written, or the last error.
+fn write_fully(port: &mut dyn ReadWrite, data: &[u8], timeout: Duration) -> io::Result<usize> {
+    let deadline = Instant::now() + timeout;
+    let mut written = 0;
+    while written < data.len() {
+        match port.write(&data[written..]) {
+            Ok(0) => return Err(io::ErrorKind::WriteZero.into()),
+            Ok(n) => written += n,
+            Err(e) if e.kind() == io::ErrorKind::Interrupted => {}
+            Err(e)
+                if matches!(
+                    e.kind(),
+                    io::ErrorKind::TimedOut | io::ErrorKind::WouldBlock
+                ) && Instant::now() < deadline =>
+            {
+                tracing::trace!("serial write timed out after {written} bytes; retrying");
+            }
+            Err(e) => return Err(e),
+        }
+    }
+    Ok(written)
+}
+
 impl SerialPort for RealSerialPort {
     fn write(&mut self, data: &[u8]) -> io::Result<usize> {
         match self.port.lock() {
-            // write_all: a short write would silently drop the tail of a G-code line
-            Ok(mut port) => port.write_all(data).map(|()| data.len()),
+            Ok(mut port) => write_fully(port.as_mut(), data, self.write_timeout),
             Err(e) => Err(io::Error::other(e.to_string())),
         }
     }

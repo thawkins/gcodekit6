@@ -62,3 +62,103 @@ fn test_grbl_probe_report_parsing() {
     assert!(parse_probe_report("[GC:G0 G54]").is_none());
     assert!(parse_probe_report("ok").is_none());
 }
+
+/// What one write call on a [`ScriptedPort`] does.
+#[derive(Clone, Copy)]
+enum WriteStep {
+    /// Accept at most this many bytes.
+    Accept(usize),
+    /// Fail with `TimedOut`.
+    TimeOut,
+}
+
+/// A fake serial stream that answers writes from a script (then accepts everything)
+/// and records the bytes it accepted.
+struct ScriptedPort {
+    steps: std::collections::VecDeque<WriteStep>,
+    written: std::sync::Arc<std::sync::Mutex<Vec<u8>>>,
+}
+
+impl std::io::Read for ScriptedPort {
+    fn read(&mut self, _buf: &mut [u8]) -> std::io::Result<usize> {
+        Err(std::io::ErrorKind::TimedOut.into())
+    }
+}
+
+impl std::io::Write for ScriptedPort {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        let n = match self.steps.pop_front() {
+            Some(WriteStep::TimeOut) => {
+                // A real port blocks for its timeout before reporting it.
+                std::thread::sleep(std::time::Duration::from_millis(1));
+                return Err(std::io::ErrorKind::TimedOut.into());
+            }
+            Some(WriteStep::Accept(n)) => n.min(buf.len()),
+            None => buf.len(),
+        };
+        self.written
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .extend_from_slice(&buf[..n]);
+        Ok(n)
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
+}
+
+/// Writes `line` through a `RealSerialPort` over a [`ScriptedPort`] running `steps`.
+///
+/// # Returns
+/// The write result and the bytes the fake accepted.
+fn scripted_write(
+    steps: &[WriteStep],
+    timeout: std::time::Duration,
+    line: &[u8],
+) -> (std::io::Result<usize>, Vec<u8>) {
+    use gcodekit5_communication::communication::serial::{RealSerialPort, SerialPort};
+    let written = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+    let fake = ScriptedPort {
+        steps: steps.iter().copied().collect(),
+        written: written.clone(),
+    };
+    let mut port = RealSerialPort::from_port(Box::new(fake), timeout);
+    let result = port.write(line);
+    let bytes = written
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .clone();
+    (result, bytes)
+}
+
+/// A serial write that times out twice before the port accepts it completes (APP-7).
+#[test]
+fn test_serial_write_retries_timeouts_until_written() {
+    let line = b"G1 X10 F1000\n";
+    let steps = [WriteStep::TimeOut, WriteStep::TimeOut];
+    let (result, bytes) = scripted_write(&steps, std::time::Duration::from_secs(5), line);
+    assert_eq!(result.expect("write completes"), line.len());
+    assert_eq!(bytes, line);
+}
+
+/// A timeout after a partial write resumes after the bytes already sent: nothing is
+/// repeated or dropped (APP-7).
+#[test]
+fn test_serial_write_resumes_after_partial_write_timeout() {
+    let line = b"G1 X10 F1000\n";
+    let steps = [WriteStep::Accept(3), WriteStep::TimeOut, WriteStep::TimeOut];
+    let (result, bytes) = scripted_write(&steps, std::time::Duration::from_secs(5), line);
+    assert_eq!(result.expect("write completes"), line.len());
+    assert_eq!(bytes, line);
+}
+
+/// A port that never accepts the data still fails once the write timeout passes.
+#[test]
+fn test_serial_write_fails_after_write_timeout() {
+    let steps = vec![WriteStep::TimeOut; 10_000];
+    let (result, bytes) = scripted_write(&steps, std::time::Duration::from_millis(20), b"G0\n");
+    let err = result.expect_err("write must time out");
+    assert_eq!(err.kind(), std::io::ErrorKind::TimedOut);
+    assert!(bytes.is_empty());
+}
