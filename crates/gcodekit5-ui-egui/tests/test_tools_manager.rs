@@ -381,7 +381,7 @@ fn save_disabled(h: &Harness<'_, GcodeKitApp>) -> bool {
 
 #[test]
 fn test_tools_manager_showing_a_stored_tool_is_not_an_edit() {
-    // The file never stores the tool number (0 after loading), and a 12-flute tool is
+    // This old-format file has no tool number (0 after loading), and a 12-flute tool is
     // outside the flutes field's range: drawing them must not change the form.
     let file = tools_file("not_dirty", Some(GTK_TOOLS));
     let mut h = app_with(&file);

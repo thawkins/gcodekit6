@@ -59,6 +59,8 @@ mod test_report_units;
 mod test_tool_material_library;
 #[path = "test_tools_manager_backend.rs"]
 mod test_tools_manager_backend;
+#[path = "test_tools_manager_number.rs"]
+mod test_tools_manager_number;
 #[path = "test_translation_catalogs.rs"]
 mod test_translation_catalogs;
 #[path = "test_unsaved_changes_choice.rs"]
