@@ -24,7 +24,8 @@ pub struct ToolpathToGcode {
     pub is_laser_2d: bool,
     /// Minimum distance between points for laser mode (mm)
     pub min_point_distance: f64,
-    /// Tolerance for curve simplification (Ramer-Douglas-Peucker)
+    /// Maximum distance (mm) a merged laser segment may deviate from the
+    /// source points it replaces (see [`Self::optimize_toolpath_for_laser`])
     pub curve_simplification_tolerance: f64,
     /// Machine Limits
     pub machine_limits: Option<MachineLimits>,
@@ -132,8 +133,11 @@ impl ToolpathToGcode {
 
         let mut last_point: Option<Point> = None;
         let mut pending_segment: Option<ToolpathSegment> = None;
+        // Source points merged into the pending segment (its interior vertices),
+        // checked against the chord of every further merge.
+        let mut merged_points: Vec<Point> = Vec::new();
 
-        for segment in &toolpath.segments {
+        for (index, segment) in toolpath.segments.iter().enumerate() {
             match segment.segment_type {
                 ToolpathSegmentType::RapidMove => {
                     // Flush any pending segment
@@ -146,12 +150,17 @@ impl ToolpathToGcode {
                 }
 
                 ToolpathSegmentType::LinearMove => {
-                    // Filter: skip points that are too close
-                    if let Some(last) = last_point {
-                        let dist = last.distance_to(&segment.end);
-                        if dist < self.min_point_distance {
-                            continue;
-                        }
+                    // Filter: skip points that are too close, but never the last point
+                    // of a run of linear moves (it closes the contour or meets an arc).
+                    let ends_run = toolpath
+                        .segments
+                        .get(index + 1)
+                        .is_none_or(|next| next.segment_type != ToolpathSegmentType::LinearMove);
+                    if let Some(last) = last_point
+                        && !ends_run
+                        && last.distance_to(&segment.end) < self.min_point_distance
+                    {
+                        continue;
                     }
 
                     // Try to merge with previous collinear segment
@@ -167,7 +176,15 @@ impl ToolpathToGcode {
 
                             if len1 > 0.01 && len2 > 0.01 {
                                 let dot = (dir1.0 * dir2.0 + dir1.1 * dir2.1) / (len1 * len2);
-                                if dot > 0.996 {
+                                // The merged chord must stay within the curve tolerance of
+                                // every source point it replaces.
+                                let within_tolerance =
+                                    merged_points.iter().chain([&prev.end]).all(|p| {
+                                        distance_to_segment(*p, prev.start, segment.end)
+                                            <= self.curve_simplification_tolerance
+                                    });
+                                if dot > 0.996 && within_tolerance {
+                                    merged_points.push(prev.end);
                                     prev.end = segment.end;
                                     last_point = Some(segment.end);
                                     continue;
@@ -178,7 +195,13 @@ impl ToolpathToGcode {
                             optimized.segments.push(prev.clone());
                         }
                     }
-                    pending_segment = Some(segment.clone());
+                    // Start from the last kept point so skipped points leave no gap.
+                    let mut next = segment.clone();
+                    if let Some(last) = last_point {
+                        next.start = last;
+                    }
+                    pending_segment = Some(next);
+                    merged_points.clear();
                     last_point = Some(segment.end);
                 }
 
@@ -307,7 +330,7 @@ impl ToolpathToGcode {
         // spindle at the first segment's speed; a later change gets an `S`.
         let mut cnc_speed = toolpath.segments.first().map(|s| s.spindle_speed);
 
-        for segment in &toolpath.segments {
+        for (index, segment) in toolpath.segments.iter().enumerate() {
             if !self.is_laser_2d
                 && segment.segment_type != ToolpathSegmentType::RapidMove
                 && cnc_speed != Some(segment.spindle_speed)
@@ -400,9 +423,15 @@ impl ToolpathToGcode {
                         toolpath.depth
                     });
 
-                    // Laser filtering: skip points that are too close
+                    // Laser filtering: skip points that are too close, but never the
+                    // last point of a run of linear moves.
                     if self.is_laser_2d {
-                        if let Some((last_x, last_y)) = last_point {
+                        let ends_run = toolpath.segments.get(index + 1).is_none_or(|next| {
+                            next.segment_type != ToolpathSegmentType::LinearMove
+                        });
+                        if let Some((last_x, last_y)) = last_point
+                            && !ends_run
+                        {
                             let dx = segment.end.x - last_x;
                             let dy = segment.end.y - last_y;
                             let dist_sq = dx * dx + dy * dy;
@@ -633,6 +662,10 @@ impl ToolpathToGcode {
 
                     line_number += 10;
                     current_xy = Some((segment.end.x, segment.end.y));
+                    // The laser point filter measures from where the arc ended.
+                    if self.is_laser_2d {
+                        last_point = Some((segment.end.x, segment.end.y));
+                    }
                 }
             }
         }
@@ -754,6 +787,18 @@ impl ToolpathToGcode {
         self.z_min_limit = Some(z_min);
         self
     }
+}
+
+/// Distance (mm) from `p` to the segment `a`-`b`.
+fn distance_to_segment(p: Point, a: Point, b: Point) -> f64 {
+    let (dx, dy) = (b.x - a.x, b.y - a.y);
+    let len_sq = dx * dx + dy * dy;
+    let t = if len_sq > 0.0 {
+        (((p.x - a.x) * dx + (p.y - a.y) * dy) / len_sq).clamp(0.0, 1.0)
+    } else {
+        0.0
+    };
+    p.distance_to(&Point::new(a.x + t * dx, a.y + t * dy))
 }
 
 impl Default for ToolpathToGcode {

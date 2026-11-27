@@ -782,17 +782,7 @@ impl ToolpathGenerator {
         let total_dist = (start_z - target_z).abs();
 
         if self.ramp_angle > 0.001 && !segments.is_empty() {
-            let contour_length: f64 = segments
-                .iter()
-                .map(|s| match s.segment_type {
-                    ToolpathSegmentType::LinearMove | ToolpathSegmentType::RapidMove => {
-                        s.start.distance_to(&s.end)
-                    }
-                    ToolpathSegmentType::ArcCW | ToolpathSegmentType::ArcCCW => {
-                        s.start.distance_to(&s.end)
-                    }
-                })
-                .sum();
+            let contour_length: f64 = segments.iter().map(ToolpathSegment::arc_length).sum();
 
             if contour_length > 0.001 {
                 // Each lap descends at most `lap_step` (the step-down). The ramp runs at
@@ -848,7 +838,9 @@ impl ToolpathGenerator {
                             continue;
                         }
 
-                        let seg_len = seg.start.distance_to(&seg.end);
+                        // Ramp along the travelled path: arcs use their arc length,
+                        // not the chord, so the slope matches the requested angle.
+                        let seg_len = seg.arc_length();
                         let z_drop = seg_len * tan_angle;
 
                         if z - z_drop >= lap_floor {
