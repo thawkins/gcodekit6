@@ -29,10 +29,10 @@ GCodeKit5 auto-detects the firmware type (GRBL, grblHAL, FluidNC, TinyG, g2core,
 ## Step 4: Jog to Test
 
 1. Select a step size (1 mm recommended to start)
-2. Use the jog buttons or keyboard shortcuts:
-   - **W** / **S** — Y+ / Y-
-   - **A** / **D** — X- / X+
-   - **Q** / **Z** — Z+ / Z-
+2. Use the jog buttons, or click in Machine Control and use the numeric keypad:
+   - **8** / **2** — Y+ / Y-
+   - **4** / **6** — X- / X+
+   - **9** / **3** — Z+ / Z-
 3. Verify the machine moves as expected
 
 ## Step 5: Load G-Code
@@ -43,9 +43,10 @@ GCodeKit5 auto-detects the firmware type (GRBL, grblHAL, FluidNC, TinyG, g2core,
 
 ## Step 6: Run Your Program
 
-1. Click **Send to Device** to start streaming
+1. Click **Send** to start streaming
 2. Monitor progress in the status bar and visualizer
-3. Use **Space** to pause or **Escape** to stop
+3. Click **Pause** or **Stop** to pause or stop the job. Press `!` for a feed hold, or
+   **Ctrl+Shift+K** (Cmd on macOS) for E-STOP. See [Keyboard Shortcuts](90-shortcuts.md)
 
 ## What's Next?
 

@@ -28,14 +28,14 @@ The DRO displays the current position of your machine in real-time.
 
 ### Keyboard Jog Controls
 
+The jog keys are on the numeric keypad. They work only while Machine Control has the keyboard
+(click in the pane first), never while a text field or dropdown has it.
+
 | Key | Action |
 |-----|--------|
-| **W** | Jog Y+ (forward) |
-| **S** | Jog Y- (backward) |
-| **A** | Jog X- (left) |
-| **D** | Jog X+ (right) |
-| **Q** | Jog Z+ (up) |
-| **Z** | Jog Z- (down) |
+| **6** / **4** | Jog X+ / X- |
+| **8** / **2** | Jog Y+ / Y- |
+| **9** / **3** | Jog Z+ / Z- |
 
 Jog buttons are also available in the UI panel for mouse control.
 
@@ -52,6 +52,9 @@ Select the distance per jog step:
 | 10.0 mm | Fast positioning |
 | 100.0 mm | Rapid traverse |
 
+In imperial mode the presets are 0.0001, 0.001, 0.01, 0.1 and 1 in. A step that is not one of
+the presets is kept and shown as its own entry in the list.
+
 ### Jog Feed Rate
 Set the feed rate for jog moves. The rate is in mm/min (or in/min when in imperial mode).
 
@@ -64,8 +67,7 @@ Set the feed rate for jog moves. The rate is in mm/min (or in/min when in imperi
 
 Click the **Home** button to run the homing cycle. This moves the machine to its reference position using limit switches.
 
-- **Home All** — Home all axes in the firmware-defined order
-- **Home X / Y / Z** — Home a single axis
+- **Home** — Home all axes in the firmware-defined order (**Ctrl+Home**)
 
 After homing, the DRO resets to the machine's reference coordinates.
 
@@ -76,7 +78,6 @@ GCodeKit5 supports six work coordinate systems: **G54** through **G59**.
 - Select the active WCS from the dropdown in the DRO panel
 - Each WCS stores independent X, Y, Z offsets
 - **Zero** buttons set offsets so the current position becomes zero in the selected WCS
-- Enter a specific position value by clicking on the coordinate display
 
 Use multiple WCS when:
 - Machining multiple parts with different origins
@@ -85,7 +86,7 @@ Use multiple WCS when:
 
 ## Emergency Stop
 
-Click **E-Stop** or press **Escape** for an immediate halt of all motion. This puts the machine into alarm state. Use **Unlock/Reset** to recover.
+Click **E-STOP** or press **Ctrl+Shift+K** (Cmd on macOS) to send a soft reset, which halts all motion. The key works on every page, also while a text field has the keyboard. This puts the machine into alarm state. Use **Unlock** (**Ctrl+U**) to recover.
 
 ## Alarm Handling
 

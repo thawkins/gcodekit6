@@ -16,7 +16,7 @@ Adjusts the speed of cutting moves (G1, G2, G3).
 | **-10%** | Decrease feed rate by 10% |
 | **Reset** | Return to 100% (programmed rate) |
 
-**Range**: 0% to 200%
+**Range**: 10% to 200%
 
 Use feed override to:
 - Slow down when cutting sounds wrong or the machine is struggling
@@ -35,11 +35,11 @@ Adjusts the spindle RPM (or laser power in laser mode).
 | **-10%** | Decrease spindle speed by 10% |
 | **Reset** | Return to 100% (programmed speed) |
 
-**Range**: 0% to 200%
+**Range**: 50% to 200%
 
 ## Rapid Override
 
-Adjusts the speed of rapid positioning moves (G0). Available as fixed presets.
+Adjusts the speed of rapid positioning moves (G0). Available only as the three fixed presets below.
 
 | Preset | Effect |
 |--------|--------|
@@ -53,7 +53,6 @@ Rapid override is a safety feature. Reducing rapids gives you more time to react
 
 - Overrides take effect **immediately** — no need to pause the program
 - The current override percentage is displayed in the overrides panel
-- Overrides reset to 100% when you disconnect or send a soft reset
 - During a first run of any new program, consider setting rapid override to 50%
 
 ## See Also

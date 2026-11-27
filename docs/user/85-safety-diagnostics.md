@@ -1,93 +1,40 @@
-# Safety & Diagnostics
+# Safety
 
 ## Overview
 
-The Safety & Diagnostics panel provides real-time monitoring of safety systems and communication health.
+GCodeKit5 has three safety controls: E-STOP, Feed Hold and jog travel limits. Their keys are
+fixed and cannot be changed in Settings. `Ctrl` is `Cmd` on macOS.
 
-## Emergency Stop (E-Stop)
+## E-STOP
 
-The E-Stop system has four states:
+Click the **E-STOP** button or press **Ctrl+Shift+K** to send a soft reset to the controller.
+This halts all motion and stops any running stream.
 
-| State | Meaning |
-|-------|---------|
-| **Armed** | Normal operating state — E-Stop is ready |
-| **Triggered** | E-Stop activated — all motion immediately halted |
-| **Resetting** | Recovering from a triggered state |
-| **Stopped** | Machine is fully stopped and locked |
-
-**Trigger E-Stop**: Press **Escape** or click the E-Stop button. This immediately halts all motion and puts the machine into alarm state.
-
-**Recovery**: Click **Reset/Unlock** to clear the alarm and return to Armed state. You may need to re-home the machine after an E-Stop.
-
-## Motion Interlock
-
-The motion interlock prevents accidental machine movement:
-
-| State | Meaning |
-|-------|---------|
-| **Enabled** | Motion commands are allowed |
-| **Disabled** | All motion commands are blocked |
-| **Waiting** | Interlock is waiting for confirmation |
+- The key works on every page, also while a text field, a menu or a window has the keyboard
+- Escape is not bound to E-STOP, so closing a dropdown never resets the machine
+- To recover, click **Unlock** (**Ctrl+U**). You may need to re-home the machine afterwards
 
 ## Feed Hold
 
-Feed hold pauses program execution while retaining the machine position for a clean resume:
+Feed hold pauses motion and keeps the machine position, so the job can resume cleanly.
 
-| State | Meaning |
-|-------|---------|
-| **Normal** | Program running normally |
-| **Held** | Execution paused — machine stopped at current position |
-| **Resuming** | Resuming from held state |
+- Press `!` or **Ctrl+Shift+H** on any page. `Ctrl+Shift+H` also works while a text field has
+  the keyboard; `!` is typed into the field instead
+- Resume with **Resume** in Job Control, or **Shift+`** (Cycle Start) while Machine Control has
+  the keyboard
 
-Press **Space** to toggle feed hold during streaming.
+## Jog Travel Limits
 
-## Communication Diagnostics
+A continuous jog is clamped to the travel left in that direction. With no known machine
+position, or no travel left, nothing moves and the pane says why. Jogging is enabled only while
+the machine is connected, not streaming, and reports `Idle` or `Jog`.
 
-Monitor the health of the connection to your controller:
-
-| Metric | Description |
-|--------|-------------|
-| **Bytes Sent/Received** | Total data transferred |
-| **Port** | Current serial port or network address |
-| **Connection Status** | Connected, disconnected, or reconnecting |
-| **Last Error** | Most recent communication error |
-| **Error Count (1 min)** | Errors in the last rolling minute |
-
-## Buffer Diagnostics
-
-Monitor the controller's command buffer:
-
-| Metric | Description |
-|--------|-------------|
-| **Buffer Size** | Total buffer capacity |
-| **Buffer Used** | Current fill percentage |
-| **Peak Usage** | Highest fill percentage observed |
-| **Commands Pending** | Number of commands waiting in the buffer |
-| **Overflow Count** | Number of buffer overflow events |
-
-## Performance Diagnostics
-
-| Metric | Description |
-|--------|-------------|
-| **Commands/sec** | Throughput of commands sent to the controller |
-| **Avg Latency** | Average round-trip time in milliseconds |
-| **Max Latency** | Peak round-trip time |
-| **Memory Usage** | Application memory consumption |
-| **CPU Usage** | Application CPU utilization |
-| **Uptime** | Time since application start |
-
-## Soft Limits
-
-Soft limits prevent the machine from moving beyond its configured travel:
-
-- Per-axis min/max boundaries (in mm)
-- Enable or disable globally without losing the configured values
-- Feedback shown when a command would exceed limits
-
-Configure soft limits in the **Advanced Features** section of the settings or directly in the firmware (`$20`, `$130`–`$132` for GRBL).
+Soft limits in the firmware itself are set with `$20` and `$130`-`$132` on GRBL, in
+**Firmware Settings**.
 
 ## See Also
 
 - [Machine Control](10-machine-control.md) — DRO, jogging, and alarm handling
 - [Streaming G-Code](80-streaming.md) — Running programs safely
+- [Keyboard Shortcuts](90-shortcuts.md) — Complete shortcut reference
 - [Console](15-console.md) — Device communication log
