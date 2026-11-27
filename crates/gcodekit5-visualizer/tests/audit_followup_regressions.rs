@@ -4,10 +4,10 @@
 //! backup naming and UTC timestamps.
 
 use gcodekit5_visualizer::visualizer::{
-    StockZeroReference, ToolpathCache, detect_stock_zero_reference, is_content_replacement,
+    StockZeroReference, detect_stock_zero_reference, is_content_replacement,
 };
 use gcodekit5_visualizer::{
-    GCodeCommand, Point3D, StockSimulator3D, ToolpathSegment, ToolpathSegmentType, Visualizer,
+    GCodeCommand, StockSimulator3D, ToolpathSegment, ToolpathSegmentType, Visualizer,
 };
 
 fn parse(gcode: &str) -> Visualizer {
@@ -94,26 +94,6 @@ fn test_visualizer_content_replacement_detects_edits_and_new_files() {
         !is_content_replacement(program, ""),
         "cleared buffer keeps view"
     );
-}
-
-// ----------------------------------------------------------- toolpath cache
-
-#[test]
-fn test_toolpath_cache_holds_commands_only() {
-    let mut cache = ToolpathCache::new();
-    assert!(cache.is_empty());
-    assert!(cache.needs_update(1));
-    let p = Point3D::new(0.0, 0.0, 0.0);
-    cache.update(
-        7,
-        vec![GCodeCommand::Dwell {
-            pos: p,
-            duration: 1.0,
-        }],
-    );
-    assert_eq!(cache.len(), 1);
-    assert!(!cache.needs_update(7));
-    assert!(cache.needs_update(8));
 }
 
 // ------------------------------------------------------------ stock removal

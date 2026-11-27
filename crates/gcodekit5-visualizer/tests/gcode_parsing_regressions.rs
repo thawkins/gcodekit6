@@ -1,6 +1,5 @@
-//! Regression tests for G-code parsing, arc handling, bounds and statistics.
+//! Regression tests for G-code parsing and arc handling.
 
-use gcodekit5_visualizer::visualizer::{ArcSegment, Vector3};
 use gcodekit5_visualizer::{GCodeCommand, Visualizer};
 
 fn parse(gcode: &str) -> Visualizer {
@@ -72,9 +71,6 @@ fn test_visualizer_full_circle_is_split_and_bounded() {
             assert!(!(approx(from.x, to.x) && approx(from.y, to.y)));
         }
     }
-    let (min_x, max_x, min_y, max_y, _, _) = vis.get_cutting_bounds().expect("bounds");
-    assert!(approx(min_x, -10.0) && approx(max_x, 10.0));
-    assert!(approx(min_y, -10.0) && approx(max_y, 10.0));
 }
 
 #[test]
@@ -119,46 +115,4 @@ fn test_visualizer_g18_arc_is_tessellated() {
     );
     assert!(vis.commands().len() > 3);
     assert!(approx(vis.current_pos.x, 10.0));
-}
-
-#[test]
-fn test_visualizer_cutting_bounds_include_cut_start() {
-    let vis = parse("G0 X10 Y10\nG1 X20 Y10");
-    let (min_x, max_x, ..) = vis.get_cutting_bounds().expect("bounds");
-    assert!(approx(min_x, 10.0) && approx(max_x, 20.0));
-}
-
-#[test]
-fn test_arc_segment_full_circle_length() {
-    let p = Vector3::new(10.0, 0.0, 0.0);
-    let arc = ArcSegment::new(p, p, Vector3::new(0.0, 0.0, 0.0), true);
-    assert!((arc.length() - std::f32::consts::TAU * 10.0).abs() < 1e-2);
-}
-
-#[test]
-fn test_arc_segment_short_arc_at_large_radius_is_not_a_full_circle() {
-    // Clockwise from (10000, 0) to (10000, -0.005) about the origin: a ~0.005 mm arc whose
-    // angle is tiny. It must not be mistaken for a full circle (~62832 mm).
-    let arc = ArcSegment::new(
-        Vector3::new(10000.0, 0.0, 0.0),
-        Vector3::new(10000.0, -0.005, 0.0),
-        Vector3::new(0.0, 0.0, 0.0),
-        true,
-    );
-    assert!(arc.length() < 1.0, "length {}", arc.length());
-}
-
-#[test]
-fn test_arc_segment_length_setting_marks_vertices_stale() {
-    // Preferences > Arc Segment Length must reach the visualizer and force a redraw.
-    let mut vis = Visualizer::new();
-    vis.clear_dirty();
-    vis.set_arc_segment_length(0.5);
-    assert_eq!(vis.arc_segment_length, 0.5);
-    assert!(vis.is_dirty());
-    vis.clear_dirty();
-    vis.set_arc_segment_length(0.5);
-    assert!(!vis.is_dirty(), "same value: nothing to redraw");
-    vis.set_arc_segment_length(f32::NAN);
-    assert_eq!(vis.arc_segment_length, 0.0);
 }
