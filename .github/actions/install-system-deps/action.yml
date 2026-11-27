@@ -1,0 +1,10 @@
+name: Install system dependencies
+description: apt packages needed to build the workspace and run the egui/wgpu tests on Ubuntu.
+runs:
+  using: composite
+  steps:
+    - name: Install system dependencies
+      shell: bash
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libudev-dev pkg-config libxkbcommon-dev libwayland-dev libx11-dev libxcursor-dev libxrandr-dev libxi-dev libvulkan1 mesa-vulkan-drivers
