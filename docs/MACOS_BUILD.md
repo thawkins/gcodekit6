@@ -8,7 +8,7 @@ The egui front end uses only system frameworks. There is nothing to install with
 
 ## GitHub Actions Workflow
 
-The workflow in `.github/workflows/release.yml` builds `aarch64-apple-darwin` on `macos-14`:
+The workflow in `.github/workflows/release.yml` builds `aarch64-apple-darwin` on `macos-latest`:
 
 1. Builds the release binary with `cargo build --release --target aarch64-apple-darwin`.
 2. Creates `GCodeKit.app` with the binary, an `AppIcon.icns` icon and an `Info.plist`. `LSMinimumSystemVersion` is `11.0`.
@@ -84,11 +84,12 @@ bash scripts/macos-create-dmg.sh "v1.2.0" "macos-arm64"
 
 The `scripts/macos-create-dmg.sh` script creates a DMG that:
 
-- Includes a symbolic link to the Applications folder
-- Sets icon view with appropriate sizing
-- Positions app and Applications folder icons
-- Uses UDZO compression for smaller file size
+- Is created with `hdiutil create ... -format UDZO -imagekey zlib-level=9` from a
+  staging folder holding the app and an `/Applications` link
 - Creates files matching the pattern: `gcodekit5-<version>-<arch>.dmg`
+
+Run it from the folder that holds `GCodeKit.app`. It takes two arguments:
+`VERSION` (default `1.0.0`) and `ARCH` (default `macos-arm64`).
 
 ## Signing and Notarization (Future)
 

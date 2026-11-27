@@ -24,17 +24,26 @@ runtime or MSYS2 is required.
 **Output:** `target\wix\gcodekit5-<version>-x64.msi` and
 `target\gcodekit5-<version>-windows-x86_64-portable.zip`
 
+Prerequisites and details: [docs/WINDOWS_BUILD.md](../docs/WINDOWS_BUILD.md).
+
 ---
 
 ## macOS Scripts
 
 ### `macos-create-dmg.sh`
 
-Creates a DMG installer for macOS.
+Creates a DMG installer for macOS. Run it from the folder that holds
+`GCodeKit.app`.
 
 ```bash
-./scripts/macos-create-dmg.sh
+./scripts/macos-create-dmg.sh [VERSION] [ARCH]
 ```
+
+- `VERSION` - default `1.0.0`
+- `ARCH` - default `macos-arm64`
+
+**Output:** `gcodekit5-<VERSION>-<ARCH>.dmg` in the current folder. See
+[docs/MACOS_BUILD.md](../docs/MACOS_BUILD.md).
 
 ---
 
@@ -43,26 +52,29 @@ Creates a DMG installer for macOS.
 ### `start-grblhal-sim.sh`
 
 Starts the grblHAL simulator with a virtual TTY device for testing CNC communication.
+Creating the device in `/dev` needs sudo. `grblHAL_sim` must be on `PATH` or in the
+invoking user's `~/.local/bin`, and `socat` must be installed.
 
 ```bash
-./scripts/start-grblhal-sim.sh
+sudo ./scripts/start-grblhal-sim.sh
 ```
 
 **What it does:**
-- Creates a virtual serial port at `target/temp/ttyGRBL`
+- Creates a virtual serial port at `/dev/ttyGRBL`
 - Starts the grblHAL simulator connected to the virtual port
-- Logs step and block output to `target/temp/`
+- Logs step and block output to `target/temp/grblhal-step.out` and
+  `target/temp/grblhal-block.out`
 - Allows your application to connect as if to real hardware
 
 **To stop:**
 ```bash
-./scripts/stop-grblhal-sim.sh
+sudo ./scripts/stop-grblhal-sim.sh
 # or
-killall socat
+sudo killall socat
 ```
 
 **To connect from your application:**
-- Use the path: `~/Projects/gcodekit5/target/temp/ttyGRBL`
+- Use the path: `/dev/ttyGRBL`
 - Baud rate: Any (virtual serial, speed doesn't matter)
 - The simulator responds to standard GRBL/grblHAL commands
 
@@ -70,11 +82,44 @@ killall socat
 
 ### `stop-grblhal-sim.sh`
 
-Stops the grblHAL simulator virtual TTY device.
+Stops the grblHAL simulator (`killall socat`) and removes `/dev/ttyGRBL`.
 
 ```bash
-./scripts/stop-grblhal-sim.sh
+sudo ./scripts/stop-grblhal-sim.sh
 ```
+
+---
+
+### `test-grblhal-sim.sh`
+
+Sends `?`, `$$`, `$I` and `$G` to the running simulator at `/dev/ttyGRBL` and
+prints the replies.
+
+```bash
+./scripts/test-grblhal-sim.sh
+```
+
+---
+
+### `EEPROM.DAT`
+
+Simulator EEPROM image; do not edit.
+
+---
+
+### `monthly-dependency-review.sh`
+
+Runs the monthly dependency review: `cargo outdated`, `cargo audit` and
+`cargo tree --duplicates`. Needs `cargo install cargo-outdated cargo-audit`.
+
+```bash
+./scripts/monthly-dependency-review.sh [--update]
+```
+
+- `--update` - also run `cargo update` (semver-compatible updates)
+
+**Output:** `target/temp/dependency-review-YYYY-MM.md`. See
+[docs/dependency_management.md](../docs/dependency_management.md).
 
 ---
 
@@ -118,24 +163,9 @@ python3 scripts/release_notes.py 2.0.0-alpha.2 --out target/temp/notes.md --repo
 
 A tag push fails at this step when `CHANGELOG.md` has no section for its version, so before tagging, give the release its own `## [<version>] - <date>` heading.
 
-## Windows Build Quick Reference
-
-### First Time Setup
-
-Install the Rust MSVC toolchain, WiX Toolset v3.14.1, and `cargo install cargo-wix`.
-
-### Create Release
-
-```powershell
-.\scripts\build-windows-release.ps1
-```
-
----
-
 ## Documentation
 
 - Windows Build Guide: [docs/WINDOWS_BUILD.md](../docs/WINDOWS_BUILD.md)
-- Windows Quick Start: [docs/WINDOWS_QUICK_START.md](../docs/WINDOWS_QUICK_START.md)
 - macOS Build Guide: [docs/MACOS_BUILD.md](../docs/MACOS_BUILD.md)
 
 ---
