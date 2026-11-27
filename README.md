@@ -5,35 +5,18 @@ window, menu, keymap and dialog crates).
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE-MIT)
 [![License: APACHE](https://img.shields.io/badge/license-apache-blue.svg)](LICENSE-APACHE)
-[![Version](https://img.shields.io/badge/Version-1.1.0--beta.1-brightgreen.svg)](CHANGELOG.md)
 
 ## Overview
 
-GCodeKit5 is a Rust-based CNC machine controller providing a modern alternative to Universal G-Code Sender. It supports multiple controller firmware types including GRBL, grblHAL, TinyG, g2core, Smoothieware, and FluidNC through a unified, intuitive interface built with egui.
+GCodeKit5 is a Rust-based CNC and laser machine controller providing a modern alternative to Universal G-Code Sender. It drives GRBL (including grblHAL and FluidNC) and Repetier controllers through one interface built with egui, and includes a 2D/3D designer, a toolpath visualizer and a set of CAM tools. See [Supported Controllers](#supported-controllers).
 
 <img src="crates/gcodekit5-ui-egui/resources/help_images/designer.png" alt="Designer" width="800">
 
-## New version tested on Linux (Kubuntu 26.04) with improvements to the Designer module
-- Now you can: correctly import DXF and SVG files
-- Import raster images with the ability to create compositions from multiple images and vector objects, whether created or imported; order canvas objects using the Objects panel, which is used for G-code workflow; and configure G-code generation independently for each image, allowing you to change speed, power, inversion, etc., according to the image's characteristics.
-- You can also independently configure the working properties of vector objects, so with multiple objects on the canvas, you can define a global configuration for them or a specific configuration for some. For example, several objects might use one speed and power for engraving, and then a different object could be defined with a different speed and power for cutting.
-- For chain sprockets, only need to enter the pitch and the number of teeth; the roller diameter is automatically calculated as standard according to ANSI/ISO norms.
-- The pan function has been implemented on the Designer screen using the middle mouse button.
-
-## Change to the Machine Control tab
-- The G-code editor has been integrated into the Machine Control screen to avoid switching between tabs.
-- The G-code Editing tab has been removed as it has been integrated into the Machine Control tab.
-- G-code output to the console has been removed to improve the speed of sending data to the machine.
-
-## Checking boundaries outside the work area
-- Boundary checking has been added to the Designer. If any point is outside the work area, a WARNING appears in the G-code alerting the user so they can take appropriate action.
-
-## Recommendation
-- CAM Tools has a built-in box creator with tabs, but it's recommended to install the **"boxes"** plugin for **Inkscape**  (https://github.com/florianfesti/boxes), which offers many more features. After generating the desired box or shape, save it as an SVG file and import it directly into gcodekit5-design. Once imported, you can arrange the objects, organize them within the workspace, delete those that don't fit, and place them in a separate gckd file.
-- This "boxes" plugin also has the ability to create gears and sprokets of different types with greater flexibility and possibilities than the tools in gcodekit-design, so the use of "boxes" is also recommended for these topics.
-
 ## Architecture
-GCodeKit5 is organized as a Cargo workspace with 9 crates for modular compilation and better code organization:
+
+GCodeKit5 is a Cargo workspace with one library crate per directory under `crates/`, plus the
+root `gcodekit5` binary package (`cargo metadata --no-deps --format-version 1 | jq '.packages|length'`
+prints 10):
 
 - **gcodekit5-core** - Core types, traits, state management, events, and data models
 - **gcodekit5-camtools** - CAM tools and special G-code processing operations
@@ -46,379 +29,163 @@ GCodeKit5 is organized as a Cargo workspace with 9 crates for modular compilatio
 - **gcodekit5-visualizer** - 2D/3D visualization engine
 - **gcodekit5** - Main binary that integrates all crates
 
-This modular structure enables:
-- Faster incremental builds (only recompile changed crates)
-- Better separation of concerns with focused crate responsibilities
-- Easier testing of individual components
-- Potential for code reuse across different applications
-- Clean architecture suitable for future plugin systems
+See [ARCHITECTURE.md](ARCHITECTURE.md) for the crate dependency graph and data flow.
 
 ## Features
 
-### 🎯 Multi-Axis CNC Control
-- **6-Axis Support**: Complete control of X, Y, Z linear axes and A, B, C rotary axes
-- **Real-time DRO**: Digital readout displays all axis positions with 0.001mm precision
-- **Live Status Bar**: Machine state, feed rate, spindle speed, and position display
-- **Raw Status View**: Debug view showing undecoded GRBL status responses
+### Machine Control
+- **6-axis positions**: X, Y, Z linear axes and A, B, C rotary axes
+- **DRO and status bar**: machine state, position, feed rate and spindle speed, polled every 200 ms
+- **Jogging**: step or continuous (hold-to-jog) mode, with the numeric keypad in Machine Control
+- **Work coordinates**: Zero buttons and a G54-G59 selector (Repetier, which has no work coordinate systems, zeroes with `G92`)
+- **Home and Unlock**: `$H` homing cycle and `$X` alarm unlock
+- **E-STOP**: the status bar eStop button sends a soft reset
+- **Real-time overrides**: feed, rapid and spindle
+- **G-code editor in Machine Control**: open, edit and stream a file from the same page, with the console beside it
+- **Streaming**: GRBL character-counting flow control, Repetier numbered and checksummed lines, progress bar, Pause (feed hold), Resume and Stop
 
-### 🕹️ Machine Control
-- **Incremental Jogging**: Configurable step sizes (0.1, 1, 10, 100mm for linear, degrees for rotary)
-  - Linear axes (X, Y, Z) in millimeters
-  - Rotary axes (A, B) in degrees
-  - G91 relative positioning for precise incremental moves
-- **Work Coordinate System Management**:
-  - Zero X/Y/Z buttons send G92 commands to set work origins
-  - G54-G59 buttons switch between work coordinate systems
-  - Quick access to all 6 standard WCS positions
-- **Home Command**: Automated homing cycle ($H)
-- **Unlock Function**: Clear ALARM state with single click (🔒 icon, $X command)
-- **Emergency Stop**: Immediate halt of all operations
-- **Real-time Overrides**: Feed rate, rapid rate, and spindle speed adjustments
+### Device Management
+- **Connections**: serial, TCP and WebSocket, with Auto Reconnect
+- **Device Manager**: machine profiles (CNC mill, CNC lathe, laser cutter, 3D printer and plotter)
+- **Device Config**: read and edit GRBL settings, and read Repetier EEPROM parameters
+- **Console**: device communication log with command history
 
-### 🔌 Device Management
-- **Auto-Detect Serial Ports**: Automatic discovery of USB CNC controllers
-- **Real-time Status Polling**: 200ms updates of position and machine state
-- **Device Information Tab**: Firmware version, build info, and capabilities
-- **Configuration Editor**: Edit and save all GRBL settings ($0-$130)
-- **Firmware Capabilities Display**:
-  - Arc support (G2/G3 circular interpolation)
-  - Variable spindle control (PWM)
-  - Homing cycle support
-  - Probe functionality
-  - Laser mode
-  - Multi-axis support (4-6 axes)
-  - Safety door feature
-  - Coolant control
-  - Tool change support
-
-### 📝 G-Code Editor & Streaming (Into Machine Control)
-- **Text Editor (Phase 2 - COMPLETE)**:
-  - ✅ Full keyboard input support (characters, arrows, backspace, delete)
-  - ✅ Text insertion and deletion with proper cursor tracking at correct position
-  - ✅ Cursor movement keys (arrows, Home, End, PageUp/PageDown) with instant feedback
-  - ✅ Correct cursor position display in status bar (Line X:Y)
-  - ✅ Undo/Redo via Ctrl+Z/Ctrl+Y (Cmd on Mac) with cursor position preservation
-  - ✅ Tab key for indentation (4 spaces)
-  - ✅ Virtual scrolling with line numbers
-  - ✅ Arrow key navigation (up, down, left, right) with immediate visual response
-  - ✅ Home/End key for jumping to line boundaries
-  - ✅ PageUp/PageDown for viewport navigation (10 lines per page)
-  - ✅ Real-time text updates as you type
-  - ✅ Proper 0-based/1-based indexing conversion (backend/UI boundary)
-  - ✅ **NEW: Mouse click to position cursor** - Click anywhere to place cursor at that location
-  - ✅ **NEW: Complete focus infrastructure** - Automatic focus cascading through UI hierarchy
-- **Syntax Highlighting**: Color-coded commands, coordinates, and comments
-- **Line Numbers**: Easy navigation and reference
-- **File Operations**: Open, edit, and save G-code files
-- **Professional G-Code Streaming**:
-  - GRBL Character-Counting Protocol for reliable transmission
-  - Automatic buffer management (127-byte GRBL RX buffer)
-  - Sends up to 5 lines per cycle with "ok" acknowledgment tracking
-  - Real-time progress updates (lines sent/total)
-  - **Progress Bar**: Visual progress indicator in status bar
-  - **Stop Button**: Terminate transmission immediately
-  - **Pause Button**: Feed hold (GRBL ! command)
-  - **Resume Button**: Cycle start (GRBL ~ command)
-  - Error detection and reporting
-  - Comments and empty lines filtered automatically
-  - Concurrent status polling via real-time `?` command
-- **Real-time Validation**: Syntax checking while editing
-
-### 🎨 2D/3D CAD/CAM Designer
-- **Vector Drawing Tools**:
-  - Geometric shapes: rectangles, circles, ellipses, triangles
-  - Lines, polygons, Bezier curves, and arcs
-  - Round rectangles with adjustable corner radius
-- **File Import**: Import SVG and DXF vector files.
-  - DXF files as updated to AutoCAD 2018 (splines). AutoCAD ACIS objects cannot be imported.
-- **SVG to G-Code Conversion**:
-  - Full support for SVG group transforms (matrix transformations)
-  - Handles complex curved paths with multi-segment cubic/quadratic Bezier curves
-  - Adaptive curve approximation for smooth engraving output
-  - Proper handling of multi-part SVG paths (z/m command sequences)
-  - Automatically detects path discontinuities and uses rapid moves for disconnected segments
-  - Example: 37-path tiger head design converts to 26,000+ precise movement commands with optimal path breaks
-- **Interactive Editing**:
-  - Zoom, pan, and fit-to-view controls
-  - Floating status panel (Zoom, Pan, Grid)
-  - Array Tools (Linear, Circular, Grid) with automatic grouping
-  - Dynamic grid and origin indicator
-  - View controls (Zoom In/Out, Fit, Reset)
-  - Precise positioning (X, Y, Width, Height inputs)
-  - Properties dialog for detailed shape adjustments
-  - Dual-grid system (10mm major + 1mm minor)
-- **SVG Canvas Rendering**: High-quality vector-based canvas
-- **Context Menu**: Right-click for Delete, Properties, Array, and the new multi-level Align menu
-  - Array operations (Linear, Circular, Grid) with dedicated dialogs
-  - Align horizontally (Left/Center/Right) or vertically (Top/Center/Bottom) across multi-selection groups
-  - Selecting "Properties" with multiple shapes opens a "Multiple Shapes" dialog that applies pocket/text/toolpath settings to every selected object while keeping individual positions intact
-- **Toolpath Generation**: Convert designs to executable G-code
-- Frame button to generate Bounds Gcode
-- **Image Import**: Import raster files, jpg, png, bmp ...
-  - New features in the image engraving Inspector
-  - G-code generator optimized for raster images
-
-- **New improvements in Designer**
-  - Multiple images and vector objects can now be placed on the canvas, and G-code can be generated for all of them according to the order set in the Layers panel. Laser parameters for vector objects are set using the "Tool Settings" button, while image engraving parameters are set independently for each image in the object properties.
-  - Polylines are now created closed, but a checkbox has been added to the properties to open/close them.
-  - From Designer, all code is now sent via direct_sender.rs, improving engraving speed to match commercial programs.
-  - Image saving alongside vector objects has been integrated into "gckd" files.
-The object positioning issue when opening "gckd" files.
-  - The colors in the viewer have been changed when displaying images alongside vector objects to improve viewing.
-  - The active machine name has been added to the status bar.
-  - New icons have been added to the tools.
-
-  **Individual properties by object**
-  - In addition to the general properties for laser engraving and cutting that apply to all objects in the Designer and are set in "Tool Settings", you can now define individual properties for each object by selecting, via a checkbox, whether you want to use global or specific properties for that object.
-
-  **Shape Gallery**
-  - In the shapes gallery, you can quickly draw various objects such as pinions and gears. These can then be edited by changing the pitch and number of teeth.
-  - Now the shapes are drawn correctly
-  - The ability to edit Timing Pulleys, which were previously not editable, has been added.
-
-  **3D objects for CNC**
-  - The Z coordinate has been implemented in the designer in "CNC 3D" mode to generate three-dimensional toolpaths.
-  - Objects in 3D Mode have depth, and machining conditions are configured through Global CAM Properties.
-  - You can also define individual properties for each object. Unchecking "Use global values" in the properties panel will apply the new values ​​to the selected object.
-  - **Important:** When working in "CNC 3D" mode, The G-code path begins at the top of material (stock material). The Z-coordinate is entered as a positive value, but Gcodekit5 treats it as a negative value (-Z), representing the machining depth.
+### 2D/3D CAD/CAM Designer
+- **Drawing tools**: rectangles, circles, ellipses, lines, polylines, triangles, polygons, and parametric pinions, gears, sprockets and timing pulleys from the Shape Gallery
+- **Chain sprockets**: enter the pitch and number of teeth; the roller diameter is derived from the pitch
+- **Import**: SVG and DXF vector files (DXF as updated to AutoCAD 2018, with splines; AutoCAD ACIS objects cannot be imported), and raster images (`Import Image...`)
+- **Editing**: zoom, pan (Pan tool or middle mouse drag), grid snap, arrays, alignment (Align Left/Right/Top/...), grouping, undo/redo, copy/paste
+- **Per-object properties**: each object can use the global laser or CAM settings, or its own values (untick "Use global values")
+- **Images and vectors together**: several images and vector objects on one canvas, cut in the order set in the object list; each image has its own engraving settings; images are saved in the `.gckd` file
+- **CNC 3D mode**: objects have depth, and the Z passes follow the Global CAM Properties (or the object's own values). The G-code path begins at the top of the stock; Z depth is entered as a positive value and cut as -Z. A safety Z height is added to the stock thickness before the first plunge
+- **Boundary check**: G-code that falls outside the machine working area gets a warning comment in the G-code and a warning dialog
+- **Toolpath generation**: designs to G-code, plus a Frame button that generates bounds G-code
 
 <img src="crates/gcodekit5-ui-egui/resources/help_images/visualizer3d2.png" alt="Visualizer" width="800">
 
 <img src="crates/gcodekit5-ui-egui/resources/help_images/visualizer3d1.png" alt="Renderer" width="800">
 
-  - For safe toolpath in CNC machining, a "Safety Z Height" parameter has been added from the start of machining to prevent collisions with the workpiece. This height is added to the Stock Material thickness. For example, if we define a material thickness of 10mm and a safety height of 5mm, the tool will begin machining at a height of 15mm and then descend to the first configured machining height, continuing to descend step by step according to the Step Down setting.
-  - To machine chain sprockets and gears, create the element in the Designer, specifying the pitch, number of teeth, etc. Then, create an external offset with the dimension of the milling cutter radius so that the machining is done correctly.
+To machine chain sprockets and gears, create the element in the Designer (pitch, number of teeth,
+and so on), then add an external offset equal to the cutter radius so the cut lands on the profile.
 
-  <img src="crates/gcodekit5-ui-egui/resources/help_images/visualizer3d5.png" alt="Renderer" width="800">
+<img src="crates/gcodekit5-ui-egui/resources/help_images/visualizer3d5.png" alt="Renderer" width="800">
 
-  <img src="crates/gcodekit5-ui-egui/resources/help_images/visualizer3d4.png" alt="Renderer" width="300">
+<img src="crates/gcodekit5-ui-egui/resources/help_images/visualizer3d4.png" alt="Renderer" width="300">
 
-  <img src="crates/gcodekit5-ui-egui/resources/help_images/visualizer3d3.png" alt="Renderer" width="500">
+<img src="crates/gcodekit5-ui-egui/resources/help_images/visualizer3d3.png" alt="Renderer" width="500">
 
-### 👁️ 3D Visualizer
-- **Real-time 3D Rendering**: Instant visualization of G-code toolpaths for CNC machining. Rendered representation of G-code toolpaths, depths according to the configured tool diameter. This preview is only available with CNC machine selection
-- **Play/Pause/Stop** to reproduce the movement of the tool at different playback speed levels. It is available for both 2D and 3D models
-- **Adaptive Grid System**:
-  - Dynamic grid spacing (e.g., 10mm, 100mm) based on zoom level
-  - Infinite grid coverage across the entire viewport
-  - Grid size indicator in status bar
-  - Horizontal and vertical scrollbars for navigation
-- **Dynamic Canvas Sizing**: Automatically adjusts to window resize events
-- **2D/3D Toggle**: Switch between a locked top-down 2D view (left-drag pans) and the free-orbit 3D view
-- **Interactive Controls**: Zoom, pan, and fit-to-view, **Orbit and isometric cámera with mouse interaction**
-- **Color-Coded Paths**: Distinct colors for Rapid (G0) and Feed (G1/G2/G3) moves
-- **Performance**: Optimized rendering for large files
-- **Shared Viewport Engine**: A centralized `ViewportTransform` keeps zoom/pan math consistent across toolpaths, grids, and origin markers.
-- **Toolpath Cache**: Parsing + SVG generation flow through a single cache so repeated renders skip redundant work.
-- **Unified Path Segments**: A single `PathSegment` enum (with shared `MovementMeta`, streaming visitors, lazy arc iterators, and cached arc geometry) powers both line and arc moves so stats/iteration stay fast and feed rates stay consistent.
-- **Analytical Bounds**: Bounding boxes are computed from segment metadata (including arcs), so zoom-to-fit and layout decisions never need to re-discretize toolpaths.
+### Visualizer
+- **2D/3D toggle**: a locked top-down 2D view (left-drag pans) or the free-orbit 3D view
+- **3D rendering**: toolpath depths drawn with the configured tool diameter (CNC machines)
+- **Play preview**: replay the tool movement at several speeds, for 2D and 3D programs
+- **Controls**: zoom, pan, orbit and fit-to-view
+- **Color-coded paths**: rapid (G0) and feed (G1/G2/G3) moves in distinct colors
 
-### 💬 Smart Device Console
-- **Command History**: Scrollable record of all device communications
-- **Color-Coded Messages**:
-  - Commands (blue/info)
-  - Responses (white/output)
-  - Errors (red)
-  - Success (green)
-  - Verbose/Debug (gray)
-- **Intelligent Filtering**: Automatically suppresses status polling spam
-  - No more "? " query logging
-  - No more `<Idle|MPos:...>` status spam
-  - No more "X bytes" messages
-- **Optional Timestamps**: Toggle timestamp display
-- **Clean Interface**: Shows only meaningful commands and responses
+### Tool and Material Libraries
+- **CNC Tools**: create, edit and delete tools; import GTC (Generic Tool Catalog) packages (`.zip`) and catalogs (`.json`)
+- **Materials**: material library with cutting parameters
 
-### ⚙️ Configuration Management
-- **GRBL Settings Editor**: Complete access to all $0-$130 parameters
-- **Repetier EEPROM**: Read Repetier EEPROM parameters in Device Config
-- **Inline Editing**: Click any setting value to edit
-- **Descriptions**: Tooltips explain each parameter's purpose
-- **Value Validation**: Ensures valid ranges and data types
-- **Save/Restore**: Persist settings to controller EEPROM
-- **Import/Export**: Backup and restore configurations
+### CAM Tools
+- **Jigsaw Puzzle Generator**, based on [Draradech's jigsaw generator](https://github.com/Draradech/jigsaw)
+- **Tabbed Box Maker**, based on the [TabbedBoxMaker algorithm](https://github.com/paulh-rnd/TabbedBoxMaker)
+- **Laser Image Engraver**: bitmap images to raster G-code with grayscale power control
+- **Speeds and Feeds Calculator**
+- **Spoilboard Surfacing** and **Create Spoilboard Grid**
+- **Gerber to G-Code**, including Excellon drill files
+- **Drill Press**: peck drilling and helical interpolation for holes larger than the tool
+- **Probe Tools**
 
-### 🔧 Tool Management
-- **CNC Tools Manager**: Comprehensive tool library management
-  - **Full CRUD Operations**: Create, read, update, and delete tools
-  - **GTC Import**: Import Generic Tool Catalog packages from suppliers (.zip and .json)
-  - **Search & Filter**: Find tools by name or filter by type
-  - **Tool Properties**: 
-    - Basic info (number, name, type, material, coating)
-    - Geometry (diameter, length, flute length, shaft diameter, flutes)
-    - Manufacturer details (maker, part number, description)
-    - Custom notes
-  - **Persistent Storage**: Auto-saves custom tools to disk
-  - **Standard Library**: Includes 5 common tools (end mills, drills, v-bits)
-  - **Scrollable Interface**: Handle unlimited tools with smooth scrolling
-  
-- **Materials Database Manager**: Material properties and settings
-  - **Full CRUD Operations**: Create, read, update, and delete materials
-  - **Material Categories**: Metals, plastics, wood, composites, and more
-  - **CNC Parameters**: Feed rates, spindle speeds, plunge rates, depth of cut
-  - **Surface Finish Control**: Roughing and finishing pass configurations
-  - **Search & Filter**: Find materials by name or filter by category
-  - **Persistent Storage**: Auto-saves custom materials to disk
-  - **Standard Library**: Includes common materials with tested parameters
-
-### 🔨 CAM Tools
-- **Drill Press**: Manual hole drilling with helical interpolation
-  - **Peck Drilling**: Configurable peck depth for chip clearing
-  - **Helical Interpolation**: Cut holes larger than tool diameter
-  - **Unit-Aware**: Automatic Metric/Imperial parameter entry
-  - **Save/Load**: Persistent tool parameters to JSON files
-
-- **Tabbed Box Maker**: Generate laser/CNC cut boxes with finger joints
-  - Inside/outside dimension modes
-  - Configurable tab width and kerf compensation
-  - Multiple box types (full, no top, no front, etc.)
-  - Layout styles: diagrammatic, three-piece, inline-compact
-  - Dividers support for internal compartments
-  - Laser settings: multi-pass, power control, feed rate
-  - Based on [TabbedBoxMaker algorithm](https://github.com/paulh-rnd/TabbedBoxMaker)
-
-- **Jigsaw Puzzle Maker**: Generate laser cut jigsaw puzzles
-  - **Draradech Algorithm**: Advanced cubic Bézier curves for organic pieces
-  - **Configurable Dimensions**: Width × Height in millimeters
-  - **Variable Piece Count**: 2-20 pieces in each direction (min 15mm per piece)
-  - **Seed-Based Generation**: Reproducible random patterns
-  - **Tab Size Control**: 10-30% adjustment for difficulty
-  - **Jitter Control**: 0-13% randomness for organic positioning
-  - **Rounded Corners**: 0-10mm corner radius for professional finish
-  - **Laser Parameters**: Multi-pass support, power control, feed rate
-  - **Enhanced Features**: Based on [Draradech's jigsaw generator](https://github.com/Draradech/jigsaw)
-  - **Smart Initialization**: Automatic homing and work coordinate setup
-
-- **Laser Image Engraver**: Convert bitmap images to G-code for laser engraving
-  - **Image Formats**: PNG, JPG, JPEG, BMP, GIF, TIFF
-  - **Grayscale Power Control**: Variable laser power based on image brightness
-  - **Bidirectional Scanning**: Optimize engraving time with bidirectional passes
-  - **Scan Direction**: Horizontal or vertical raster patterns
-  - **Image Preview**: Real-time preview of processed grayscale image
-  - **Configurable Parameters**:
-    - Output size (width in mm, height auto-calculated)
-    - Resolution (pixels per mm)
-    - Feed rate and travel rate
-    - Laser power range (0-100%)
-    - Power scale (GRBL compatibility 0-1000)
-    - Line spacing for speed/quality balance
-    - Image inversion for negative images
-  - **Time Estimation**: Calculate engraving time before generating
-  - **Background Processing**: Non-blocking G-code generation
-  - **Smart Initialization**: Proper homing and coordinate system setup
-
-- **Spoilboard Surfacing**: Flatten CNC beds/spoilboards
-  - Automatic dimension loading from DeviceDB
-  - Configurable tool parameters (diameter, feed, speed, stepover)
-  - Proper G-code initialization sequence ($H, G54, G10)
-  - Imperial unit support (inches) based on user preference
-
-- **Speeds & Feeds Calculator**: Calculate optimal cutting parameters
-  - Material and tool data integration
-  - Automatic feed rate and spindle speed calculation
+### Help and Translations
+- **In-app help**: F1 opens the documentation, with images for each module
+- **Translations**: German, Spanish, French, Italian and Portuguese (`po/*.po`)
 
 ## Supported Controllers
 
-| Controller | Versions | Protocol | Features |
-|-----------|----------|----------|----------|
-| **GRBL** | v0.9, v1.0, v1.1 | Text-based | Character counting, real-time commands, status reports |
-| **grblHAL** | Latest | Enhanced GRBL | Extended features, faster execution |
-| **TinyG** | v0.97+ | JSON | 6-axis support, macros, tool tables |
-| **g2core** | Latest | JSON | Advanced planning, file system, networking |
-| **Smoothieware** | Latest | RepRap dialect | Extensive M-codes, network support |
-| **FluidNC** | Latest | JSON + WebSocket | WiFi, web interface, SD card |
+| Controller | Status |
+|-----------|--------|
+| **GRBL** | Supported |
+| **Repetier** | Supported |
+| **grblHAL** | Supported via GRBL |
+| **FluidNC** | Supported via GRBL |
+| **TinyG** | Detected, not supported |
+| **g2core** | Detected, not supported |
+| **Smoothieware** | Detected, not supported |
+| **Marlin** | Detected, not supported |
+
+grblHAL and FluidNC are driven with the GRBL protocol. A machine profile with an unsupported
+controller cannot be saved. Sources: `crates/gcodekit5-communication/src/firmware/protocol_registry.rs`
+and `CONTROLLER_CHOICES` in `crates/gcodekit5-app/src/device_profiles.rs`.
 
 ## Installation
 
 ### Prerequisites
 - **Rust** 1.95 or later (MSRV - Minimum Supported Rust Version)
 - **Operating System**: Linux, macOS, or Windows
-- **Memory**: 512MB minimum (2GB recommended)
-- **Display**: 1024x768 minimum resolution
+- **Linux libraries**: see [DEVELOPMENT.md](DEVELOPMENT.md) (the CI list is in
+  `.github/actions/install-system-deps/action.yml`). Running needs a Vulkan or OpenGL driver for wgpu.
 
 ### Build from Source
 ```bash
 # Clone the repository
-git clone https://github.com/thawkins/gcodekit5.git
-cd gcodekit5
+git clone https://github.com/thawkins/gcodekit6.git
+cd gcodekit6
 
 # Build release version (optimized)
 cargo build --release
 
-# Run the application (egui front end, the default)
-cargo run --release
+# Run the application
+./target/release/gcodekit5
 ```
-
-The compiled binary will be located at `target/release/gcodekit5`.
 
 The GTK4 front end has been removed; egui is the only front end. Features ported from it,
 and the manual checks still pending before release, are listed in
-`docs/reports/egui-parity.md`.
-
-### Development Build
-```bash
-# Build debug version (faster compilation, includes debug symbols)
-cargo build
-
-# Run with debug logging
-RUST_LOG=debug cargo run
-```
+[docs/reports/egui-parity.md](docs/reports/egui-parity.md).
 
 ## Quick Start Guide
 
+See the [User Guide](docs/user/README.md) for the full walkthrough.
+
 ### 1. Connect to Your CNC Controller
 1. Launch GCodeKit5
-2. Click **"Refresh Ports"** to detect available serial devices
+2. Click **Refresh ports** to detect available serial devices
 3. Select your controller's port from the dropdown
 4. Choose baud rate (typically **115200** for GRBL)
-5. Click **"Connect"**
-6. Wait for "Device connected" message in console
+5. Click **Connect**
 
 ### 2. Initialize Machine
-1. Click the **Home** button (⌂) to run homing cycle
-2. Machine will move to home position
-3. DRO will display current position
-4. Status bar shows machine state (Idle/Run/Hold/Alarm)
+1. Click **Home** to run the homing cycle
+2. The DRO shows the current position and the status bar shows the machine state
 
 ### 3. Jog Machine
-1. Select step size (0.1, 1, 10, or 100mm)
-2. Click directional buttons to move:
-   - **X+/X-**: Move left/right
-   - **Y+/Y-**: Move forward/backward
-   - **Z+/Z-**: Move up/down
-   - **A+/A-**: Rotate A axis (if equipped)
-   - **B+/B-**: Rotate B axis (if equipped)
+1. Select a step size
+2. Click the X/Y/Z (and A/B, if configured) jog buttons, or use the numeric keypad
+   (4/6 X, 8/2 Y, 9/3 Z) while Machine Control has the keyboard
 
 ### 4. Load and Run G-Code
-1. Click **File → Open** or drag-and-drop a .nc/.gcode file
-2. Review code in editor tab
-3. Click **"Send to Device"** to execute
-4. Monitor progress in status bar and console
+1. Click **File > Open** (Ctrl+O) and pick a `.nc`/`.gcode` file
+2. Review the code in the editor
+3. Click **Send** to execute
+4. Monitor progress in the status bar and console
 
 ### 5. Configure Settings
-1. Navigate to **Config Settings** tab
-2. View current GRBL settings
-3. Click any value to edit
-4. Press Enter to save to controller
-5. Changes are immediately applied
+1. Open the **Device Config** page
+2. Read and edit the controller settings
 
 ## Keyboard Shortcuts
 
 | Key | Action |
 |-----|--------|
-| **Ctrl+O** | Open G-code file |
-| **Ctrl+S** | Save current file |
-| **Ctrl+Q** | Quit application |
-| **F11** | Toggle fullscreen |
-| **Arrow Keys** | Jog X/Y axes (when enabled) |
-| **Page Up/Down** | Jog Z axis (when enabled) |
+| **Ctrl+Shift+K** | E-STOP (soft reset) |
+| **!** | Feed hold |
+| **Ctrl+O** | Open file |
+| **Ctrl+S** | Save file |
 
-## Architecture
+The full list is in [docs/user/90-shortcuts.md](docs/user/90-shortcuts.md).
 
-### Technology Stack
+## Technology Stack
 - **Rust**: System programming language for memory safety and performance
 - **egui / eframe**: Immediate-mode UI, drawn with wgpu (the visualizer renders with wgpu too)
-- **craft-libs**: Window, native menu, keyboard shortcuts and native file dialogs
-- **Tokio**: Async runtime for non-blocking I/O
+- **craft-libs**: Window, native menu, keyboard shortcuts and native file dialogs (see [ADR-012](docs/adr/ADR-012-egui-craft-libs.md))
 - **Serialport-rs**: Cross-platform serial communication
 - **Tracing**: Structured logging and diagnostics
 - **Serde**: Serialization/deserialization
@@ -434,152 +201,23 @@ Settings files are stored in platform-specific locations:
 
 On first start the app imports the settings and data files of the older GTK builds (`config.json` and the JSON data files beside it). The old files are left unchanged.
 
-## Libraries needed to compile on Linux (Debian/Ubuntu)
-- **Build**:  
-  sudo apt update && sudo apt install -y build-essential pkg-config libudev-dev libxkbcommon-dev libwayland-dev libx11-dev libxcursor-dev libxrandr-dev libxi-dev
-- **Run**: a Vulkan or OpenGL driver for wgpu (for example `libvulkan1 mesa-vulkan-drivers`).
-- Translations are built from `po/*.po` at compile time; gettext is not needed.
-
-
 ## Development
 
-### Development Container (Podman)
-
-GCodeKit5 provides a development container for a one-click development environment with all dependencies pre-installed.
-
-**Prerequisites**: [Podman](https://podman.io/) and VS Code with the [Dev Containers extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers).
-
-**Setup**:
-1. Configure VS Code to use Podman: Set `"dev.containers.dockerPath": "podman"` in VS Code settings
-2. Open the project folder in VS Code
-3. Click "Reopen in Container" when prompted (or use Command Palette: "Dev Containers: Reopen in Container")
-4. Wait for the container to build (first time takes ~5-10 minutes)
-
-The container includes:
-- Rust toolchain with clippy, rustfmt, and rust-analyzer
-- The libraries the egui build needs (udev, xkbcommon, Wayland and X11)
-- Flatpak build tools
-- Helpful VS Code extensions pre-installed
-
-**Manual build** (without VS Code):
-```bash
-# Build the container
-podman build -t gcodekit5-dev .devcontainer/
-
-# Run with workspace mounted
-podman run -it --rm \
-  --userns=keep-id \
-  --security-opt label=disable \
-  -v "$(pwd):/workspace:Z" \
-  gcodekit5-dev
-```
-
-### Building
-```bash
-# Debug build (fast compilation, includes debug info)
-cargo build
-
-# Release build (optimized, no debug info)
-cargo build --release
-
-# Check code without building
-cargo check
-```
-
-### Testing
-```bash
-# Run all tests (cargo-nextest)
-cargo nextest run --workspace
-
-# Run specific test
-cargo nextest run -E 'test(test_grbl_status_parser)'
-
-# Run tests with output visible
-cargo nextest run --success-output immediate
-
-# Run doc tests (nextest does not run them)
-cargo test --doc
-
-# Run tests with a timeout
-timeout 1500 cargo nextest run --workspace
-```
-
-### Code Quality
-```bash
-# Format code (Rust standard style)
-cargo fmt
-
-# Check formatting without changing files
-cargo fmt --check
-
-# Run Clippy linter
-cargo clippy
-
-# Run Clippy with warnings as errors
-cargo clippy -- -D warnings
-```
-
-### Logging
-```bash
-# Enable debug logging
-RUST_LOG=debug cargo run
-
-# Enable trace logging (very verbose)
-RUST_LOG=trace cargo run
-
-# Enable logging for specific module
-RUST_LOG=gcodekit5::communication=debug cargo run
-```
+Debug builds, tests (`cargo nextest`), formatting, Clippy, logging (`RUST_LOG`) and the Podman
+development container (`.devcontainer/`) are covered in [DEVELOPMENT.md](DEVELOPMENT.md).
 
 ## Contributing
 
-Contributions are welcome! Please see **[CONTRIBUTING.md](CONTRIBUTING.md)** for detailed guidelines on:
-
-- Code style and formatting requirements
-- Branch naming conventions
-- Commit message format
-- Pull request process
-- Testing requirements
-- Documentation expectations
-
-### Quick Start
-
-```bash
-# 1. Fork and clone the repository
-git clone https://github.com/YOUR_USERNAME/gcodekit5.git
-cd gcodekit5
-
-# 2. Enable pre-commit hooks
-git config core.hooksPath .githooks
-
-# 3. Create a feature branch
-git checkout -b feature/amazing-feature
-
-# 4. Make changes, then run checks
-cargo fmt && cargo clippy && cargo nextest run --workspace
-
-# 5. Commit and push
-git commit -m "feat: add amazing feature"
-git push origin feature/amazing-feature
-```
-
-### Areas for Contribution
-- 🐛 **Bug Fixes**: Fix existing issues
-- ✨ **Features**: Implement new functionality
-- 📝 **Documentation**: Improve guides and API docs
-- 🧪 **Tests**: Increase test coverage
-- 🎨 **UI/UX**: Enhance interface and user experience
-- 🌐 **Translations**: Add multi-language support
-- 📦 **Packaging**: Create installers for platforms
-
+Contributions are welcome. See **[CONTRIBUTING.md](CONTRIBUTING.md)** for code style, branch
+naming, commit format, the pull request process and testing requirements.
 
 ## Known Issues
 
-See [CHANGELOG.md](CHANGELOG.md) for detailed version history and [GitHub Issues](https://github.com/thawkins/gcodekit5/issues) for current bug tracker.
+See [GitHub Issues](https://github.com/thawkins/gcodekit6/issues) for the current bug tracker.
 
 ## Documentation
 
-- **[docs/user/](docs/user/)** - **Comprehensive User Guide** (start here!)
+- **[docs/user/](docs/user/README.md)** - **Comprehensive User Guide** (start here!)
 - **[DEVELOPMENT.md](DEVELOPMENT.md)** - Developer setup guide
 - **[CONTRIBUTING.md](CONTRIBUTING.md)** - Contribution guidelines
 - **[ARCHITECTURE.md](ARCHITECTURE.md)** - System architecture overview
@@ -605,7 +243,7 @@ You may choose either license for your use of this software.
 
 - **Inspiration**: Universal G-Code Sender (UGS) project
 - **Frameworks**: the egui, eframe, winit and wgpu projects
-- **Firmware**: GRBL, TinyG, g2core, and other open-source CNC firmware projects
+- **Firmware**: GRBL, Repetier and other open-source CNC firmware projects
 - **Community**: Rust community for excellent tooling and support
 
 ## Third-party assets
@@ -616,294 +254,16 @@ You may choose either license for your use of this software.
 
 ## Support
 
-- **Bug Reports**: [GitHub Issues](https://github.com/thawkins/gcodekit5/issues)
-- **Feature Requests**: [GitHub Discussions](https://github.com/thawkins/gcodekit5/discussions)
+- **Bug Reports**: [GitHub Issues](https://github.com/thawkins/gcodekit6/issues)
+- **Feature Requests**: [GitHub Discussions](https://github.com/thawkins/gcodekit6/discussions)
 - **Email**: tim.thawkins@gmail.com
 - **Documentation**: See docs/ folder and SPEC.md
 
 ## Project Status
 
-  - **Current Version**: 2.0.0-alpha.4
-  - **Status**: Active Development
-  - **Stability**: Alpha
+- **Status**: Active Development
+- **Stability**: Alpha (the current version is in `Cargo.toml`)
 
-## Updates
+Release history: see [CHANGELOG.md](CHANGELOG.md).
 
-### Recent Updates (2.0.0-alpha.4) - Audit fixes and four features (2026-11-28)
-- New: WebSocket connections with Auto Reconnect, Excellon drilling on the Gerber Drill Holes layer, filled Gerber copper pours and macro pads, and Springs, Barbs and Snap Fit tabbed box joints.
-- Fixes from a full code audit: the CAM tools follow the machine's axes and laser mode, the designer canvas matches what is cut, and many import, export, CAM and controller fixes. See CHANGELOG.md.
-
-### Recent Updates (2.0.0-alpha.3) - Full release notes (2026-11-27)
-- Each GitHub release now carries the full CHANGELOG notes for its version, and suffixed versions are marked as pre-releases. The application is unchanged from 2.0.0-alpha.2.
-
-### Recent Updates (2.0.0-alpha.2) - Release workflow fixed (2026-11-27)
-- Republishes 2.0.0-alpha.1 with installers for Linux, macOS and Windows; the application is unchanged. The v2.0.0-alpha.1 tag has no published release.
-
-### Recent Updates (2.0.0-alpha.1) - UI rewritten on egui + craft-libs (2026-11-27)
-- The GTK4 front end is replaced by egui + craft-libs. GTK4, libadwaita and GtkSourceView are no longer needed to build, run or package GCodeKit5.
-- Every GTK feature is ported or recorded in `docs/reports/egui-parity.md`; settings, machine profiles and libraries carry over.
-- CI and the release builds (`.deb`, `.rpm`, Flatpak, AppImage, `.dmg`, `.msi`, portable zip) no longer install or bundle GTK.
-- Alpha: not yet tested on real hardware or on Windows and macOS builds.
-
-### Recent Updates (1.2.0-beta.2a) Fixed an issue with moving multiple objects using grips and Fix Dead Keys on Wayland (2026-10-25)
-  - When modifying the grips of a set of objects, they would lose their position. This issue has been fixed.
-
-- #### Fix: Accents and Dead Keys on Wayland (GTK front end only)
-
-  - This release set `GTK_IM_MODULE=simple` at startup so the GTK front end composed dead
-keys on Wayland. The GTK front end, and this workaround with it, has since been removed;
-the egui front end does not read `GTK_IM_MODULE`.
-
-### Recent Updates (1.2.0-beta.2) - refactor: consolidate Sender trait, enforce protocol consistency, and dead code cleanup (2026-10-20)
-- This update consolidates communication architecture, enforces strict protocol validation, and removes obsolete code. All changes have been verified in real-world environments
-
- ***Key Changes***
-
- - **Repetier Compatibility:**
-	- Transparent Translation: The processor automatically converts G10 L20 (Zero All) to G92.
-	- Pen Plotter Mode: Maps laser commands (M3/M4 → G0 Z0, M5 → G0 Z5) and discards redundant trailing M5 commands.
-- **Non-functional protocols are indicated as (not supported)** and cannot be selected. The code for            these protocols has been left in the firmware for future implementations.
-- **Logging & Telemetry:**
-	- Centralized command logging directly within the Sender implementations, eliminating duplicate or inaccurate logs in the UI.
-- **Communication Abstraction:**
-	- Introduced a unified Sender trait (gcodekit5-communication/src/firmware/sender.rs) with flow control methods (send_gcode, pause, resume, stop, unlock, is_streaming).
-	- Implemented by GrblSender and RepetierSender (formerly DirectSender, moved to core).
-	- The UI (MachineControlView) now manages the active sender agnostically via Rc<RefCell<Option<Rc<dyn Sender>>>>.
-- **Protocol Management & Consistency:**
-	- Added init_commands to ProtocolProfile (removing hardcoded $10=47 and the redundant identity_query).
-	- Enforced strict validation: Case-insensitive detection of expanded signatures (GRBL) and automatic connection rejection on protocol mismatch.
-	- Injects 0x18 on connection to force the firmware boot banner.
-	
-- **Dead Code Cleanup:**
-	- Various files and functions
- 
-**Verification Tests (Real Hardware)**
-
-- Ray5 (GRBL): Full streaming, pause/resume, and recovery cycle (E-Stop → Unlock → Resume work without resetting).
-- ANET A8 (Repetier): Connection, streaming flow control with resends, and functional pen plotter mode using a marker.
-
-**Designer:**
-
-  - In the Designer, the selection of objects and groups within the object list has been improved.
-  - The ability to delete objects and groups from the object list using the "Delete" key has been added.
-
-## [Unreleased] - 2026-09-03
-
-### Fixed
-- **Laser stalls and stops on long image engravings**: The Machine Control status poller (50ms) and the DirectSender streaming thread were both reading the same serial port independently. Under load, the poller could "steal" the GRBL "ok" acknowledgments meant for the streaming job, desyncing its internal flow-control window. On short jobs this caused occasional stuttering; on long jobs it could eventually make the sender stop feeding new G-code entirely, starving the machine's buffer and bringing the laser to a complete stop.
-  - `DirectSender` is now the sole reader/writer of the serial port while an image engraving job is running; the status poller yields the port for the duration of the job instead of competing for it.
-  - Removed a 30-second "watchdog" recovery mechanism that, on inspection, was placed after the exact loop it was meant to rescue and could never actually trigger during a real stall — no longer needed now that the root cause is fixed.
-  - Verified stable on real hardware with engravings of 216,604 and 158,923 G-code lines, completed with no stutter and no stops.
-  - Trade-off: while an image engraving job is streaming, the live DRO/position and buffer-state readouts in Machine Control no longer update (the progress bar still does, via the engraving job itself), keeping the serial port free of contention for maximum reliability and speed.
-  
-### Recent Updates (1.1.0-beta.1) - Multiple modifications and adjustments
-- The grid adjustment checkbox now forces the cursor to move with a snapping point based on the adjustment parameter. Objects take values ​​in multiples of this adjustment value (Snap).
-- In 3D mode, the Z coordinate is implemented to generate 3D G-code with passes based on the machining parameters in the Global or specific properties of each object.
-- The 2D viewer is removed, and the 3D viewer is always used for all G-code, whether 2D or 3D. Camera positions are used for this purpose.
-- The safety height parameter is generated from the entered value and the material thickness.
-- A warning dialog box has been added for when G-code is generated outside the machine limits. The warning is also retained within the G-code itself.
-- When saving as, the last path is used.
-- Play/pause/stop buttons and playback speed values ​​have been added to the viewer for simulating the tool's path on screen.
-- The shapes in the Shape Gallery have been corrected, and parametric mode has been added to the timing belt pulley, which previously lacked it.
-- Some errors in creating chamfers and radii on shape objects have been fixed.
- 
-### Recent Updates (1.0.0-alpha.1) - Multiple modifications and adjustments
-- Triangle generation in the designer has been corrected. Triangles can now be generated in all four positions and true symmetry can be applied. Previously, they could only be generated in one position.
-- The bounds of the triangles are now generated correctly and updated when the triangle is rotated.
-- The G-code and the Visualizer correctly reproduce the position of the triangles.
-- The triangles are now correctly saved in the gckd file
-- The display establishes a color scale based on the power S to preview the movements
-- In the designer, the bounds for the created lines are corrected. They now take into account the size and rotation of the line, which they didn't do before.
-- The Pause and Resume function in laser mode, which turned off the laser during some movements, has been fixed.
-- Help is implemented via F1 with explanatory images for each program module
-- The program translation has been expanded, including the help section.
-- A Warning is added to the G-code when the path goes outside the machine area (negative coordinates)
-- The positioning of texts and their grips is corrected.
-- Other visual modifications
-
-### Recent Updates (v0.41.0-alpha.1) - Non-Destructive Geometry
-- **Designer**: Implemented non-destructive geometry operations (Offset, Fillet, Chamfer).
-- **Designer**: Geometry modifiers are now properties of the shape, allowing live tweaking.
-- **Designer**: Updated rendering, hit-testing, and G-code generation to use the "effective shape".
-- **UI**: Removed "Apply" buttons from Geometry Operations in the Properties Panel.
-- **UI**: Geometry operations now apply immediately on Enter or Focus Out.
-- **UI**: Geometry Operations frame is now context-sensitive (hidden for Text shapes).
-
-### Recent Updates (v0.41.0-alpha.0) - Drill Press CAMTool
-- **CAM Tools**: Added new "Drill Press" tool for manual hole drilling and helical interpolation.
-- **CAM Tools**: Support for peck drilling (chip clearing) with configurable depth.
-- **CAM Tools**: Support for helical interpolation for holes larger than the tool diameter.
-- **CAM Tools**: Unit-aware parameter entry (Metric/Imperial) with dynamic switching.
-- **CAM Tools**: Ability to save and load tool parameters to JSON files.
-
-### Recent Updates (v0.40.0-alpha.6) - UI Polish & Fixes
-- **Machine Control**: Fixed feedrate display jumping and spindle speed showing zero.
-- **Machine Control**: Fixed override controls (Feed/Spindle) not working correctly.
-- **Machine Control**: Added commanded vs actual feedrate/spindle speed tracking.
-- **Machine Control**: Fixed elapsed time display to reset correctly on stop/estop.
-- **Machine Control**: Removed "Use G53" button.
-- **Machine Control**: Added logging of all sent commands to device console.
-- **CAM Tools**: Changed Vector Image CAMTool preview background to 50% grey.
-
-### Recent Updates (v0.40.0-alpha.5)
-- **Device Manager**: Added device type selection (CNC, Laser, Other) with auto-configuration.
-- **Machine Control**: Added feedrate/spindle overrides, indicators, and console command history.
-- **DRO**: Fixed slow WPos updates and visualizer lag.
-
-### Recent Updates (v0.2.5-alpha.3)
-- **Designer**: Added Pan tool, Alignment tools, Array tools, Shape Conversion, Import/Export, and Toolpath Simulation.
-- **Visualizer**: Added scrollbars, laser position indicator, and statistics panel.
-- **CAM Tools**: Added "Home device before starting" option.
-- **Status Bar**: Added job progress bar and time estimation.
-
-### Recent Updates (v0.68.3)
-- **CAM Tools**: Fixed dialog re-opening issue and standardized G-code loading.
-- **Visualizer**: Added automatic "Fit to View" on tab switch.
-- **Code Quality**: Cleanup of unused variables and clones.
-
-### Recent Updates (v0.68.0)
-- **UI**: Reordered main tabs to prioritize Machine Control.
-- **UI**: Set "Machine Control" as default startup tab.
-- **UI**: Updated View menu order.
-
-### Recent Updates (v0.67.0)
-- **UI**: Refactored UI for unit conversion.
-- **Tests**: Added Spoilboard Grid generator tests.
-
-### Recent Updates (v0.63.0)
-- **Device Manager**: Fixed critical data loss bugs in device profile management (resetting data, wrong selection, empty names).
-- **Device Manager**: Added file locking and improved logging.
-
-### Recent Updates (v0.62.0)
-- **Settings**: Added Metric/Imperial measurement system preference.
-- **CAM Tools**: Updated Spoilboard Surfacing for Imperial units.
-
-### Recent Updates (v0.60.0)
-- **CAM Tools**: Implemented singleton dialogs and success alerts.
-- **UI**: Fixed Windows fullscreen and Linux window ordering issues.
-
-### Recent Updates (v0.59.0)
-- **Settings**: Added Default Directory preference.
-- **CAM Tools**: Added Load/Save for Tabbed Box and Jigsaw Puzzle.
-
-### Recent Updates (v0.56.0)
-- **Maintenance**: Version bump for next development iteration.
-
-### Recent Updates (v0.55.0)
-- **CI/CD**: Full Flatpak support for Linux distribution.
-  - Automated build and bundling in GitHub Actions.
-  - AppStream metadata and desktop integration.
-  - Validated icon sizing and manifest configuration.
-
-### Recent Updates (v0.54.0)
-- **CI/CD**: Added Flatpak support for Linux builds.
-  - Created `flatpak/` directory with desktop entry, AppStream metainfo, and Flatpak manifest.
-  - Updated release workflow to install `flatpak-builder` and generate a `.flatpak` bundle.
-  - Configured application icon and desktop integration.
-
-### Recent Updates (v0.53.1)
-- **CI/CD**: Fixed macOS build failure by using `osx` format for `cargo-bundle` and `hdiutil` for `.dmg` creation.
-
-### Recent Updates (v0.53.0)
-- **CI/CD**: Updated version format to satisfy WiX/MSI requirements for Windows installer generation.
-
-### Recent Updates (v0.51.4)
-- **CI/CD**: Fixed Windows and macOS build failures by explicitly specifying package name in workspace.
-
-### Recent Updates (v0.51.3)
-- **CI/CD**: Updated release workflow to generate platform-specific packages:
-  - **macOS**: Generates `.dmg` disk image.
-  - **Windows**: Generates `.msi` installer.
-  - **Linux**: Generates binary executable.
-
-### Recent Updates (v0.51.2)
-- **Visualizer**: Fixed rendering issues by implementing backend callbacks for refresh, zoom, and pan operations.
-- **Designer**: Added rotation support to shapes and properties panel.
-- **Designer**: Added "Convert to" context menu (Rectangle, Path).
-
-### Recent Updates (v0.50.0)
-- **Designer**: Fixed multiple selection properties and resizing behavior.
-
-### Recent Updates (v0.46.7)
-- **Designer**: Fixed incorrect properties display for multiple selections.
-
-### Recent Updates (v0.46.6)
-- **CI/CD**: Triggering release build.
-
-### Recent Updates (v0.46.5)
-- **CI/CD**: Triggering release with updated secret configuration.
-
-### Recent Updates (v0.46.4)
-- **CI/CD**: Triggering new release build with updated workflow configuration.
-
-### Recent Updates (v0.46.3)
-- **CI/CD**: Updated release workflow to use PAT for secure uploads.
-- **Maintenance**: Added error decoder module and updated UI components.
-
-### Recent Updates (v0.46.2)
-- **Compilation Fixes**: Fixed unresolved import `format_error` in `main.rs`.
-
-### Recent Updates (v0.46.1)
-- **Compilation Fixes**: Resolved build errors related to imports and UI methods.
-
-### Recent Updates (v0.46.0)
-- **CI/CD**: Added GitHub Actions workflow to build and release binaries for Linux, Windows, and macOS on every push and tag.
-- **Jog Command Latency**: Fixed 5-10 second delay when sending jog commands by reducing serial port read timeout from 5000ms to 50ms.
-
-### Recent Updates (v0.45.0)
-- **UI Refactoring**:
-  - **Centralized Theme**: Implemented a global `Theme` singleton for consistent colors and sizing across the application.
-  - **Shared Components**: Created a library of reusable UI components (`StandardButton`, `StandardInput`, `StandardCheckBox`, `StandardSpinBox`, `StandardSidebar`) to replace ad-hoc implementations.
-  - **Panel Updates**: Refactored 11 major UI panels to use the new theme and shared components.
-
-### Recent Updates (v0.44.0)
-- **UI Aesthetics Overhaul**:
-  - **Complete Redesign**: Visualizer, G-Code Editor, Machine Control, Device Console, Device Info, Device Manager, Device Config, and CAM Tools updated to a unified dark theme.
-  - **Improved Layouts**: Left sidebar navigation, grid layouts for tools, and responsive design.
-  - **Enhanced Components**: Custom checkboxes, tabs, and tool buttons for better visibility and usability.
-  - **CAM Tools**: Restored all 7 tools with dynamic icon generation and improved grid layout.
-
-### Recent Updates (v0.43.0)
-- **Visualizer UI Overhaul**:
-  - **Dark Theme**: Full adoption of Designer's dark theme for consistent aesthetics.
-  - **Modern Layout**: Left sidebar controls, floating status/zoom overlays, and edge-to-edge canvas.
-  - **Components**: New icon-based tool buttons and styled checkboxes.
-
-### Recent Updates (v0.40.0)
-- **Designer Enhancements**:
-  - **Shape Naming**: User-editable names for all shapes, displayed in Layers list.
-  - **Rectangle Features**: Rounded corners and Slot mode (auto-radius) for rectangles.
-  - **Layers Tab**: Improved layout with headers and keyboard navigation (Up/Down arrows).
-
-### Recent Updates (v0.37.14)
-- **Designer Copy/Paste**: Copy and paste shapes (single, multiple, groups) with context menu support.
-- **Designer Undo/Redo**: Full history stack for all canvas operations with toolbar buttons and keyboard shortcuts.
-
-### Recent Updates (v0.37.13)
-- **Designer Grouping**: Group/Ungroup shapes, unified selection handles, and group bounding box.
-- **Spatial Index Fix**: Increased bounds to support large coordinate ranges (+/- 1,000,000mm).
-
-### Recent Updates (v0.37.1)
-- **Visualizer Performance**: Optimized grid rendering and G-code parsing for smoother zoom/pan operations.
-
-### Recent Updates (v0.37)
-- **Pocketing Strategies**: Added Raster (Zig-Zag), Contour-Parallel (Offset), and Adaptive strategies.
-- **Designer UI**: Added controls for pocket strategy, raster angle, and bidirectional milling.
-- **Implementation**: Integrated `cavalier_contours` for robust polygon offsetting.
-
-### Recent Updates (v0.36)
-- **Spoilboard Surfacing**: New CAM tool for flattening CNC beds.
-- **Device Manager**: Improved UI with explicit Min/Max labels and auto-correction.
-- **CNC Tools**: Added "Specialty" tool category and dynamic tool type handling.
-
-### Recent Updates (v0.35)
-- **Speeds & Feeds Calculator**: New CAM tool for calculating optimal cutting parameters based on material and tool data.
-- **Designer Improvements**: Renamed Polygon to Polyline, added rendering support for Polyline/Path, and improved Shape Properties dialog.
-- **Test Reorganization**: Massive cleanup and migration of tests to standard `tests/` directory structure across all crates.
-- **SVG Import Fixes**: Corrected mirroring behavior for SVG imports in Designer and Vector Engraver.
-
-This project is in active development. New features are being added regularly, and breaking changes may occur between versions. While the core functionality is stable, use in production environments is at your own risk.
-
----
-
-**Built with ❤️ using Rust and egui**
+This project is in active development. New features are being added regularly, and breaking changes may occur between versions. Use in production environments is at your own risk.
