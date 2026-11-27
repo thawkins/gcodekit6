@@ -470,6 +470,25 @@ impl ReportedLimits {
     }
 }
 
+/// Parses the leading number of a firmware setting value, so `"1000.000"` and `"1 (laser)"`
+/// both read as numbers. Returns `None` when the value does not start with one.
+fn parse_numeric_prefix(s: &str) -> Option<f64> {
+    let s = s.trim();
+    let mut end = 0usize;
+    for (i, ch) in s.char_indices() {
+        if ch.is_ascii_digit() || ch == '.' || ch == '-' || ch == '+' {
+            end = i + ch.len_utf8();
+        } else {
+            break;
+        }
+    }
+    if end == 0 {
+        None
+    } else {
+        s[..end].parse::<f64>().ok()
+    }
+}
+
 /// Keeps a reported `$$` dump in `profile`, with its maximum S value (`$30`) and laser mode
 /// (`$32` at least 1), as GTK's Device Config page does.
 ///
@@ -478,11 +497,7 @@ impl ReportedLimits {
 /// * `settings` - The reported settings.
 pub fn store_reported_settings(profile: &mut DeviceProfile, settings: &HashMap<u16, String>) {
     profile.grbl_settings = settings.clone();
-    let numeric = |n: u16| {
-        settings
-            .get(&n)
-            .and_then(|v| crate::device_status::parse_numeric_prefix(v))
-    };
+    let numeric = |n: u16| settings.get(&n).and_then(|v| parse_numeric_prefix(v));
     if let Some(max_s) = numeric(30) {
         profile.max_s_value = max_s;
     }

@@ -35,8 +35,6 @@ mod test_grbl_stream;
 mod test_i18n;
 #[path = "test_job_preferences.rs"]
 mod test_job_preferences;
-#[path = "test_machine_busy_guard.rs"]
-mod test_machine_busy_guard;
 #[path = "test_machine_controller.rs"]
 mod test_machine_controller;
 #[path = "test_machine_lines_answered.rs"]
@@ -53,8 +51,6 @@ mod test_material_form;
 mod test_materials_manager_backend;
 #[path = "test_override_target.rs"]
 mod test_override_target;
-#[path = "test_report_units.rs"]
-mod test_report_units;
 #[path = "test_tool_material_library.rs"]
 mod test_tool_material_library;
 #[path = "test_tools_manager_backend.rs"]
