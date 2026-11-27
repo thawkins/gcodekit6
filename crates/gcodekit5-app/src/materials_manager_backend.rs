@@ -4,7 +4,7 @@
 //! the id conversions the GTK window uses.
 
 use crate::tools_manager_backend::{CustomLibraryFile, storage_dir};
-use gcodekit5_core::data::materials::{Material, MaterialCategory, MaterialId, MaterialLibrary};
+use gcodekit5_core::data::materials::{Material, MaterialId, MaterialLibrary};
 use gcodekit5_core::types::aliases::BoxedError;
 use std::path::{Path, PathBuf};
 
@@ -146,16 +146,6 @@ impl MaterialsManagerBackend {
         self.library.get_material(id)
     }
 
-    /// The materials whose name or subcategory matches `query` (every material for an
-    /// empty query).
-    pub fn search_materials(&self, query: &str) -> Vec<&Material> {
-        if query.is_empty() {
-            self.library.get_all_materials()
-        } else {
-            self.library.search_by_name(query)
-        }
-    }
-
     /// Every material, standard and custom (unordered).
     pub fn get_all_materials(&self) -> Vec<&Material> {
         self.library.get_all_materials()
@@ -165,18 +155,5 @@ impl MaterialsManagerBackend {
 impl Default for MaterialsManagerBackend {
     fn default() -> Self {
         Self::new()
-    }
-}
-
-pub fn string_to_category(s: &str) -> Option<MaterialCategory> {
-    match s {
-        "Wood" => Some(MaterialCategory::Wood),
-        "Engineered Wood" => Some(MaterialCategory::EngineeredWood),
-        "Plastic" => Some(MaterialCategory::Plastic),
-        "Non-Ferrous Metal" => Some(MaterialCategory::NonFerrousMetal),
-        "Ferrous Metal" => Some(MaterialCategory::FerrousMetal),
-        "Composite" => Some(MaterialCategory::Composite),
-        "Stone and Ceramic" => Some(MaterialCategory::StoneAndCeramic),
-        _ => None,
     }
 }

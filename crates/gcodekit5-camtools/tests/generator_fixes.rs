@@ -3,7 +3,7 @@
 //! unit-aware CAM presets.
 
 use gcodekit5_camtools::cam_presets::{BitmapEngravingPreset, PRESET_FORMAT_VERSION, ProbePreset};
-use gcodekit5_camtools::comment_processor::{CommentMode, CommentProcessor, strip_comments, words};
+use gcodekit5_camtools::comment_processor::{split_comments, strip_comments, words};
 use gcodekit5_camtools::gerber::{GerberConverter, GerberLayerType, GerberParameters};
 use gcodekit5_camtools::laser_engraver::{
     BitmapImageEngraver, EngravingParameters, ImageTransformations,
@@ -338,9 +338,9 @@ fn test_gerber_obround_flash_is_rounded() {
 #[test]
 fn test_comment_processor_strips_all_comments() {
     assert_eq!(strip_comments("G1 (move X5) X10 ; to Y20"), "G1 X10");
-    let (code, comment) = CommentProcessor::new(CommentMode::Extract).process_line("G0 X1 (a) (b)");
+    let (code, comments) = split_comments("G0 X1 (a) (b)");
     assert_eq!(code, "G0 X1");
-    assert_eq!(comment.as_deref(), Some("a; b"));
+    assert_eq!(comments, ["a", "b"]);
     let w = words("g1x-1.5 (Y9) f300");
     assert_eq!(w.len(), 3);
     assert_eq!((w[0].letter, w[0].value), ('G', 1.0));

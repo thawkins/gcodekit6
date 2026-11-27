@@ -9,17 +9,6 @@
 //!
 //! Depends on `gcodekit5_core::gcode::words` for the shared `Word` type and tokenizer.
 
-/// Comment processing mode
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum CommentMode {
-    /// Remove all comments
-    Remove,
-    /// Keep comments inline
-    Keep,
-    /// Extract comments separately
-    Extract,
-}
-
 /// One G-code word: an address letter (upper-cased) and its numeric value
 /// (the shared core type).
 pub use gcodekit5_core::gcode::words::Word;
@@ -168,45 +157,4 @@ pub fn system_command(line: &str) -> Option<SystemCommand> {
     } else {
         SystemCommand::Unknown(normalised)
     })
-}
-
-/// Processes comments in G-code
-#[derive(Debug)]
-pub struct CommentProcessor {
-    mode: CommentMode,
-}
-
-impl CommentProcessor {
-    /// Create a new comment processor
-    pub fn new(mode: CommentMode) -> Self {
-        Self { mode }
-    }
-
-    /// Process a line and extract comment if present.
-    ///
-    /// # Arguments
-    /// * `line` - One line of G-code.
-    ///
-    /// # Returns
-    /// The processed line (comments removed unless the mode is [`CommentMode::Keep`]) and
-    /// the comment text (several comments are joined with `"; "`), if any.
-    pub fn process_line(&self, line: &str) -> (String, Option<String>) {
-        let (code, comments) = split_comments(line);
-        let comment = if comments.is_empty() {
-            None
-        } else {
-            Some(comments.join("; "))
-        };
-        let processed = match self.mode {
-            CommentMode::Remove | CommentMode::Extract => code,
-            CommentMode::Keep => line.to_string(),
-        };
-        (processed, comment)
-    }
-}
-
-impl Default for CommentProcessor {
-    fn default() -> Self {
-        Self::new(CommentMode::Remove)
-    }
 }

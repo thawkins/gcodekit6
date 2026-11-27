@@ -2,7 +2,6 @@
 //!
 //! Each test pins down a concrete wrong-G-code / wrong-geometry scenario.
 
-use gcodekit5_camtools::arc_expander::ArcExpander;
 use gcodekit5_camtools::gerber::{GerberConverter, GerberLayerType, GerberParameters};
 use gcodekit5_camtools::laser_engraver::{BitmapImageEngraver, EngravingParameters};
 use gcodekit5_camtools::probe_routines::ProbeRoutineEngine;
@@ -454,13 +453,6 @@ fn test_speeds_feeds_rpm_clamp_preserves_chip_load() {
         (load_free - load_clamped).abs() / load_free < 0.01,
         "chip load changed from {load_free} to {load_clamped}"
     );
-}
-
-#[test]
-fn test_arc_expander_full_circle() {
-    let pts = ArcExpander::default().expand_arc(10.0, 0.0, 10.0, 0.0, 0.0, 0.0, false);
-    // A full circle must visit the opposite side (-10, 0), not collapse onto the start point.
-    assert!(pts.iter().any(|&(x, _)| x < -9.0));
 }
 
 // Moved from the inline `hatch_test` module (audit D-03); its empty

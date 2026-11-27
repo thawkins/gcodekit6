@@ -9,19 +9,13 @@
 //!   carrying partial lines (and partial UTF-8 sequences) over to the next read.
 //! * [`classify_response`] sorts a response line into acks, errors, alarms, status
 //!   reports and other messages.
-//! * Small helpers for probe reports, axis detection, jog step presets and jog feed
-//!   validation.
+//! * Small helpers for probe reports, jog step presets and jog lines.
 //!
-//! Depends only on `gcodekit5_core::units` and the GRBL status parser types.
+//! Depends only on `gcodekit5_core::units` and the GRBL status parser.
 
 use std::collections::VecDeque;
 
-use gcodekit5_communication::ConnectionDriver;
-use gcodekit5_communication::firmware::grbl::status_parser::MachinePosition;
-use gcodekit5_core::units::{
-    FeedRateUnits, MM_PER_INCH_F32, MeasurementSystem, format_feed_rate, get_unit_label,
-    parse_feed_rate,
-};
+use gcodekit5_core::units::{MM_PER_INCH_F32, MeasurementSystem, get_unit_label};
 
 /// Usable size of GRBL's serial RX buffer in bytes (the buffer is 128 bytes; one slot is
 /// kept free by the ring buffer, so at most 127 bytes may be outstanding).
@@ -243,22 +237,6 @@ pub fn parse_probe_report(line: &str) -> Option<bool> {
         .map(|report| report.success)
 }
 
-/// Returns how many axes a status report's position carries (3 to 6).
-///
-/// # Arguments
-/// * `pos` - A parsed `MPos`/`WPos` position.
-pub fn reported_axis_count(pos: &MachinePosition) -> u8 {
-    if pos.c.is_some() {
-        6
-    } else if pos.b.is_some() {
-        5
-    } else if pos.a.is_some() {
-        4
-    } else {
-        3
-    }
-}
-
 /// One jog step preset.
 #[derive(Debug, Clone, PartialEq)]
 pub struct JogStepPreset {
@@ -341,77 +319,6 @@ pub fn nearest_jog_step_preset(presets: &[JogStepPreset], step_mm: f32) -> Optio
         .map(|(i, _)| i)
 }
 
-/// Parses a jog feed entry into mm/min.
-///
-/// # Arguments
-/// * `text` - The entry text in the display feed unit.
-/// * `units` - The display feed unit.
-///
-/// # Returns
-/// The feed in mm/min, or an error message if the text is not a positive number.
-pub fn parse_jog_feed(text: &str, units: FeedRateUnits) -> Result<f32, String> {
-    let value = parse_feed_rate(text, units)?;
-    if value.is_finite() && value > 0.0 {
-        Ok(value)
-    } else {
-        Err(format!(
-            "jog feed must be a positive number, got '{}'",
-            text.trim()
-        ))
-    }
-}
-
-/// Formats a probe move for display in the user's units.
-///
-/// The command itself is always sent in millimetres (G21); this is only for the
-/// console log and tooltips.
-///
-/// # Arguments
-/// * `axis_move` - Signed distance in mm and axis letter, e.g. `('Z', -20.0)`.
-/// * `feed_mm_per_min` - Probe feed in mm/min.
-/// * `units` - Display length unit.
-/// * `feed_units` - Display feed unit.
-///
-/// # Returns
-/// Text such as `"Z-0.79 in at 3.94 in/min"` (2 decimal places).
-pub fn format_probe_move(
-    axis_move: (char, f32),
-    feed_mm_per_min: f32,
-    units: MeasurementSystem,
-    feed_units: FeedRateUnits,
-) -> String {
-    let (axis, distance_mm) = axis_move;
-    let distance = match units {
-        MeasurementSystem::Metric => distance_mm,
-        MeasurementSystem::Imperial => distance_mm / MM_PER_INCH_F32,
-    };
-    let feed: f32 = format_feed_rate(feed_mm_per_min, feed_units)
-        .parse()
-        .unwrap_or(feed_mm_per_min);
-    format!(
-        "{axis}{distance:.2} {} at {feed:.2} {feed_units}",
-        get_unit_label(units)
-    )
-}
-
-/// Maps a device profile's connection type to a network driver.
-///
-/// # Arguments
-/// * `connection_type` - The profile's connection type ("Serial", "TCP/IP", "WebSocket").
-///
-/// # Returns
-/// `Some(Tcp)` or `Some(WebSocket)` for network profiles, `None` for serial ones.
-pub fn network_driver_for(connection_type: &str) -> Option<ConnectionDriver> {
-    let kind = connection_type.trim().to_ascii_lowercase();
-    if kind.contains("websocket") {
-        Some(ConnectionDriver::WebSocket)
-    } else if kind.contains("tcp") || kind == "network" || kind == "telnet" {
-        Some(ConnectionDriver::Tcp)
-    } else {
-        None
-    }
-}
-
 /// Longest line, in characters, the front ends send: grblHAL's line buffer (GRBL's own is
 /// 80 characters, and refuses longer lines with an error).
 pub const MAX_LINE_LENGTH: usize = 256;
@@ -470,13 +377,6 @@ fn strip_gcode_comments(line: &str) -> String {
     out.trim().to_string()
 }
 
-/// The `$J=` jog for a rotary axis: `delta` degrees at `feed_mm_per_min`.
-/// `G21` is stated because the feed is stored in mm/min; a program that left
-/// the controller in `G20` would otherwise read it as inches per minute.
-pub fn rotary_jog_command(axis: char, delta: f32, feed_mm_per_min: f32) -> String {
-    format!("$J=G21 G91 {axis}{delta} F{feed_mm_per_min}\n")
-}
-
 /// The `$J=` jog for a linear axis: `distance_mm` (relative, 2 decimal places) at
 /// `feed_mm_min`, without a trailing newline, e.g. `$J=G91 G21 X1.00 F1000`.
 /// `G21` is stated so a program left in `G20` cannot turn it into inches.
@@ -515,16 +415,4 @@ pub fn jog_writes_zero(distance: f32, decimals: usize) -> bool {
     jog_value_text(distance, decimals)
         .parse::<f32>()
         .map_or(true, |written| written == 0.0)
-}
-
-/// The steps-per-degree value to send for Preferences text `value`, or
-/// `None` when it is not a finite number. Values below 1 become 1, as saving
-/// Preferences stores them, so the controller and the config agree.
-pub fn steps_per_degree_to_send(value: &str) -> Option<f64> {
-    value
-        .trim()
-        .parse::<f64>()
-        .ok()
-        .filter(|v| v.is_finite())
-        .map(|v| v.max(1.0))
 }

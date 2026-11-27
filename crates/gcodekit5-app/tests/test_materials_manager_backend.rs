@@ -23,23 +23,6 @@ fn test_backend_creation() {
 }
 
 #[test]
-fn test_category_conversion() {
-    assert_eq!(string_to_category("Wood"), Some(MaterialCategory::Wood));
-    assert_eq!(
-        string_to_category("Non-Ferrous Metal"),
-        Some(MaterialCategory::NonFerrousMetal)
-    );
-}
-
-#[test]
-fn test_search_materials() {
-    let storage = test_storage("test_search_materials");
-    let backend = MaterialsManagerBackend::with_storage_path(storage.clone());
-    let results = backend.search_materials("oak");
-    assert!(!results.is_empty());
-}
-
-#[test]
 fn test_persistence() {
     let storage = test_storage("test_persistence");
     // Create a test material
