@@ -13,7 +13,10 @@
 //! `gcodekit5-core` (units), `serde_json` (presets).
 
 use gcodekit5_app::i18n::Translator;
-use gcodekit5_camtools::jigsaw_puzzle::{JigsawPuzzleMaker, PuzzleParameters};
+use gcodekit5_camtools::jigsaw_puzzle::{
+    JigsawPuzzleMaker, MAX_CORNER_RADIUS_MM, MAX_JITTER_PERCENT, MAX_PIECES, MAX_TAB_SIZE_PERCENT,
+    MIN_PIECE_MM, MIN_PIECES, MIN_SIZE_MM, MIN_TAB_SIZE_PERCENT, PuzzleParameters,
+};
 use gcodekit5_core::units::{self, MeasurementSystem};
 
 use super::common::{
@@ -47,10 +50,6 @@ const JITTER_RANGE: &str = n_!("Must be between 0 and 13");
 const RADIUS_RANGE: &str = n_!("Must be between 0 and 10 mm");
 const SEED_RANGE: &str = n_!("Must be a whole number from 0 to 4294967295");
 
-/// The smallest piece the generator makes (mm).
-const MIN_PIECE_MM: f32 = 15.0;
-/// The smallest puzzle side the generator makes (mm).
-const MIN_SIZE_MM: f64 = 50.0;
 /// The largest puzzle side (mm): the generator's most pieces (20) at 100 mm each. The
 /// generator itself has no upper limit.
 const MAX_SIZE_MM: f64 = 2000.0;
@@ -177,9 +176,9 @@ impl JigsawParams {
         let corner_radius = len(
             CORNER_RADIUS,
             &self.corner_radius,
-            &between(0.0, 10.0, RADIUS_RANGE),
+            &between(0.0, MAX_CORNER_RADIUS_MM, RADIUS_RANGE),
         );
-        let count = between(2.0, 20.0, PIECE_COUNT);
+        let count = between(MIN_PIECES, MAX_PIECES, PIECE_COUNT);
         let mut whole =
             |label, text: &str| check(&mut errors, label, parse_whole(text), gated(strict, &count));
         let pieces_across = whole(PIECES_ACROSS, &self.pieces_across) as i32;
@@ -187,8 +186,16 @@ impl JigsawParams {
         let mut num = |label, text: &str, rule: &dyn Fn(f64) -> Option<&'static str>| {
             check(&mut errors, label, parse_number(text), gated(strict, rule))
         };
-        let tab_size_percent = num(TAB_SIZE, &self.tab_size, &between(10.0, 30.0, TAB_RANGE));
-        let jitter_percent = num(JITTER, &self.jitter, &between(0.0, 13.0, JITTER_RANGE));
+        let tab_size_percent = num(
+            TAB_SIZE,
+            &self.tab_size,
+            &between(MIN_TAB_SIZE_PERCENT, MAX_TAB_SIZE_PERCENT, TAB_RANGE),
+        );
+        let jitter_percent = num(
+            JITTER,
+            &self.jitter,
+            &between(0.0, MAX_JITTER_PERCENT, JITTER_RANGE),
+        );
         let seed = match self.seed.trim().parse::<u32>() {
             Ok(seed) => seed,
             Err(_) => {
@@ -198,10 +205,10 @@ impl JigsawParams {
         };
         if strict && errors.is_empty() {
             let (w, h) = (width as f32, height as f32);
-            if w / (pieces_across as f32) < MIN_PIECE_MM {
+            if w / (pieces_across as f32) < MIN_PIECE_MM as f32 {
                 errors.push(FieldError::field(PIECES_ACROSS, PIECES_TOO_NARROW));
             }
-            if h / (pieces_down as f32) < MIN_PIECE_MM {
+            if h / (pieces_down as f32) < MIN_PIECE_MM as f32 {
                 errors.push(FieldError::field(PIECES_DOWN, PIECES_TOO_SHORT));
             }
         }

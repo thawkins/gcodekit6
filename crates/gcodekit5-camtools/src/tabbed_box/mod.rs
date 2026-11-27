@@ -14,6 +14,17 @@ struct LayoutCursor {
     spacing: f32,
 }
 
+/// The smallest box width, depth or height accepted (mm).
+pub const MIN_SIDE_MM: f64 = 20.0;
+/// The thinnest material accepted (mm).
+pub const MIN_THICKNESS_MM: f64 = 1.0;
+/// The thickest material accepted (mm).
+pub const MAX_THICKNESS_MM: f64 = 20.0;
+/// The smallest accepted magnitude of finger plus space (in thicknesses).
+pub const MIN_JOINT_WIDTH: f32 = 0.1;
+/// The fewest laser passes accepted.
+pub const MIN_LASER_PASSES: f64 = 1.0;
+
 impl LayoutCursor {
     fn new(spacing: f32) -> Self {
         Self {
@@ -102,7 +113,7 @@ impl TabbedBoxMaker {
             return Err("All dimensions must be numbers".to_string());
         }
 
-        if params.laser_passes < 1 {
+        if params.laser_passes < MIN_LASER_PASSES as i32 {
             return Err("Laser passes must be at least 1".to_string());
         }
 
@@ -110,15 +121,19 @@ impl TabbedBoxMaker {
             return Err("Z step down must not be negative".to_string());
         }
 
-        if params.x < 20.0 || params.y < 20.0 || params.h < 20.0 {
+        if params.x < MIN_SIDE_MM as f32
+            || params.y < MIN_SIDE_MM as f32
+            || params.h < MIN_SIDE_MM as f32
+        {
             return Err("All dimensions must be at least 20mm".to_string());
         }
 
-        if params.thickness < 1.0 || params.thickness > 20.0 {
+        if params.thickness < MIN_THICKNESS_MM as f32 || params.thickness > MAX_THICKNESS_MM as f32
+        {
             return Err("Material thickness must be between 1mm and 20mm".to_string());
         }
 
-        if (params.finger_joint.space + params.finger_joint.finger).abs() < 0.1 {
+        if (params.finger_joint.space + params.finger_joint.finger).abs() < MIN_JOINT_WIDTH {
             return Err("Finger + space must not be close to zero".to_string());
         }
 
