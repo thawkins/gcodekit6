@@ -19,9 +19,7 @@ pub mod grbl;
 pub mod protocol_registry;
 pub mod repetier;
 
-pub use protocol_registry::{
-    FALLBACK_PROFILE, PROTOCOLS, ProtocolProfile, SenderKind, protocol_profile,
-};
+pub use protocol_registry::{FALLBACK_PROFILE, PROTOCOLS, ProtocolProfile, protocol_profile};
 
 /// Supported CNC controller types
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
