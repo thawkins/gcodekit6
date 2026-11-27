@@ -7,6 +7,7 @@
 //! - Toolpath bounds tracking
 
 pub mod camera;
+mod parse;
 pub mod stock_removal_3d;
 pub mod viewport;
 
