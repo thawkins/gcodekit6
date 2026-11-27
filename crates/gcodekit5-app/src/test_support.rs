@@ -19,7 +19,7 @@ use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
-use gcodekit5_communication::{Communicator, CommunicatorListenerHandle, ConnectionParams};
+use gcodekit5_communication::{Communicator, ConnectionParams};
 use gcodekit5_settings::{ConnectionSettings, ConnectionType};
 
 use crate::machine::MachineController;
@@ -300,10 +300,6 @@ impl Communicator for Loopback {
         std::thread::sleep(Duration::from_millis(1));
         Ok(Vec::new())
     }
-
-    fn add_listener(&mut self, _listener: CommunicatorListenerHandle) {}
-
-    fn remove_listener(&mut self, _listener: &CommunicatorListenerHandle) {}
 
     fn connection_params(&self) -> Option<&ConnectionParams> {
         self.params.as_ref()

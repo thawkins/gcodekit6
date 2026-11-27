@@ -1,6 +1,6 @@
 //! Console/Output Panel - Task 73
 //!
-//! Display controller responses, command history, and message filtering
+//! A bounded log of controller responses and command echoes for the console pane.
 
 use std::collections::VecDeque;
 
@@ -38,8 +38,6 @@ pub struct ConsoleMessage {
     pub level: MessageLevel,
     /// Message text
     pub text: String,
-    /// Timestamp (seconds since epoch)
-    pub timestamp: u64,
     /// Is command echo
     pub is_command: bool,
 }
@@ -47,15 +45,9 @@ pub struct ConsoleMessage {
 impl ConsoleMessage {
     /// Create new message
     pub fn new(level: MessageLevel, text: impl Into<String>) -> Self {
-        let timestamp = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_secs())
-            .unwrap_or(0);
-
         Self {
             level,
             text: text.into(),
-            timestamp,
             is_command: false,
         }
     }
@@ -66,137 +58,15 @@ impl ConsoleMessage {
         msg.is_command = true;
         msg
     }
-
-    /// Get formatted message
-    pub fn formatted(&self) -> String {
-        format!("[{}] {}", self.level, self.text)
-    }
-
-    /// Get formatted message with timestamp
-    pub fn formatted_with_time(&self) -> String {
-        let hours = (self.timestamp / 3600) % 24;
-        let minutes = (self.timestamp / 60) % 60;
-        let seconds = self.timestamp % 60;
-
-        format!(
-            "[{:02}:{:02}:{:02}] [{}] {}",
-            hours, minutes, seconds, self.level, self.text
-        )
-    }
 }
 
-/// Message filter for console
-#[derive(Debug, Clone)]
-pub struct MessageFilter {
-    /// Show debug messages
-    pub debug: bool,
-    /// Show info messages
-    pub info: bool,
-    /// Show warning messages
-    pub warning: bool,
-    /// Show error messages
-    pub error: bool,
-    /// Show success messages
-    pub success: bool,
-    /// Show command echos
-    pub commands: bool,
-    /// Text search filter (case-insensitive)
-    pub text_filter: Option<String>,
-}
-
-impl MessageFilter {
-    /// Create filter showing all messages
-    pub fn show_all() -> Self {
-        Self {
-            debug: true,
-            info: true,
-            warning: true,
-            error: true,
-            success: true,
-            commands: true,
-            text_filter: None,
-        }
-    }
-
-    /// Check if message passes filter
-    pub fn matches(&self, msg: &ConsoleMessage) -> bool {
-        let level_match = match msg.level {
-            MessageLevel::Debug => self.debug,
-            MessageLevel::Info => self.info,
-            MessageLevel::Warning => self.warning,
-            MessageLevel::Error => self.error,
-            MessageLevel::Success => self.success,
-        };
-
-        if !level_match {
-            return false;
-        }
-
-        if msg.is_command && !self.commands {
-            return false;
-        }
-
-        if let Some(ref filter) = self.text_filter {
-            let text_lower = msg.text.to_lowercase();
-            let filter_lower = filter.to_lowercase();
-            if !text_lower.contains(&filter_lower) {
-                return false;
-            }
-        }
-
-        true
-    }
-}
-
-impl Default for MessageFilter {
-    fn default() -> Self {
-        Self::show_all()
-    }
-}
-
-/// Command history entry
-#[derive(Debug, Clone)]
-pub struct HistoryEntry {
-    /// Command text
-    pub command: String,
-    /// Timestamp
-    pub timestamp: u64,
-}
-
-impl HistoryEntry {
-    /// Create new history entry
-    pub fn new(command: impl Into<String>) -> Self {
-        let timestamp = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_secs())
-            .unwrap_or(0);
-
-        Self {
-            command: command.into(),
-            timestamp,
-        }
-    }
-}
-
-/// Console/Output panel
+/// Console/Output panel: a bounded log of console messages.
 #[derive(Debug)]
 pub struct ConsolePanel {
     /// All messages
     pub messages: VecDeque<ConsoleMessage>,
-    /// Command history
-    pub history: VecDeque<HistoryEntry>,
-    /// Current filter
-    pub filter: MessageFilter,
     /// Maximum messages to keep
     pub max_messages: usize,
-    /// Maximum history entries to keep
-    pub max_history: usize,
-    /// Auto-scroll enabled
-    pub auto_scroll: bool,
-    /// Current scroll position (from end)
-    pub scroll_position: usize,
-    /// Show timestamps
-    pub show_timestamps: bool,
 }
 
 impl ConsolePanel {
@@ -204,106 +74,31 @@ impl ConsolePanel {
     pub fn new() -> Self {
         Self {
             messages: VecDeque::new(),
-            history: VecDeque::new(),
-            filter: MessageFilter::default(),
             max_messages: 1000,
-            max_history: 100,
-            auto_scroll: true,
-            scroll_position: 0,
-            show_timestamps: true,
         }
     }
 
     /// Add message to console
     pub fn add_message(&mut self, level: MessageLevel, text: impl Into<String>) {
-        let msg = ConsoleMessage::new(level, text);
-        self.messages.push_back(msg);
-
-        if self.messages.len() > self.max_messages {
-            self.messages.pop_front();
-        }
-
-        if self.auto_scroll {
-            self.scroll_position = 0;
-        }
+        self.push(ConsoleMessage::new(level, text));
     }
 
     /// Add command message
     pub fn add_command(&mut self, command: impl Into<String>) {
-        let msg = ConsoleMessage::command(command);
-        self.messages.push_back(msg);
+        self.push(ConsoleMessage::command(command));
+    }
 
+    /// Append `msg`, dropping the oldest message past `max_messages`.
+    fn push(&mut self, msg: ConsoleMessage) {
+        self.messages.push_back(msg);
         if self.messages.len() > self.max_messages {
             self.messages.pop_front();
         }
-
-        if self.auto_scroll {
-            self.scroll_position = 0;
-        }
-    }
-
-    /// Add to command history
-    pub fn add_to_history(&mut self, command: impl Into<String>) {
-        let entry = HistoryEntry::new(command);
-        self.history.push_back(entry);
-
-        if self.history.len() > self.max_history {
-            self.history.pop_front();
-        }
-    }
-
-    /// Get command history list
-    pub fn get_history(&self) -> Vec<String> {
-        self.history.iter().map(|e| e.command.clone()).collect()
-    }
-
-    /// Get filtered messages
-    pub fn get_filtered_messages(&self) -> Vec<ConsoleMessage> {
-        self.messages
-            .iter()
-            .filter(|m| self.filter.matches(m))
-            .cloned()
-            .collect()
-    }
-
-    /// Get displayed messages (respecting scroll)
-    pub fn get_displayed_messages(&self, limit: usize) -> Vec<ConsoleMessage> {
-        let filtered = self.get_filtered_messages();
-        let total = filtered.len();
-
-        if total <= limit {
-            filtered
-        } else {
-            let start = total.saturating_sub(limit + self.scroll_position);
-            let end = start + limit;
-            filtered[start..end.min(total)].to_vec()
-        }
-    }
-
-    /// Get displayed message strings
-    pub fn get_displayed_strings(&self, limit: usize) -> Vec<String> {
-        self.get_displayed_messages(limit)
-            .iter()
-            .rev()
-            .map(|m| {
-                if self.show_timestamps {
-                    m.formatted_with_time()
-                } else {
-                    m.formatted()
-                }
-            })
-            .collect()
     }
 
     /// Clear all messages
     pub fn clear(&mut self) {
         self.messages.clear();
-        self.scroll_position = 0;
-    }
-
-    /// Clear history
-    pub fn clear_history(&mut self) {
-        self.history.clear();
     }
 
     /// Get message count (total)

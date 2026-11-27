@@ -5,7 +5,7 @@
 use std::sync::{Arc, Mutex};
 
 use gcodekit5_communication::communication::serial::SerialPort;
-use gcodekit5_communication::{Communicator, CommunicatorListener, SerialCommunicator};
+use gcodekit5_communication::{Communicator, SerialCommunicator};
 
 /// A port that records every write and hands out scripted reads.
 struct ScriptedPort {
@@ -37,26 +37,6 @@ impl SerialPort for ScriptedPort {
     }
 }
 
-/// Records the received data listeners are told about.
-#[derive(Default)]
-struct Recorder {
-    received: Mutex<Vec<u8>>,
-}
-
-impl CommunicatorListener for Recorder {
-    fn on_connected(&self) {}
-    fn on_disconnected(&self) {}
-    fn on_error(&self, _error: &str) {}
-    fn on_data_received(&self, data: &[u8]) {
-        self.received
-            .lock()
-            .expect("received lock")
-            .extend_from_slice(data);
-    }
-    fn on_data_sent(&self, _data: &[u8]) {}
-    fn on_timeout(&self) {}
-}
-
 fn communicator(reads: Vec<Vec<u8>>) -> (SerialCommunicator, Arc<Mutex<Vec<u8>>>) {
     let written = Arc::new(Mutex::new(Vec::new()));
     let port = ScriptedPort {
@@ -81,18 +61,11 @@ fn test_serial_passthrough_send_writes_bytes_verbatim() {
 }
 
 #[test]
-fn test_serial_passthrough_receive_returns_raw_bytes_and_notifies() {
+fn test_serial_passthrough_receive_returns_raw_bytes() {
     let banner = b"start\nRepetier-Firmware\nok 1\nResend:2\n".to_vec();
     let (mut comm, _written) = communicator(vec![banner.clone()]);
-    let recorder = Arc::new(Recorder::default());
-    comm.add_listener(recorder.clone());
 
     let data = comm.receive().expect("receive");
 
     assert_eq!(data, banner, "received bytes are returned unchanged");
-    assert_eq!(
-        recorder.received.lock().expect("received lock").as_slice(),
-        banner.as_slice(),
-        "listeners see every received byte"
-    );
 }
