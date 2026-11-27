@@ -5,6 +5,23 @@
 use serde::{Deserialize, Serialize};
 use std::f32::consts::PI;
 
+/// The smallest puzzle width or height accepted (mm).
+pub const MIN_SIZE_MM: f64 = 50.0;
+/// The fewest pieces accepted in either direction.
+pub const MIN_PIECES: f64 = 2.0;
+/// The most pieces accepted in either direction.
+pub const MAX_PIECES: f64 = 20.0;
+/// The smallest piece width or height accepted (mm).
+pub const MIN_PIECE_MM: f64 = 15.0;
+/// The smallest tab size accepted (percent).
+pub const MIN_TAB_SIZE_PERCENT: f64 = 10.0;
+/// The largest tab size accepted (percent).
+pub const MAX_TAB_SIZE_PERCENT: f64 = 30.0;
+/// The largest jitter accepted (percent); the smallest is 0.
+pub const MAX_JITTER_PERCENT: f64 = 13.0;
+/// The largest corner radius accepted (mm); the smallest is 0.
+pub const MAX_CORNER_RADIUS_MM: f64 = 10.0;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PuzzleParameters {
     pub width: f32,
@@ -79,34 +96,36 @@ impl JigsawPuzzleMaker {
     }
 
     fn validate_parameters(params: &PuzzleParameters) -> Result<(), String> {
-        if params.width < 50.0 || params.height < 50.0 {
+        if params.width < MIN_SIZE_MM as f32 || params.height < MIN_SIZE_MM as f32 {
             return Err("Puzzle dimensions must be at least 50mm".to_string());
         }
 
-        if params.pieces_across < 2 || params.pieces_down < 2 {
+        if params.pieces_across < MIN_PIECES as i32 || params.pieces_down < MIN_PIECES as i32 {
             return Err("Must have at least 2x2 pieces".to_string());
         }
 
-        if params.pieces_across > 20 || params.pieces_down > 20 {
+        if params.pieces_across > MAX_PIECES as i32 || params.pieces_down > MAX_PIECES as i32 {
             return Err("Maximum 20 pieces in any direction".to_string());
         }
 
         let piece_width = params.width / params.pieces_across as f32;
         let piece_height = params.height / params.pieces_down as f32;
 
-        if piece_width < 15.0 || piece_height < 15.0 {
+        if piece_width < MIN_PIECE_MM as f32 || piece_height < MIN_PIECE_MM as f32 {
             return Err("Pieces too small (minimum 15mm per piece)".to_string());
         }
 
-        if params.tab_size_percent < 10.0 || params.tab_size_percent > 30.0 {
+        if params.tab_size_percent < MIN_TAB_SIZE_PERCENT as f32
+            || params.tab_size_percent > MAX_TAB_SIZE_PERCENT as f32
+        {
             return Err("Tab size must be between 10% and 30%".to_string());
         }
 
-        if params.jitter_percent < 0.0 || params.jitter_percent > 13.0 {
+        if params.jitter_percent < 0.0 || params.jitter_percent > MAX_JITTER_PERCENT as f32 {
             return Err("Jitter must be between 0% and 13%".to_string());
         }
 
-        if params.corner_radius < 0.0 || params.corner_radius > 10.0 {
+        if params.corner_radius < 0.0 || params.corner_radius > MAX_CORNER_RADIUS_MM as f32 {
             return Err("Corner radius must be between 0 and 10mm".to_string());
         }
 

@@ -17,7 +17,8 @@ mod preset;
 
 use gcodekit5_app::i18n::Translator;
 use gcodekit5_camtools::tabbed_box::{
-    BoxParameters, BoxType, FingerJointSettings, KeyDividerType, TabbedBoxMaker,
+    BoxParameters, BoxType, FingerJointSettings, KeyDividerType, MAX_THICKNESS_MM, MIN_JOINT_WIDTH,
+    MIN_LASER_PASSES, MIN_SIDE_MM, MIN_THICKNESS_MM, TabbedBoxMaker,
 };
 use gcodekit5_core::units::{self, MeasurementSystem};
 
@@ -76,9 +77,6 @@ const TOO_MANY_PASSES: &str = n_!("Must be at most 100");
 
 /// The most laser passes the page accepts (each pass repeats every path).
 const MAX_PASSES: f64 = 100.0;
-
-/// The smallest box side the generator makes (mm).
-const MIN_SIDE_MM: f64 = 20.0;
 
 /// The box types and the msgids of their names, in GTK's menu order.
 const BOX_TYPES: [(BoxType, &str); 6] = [
@@ -283,7 +281,7 @@ impl TabbedBoxParams {
         let thickness = len(
             THICKNESS,
             &self.thickness,
-            &between(1.0, 20.0, THICKNESS_RANGE),
+            &between(MIN_THICKNESS_MM, MAX_THICKNESS_MM, THICKNESS_RANGE),
         );
         let burn = len(BURN, &self.burn, &not_negative);
         let play = len(PLAY, &self.play, &any);
@@ -303,7 +301,7 @@ impl TabbedBoxParams {
         };
         let dividers_x = whole(DIVIDERS_X, &self.dividers_x, &not_negative);
         let dividers_y = whole(DIVIDERS_Y, &self.dividers_y, &not_negative);
-        let at_least_one = at_least(1.0, AT_LEAST_ONE);
+        let at_least_one = at_least(MIN_LASER_PASSES, AT_LEAST_ONE);
         let passes_rule =
             |v: f64| at_least_one(v).or_else(|| (v > MAX_PASSES).then_some(TOO_MANY_PASSES));
         let passes = whole(PASSES, &self.passes, &passes_rule);
@@ -362,7 +360,7 @@ impl TabbedBoxParams {
         finger: f64,
         space: f64,
     ) {
-        if ((space + finger) as f32).abs() < 0.1 {
+        if ((space + finger) as f32).abs() < MIN_JOINT_WIDTH {
             errors.push(FieldError::field(SPACE_WIDTH, JOINT_TOO_SMALL));
         }
         if self.outside {
