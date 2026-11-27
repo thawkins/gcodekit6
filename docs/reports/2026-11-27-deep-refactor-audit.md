@@ -105,6 +105,8 @@ Most severe first: safety and destructive output, then data loss, then wrong geo
 
 ## 4. Product decisions needed
 
+**Decided 2026-11-27 by the owner: option (a) for every decision, D-1 to D-14.** The blocked tickets (T15-T23, T27, T47-T56) are now Approved; fixture edits they imply are sanctioned but must be enumerated in each PR. D-2, D-3, D-4 and D-14 (a) are feature work, scheduled after the cleanup tickets.
+
 | ID | Decision | Options |
 |---|---|---|
 | D-1 (P2FW-1) | Tool number | (a) persist `number` with `#[serde(default)]`; (b) make it read-only and drop the GTC import numbering |
