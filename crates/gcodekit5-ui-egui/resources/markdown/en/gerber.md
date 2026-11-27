@@ -20,6 +20,11 @@ The Gerber to G-Code tool allows you to convert standard Gerber files (commonly 
     *   **Generate Alignment Holes**: Adds drilling operations for alignment pins.
     *   **Hole Diameter**: Diameter of the alignment holes.
     *   **Margin**: Distance from the board edge to the alignment holes.
+    *   **Drill Depth (Z)**: Depth of the alignment holes and of the Drill Holes layer (negative, through the board).
+
+## Drill Holes
+
+The Drill Holes layer reads the Excellon drill file (`.drl`, `.xln`, `.exc`, a name with "drill", or a `.txt` that starts with `M48`) and drills every hole to **Drill Depth (Z)** at the feed rate. The drills are used smallest first; before each one the spindle stops and the program pauses (`M0`) with a comment naming the drill to load. Resume once it is fitted. Slots are cut with the drill from end to end. The holes use the same Offset X/Y as the copper layers, so they line up with the isolation cut.
 
 ## Output
 

@@ -35,6 +35,12 @@ La herramienta Gerber a G-code permite convertir archivos Gerber estándar (com�
 
 * **Margen**: Distancia desde el borde de la placa hasta los agujeros de alineación.
 
+* **Profundidad de taladrado (Z)**: Profundidad de los agujeros de alineación y de la capa Agujeros de taladro (negativa, atravesando la placa).
+
+## Agujeros de taladro
+
+La capa Agujeros de taladro lee el archivo de taladrado Excellon (`.drl`, `.xln`, `.exc`, un nombre con "drill" o un `.txt` que empieza por `M48`) y perfora cada agujero hasta la **Profundidad de taladrado (Z)** a la velocidad de avance. Las brocas se usan de menor a mayor; antes de cada una el husillo se detiene y el programa hace una pausa (`M0`) con un comentario que indica la broca que hay que montar. Reanude cuando esté colocada. Las ranuras se cortan con la broca de extremo a extremo. Los agujeros usan el mismo Desplazamiento X/Y que las capas de cobre, por lo que coinciden con el corte de aislamiento.
+
 ## Salida
 
 Haga clic en **Generar G-code** para crear la trayectoria. El resultado se cargará en el editor/visualizador de G-code.

@@ -11,7 +11,9 @@
 //! above it (on a device with a Z axis), and for alignment holes a diameter above 0, a margin
 //! that is not negative and a depth below the surface. The Board Outline layer is cut
 //! outside the board edge by the tool radius, in passes of at most the outline step-down
-//! (default 0.5 mm, above 0 on a device with a Z axis) down to the cut depth.
+//! (default 0.5 mm, above 0 on a device with a Z axis) down to the cut depth. The Drill
+//! Holes layer reads an Excellon drill file and drills every hole to the alignment holes'
+//! drill depth (below the surface), one tool after the other with a pause to change tools.
 //!
 //! Dependencies: `egui`, `gcodekit5-camtools` (converter, layer detection), `gcodekit5-app`
 //! (translations), `gcodekit5-core` (units), `serde_json` (presets).
@@ -307,10 +309,12 @@ impl GerberParams {
             holes,
             &not_negative,
         );
+        // The Drill Holes layer drills to the same depth as the alignment holes.
+        let drill = self.layer_type == GerberLayerType::DrillHoles;
         let hole_depth = len(
             HOLE_DEPTH,
             &self.alignment_hole_depth,
-            holes && has_z,
+            (holes || drill) && has_z,
             &below,
         );
         let mut num = |label, text: &str| {

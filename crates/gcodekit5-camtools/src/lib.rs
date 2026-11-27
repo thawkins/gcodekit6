@@ -8,6 +8,7 @@
 //! - **Jigsaw Puzzle Maker**: Generate G-Code for cutting interlocking puzzle pieces
 //! - **Tabbed Box Maker**: Create finger-jointed box designs with customizable parameters
 //! - **Drill Press**: Specialized drilling cycles including peck drilling and helical interpolation
+//! - **Excellon Drill Files**: Drill-file parsing and drilling for the Gerber Drill Holes layer
 //! - **Laser Engraver**: Specialized processing for laser cutting and engraving
 //! - **Probe Routines**: Touch probe operations for work coordinate setup
 //! - **WCS Service**: Work coordinate system offset management from probe results
@@ -25,6 +26,7 @@
 pub mod cam_presets;
 pub mod comment_processor;
 pub mod drill_press;
+pub mod excellon;
 pub mod gerber;
 pub mod hatch_generator;
 pub mod jigsaw_puzzle;
