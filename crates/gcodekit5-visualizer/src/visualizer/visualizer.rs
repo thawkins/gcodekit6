@@ -1,20 +1,12 @@
 //! G-Code Visualizer
-//! Parses G-Code toolpaths for canvas-based visualization
+//! Parses G-Code toolpaths into visualization commands
 
-use super::toolpath_cache::ToolpathCache;
 use super::viewport::Bounds;
 use crate::gcode::{arc, words};
 use gcodekit5_core::constants as core_constants;
-use std::collections::hash_map::DefaultHasher;
-use std::hash::{Hash, Hasher};
 use tracing::{debug, trace};
 
-const MIN_ZOOM: f32 = 0.1;
-const MAX_ZOOM: f32 = 50.0;
-const ZOOM_STEP: f32 = 1.1;
-const PAN_PERCENTAGE: f32 = 0.1;
 const BOUNDS_PADDING_FACTOR: f32 = core_constants::VIEW_PADDING as f32;
-const DEFAULT_SCALE_FACTOR: f32 = 1.0;
 
 /// Decide whether `new` replaces `old` (a newly loaded program) rather than
 /// being an edit of it.
@@ -320,31 +312,6 @@ fn push_arc_commands(
     true
 }
 
-/// Extend `bounds` with the full extent of a stored XY arc command.
-fn update_bounds_with_arc(
-    bounds: &mut Bounds,
-    from: Point3D,
-    to: Point3D,
-    center: Point3D,
-    clockwise: bool,
-) {
-    bounds.update(from.x, from.y, from.z);
-    bounds.update(to.x, to.y, to.z);
-    let center_xy = (center.x as f64, center.y as f64);
-    let Some(sweep) = arc::arc_sweep(
-        center_xy,
-        (from.x as f64, from.y as f64),
-        (to.x as f64, to.y as f64),
-        clockwise,
-    ) else {
-        return;
-    };
-    let (min_x, min_y, max_x, max_y) =
-        arc::arc_bounds(center_xy, sweep.radius, sweep.start_angle, sweep.sweep);
-    bounds.update(min_x as f32, min_y as f32, from.z);
-    bounds.update(max_x as f32, max_y as f32, to.z);
-}
-
 /// Movement command
 #[derive(Debug, Clone)]
 pub enum GCodeCommand {
@@ -369,55 +336,6 @@ pub enum GCodeCommand {
         duration: f32,
     },
 }
-/*
-/// Coordinate transformation helper
-#[allow(dead_code)]
-struct CoordTransform {
-    min_x: f32,
-    min_y: f32,
-    scale: f32,
-    width: f32,
-    height: f32,
-    x_offset: f32,
-    y_offset: f32,
-}
-
-// See CoordTransform struct above — methods also unused pending integration.
-#[allow(dead_code)]
-impl CoordTransform {
-    fn new(
-        min_x: f32,
-        min_y: f32,
-        scale: f32,
-        width: f32,
-        height: f32,
-        x_offset: f32,
-        y_offset: f32,
-    ) -> Self {
-        Self {
-            min_x,
-            min_y,
-            scale,
-            width,
-            height,
-            x_offset,
-            y_offset,
-        }
-    }
-
-    fn world_to_screen(&self, x: f32, y: f32) -> (i32, i32) {
-        let screen_x = (x - self.min_x) * self.scale + CANVAS_PADDING + self.x_offset;
-        // Flip Y axis: higher Y values should move up the screen (smaller screen_y)
-        let screen_y =
-            self.height - ((y - self.min_y) * self.scale + CANVAS_PADDING - self.y_offset);
-        (safe_to_i32(screen_x), safe_to_i32(screen_y))
-    }
-
-    fn point_to_screen(&self, point: Point3D) -> (i32, i32) {
-        self.world_to_screen(point.x, point.y)
-    }
-}
-*/
 
 /// Visualizer state with 6-axis support
 #[derive(Debug, Clone)]
@@ -440,25 +358,10 @@ pub struct Visualizer {
     pub current_pos: Point3D,
     pub current_rotary: RotaryPosition,
     pub current_intensity: f32,
-    /// Zoom/scale factor for rendering (1.0 = 100%)
-    pub zoom_scale: f32,
-    /// X-offset for panning the view (in pixels)
-    pub x_offset: f32,
-    /// Y-offset for panning the view (in pixels)
-    pub y_offset: f32,
-    /// Grid visibility flag
-    pub show_grid: bool,
-    /// Scale factor: pixels per mm (default 1.0 = 1px:1mm)
-    pub scale_factor: f32,
     /// Whether to use different colors for rotary moves
     pub color_rotary_moves: bool,
-    toolpath_cache: ToolpathCache,
-    /// Dirty flag — set when vertex data needs regeneration
-    dirty: bool,
-
-    /// Longest straight segment (mm) used to draw an arc; 0 keeps the default
-    /// angle-based segmentation. Set from Preferences > Arc Segment Length.
-    pub arc_segment_length: f32,
+    /// Commands produced by the last [`Visualizer::parse_gcode`] call
+    commands: Vec<GCodeCommand>,
 
     /// Colors according to intensity
     pub min_intensity: f32,
@@ -490,79 +393,13 @@ impl Visualizer {
             current_pos: Point3D::new(0.0, 0.0, 0.0),
             current_rotary: RotaryPosition::default(),
             current_intensity: 0.0,
-            zoom_scale: 1.0,
-            x_offset: 0.0,
-            y_offset: 0.0,
-            show_grid: true,
-            scale_factor: DEFAULT_SCALE_FACTOR,
             color_rotary_moves: true, // Enable rotary color coding by default
-            toolpath_cache: ToolpathCache::new(),
-            dirty: true,
-
-            arc_segment_length: 0.0,
+            commands: Vec::new(),
             min_intensity: 0.0,
             max_intensity: 1000.0,
             use_intensity_colors: true,
             is_raster: false,
         }
-    }
-
-    /// Returns true if vertex data needs regeneration
-    pub fn is_dirty(&self) -> bool {
-        self.dirty
-    }
-
-    /// Clear the dirty flag after vertex data has been regenerated
-    pub fn clear_dirty(&mut self) {
-        self.dirty = false;
-    }
-
-    /// Toggle grid visibility
-    pub fn toggle_grid(&mut self) {
-        self.show_grid = !self.show_grid;
-    }
-
-    /// Set grid visibility
-    pub fn set_grid_visible(&mut self, visible: bool) {
-        self.show_grid = visible;
-    }
-
-    /// Get grid visibility
-    pub fn is_grid_visible(&self) -> bool {
-        self.show_grid
-    }
-
-    /// Get scale factor
-    pub fn get_scale_factor(&self) -> f32 {
-        self.scale_factor
-    }
-    /*
-        /// Extract multiple parameters from G-Code line
-        // Deprecated: Use direct parsing in parse_linear_move/parse_arc_move instead
-        #[allow(dead_code)]
-        fn extract_params(line: &str, param_names: &[char]) -> HashMap<char, f32> {
-            let mut params = HashMap::new();
-
-            for part in line.split_whitespace() {
-                if part.len() < 2 {
-                    continue;
-                }
-                let Some(first_char) = part.chars().next() else {
-                    continue;
-                };
-                if param_names.contains(&first_char) {
-                    if let Ok(value) = part[1..].parse::<f32>() {
-                        params.insert(first_char, value);
-                    }
-                }
-            }
-
-            params
-        }
-    */
-    /// Get number of commands parsed
-    pub fn get_command_count(&self) -> usize {
-        self.toolpath_cache.len()
     }
 
     /// Parse G-Code and extract movement commands
@@ -574,17 +411,6 @@ impl Visualizer {
     /// after `;` are ignored and several G words may share one line.
     pub fn parse_gcode(&mut self, gcode: &str) {
         debug!("Starting G-code parse, input size: {} bytes", gcode.len());
-
-        let mut hasher = DefaultHasher::new();
-        gcode.hash(&mut hasher);
-        let new_hash = hasher.finish();
-
-        if !self.toolpath_cache.needs_update(new_hash) {
-            debug!("G-code hash unchanged, skipping parse");
-            return;
-        }
-
-        debug!("Parsing new G-code (hash: {})", new_hash);
 
         let mut commands = Vec::new();
 
@@ -897,9 +723,7 @@ impl Visualizer {
         self.current_pos = current_pos;
         self.current_rotary = rotary;
 
-        // Move commands to the cache (last step)
-        self.toolpath_cache.update(new_hash, commands);
-        self.dirty = true;
+        self.commands = commands;
 
         // Update visualizer bounds from parsed bounds
         (
@@ -928,187 +752,9 @@ impl Visualizer {
         );
     }
 
-    /// Get bounds information
-    pub fn get_bounds(&self) -> (f32, f32, f32, f32) {
-        (self.min_x, self.max_x, self.min_y, self.max_y)
-    }
-
+    /// Commands produced by the last [`Visualizer::parse_gcode`] call.
     pub fn commands(&self) -> &[GCodeCommand] {
-        self.toolpath_cache.commands()
-    }
-
-    /// Increase zoom by 10%
-    pub fn zoom_in(&mut self) {
-        self.zoom_scale = (self.zoom_scale * ZOOM_STEP).min(MAX_ZOOM);
-    }
-
-    /// Decrease zoom by 10%
-    pub fn zoom_out(&mut self) {
-        self.zoom_scale = (self.zoom_scale / ZOOM_STEP).max(MIN_ZOOM);
-    }
-
-    /// Reset zoom to default (100%)
-    pub fn reset_zoom(&mut self) {
-        self.zoom_scale = 1.0;
-    }
-
-    /// Get current zoom scale as percentage
-    pub fn get_zoom_percent(&self) -> u32 {
-        (self.zoom_scale * 100.0).round() as u32
-    }
-
-    /// Pan view to the right by 10% of canvas width
-    pub fn pan_right(&mut self, canvas_width: f32) {
-        self.x_offset += canvas_width * PAN_PERCENTAGE;
-    }
-
-    /// Pan view to the left by 10% of canvas width
-    pub fn pan_left(&mut self, canvas_width: f32) {
-        self.x_offset -= canvas_width * PAN_PERCENTAGE;
-    }
-
-    /// Pan view down by 10% of canvas height
-    pub fn pan_down(&mut self, canvas_height: f32) {
-        self.y_offset -= canvas_height * PAN_PERCENTAGE;
-    }
-
-    /// Pan view up by 10% of canvas height
-    pub fn pan_up(&mut self, canvas_height: f32) {
-        self.y_offset += canvas_height * PAN_PERCENTAGE;
-    }
-
-    /// Reset pan to center (offset = 0)
-    pub fn reset_pan(&mut self) {
-        self.x_offset = 0.0;
-        self.y_offset = 0.0;
-    }
-
-    /// Calculate zoom and offset to fit all cutting commands in view with margin
-    pub fn fit_to_view(&mut self, canvas_width: f32, canvas_height: f32) {
-        let mut bounds = Bounds::new();
-        let mut has_content = false;
-
-        // Collect bounds of all cutting moves
-        for cmd in self.toolpath_cache.commands() {
-            match cmd {
-                GCodeCommand::Move {
-                    from, to, rapid, ..
-                } => {
-                    if !rapid {
-                        bounds.update(from.x, from.y, from.z);
-                        bounds.update(to.x, to.y, to.z);
-                        has_content = true;
-                    }
-                }
-                GCodeCommand::Arc {
-                    from,
-                    to,
-                    center,
-                    clockwise,
-                    ..
-                } => {
-                    update_bounds_with_arc(&mut bounds, *from, *to, *center, *clockwise);
-                    has_content = true;
-                }
-                GCodeCommand::Dwell { pos, .. } => {
-                    bounds.update(pos.x, pos.y, pos.z);
-                    has_content = true;
-                }
-            }
-        }
-
-        if !has_content || !bounds.is_valid() {
-            self.zoom_scale = 1.0;
-            self.x_offset = 0.0;
-            self.y_offset = 0.0;
-            return;
-        }
-
-        let content_width = bounds.max_x - bounds.min_x;
-        let content_height = bounds.max_y - bounds.min_y;
-
-        // Apply 5% margin
-        let margin_percent = core_constants::VIEW_PADDING as f32;
-        let available_width = canvas_width * (1.0 - margin_percent * 2.0);
-        let available_height = canvas_height * (1.0 - margin_percent * 2.0);
-
-        if content_width == 0.0 || content_height == 0.0 {
-            // Point content
-            self.zoom_scale = 1.0;
-            self.x_offset = -(bounds.min_x + bounds.max_x) / 2.0;
-            self.y_offset = -(bounds.min_y + bounds.max_y) / 2.0;
-            return;
-        }
-
-        // Calculate zoom to fit
-        let scale_x = available_width / content_width;
-        let scale_y = available_height / content_height;
-        self.zoom_scale = scale_x.min(scale_y);
-
-        // Center the content
-        // The draw function applies: translate(screen_center) -> scale -> translate(offset)
-        // So offset needs to be the negative center of the content to bring it to (0,0) before scaling/centering on screen
-        let center_x = (bounds.min_x + bounds.max_x) / 2.0;
-        let center_y = (bounds.min_y + bounds.max_y) / 2.0;
-
-        self.x_offset = -center_x;
-        self.y_offset = -center_y;
-    }
-
-    /// Get bounds of cutting moves only (excluding rapid moves)
-    pub fn get_cutting_bounds(&self) -> Option<(f32, f32, f32, f32, f32, f32)> {
-        let mut bounds = Bounds::new();
-        let mut has_cutting_moves = false;
-
-        for cmd in self.toolpath_cache.commands() {
-            match cmd {
-                GCodeCommand::Move {
-                    from, to, rapid, ..
-                } => {
-                    if !*rapid {
-                        bounds.update(from.x, from.y, from.z);
-                        bounds.update(to.x, to.y, to.z);
-                        has_cutting_moves = true;
-                    }
-                }
-                GCodeCommand::Arc {
-                    from,
-                    to,
-                    center,
-                    clockwise,
-                    ..
-                } => {
-                    update_bounds_with_arc(&mut bounds, *from, *to, *center, *clockwise);
-                    has_cutting_moves = true;
-                }
-                GCodeCommand::Dwell { pos, .. } => {
-                    bounds.update(pos.x, pos.y, pos.z);
-                    has_cutting_moves = true;
-                }
-            }
-        }
-
-        if has_cutting_moves && bounds.is_valid() {
-            Some((
-                bounds.min_x,
-                bounds.max_x,
-                bounds.min_y,
-                bounds.max_y,
-                bounds.min_z,
-                bounds.max_z,
-            ))
-        } else {
-            None
-        }
-    }
-
-    /// Get the start point of the toolpath (for debugging/testing)
-    pub fn get_start_point(&self) -> Option<Point3D> {
-        self.toolpath_cache.commands().first().map(|cmd| match cmd {
-            GCodeCommand::Move { from, .. } => *from,
-            GCodeCommand::Arc { from, .. } => *from,
-            GCodeCommand::Dwell { pos, .. } => *pos,
-        })
+        &self.commands
     }
 
     /// Obtain the color for a given intensity.
@@ -1123,27 +769,6 @@ impl Visualizer {
 
         intensity_to_color(intensity, self.max_intensity)
     }
-
-    /// Sets the longest straight segment (mm) used to draw arcs (0 keeps
-    /// the default angle-based segmentation) and marks the vertex data stale.
-    pub fn set_arc_segment_length(&mut self, mm: f32) {
-        let mm = if mm.is_finite() { mm.max(0.0) } else { 0.0 };
-        if (mm - self.arc_segment_length).abs() > f32::EPSILON {
-            self.arc_segment_length = mm;
-            self.dirty = true;
-        }
-    }
-
-    /// Activate/deactivate colors by intensity
-    pub fn toggle_intensity_colors(&mut self) {
-        self.use_intensity_colors = !self.use_intensity_colors;
-        self.dirty = true;
-    }
-
-    /// Obtain the detected intensity range
-    pub fn get_intensity_range(&self) -> (f32, f32) {
-        (self.min_intensity, self.max_intensity)
-    }
 }
 
 impl Default for Visualizer {
@@ -1151,13 +776,3 @@ impl Default for Visualizer {
         Self::new()
     }
 }
-/*
-/// Safely convert a float to i32, clamping to valid range
-#[allow(dead_code)]
-fn safe_to_i32(value: f32) -> i32 {
-    if !value.is_finite() {
-        return 0;
-    }
-    value.clamp(i32::MIN as f32 + 1.0, i32::MAX as f32 - 1.0) as i32
-}
-*/

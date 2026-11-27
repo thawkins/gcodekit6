@@ -5,11 +5,9 @@
 #![deny(unsafe_code)]
 
 pub mod gcode;
-pub mod helpers;
 pub mod visualizer;
 
 pub use visualizer::{
-    Camera, Camera3D, GCodeCommand, HeightMap, Point3D, Renderer, Scene, StockSimulator3D,
-    ToolpathSegment, ToolpathSegmentType, Visualizer, VisualizerControls, generate_surface_mesh,
-    toolpath_from_commands,
+    Camera3D, GCodeCommand, HeightMap, Point3D, StockSimulator3D, ToolpathSegment,
+    ToolpathSegmentType, Visualizer, generate_surface_mesh, toolpath_from_commands,
 };

@@ -25,3 +25,5 @@ mod gcode_parsing_regressions;
 mod test_camera_matrices;
 #[path = "test_stock_removal_heightmap.rs"]
 mod test_stock_removal_heightmap;
+#[path = "test_visualizer_reparse.rs"]
+mod test_visualizer_reparse;
