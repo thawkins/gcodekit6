@@ -3472,6 +3472,9 @@ msgstr "Définissez la vitesse maximale et la puissance de la broche dans le ges
 msgid "Must not be larger than the hole"
 msgstr "Ne doit pas être plus grand que le trou"
 
+msgid "Too small: the hole would take more than 10000 pecks"
+msgstr "Trop petit : le trou nécessiterait plus de 10000 débourrages"
+
 msgid "The device is in laser mode ($32=1). Switch it to CNC mode to use the Drill Press."
 msgstr "L'appareil est en mode laser ($32=1). Passez-le en mode CNC pour utiliser la perceuse."
 

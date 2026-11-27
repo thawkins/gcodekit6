@@ -122,6 +122,34 @@ impl TabbedBoxMaker {
             return Err("Finger + space must not be close to zero".to_string());
         }
 
+        // A zero or negative feed emits `F0`/`F-n` and a negative power `S-n`: GRBL
+        // rejects both mid-job, after the head has already moved.
+        if params.feed_rate <= 0.0 {
+            return Err("Feed rate must be greater than 0".to_string());
+        }
+
+        if params.laser_power < 0 {
+            return Err("Laser power must not be negative".to_string());
+        }
+
+        // The finger edge draws `space - burn` and the notch edge `finger + play - burn`
+        // and `space - play + burn`; a burn or play that makes any of them negative walks
+        // the path backwards and the outline crosses itself.
+        let space = params.finger_joint.space * params.thickness;
+        let finger = params.finger_joint.finger * params.thickness;
+        if params.burn < 0.0 || params.burn >= space || params.burn >= finger {
+            return Err(
+                "Burn must not be negative and must be less than the finger and \
+                 space widths"
+                    .to_string(),
+            );
+        }
+
+        let play = params.finger_joint.play * params.thickness;
+        if finger + play - params.burn <= 0.0 || space - play + params.burn <= 0.0 {
+            return Err("Play is too large for the finger and space widths".to_string());
+        }
+
         Ok(())
     }
 

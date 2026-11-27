@@ -3468,6 +3468,9 @@ msgstr "Configure las RPM máximas y la potencia del husillo en el Administrador
 msgid "Must not be larger than the hole"
 msgstr "No debe ser mayor que el agujero"
 
+msgid "Too small: the hole would take more than 10000 pecks"
+msgstr "Demasiado pequeño: el agujero necesitaría más de 10000 picoteos"
+
 msgid "The device is in laser mode ($32=1). Switch it to CNC mode to use the Drill Press."
 msgstr "El dispositivo está en modo láser ($32=1). Cámbielo a modo CNC para usar el taladro."
 

@@ -25,6 +25,8 @@ mod generator_fixes;
 mod homing_safety;
 #[path = "probe_routines.rs"]
 mod probe_routines;
+#[path = "test_camtools_validation_gaps.rs"]
+mod test_camtools_validation_gaps;
 #[path = "test_gerber_input_safety.rs"]
 mod test_gerber_input_safety;
 #[path = "test_speeds_feeds_calculator.rs"]

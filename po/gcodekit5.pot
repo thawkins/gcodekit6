@@ -3389,6 +3389,9 @@ msgstr ""
 msgid "Must not be larger than the hole"
 msgstr ""
 
+msgid "Too small: the hole would take more than 10000 pecks"
+msgstr ""
+
 msgid "The device is in laser mode ($32=1). Switch it to CNC mode to use the Drill Press."
 msgstr ""
 

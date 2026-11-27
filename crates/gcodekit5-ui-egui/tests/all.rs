@@ -54,6 +54,8 @@ mod test_cam_spoilboard_surfacing;
 mod test_cam_tabbed_box;
 #[path = "test_cam_tools.rs"]
 mod test_cam_tools;
+#[path = "test_cam_validation_gaps.rs"]
+mod test_cam_validation_gaps;
 #[path = "test_commands.rs"]
 mod test_commands;
 #[path = "test_console_pane.rs"]

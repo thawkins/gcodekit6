@@ -3460,6 +3460,9 @@ msgstr "Defina as RPM máximas e a potência do fuso no Gerenciador de dispositi
 msgid "Must not be larger than the hole"
 msgstr "Não pode ser maior que o furo"
 
+msgid "Too small: the hole would take more than 10000 pecks"
+msgstr "Muito pequeno: o furo precisaria de mais de 10000 avanços"
+
 msgid "The device is in laser mode ($32=1). Switch it to CNC mode to use the Drill Press."
 msgstr "O dispositivo está no modo laser ($32=1). Mude-o para o modo CNC para usar a furadeira."
 

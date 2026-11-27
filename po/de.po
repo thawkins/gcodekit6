@@ -3465,6 +3465,9 @@ msgstr "Legen Sie die maximale Drehzahl und die Leistung der Spindel im Geräte-
 msgid "Must not be larger than the hole"
 msgstr "Darf nicht größer als das Loch sein"
 
+msgid "Too small: the hole would take more than 10000 pecks"
+msgstr "Zu klein: das Loch bräuchte mehr als 10000 Bohrhübe"
+
 msgid "The device is in laser mode ($32=1). Switch it to CNC mode to use the Drill Press."
 msgstr "Das Gerät ist im Lasermodus ($32=1). Schalten Sie es in den CNC-Modus, um die Bohrmaschine zu verwenden."
 
