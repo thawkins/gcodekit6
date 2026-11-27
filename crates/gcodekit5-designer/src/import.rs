@@ -245,7 +245,7 @@ impl SvgImporter {
     ///
     /// Geometry from `path`, `rect`, `circle`, `ellipse`, `line`, `polyline` and
     /// `polygon` elements is converted to millimetres using the full transform stack:
-    /// the root `viewBox` → physical size mapping (`width`/`height` in mm, cm, in, pt,
+    /// the root `viewBox` to physical size mapping (`width`/`height` in mm, cm, in, pt,
     /// pc or px at 96 dpi; unitless values are taken as mm), every enclosing group's
     /// and the element's own `transform` attribute (`matrix`, `translate`, `scale`,
     /// `rotate`, `skewX`, `skewY`), and finally the importer's `scale`. Content of
@@ -362,7 +362,7 @@ impl SvgImporter {
     }
 
     /// Converts one SVG geometry element, already resolved to the transform `ctm`
-    /// (element user units → mm), into an imported shape.
+    /// (element user units to mm), into an imported shape.
     ///
     /// Primitives keep their type when `ctm` allows it (axis-aligned scale, or a
     /// rotation with uniform scale for rectangles and ellipses); otherwise they become

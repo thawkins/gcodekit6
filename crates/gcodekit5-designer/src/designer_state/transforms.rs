@@ -163,9 +163,9 @@ impl DesignerState {
         for obj in selected {
             let old_state = obj.clone();
             let mut obj = obj;
-            // Verificar si es un triángulo
+            // Check whether it is a triangle
             if let Shape::Triangle(triangle) = &mut obj.shape {
-                // Aplicar mirror específico para triángulo
+                // Triangle-specific mirror
                 match axis {
                     MirrorAxis::X => {
                         // Horizontal flip (sx = -1, invierte X): swap left/right corners
@@ -176,7 +176,7 @@ impl DesignerState {
                             3 => 2, // Superior-Derecha → Superior-Izquierda
                             _ => triangle.right_angle_corner,
                         };
-                        // Invertir rotación
+                        // Invert the rotation
                         triangle.rotation = -triangle.rotation;
                     }
                     MirrorAxis::Y => {
@@ -188,12 +188,12 @@ impl DesignerState {
                             3 => 1, // Superior-Derecha → Inferior-Derecha
                             _ => triangle.right_angle_corner,
                         };
-                        // Invertir rotación
+                        // Invert the rotation
                         triangle.rotation = -triangle.rotation;
                     }
                 }
 
-                // Ajustar la posición del centro para que el reflejo sea alrededor del centro de selección
+                // Move the centre so the reflection is about the selection centre
                 triangle.center.x = center_x + (triangle.center.x - center_x) * sx;
                 triangle.center.y = center_y + (triangle.center.y - center_y) * sy;
 
@@ -203,7 +203,7 @@ impl DesignerState {
                     new_state: obj,
                 }));
             } else {
-                // Para otros tipos de formas, usar el scale genérico
+                // Other shape types use the generic scale
                 let mut new_obj = obj;
                 new_obj.shape.scale(sx, sy, Point::new(center_x, center_y));
 
@@ -297,8 +297,8 @@ impl DesignerState {
         }));
     }
 
-    /// Mueve los shapes seleccionados al principio del orden de mecanizado.
-    /// Devuelve `true` si se aplicó, `false` si se rechazó porque partiría un grupo.
+    /// Moves the selected shapes to the start of the machining order.
+    /// Returns `true` if applied, `false` if refused because it would split a group.
     pub fn move_selected_to_top(&mut self) -> bool {
         let Some(after) = self.canvas.move_selected_to_top() else {
             return false;

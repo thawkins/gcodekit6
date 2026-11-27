@@ -1,12 +1,11 @@
-//! Moving a feed or spindle override to an exact percentage (GTK's "Set %").
+//! Moving a feed or spindle override to an exact percentage (the "Set %" button).
 //!
 //! GRBL has no "set override to N %" command, only one-byte steps (reset to 100 %, +/-10 %,
 //! +/-1 %), and it may merge identical bytes that arrive back to back. So a target is
 //! reached one step at a time: a step is sent only once the controller's `Ov:` report shows
 //! that the previous one took effect (the report value differs from the one before it). A
 //! step not confirmed within [`STEP_TIMEOUT`], or more than [`MAX_STEPS`] steps, ends the
-//! sequence as failed. Ported from the GTK `machine_control/overrides.rs`
-//! (`setup_override_set`); the step choice is `next_override_step` from
+//! sequence as failed. The step choice is `next_override_step` from
 //! `gcodekit5-communication`.
 //!
 //! The type does no I/O: the front end calls [`OverrideTarget::step`] with the latest

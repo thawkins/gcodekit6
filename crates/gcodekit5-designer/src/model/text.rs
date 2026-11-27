@@ -141,7 +141,7 @@ impl DesignText {
         })
     }
 
-    /// Calcula el bounding box del texto asumiendo que (x, y) es el CENTRO.
+    /// Computes the text's bounding box, taking (x, y) as the CENTRE.
     fn calculate_bounds(&self) -> (f64, f64, f64, f64) {
         let Some(layout) = self.layout() else {
             let approx_width = self.text.len() as f64 * self.font_size * 0.6;
@@ -154,13 +154,13 @@ impl DesignText {
             );
         };
 
-        // Ancho y alto reales del bloque de glifos (rusttype, Y-down).
+        // Actual width and height of the glyph block (rusttype, Y-down).
         let rel_width = layout.width;
         let rel_height = layout.height;
 
-        // Centrar el AABB real en (self.x, self.y) en coords canvas (Y-up).
-        // No importa dónde esté la baseline: el bloque de glifos (su AABB)
-        // queda centrado en el punto que el usuario controla.
+        // Centre the actual AABB on (self.x, self.y) in canvas coordinates (Y-up).
+        // Wherever the baseline is, the glyph block (its AABB)
+        // is centred on the point the user controls.
         let canvas_x_left = self.x - rel_width / 2.0;
         let canvas_y_bottom = self.y - rel_height / 2.0;
 

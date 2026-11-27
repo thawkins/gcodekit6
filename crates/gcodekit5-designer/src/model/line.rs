@@ -62,10 +62,10 @@ impl DesignLine {
         self.rotation = self.current_angle_degrees();
     }
 
-    // Obtener el rectángulo contenedor de la línea SIN aplicar rotación
-    // Este es el que se muestra en los entry de dimensiones
+    // The line's bounding rectangle WITHOUT the rotation applied
+    // This is the one shown in the dimension fields
     pub fn get_bounds_dimensions(&self) -> (f64, f64, f64, f64) {
-        // Usar coordenadas originales sin rotación
+        // Use the original, unrotated coordinates
         let min_x = self.start.x.min(self.end.x);
         let min_y = self.start.y.min(self.end.y);
         let max_x = self.start.x.max(self.end.x);
@@ -74,8 +74,8 @@ impl DesignLine {
         (min_x, min_y, max_x - min_x, max_y - min_y)
     }
 
-    // Establecer las dimensiones del rectángulo contenedor manteniendo la dirección
-    // Redimensionar la línea desde los entry de dimensiones
+    // Set the bounding rectangle's dimensions, keeping the direction
+    // Resizes the line from the dimension fields
 }
 
 impl DesignerShape for DesignLine {
@@ -113,8 +113,8 @@ impl DesignerShape for DesignLine {
     }
 
     fn bounds(&self) -> (f64, f64, f64, f64) {
-        // Para los bounds, usar las coordenadas originales SIN rotación
-        // porque la rotación ya está almacenada como propiedad
+        // The bounds use the original coordinates WITHOUT rotation,
+        // because the rotation is stored as a property
         let (x, y, width, height) = self.get_bounds_dimensions();
         (x, y, x + width, y + height)
     }
@@ -128,7 +128,7 @@ impl DesignerShape for DesignLine {
     }
 
     fn properties(&self) -> Vec<Property> {
-        // Obtener las dimensiones del rectángulo contenedor SIN rotación
+        // The bounding rectangle's dimensions WITHOUT rotation
         let (x, y, width, height) = self.get_bounds_dimensions();
 
         vec![
@@ -203,7 +203,7 @@ impl DesignerShape for DesignLine {
                 self.rotation = self.current_angle_degrees();
             }
             4 => {
-                // Centro - mover toda la línea
+                // Centre - move the whole line
                 self.translate(dx, dy);
             }
             _ => {}

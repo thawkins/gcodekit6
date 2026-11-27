@@ -20,8 +20,8 @@ pub struct DesignTriangle {
     pub rotation: f64,
     pub laser_params: LaserParams,
     #[serde(default)]
-    // Especifica la posición del vértice del ángulo recto
-    // 0: Inferior-Izquierda, 1: Inferior-Derecha, 2: Superior-Izquierda, 3: Superior-Derecha
+    // Position of the right-angle vertex
+    // 0: bottom-left, 1: bottom-right, 2: top-left, 3: top-right
     pub right_angle_corner: u8,
 }
 
@@ -48,14 +48,14 @@ impl DesignTriangle {
         }
     }
 
-    // Obtener los vértices del triángulo en espacio local (sin rotación)
+    // The triangle's vertices in local space (without rotation)
     fn get_local_vertices(&self) -> [LyonPoint; 3] {
         let abs_w = self.width.abs();
         let abs_h = self.height.abs();
         let off_x = abs_w / 2.0;
         let off_y = abs_h / 2.0;
 
-        // Los 4 puntos de las esquinas (sin rotación)
+        // The 4 corner points (without rotation)
         let corners = [
             point(-off_x as f32, -off_y as f32), // 0: Inferior-Izquierda
             point(off_x as f32, -off_y as f32),  // 1: Inferior-Derecha
@@ -76,7 +76,7 @@ impl DesignTriangle {
         [right_angle, v1, v2]
     }
 
-    // Obtener los vértices como f64
+    // The vertices as f64
     pub fn get_local_vertices_f64(&self) -> [Point; 3] {
         let lyon_vertices = self.get_local_vertices();
         [
@@ -86,11 +86,11 @@ impl DesignTriangle {
         ]
     }
 
-    // Obtener los vértices rotados y trasladados
+    // The rotated and translated vertices
     fn get_rotated_vertices(&self) -> [LyonPoint; 3] {
         let [p1, p2, p3] = self.get_local_vertices();
 
-        // Crear transformación: primero rotación, luego traslación
+        // Build the transform: rotation first, then translation
         let mut transform = Transform::identity();
         if self.rotation.abs() > 1e-6 {
             transform = transform
@@ -110,16 +110,16 @@ impl DesignTriangle {
 
     /// Scale the triangle by sx, sy around a center point
     pub fn scale(&mut self, sx: f64, sy: f64, center: Point) {
-        // Escalar las dimensiones (siempre positivas)
+        // Scale the dimensions (always positive)
         self.width *= sx.abs();
         self.height *= sy.abs();
 
-        // Escalar la posición del centro
+        // Scale the centre position
         self.center.x = center.x + (self.center.x - center.x) * sx;
         self.center.y = center.y + (self.center.y - center.y) * sy;
 
-        // Actualizar la esquina del ángulo recto si hay reflexión
-        // Reflejo en Y (sx < 0): intercambia izquierda ↔ derecha
+        // Update the right-angle corner on a reflection
+        // Reflection in Y (sx < 0): swaps left and right
         if sx < 0.0 {
             self.right_angle_corner = match self.right_angle_corner {
                 0 => 1, // Inferior-Izquierda → Inferior-Derecha
@@ -130,7 +130,7 @@ impl DesignTriangle {
             };
         }
 
-        // Reflejo en X (sy < 0): intercambia inferior ↔ superior
+        // Reflection in X (sy < 0): swaps bottom and top
         if sy < 0.0 {
             self.right_angle_corner = match self.right_angle_corner {
                 0 => 2, // Inferior-Izquierda → Superior-Izquierda
@@ -141,7 +141,7 @@ impl DesignTriangle {
             };
         }
 
-        // Invertir la rotación si hay reflejo en algún eje
+        // Invert the rotation on a reflection in either axis
         if sx < 0.0 || sy < 0.0 {
             self.rotation = -self.rotation;
         }
@@ -152,7 +152,7 @@ impl DesignerShape for DesignTriangle {
     fn render(&self) -> Path {
         let mut builder = Path::builder();
 
-        // Obtener los vértices del triángulo en espacio local
+        // The triangle's vertices in local space
         let [p1, p2, p3] = self.get_local_vertices(); // Usar get_local_vertices
 
         builder.begin(p1);
@@ -162,7 +162,7 @@ impl DesignerShape for DesignTriangle {
 
         let path = builder.build();
 
-        // Aplicar rotación y traslación
+        // Apply rotation and translation
         let mut transform = Transform::identity();
         if self.rotation.abs() > 1e-6 {
             transform = transform
@@ -177,15 +177,15 @@ impl DesignerShape for DesignTriangle {
     }
 
     fn as_csg(&self) -> Sketch<()> {
-        // Obtener los vértices del triángulo en espacio local (sin rotación ni traslación)
+        // The triangle's vertices in local space (no rotation or translation)
         let [p1, p2, p3] = self.get_local_vertices_f64(); // Usar get_local_vertices_f64
 
         let points = vec![[p1.x, p1.y], [p2.x, p2.y], [p3.x, p3.y]];
 
-        // Crear el sketch con los vértices locales
+        // Build the sketch from the local vertices
         let mut sketch: Sketch<()> = Sketch::polygon(&points, None);
 
-        // Aplicar rotación y traslación
+        // Apply rotation and translation
         let rotation = nalgebra::Matrix4::new_rotation(nalgebra::Vector3::new(
             0.0,
             0.0,
@@ -202,10 +202,10 @@ impl DesignerShape for DesignTriangle {
     }
 
     fn bounds(&self) -> (f64, f64, f64, f64) {
-        // Obtener los vértices rotados
+        // The rotated vertices
         let [p1, p2, p3] = self.get_rotated_vertices();
 
-        // Calcular los bounds a partir de los vértices rotados
+        // Compute the bounds from the rotated vertices
         let x_coords = [p1.x, p2.x, p3.x];
         let y_coords = [p1.y, p2.y, p3.y];
 
@@ -221,7 +221,7 @@ impl DesignerShape for DesignTriangle {
         let p = t.transform_point(point(self.center.x as f32, self.center.y as f32));
         self.center = Point::new(p.x as f64, p.y as f64);
 
-        // Extraer escala para cada eje
+        // Extract the scale of each axis
         let sx = (t.m11 * t.m11 + t.m12 * t.m12).sqrt() as f64;
         let sy = (t.m21 * t.m21 + t.m22 * t.m22).sqrt() as f64;
 
@@ -270,7 +270,7 @@ impl DesignerShape for DesignTriangle {
     }
 
     fn contains_point(&self, p: Point, _tolerance: f64) -> bool {
-        // Transformar punto al espacio local
+        // Transform the point into local space
         let dx = p.x - self.center.x;
         let dy = p.y - self.center.y;
         let angle = (-self.rotation).to_radians();

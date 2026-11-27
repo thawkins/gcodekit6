@@ -376,12 +376,12 @@ impl BitmapImageEngraver {
         Ok(())
     }
 
-    /// Apply Floyd-Steinberg error diffusion (Corregido con aritmética flotante)
+    /// Apply Floyd-Steinberg error diffusion in floating-point arithmetic
     fn apply_floyd_steinberg_image(image: &mut GrayImage) -> Result<()> {
         let width = image.width();
         let height = image.height();
 
-        // Trabajamos con f32 para preservar con total precisión la dispersión del error
+        // Work in f32 so the diffused error keeps its full precision
         let mut buffer: Vec<f32> = image.as_raw().iter().map(|&p| p as f32).collect();
 
         for y in 0..height {
@@ -389,13 +389,13 @@ impl BitmapImageEngraver {
                 let idx = (y * width + x) as usize;
                 let old_pixel = buffer[idx];
 
-                // Determinamos el blanco o negro puro basado en el umbral
+                // Choose pure black or white from the threshold
                 let new_pixel = if old_pixel > 127.0 { 255.0 } else { 0.0 };
 
                 buffer[idx] = new_pixel;
                 let error = old_pixel - new_pixel;
 
-                // Distribuimos el error usando coeficientes estándar de Floyd-Steinberg (f32)
+                // Diffuse the error with the standard Floyd-Steinberg weights (f32)
                 if x + 1 < width {
                     let n_idx = (y * width + (x + 1)) as usize;
                     buffer[n_idx] += error * (7.0 / 16.0);
@@ -415,7 +415,7 @@ impl BitmapImageEngraver {
             }
         }
 
-        // Copiamos de vuelta al formato u8 original de la imagen clampeando los valores
+        // Copy back into the image's u8 format, clamping the values
         for (i, &val) in buffer.iter().enumerate() {
             let x = (i as u32) % width;
             let y = (i as u32) / width;
@@ -424,7 +424,7 @@ impl BitmapImageEngraver {
         Ok(())
     }
 
-    /// Apply Atkinson error diffusion (Corregido con aritmética flotante)
+    /// Apply Atkinson error diffusion in floating-point arithmetic
     fn apply_atkinson_image(image: &mut GrayImage) -> Result<()> {
         let width = image.width();
         let height = image.height();
@@ -440,7 +440,7 @@ impl BitmapImageEngraver {
                 buffer[idx] = new_pixel;
                 let error = old_pixel - new_pixel;
 
-                // Atkinson distribuye exactamente 1/8 del error a 6 vecinos específicos
+                // Atkinson gives exactly 1/8 of the error to each of 6 fixed neighbours
                 let neighbors = [(1, 0), (2, 0), (-1, 1), (0, 1), (1, 1), (0, 2)];
 
                 for (dx, dy) in neighbors {

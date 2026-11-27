@@ -208,7 +208,7 @@ impl DesignerState {
         self.push_command(cmd);
     }
 
-    /// Duplicates the selected shapes `offset` mm right and up (GTK's Ctrl+D: 10 mm) as one
+    /// Duplicates the selected shapes `offset` mm right and up (Ctrl+D uses 10 mm) as one
     /// undo step: the copies get new ids and their own group ids, and become the selection.
     /// The originals are left as they are. Does nothing without a selection.
     ///

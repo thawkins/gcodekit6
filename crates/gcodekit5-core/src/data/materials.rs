@@ -148,7 +148,7 @@ pub enum CoolantType {
 /// Cutting parameters for a specific material and tool combination.
 ///
 /// Recommended operating ranges that vary by workpiece material. All linear
-/// values are in mm, rates in mm/min. These are starting points — adjust
+/// values are in mm, rates in mm/min. These are starting points; adjust
 /// based on actual cutting conditions.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CuttingParameters {
@@ -344,13 +344,13 @@ pub struct Material {
     pub description: String,
 
     // Physical properties
-    /// Density in kg/m³
+    /// Density in kg/m^3
     pub density: f32,
     /// Machinability rating (1-10, higher is easier)
     pub machinability_rating: u8,
     /// Tensile strength in MPa (optional)
     pub tensile_strength: Option<f32>,
-    /// Melting point or glass transition temperature in °C (optional)
+    /// Melting point or glass transition temperature in deg C (optional)
     pub melting_point: Option<f32>,
     /// Brinell hardness (HB) - for SFM adjustment calculations
     #[serde(default)]
@@ -358,10 +358,10 @@ pub struct Material {
     /// Rockwell hardness C scale (HRC) - for hardened materials
     #[serde(default)]
     pub rockwell_hardness: Option<f32>,
-    /// Thermal conductivity in W/(m·K) - for heat dissipation calculations
+    /// Thermal conductivity in W/(m*K) - for heat dissipation calculations
     #[serde(default)]
     pub thermal_conductivity: Option<f32>,
-    /// Specific cutting force (Kc) in N/mm² - for power calculations
+    /// Specific cutting force (Kc) in N/mm^2 - for power calculations
     #[serde(default)]
     pub specific_cutting_force: Option<f32>,
     // Machining characteristics
@@ -459,7 +459,7 @@ impl Material {
         self
     }
 
-    /// Builder method to set density in kg/m³.
+    /// Builder method to set density in kg/m^3.
     pub fn with_density(mut self, density: f32) -> Self {
         self.density = density;
         self
@@ -477,7 +477,7 @@ impl Material {
         self
     }
 
-    /// Builder method to set melting point in °C.
+    /// Builder method to set melting point in deg C.
     pub fn with_melting_point(mut self, temp: f32) -> Self {
         self.melting_point = Some(temp);
         self
@@ -495,13 +495,13 @@ impl Material {
         self
     }
 
-    /// Builder method to set thermal conductivity in W/(m·K).
+    /// Builder method to set thermal conductivity in W/(m*K).
     pub fn with_thermal_conductivity(mut self, conductivity: f32) -> Self {
         self.thermal_conductivity = Some(conductivity);
         self
     }
 
-    /// Builder method to set specific cutting force (Kc) in N/mm².
+    /// Builder method to set specific cutting force (Kc) in N/mm^2.
     pub fn with_specific_cutting_force(mut self, kc: f32) -> Self {
         self.specific_cutting_force = Some(kc);
         self
@@ -567,7 +567,7 @@ impl Material {
     }
 }
 
-/// Materials library — manages a collection of materials.
+/// Materials library: manages a collection of materials.
 ///
 /// Provides add, remove, and lookup operations for materials.
 /// Standard materials are loaded via [`init_standard_library`].

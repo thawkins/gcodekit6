@@ -1,7 +1,7 @@
 //! Step-by-step sequencing of GRBL feed and spindle overrides.
 //!
 //! GRBL 1.1 has no "set override to N%" command. Overrides are changed with
-//! realtime bytes (reset to 100%, ±10%, ±1%), and GRBL records each request as
+//! realtime bytes (reset to 100%, +/-10%, +/-1%), and GRBL records each request as
 //! a pending flag rather than in a counted queue. Several identical bytes sent
 //! back-to-back before the controller's protocol loop runs therefore collapse
 //! into a single adjustment.
@@ -31,7 +31,7 @@ pub struct OverrideStepCodes {
     pub minus_1: u8,
 }
 
-/// Feed override realtime bytes (GRBL 1.1: 0x90–0x94).
+/// Feed override realtime bytes (GRBL 1.1: 0x90-0x94).
 pub const FEED_OVERRIDE_CODES: OverrideStepCodes = OverrideStepCodes {
     reset: 0x90,
     plus_10: 0x91,
@@ -40,7 +40,7 @@ pub const FEED_OVERRIDE_CODES: OverrideStepCodes = OverrideStepCodes {
     minus_1: 0x94,
 };
 
-/// Spindle override realtime bytes (GRBL 1.1: 0x99–0x9D).
+/// Spindle override realtime bytes (GRBL 1.1: 0x99-0x9D).
 pub const SPINDLE_OVERRIDE_CODES: OverrideStepCodes = OverrideStepCodes {
     reset: 0x99,
     plus_10: 0x9A,
@@ -49,7 +49,7 @@ pub const SPINDLE_OVERRIDE_CODES: OverrideStepCodes = OverrideStepCodes {
     minus_1: 0x9D,
 };
 
-/// Number of ±10/±1 steps needed to move an override by `delta` percent.
+/// Number of +/-10 or +/-1 steps needed to move an override by `delta` percent.
 fn step_count(delta: i32) -> u32 {
     let magnitude = delta.unsigned_abs();
     magnitude / 10 + magnitude % 10
@@ -63,14 +63,14 @@ pub fn is_valid_override_target(percent: u16) -> bool {
 /// Chooses the next single realtime byte that moves an override toward `target`.
 ///
 /// The choice is based on `current`, the value the controller last reported in
-/// its `Ov:` field. It uses ±10% steps while at least 10% away and ±1% steps
+/// its `Ov:` field. It uses +/-10% steps while at least 10% away and +/-1% steps
 /// after that, and starts with a reset to 100% when that needs fewer steps
 /// overall. Steps never overshoot the target, so GRBL's clamping at 10% and
 /// 200% never comes into play.
 ///
 /// # Arguments
 /// * `current` - Override percentage last reported by the controller.
-/// * `target` - Desired override percentage (10–200).
+/// * `target` - Desired override percentage (10-200).
 /// * `codes` - The realtime bytes for the override being adjusted.
 ///
 /// # Returns
@@ -97,7 +97,7 @@ pub fn next_override_step(current: u16, target: u16, codes: OverrideStepCodes) -
 /// Applies the effect of `byte` to `current`, mirroring GRBL's own arithmetic.
 ///
 /// This is used to predict the value after a step (for example in tests, or to
-/// show progress) and clamps to GRBL's 10–200% range.
+/// show progress) and clamps to GRBL's 10-200% range.
 ///
 /// # Arguments
 /// * `current` - Override percentage before the step.

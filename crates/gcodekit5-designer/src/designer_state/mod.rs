@@ -169,11 +169,11 @@ impl DesignerState {
     }
 
     pub fn set_feed_rate(&mut self, rate: f64) {
-        // Si es inválido, usa un valor por defecto
+        // If invalid, use a default value
         let valid_rate = if rate.is_finite() && rate > 0.0 {
             rate
         } else {
-            // Valor por defecto seguro
+            // Safe default value
             1.0
         };
 
@@ -213,10 +213,10 @@ impl DesignerState {
     /// Sets the step-down for toolpath generation.
     pub fn set_step_down(&mut self, step: f64) {
         let step = if self.machine_mode() == MachineMode::Laser2D {
-            // En modo láser: el valor es el número de pasadas (1-10)
+            // In laser mode: the value is the number of passes (1-10)
             step.round().clamp(1.0, 10.0)
         } else {
-            // En modo CNC: profundidad de pasada en mm
+            // In CNC mode: the pass depth in mm
             if step <= 0.0 { 0.1 } else { step }
         };
         debug_assert!(

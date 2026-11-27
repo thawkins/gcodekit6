@@ -1,5 +1,5 @@
-//! The Materials manager's rules, shared by the GTK and egui windows: the edit form (every
-//! field GTK's Basic Info, Properties, Machining, Safety and Notes tabs edit) with its
+//! The Materials manager's rules: the edit form (every field of its
+//! Basic Info, Properties, Machining, Safety and Notes tabs) with its
 //! validation and messages, the list's search and category filter, and the list order.
 //!
 //! Error and label strings are English msgids for the caller to translate.
@@ -11,7 +11,7 @@ use gcodekit5_core::data::materials::{
     SurfaceFinishability,
 };
 
-/// The categories in GTK's order (also the list's sort order).
+/// The categories in display order (also the list's sort order).
 pub const CATEGORIES: [MaterialCategory; 7] = [
     MaterialCategory::Wood,
     MaterialCategory::EngineeredWood,
@@ -22,7 +22,7 @@ pub const CATEGORIES: [MaterialCategory; 7] = [
     MaterialCategory::StoneAndCeramic,
 ];
 
-/// The chip types in GTK's order.
+/// The chip types, in display order.
 pub const CHIP_TYPES: [ChipType; 4] = [
     ChipType::Continuous,
     ChipType::Segmented,
@@ -30,21 +30,21 @@ pub const CHIP_TYPES: [ChipType; 4] = [
     ChipType::Small,
 ];
 
-/// The heat sensitivities in GTK's order.
+/// The heat sensitivities, in display order.
 pub const HEAT_SENSITIVITIES: [HeatSensitivity; 3] = [
     HeatSensitivity::Low,
     HeatSensitivity::Moderate,
     HeatSensitivity::High,
 ];
 
-/// The abrasiveness levels in GTK's order.
+/// The abrasiveness levels, in display order.
 pub const ABRASIVENESS: [Abrasiveness; 3] = [
     Abrasiveness::Low,
     Abrasiveness::Moderate,
     Abrasiveness::High,
 ];
 
-/// The surface finishes in GTK's order.
+/// The surface finishes, in display order.
 pub const SURFACE_FINISHES: [SurfaceFinishability; 4] = [
     SurfaceFinishability::Excellent,
     SurfaceFinishability::Good,
@@ -52,7 +52,7 @@ pub const SURFACE_FINISHES: [SurfaceFinishability; 4] = [
     SurfaceFinishability::Rough,
 ];
 
-/// The hazard levels in GTK's order.
+/// The hazard levels, in display order.
 pub const HAZARD_LEVELS: [HazardLevel; 4] = [
     HazardLevel::None,
     HazardLevel::Minimal,
@@ -60,10 +60,10 @@ pub const HAZARD_LEVELS: [HazardLevel; 4] = [
     HazardLevel::High,
 ];
 
-/// The density range GTK's spin button allows (kg/m3).
+/// The density range the form allows (kg/m3).
 pub const DENSITY_RANGE: std::ops::RangeInclusive<f32> = 0.0..=20000.0;
 
-/// The machinability range GTK's spin button allows.
+/// The machinability range the form allows.
 pub const MACHINABILITY_RANGE: std::ops::RangeInclusive<u8> = 1..=10;
 
 /// The msgid of a category's name.
@@ -127,7 +127,7 @@ pub fn hazard_level_label(level: HazardLevel) -> &'static str {
     }
 }
 
-/// The edit form: every field GTK's five tabs edit.
+/// The edit form: every field of its five tabs.
 #[derive(Debug, Clone, PartialEq)]
 pub struct MaterialForm {
     /// The id (only editable for a new material).
@@ -167,7 +167,7 @@ pub struct MaterialForm {
 }
 
 impl Default for MaterialForm {
-    /// GTK's form for a new material (`clear_form`).
+    /// The form for a new material.
     fn default() -> Self {
         Self {
             id: String::new(),
@@ -208,7 +208,7 @@ fn optional(text: &str, error: &'static str) -> Result<Option<f32>, &'static str
 }
 
 impl MaterialForm {
-    /// The form showing `material` (GTK's `write_form`).
+    /// The form showing `material`.
     ///
     /// # Arguments
     /// * `material` - The material to edit.
@@ -240,7 +240,7 @@ impl MaterialForm {
         }
     }
 
-    /// The material the form describes (GTK's `read_form`), marked custom so it is saved.
+    /// The material the form describes, marked custom so it is saved.
     ///
     /// Fields the form does not edit (hardness, conductivity, cutting force, PPE, cutting
     /// parameters) are kept from `base`, the material being edited.
@@ -308,7 +308,7 @@ impl MaterialForm {
     }
 }
 
-/// The list's search text and category filter (GTK's sidebar).
+/// The list's search text and category filter (the sidebar).
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct MaterialFilter {
     /// Matches the name or subcategory, ignoring case.
@@ -330,7 +330,7 @@ impl MaterialFilter {
         found && self.category.is_none_or(|c| c == material.category)
     }
 
-    /// The materials listed, by category (GTK's order) then name.
+    /// The materials listed, by category (display order) then name.
     ///
     /// # Arguments
     /// * `materials` - Every material.

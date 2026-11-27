@@ -15,7 +15,7 @@
 //!
 //! On a Repetier connection ([`MachineController::connect_with`] with
 //! [`ControllerProtocol::Repetier`](gcodekit5_communication::firmware::ControllerProtocol::Repetier)) the worker speaks Repetier's flow-control protocol
-//! instead, as the GTK front end's `RepetierSender` did: every line is numbered and
+//! instead: every line is numbered and
 //! checksummed by `gcodekit5-communication`'s [`RepetierProcessor`](gcodekit5_communication::firmware::repetier::RepetierProcessor), one command is in flight
 //! at a time, a `Resend:N` replays the numbered lines from `N`, and no GRBL real-time byte or
 //! `$` command is ever written. The emergency stop is `M112`.

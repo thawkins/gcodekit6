@@ -19,7 +19,7 @@
 //!
 //! ## Design notes
 //!
-//! - All data is `&'static` → zero runtime allocation, zero lookup cost.
+//! - All data is `&'static`: zero runtime allocation, zero lookup cost.
 //! - Unknown protocols fall back to [`FALLBACK_PROFILE`].
 //! - Adding a new protocol is a one-entry change.
 
@@ -78,7 +78,7 @@ pub struct ProtocolProfile {
 /// The full registry. Add new protocols by inserting an entry here.
 ///
 pub const PROTOCOLS: &[ProtocolProfile] = &[
-    // ─── Repetier ───
+    // --- Repetier ---
     ProtocolProfile {
         id: "Repetier",
         display_name: "Repetier",
@@ -87,7 +87,7 @@ pub const PROTOCOLS: &[ProtocolProfile] = &[
         init_commands: &["M110", "M115"],
         detection_signatures: &["Free RAM", "FIRMWARE_NAME:Repetier", "Repetier", "Resend:"],
     },
-    // ─── grblHAL ───
+    // --- grblHAL ---
     ProtocolProfile {
         id: "grblHAL",
         display_name: "grblHAL",
@@ -96,7 +96,7 @@ pub const PROTOCOLS: &[ProtocolProfile] = &[
         init_commands: &["$I", "$$"],
         detection_signatures: &["grblHAL", "[FIRMWARE:grblHAL]"],
     },
-    // ─── FluidNC ───
+    // --- FluidNC ---
     ProtocolProfile {
         id: "FluidNC",
         display_name: "FluidNC",
@@ -105,7 +105,7 @@ pub const PROTOCOLS: &[ProtocolProfile] = &[
         init_commands: &["$I", "$$"],
         detection_signatures: &["FluidNC"],
     },
-    // ─── GRBL ───
+    // --- GRBL ---
     ProtocolProfile {
         id: "GRBL",
         display_name: "GRBL",
@@ -114,9 +114,9 @@ pub const PROTOCOLS: &[ProtocolProfile] = &[
         init_commands: &["$I", "$$"],
         detection_signatures: &["Grbl"],
     },
-    // ──────────────────────────
+    // --------------------------
     // Protocols not implemented
-    // ──────────────────────────
+    // --------------------------
     ProtocolProfile {
         id: "TinyG",
         display_name: "TinyG",

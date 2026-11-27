@@ -2,7 +2,7 @@
 //!
 //! Application configuration ([`Config`]), loading and saving it through the
 //! craft-settings store ([`SettingsManager`]), and the one-time import of the
-//! GTK build's settings ([`migrate`]).
+//! legacy settings ([`migrate`]).
 #![deny(unsafe_code)]
 
 pub mod config;

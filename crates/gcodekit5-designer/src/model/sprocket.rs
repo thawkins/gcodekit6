@@ -39,10 +39,10 @@ impl DesignSprocket {
         }
     }
 
-    /// Devuelve el diámetro de rodillo estándar para un paso dado (en mm)
-    /// Basado en norma ANSI/ISO para cadenas de rodillos
+    /// Returns the standard roller diameter for a given pitch (in mm)
+    /// Based on the ANSI/ISO roller chain standard
     pub fn standard_roller_diameter(pitch_mm: f64) -> f64 {
-        // Tolerancia pequeña para comparar con floats
+        // Small tolerance for comparing floats
         const EPS: f64 = 0.01;
 
         match pitch_mm {

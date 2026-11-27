@@ -249,7 +249,7 @@ impl ShapeStore {
         &self.draw_order
     }
 
-    /// Devuelve los IDs seleccionados, en el orden actual de `draw_order`.
+    /// Returns the selected IDs, in the current `draw_order` order.
     fn selected_ids_in_order(&self) -> Vec<u64> {
         self.draw_order
             .iter()
@@ -258,14 +258,14 @@ impl ShapeStore {
             .collect()
     }
 
-    /// Devuelve los IDs seleccionados (en orden de `draw_order`).
+    /// Returns the selected IDs (in `draw_order` order).
     pub fn selected_ids(&self) -> Vec<u64> {
         self.selected_ids_in_order()
     }
 
-    /// Comprueba si mover `id` a `target_idx` dejaría algún grupo partido
-    /// (con miembros en posiciones no contiguas del `draw_order`).
-    /// No modifica el estado.
+    /// Checks whether moving `id` to `target_idx` would split a group
+    /// (leave its members at non-contiguous `draw_order` positions).
+    /// Does not change the state.
     pub fn would_split_group(&self, id: u64, target_idx: usize) -> bool {
         if !self.shapes.contains_key(&id) {
             return false;
@@ -281,12 +281,12 @@ impl ShapeStore {
         self.has_split_group_in(&new_order)
     }
 
-    /// Comprueba si el `draw_order` dado deja algún grupo partido.
+    /// Checks whether the given `draw_order` splits a group.
     pub fn would_split_group_with_order(&self, new_order: &[u64]) -> bool {
         self.has_split_group_in(new_order)
     }
 
-    /// Devuelve true si hay algún grupo con miembros en posiciones no contiguas.
+    /// Returns true if a group has members at non-contiguous positions.
     fn has_split_group_in(&self, order: &[u64]) -> bool {
         let mut groups: std::collections::HashMap<u64, Vec<usize>> =
             std::collections::HashMap::new();
@@ -306,7 +306,7 @@ impl ShapeStore {
         )
     }
 
-    /// Reemplaza el `draw_order` por el dado. No comprueba nada.
+    /// Replaces the `draw_order` with the given one. Checks nothing.
     pub fn apply_order(&mut self, new_order: Vec<u64>) {
         self.draw_order = new_order;
     }

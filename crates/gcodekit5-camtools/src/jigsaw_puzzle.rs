@@ -254,7 +254,7 @@ impl JigsawPuzzleMaker {
             let y_start = row as f32 * piece_height;
             let flip = self.rbool();
 
-            // Draw tab using Draradech's Bézier algorithm
+            // Draw tab using Draradech's Bezier algorithm
             // Save current position
             let start_y = path.last().map(|p| p.y).unwrap_or(0.0);
 
@@ -283,7 +283,7 @@ impl JigsawPuzzleMaker {
             let x_start = col as f32 * piece_width;
             let flip = self.rbool();
 
-            // Draw tab using Draradech's Bézier algorithm
+            // Draw tab using Draradech's Bezier algorithm
             let start_x = path.last().map(|p| p.x).unwrap_or(0.0);
 
             let mut tab_path = Vec::new();
@@ -307,7 +307,7 @@ impl JigsawPuzzleMaker {
         piece_width: f32,
         flip: bool,
     ) {
-        // Draradech algorithm: Uses Bézier curves with random jitter
+        // Draradech algorithm: Uses Bezier curves with random jitter
         // t = tab size (as fraction), j = jitter, a-e = random values
         let t = self.params.tab_size_percent / 200.0; // Divide by 200 to get fraction of piece
         let j = self.params.jitter_percent / 100.0;
@@ -326,7 +326,7 @@ impl JigsawPuzzleMaker {
         let w = |v: f32| x + piece_width * v * sign;
 
         // 10 control points using Draradech's algorithm (p0-p9)
-        // These create 3 cubic Bézier curves
+        // These create 3 cubic Bezier curves
         let p0 = Point::new(w(0.0), l(0.0));
         let p1 = Point::new(w(a), l(0.2));
         let p2 = Point::new(w(-t + c), l(0.5 + b + d));
@@ -338,24 +338,24 @@ impl JigsawPuzzleMaker {
         let p8 = Point::new(w(e), l(0.8));
         let p9 = Point::new(w(0.0), l(1.0));
 
-        // Approximate cubic Bézier curves with line segments
+        // Approximate cubic Bezier curves with line segments
         let steps = 10;
 
-        // First cubic Bézier: p0-p1-p2-p3
+        // First cubic Bezier: p0-p1-p2-p3
         for i in 1..=steps {
             let t_val = i as f32 / steps as f32;
             let point = Self::cubic_bezier(p0.clone(), p1.clone(), p2.clone(), p3.clone(), t_val);
             path.push(point);
         }
 
-        // Second cubic Bézier: p3-p4-p5-p6
+        // Second cubic Bezier: p3-p4-p5-p6
         for i in 1..=steps {
             let t_val = i as f32 / steps as f32;
             let point = Self::cubic_bezier(p3.clone(), p4.clone(), p5.clone(), p6.clone(), t_val);
             path.push(point);
         }
 
-        // Third cubic Bézier: p6-p7-p8-p9
+        // Third cubic Bezier: p6-p7-p8-p9
         for i in 1..=steps {
             let t_val = i as f32 / steps as f32;
             let point = Self::cubic_bezier(p6.clone(), p7.clone(), p8.clone(), p9.clone(), t_val);
@@ -420,7 +420,7 @@ impl JigsawPuzzleMaker {
     }
 
     fn cubic_bezier(p0: Point, p1: Point, p2: Point, p3: Point, t: f32) -> Point {
-        // Cubic Bézier curve formula: B(t) = (1-t)³P0 + 3(1-t)²tP1 + 3(1-t)t²P2 + t³P3
+        // Cubic Bezier curve formula: B(t) = (1-t)^3 P0 + 3(1-t)^2 t P1 + 3(1-t) t^2 P2 + t^3 P3
         let t2 = t * t;
         let t3 = t2 * t;
         let mt = 1.0 - t;

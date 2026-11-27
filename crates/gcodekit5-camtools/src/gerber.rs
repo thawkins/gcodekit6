@@ -94,7 +94,7 @@ pub struct GerberParameters {
     /// Board Outline layer only: the most Z each pass of the outline cut goes down (mm,
     /// positive). The outline is cut in passes from the surface to `cut_depth`; the default
     /// cuts thin stock (down to 0.5 mm) in a single pass. Left out of a preset file when it
-    /// is the default, so presets without it (GTK's) load and round-trip unchanged.
+    /// is the default, so older presets without it load and round-trip unchanged.
     #[serde(
         default = "default_outline_step_down",
         skip_serializing_if = "is_default_outline_step_down"

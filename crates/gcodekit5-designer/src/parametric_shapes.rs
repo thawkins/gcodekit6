@@ -183,7 +183,7 @@ pub fn generate_sprocket(
         // Instead of one point, we created two points on either side of the center of the tooth
         let flat_width = 0.05; // Adjust this value for a wider or narrower ridge
 
-        // Punto 1 de la cresta (antes del centro)
+        // Ridge point 1 (before the centre)
         let tip_1 = angle + angle_per_tooth * (0.5 - flat_width);
         points.push(Point::new(
             center.x + outer_radius * tip_1.cos(),
@@ -228,10 +228,10 @@ pub fn generate_timing_pulley(
 ) -> Path {
     let mut builder = Path::builder();
 
-    // Parámetros de la correa XL
+    // XL belt parameters
     let tooth_height = 1.27; // mm
 
-    // Corrección del radio: En poleas síncronas el radio primitivo se basa en el paso perimetral
+    // Radius: on timing pulleys the pitch radius comes from the circular pitch
     let pitch_radius = (pitch * teeth as f64) / (2.0 * PI);
     let outer_radius = pitch_radius;
     let root_radius = outer_radius - tooth_height;
@@ -242,28 +242,28 @@ pub fn generate_timing_pulley(
     for i in 0..teeth {
         let base_angle = i as f64 * angle_per_tooth;
 
-        // 1. Fondo izquierdo del diente (Punto más bajo antes de subir)
+        // 1. Left root of the tooth (lowest point before rising)
         let valley_left = base_angle - angle_per_tooth * 0.25;
         points.push(Point::new(
             center.x + root_radius * valley_left.cos(),
             center.y + root_radius * valley_left.sin(),
         ));
 
-        // 2. Flanco izquierdo del diente (Sube hacia la cresta)
+        // 2. Left flank of the tooth (rises to the crest)
         let tooth_left = base_angle - angle_per_tooth * 0.15;
         points.push(Point::new(
             center.x + outer_radius * tooth_left.cos(),
             center.y + outer_radius * tooth_left.sin(),
         ));
 
-        // 3. Flanco derecho del diente (Mantiene la cresta antes de bajar)
+        // 3. Right flank of the tooth (holds the crest before falling)
         let tooth_right = base_angle + angle_per_tooth * 0.15;
         points.push(Point::new(
             center.x + outer_radius * tooth_right.cos(),
             center.y + outer_radius * tooth_right.sin(),
         ));
 
-        // 4. Fondo derecho del diente (Baja hacia el siguiente valle)
+        // 4. Right root of the tooth (falls to the next valley)
         let valley_right = base_angle + angle_per_tooth * 0.25;
         points.push(Point::new(
             center.x + root_radius * valley_right.cos(),

@@ -4,7 +4,7 @@ use super::toolpath::{Toolpath, ToolpathSegment, ToolpathSegmentType};
 use crate::geometry::point_segment_distance;
 use crate::model::Point;
 
-/// Límites de la máquina para verificación
+/// Machine limits for verification
 #[derive(Debug, Clone)]
 pub struct MachineLimits {
     pub x_min: f64,
@@ -133,7 +133,7 @@ impl ToolpathToGcode {
         gcode
     }
 
-    /// Optimiza un toolpath completo para láser (une colineales Y simplifica curvas)
+    /// Optimizes a whole toolpath for the laser (merges collinear moves and simplifies curves)
     pub fn optimize_toolpath_for_laser(&self, toolpath: &Toolpath) -> Toolpath {
         if toolpath.segments.is_empty() {
             return toolpath.clone();
@@ -299,7 +299,7 @@ impl ToolpathToGcode {
         (value * 1000.0).round() / 1000.0
     }
 
-    /// Helper para obtener prefijo de línea
+    /// Helper that returns the line prefix
     fn get_line_prefix(&self, line_number: u32) -> String {
         if self.line_numbers_enabled {
             format!("N{} ", line_number)

@@ -115,8 +115,7 @@ pub(super) struct Halt {
     pub(super) stale_reports: usize,
 }
 
-/// The Repetier side of a worker on a Repetier connection: one command in flight at a time,
-/// as GTK's `RepetierSender` streamed.
+/// The Repetier side of a worker on a Repetier connection: one command in flight at a time.
 pub(super) struct RepetierLink {
     /// Numbers and checksums the lines written, keeps them for resends, frames the replies and
     /// stands in a GRBL-style status report for the position readout.
@@ -134,7 +133,7 @@ pub(super) struct RepetierLink {
     /// Pen mode ([`MachineController::set_pen_mode`](super::MachineController::set_pen_mode)), read per program line.
     pub(super) pen_mode: Arc<AtomicBool>,
     /// In pen mode, whether the pen is up; down at the start of each program, so its first
-    /// `M5` lifts it, as GTK's `apply_pen_mode` started.
+    /// `M5` lifts it.
     pub(super) pen_up: bool,
 }
 

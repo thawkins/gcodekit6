@@ -93,7 +93,7 @@ impl From<PersistedTool> for Tool {
     }
 }
 
-/// The file, in the settings folder of the GTK build, that holds the custom tools.
+/// The file, in the settings folder, that holds the custom tools.
 pub const TOOLS_FILE: &str = "custom_tools.json";
 
 /// The tool library (the standard tools plus the user's custom tools) and the file the
@@ -132,8 +132,8 @@ impl ToolsManagerBackend {
         Self { library, file }
     }
 
-    /// The custom tools file both builds use: `custom_tools.json` in the GTK build's
-    /// settings folder ([`gcodekit5_settings::SettingsManager::config_directory`]), or in
+    /// The custom tools file: `custom_tools.json` in the settings folder
+    /// ([`gcodekit5_settings::SettingsManager::config_directory`]), or in
     /// `~/gcodekit5` on a platform without a configuration folder.
     pub fn default_storage_path() -> PathBuf {
         storage_dir().join(TOOLS_FILE)
@@ -315,7 +315,7 @@ impl Default for ToolsManagerBackend {
     }
 }
 
-/// The GTK build's settings folder, or `~/gcodekit5` without a platform config folder.
+/// The settings folder, or `~/gcodekit5` without a platform config folder.
 pub(crate) fn storage_dir() -> PathBuf {
     gcodekit5_settings::SettingsManager::config_directory()
         .ok()

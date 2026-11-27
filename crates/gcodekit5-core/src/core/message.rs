@@ -8,7 +8,7 @@
 
 /// Message severity level.
 ///
-/// Ordered from least to most severe. Used to filter messages — setting a
+/// Ordered from least to most severe. Used to filter messages: setting a
 /// minimum level of `Warning` suppresses `Verbose` and `Info` messages.
 ///
 /// # Example

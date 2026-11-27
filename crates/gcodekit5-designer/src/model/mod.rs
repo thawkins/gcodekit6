@@ -575,12 +575,12 @@ pub fn rotate_point(p: Point, center: Point, angle_deg: f64) -> Point {
 }
 
 /// Applies the linear part of `t` to a parametric shape whose rendered geometry is
-/// `R(rotation) · F · base` about its centre, where `F` is a reflection across the
+/// `R(rotation) * F * base` about its centre, where `F` is a reflection across the
 /// vertical axis when `mirrored` is set.
 ///
 /// A rotation is folded into `rotation`; a reflection (negative determinant) toggles
 /// `mirrored` and adjusts `rotation` so the rendered geometry equals `t` applied to
-/// the old geometry, rather than approximating the mirror with a 180° turn.
+/// the old geometry, rather than approximating the mirror with a 180 degree turn.
 ///
 /// # Arguments
 /// * `t` - The transform being applied.
@@ -597,7 +597,7 @@ pub(crate) fn apply_linear_transform_to_parametric(
     let (m11, m12, m21, m22) = (t.m11 as f64, t.m12 as f64, t.m21 as f64, t.m22 as f64);
     let det = m11 * m22 - m12 * m21;
     if det < 0.0 {
-        // t = R(phi) · F, and F · R(rot) = R(-rot) · F, so the new rotation is
+        // t = R(phi) * F, and F * R(rot) = R(-rot) * F, so the new rotation is
         // phi - rot and the reflection toggles.
         let phi = (-m12).atan2(-m11).to_degrees();
         *rotation = normalize_degrees(phi - *rotation);
@@ -620,7 +620,7 @@ fn normalize_degrees(angle: f64) -> f64 {
     if a.abs() < 1e-9 { 0.0 } else { a }
 }
 
-/// Builds the render transform `R(rotation) · F` about `center` for a parametric
+/// Builds the render transform `R(rotation) * F` about `center` for a parametric
 /// shape, where `F` mirrors across the vertical axis through `center` when
 /// `mirrored` is set. Returns `None` when the transform is the identity.
 pub(crate) fn parametric_render_transform(

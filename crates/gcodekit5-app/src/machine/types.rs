@@ -278,13 +278,13 @@ pub enum MachineEvent {
     },
     /// A manual command line (`$H`, `$X`, an MDI line, a `$J` jog) or a real-time command
     /// (shown as its label, e.g. `0x18 (Reset)`) was written to the controller. Program
-    /// lines of a stream are not reported (as in the GTK console, which did not echo them).
+    /// lines of a stream are not reported (the console does not echo them).
     Sent(String),
     /// An error from the controller or the transport.
     Error(String),
     /// The controller identified itself as another firmware than the connection was opened
-    /// for (the active device profile's), so the worker closed the connection, as the GTK
-    /// front end rejected it. [`MachineEvent::Disconnected`] follows.
+    /// for (the active device profile's), so the worker closed the connection.
+    /// [`MachineEvent::Disconnected`] follows.
     ProtocolMismatch {
         /// The protocol the connection was opened for.
         configured: ControllerProtocol,

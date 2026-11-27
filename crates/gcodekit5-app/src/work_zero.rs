@@ -2,8 +2,7 @@
 //! the current position as its zero (`G10 L20`) and move to work zero, and the reading of
 //! the active system from the controller's parser state (GRBL's `[GC:...]` reply to `$G`).
 //!
-//! Plain functions without I/O, shared by the front ends; ported from the GTK
-//! `machine_control` view, which built these lines inline.
+//! Plain functions without I/O, used by the Machine Control panel.
 //!
 //! Dependencies: `gcodekit5-devicedb` (controller type), [`crate::machine::Axis`].
 
@@ -15,7 +14,7 @@ use crate::machine::Axis;
 /// The line that asks GRBL for its G-code parser state; it answers `[GC:...]`, then `ok`.
 pub const PARSER_STATE_QUERY: &str = "$G";
 
-/// How the work zero commands work on a controller type, as the GTK front end sent them
+/// How the work zero commands work on a controller type
 /// (`G10 L20 P<n>` for Zero, `G54`-`G59` for the selector, `G90 G0 X0 Y0` for Go to Work Zero,
 /// whatever the firmware) where the firmware takes them.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -24,7 +23,7 @@ pub enum WorkZeroSupport {
     #[default]
     Reported,
     /// Smoothieware: `G10 L20 P<n>` and G54-G59 work, but there is no `$G`; the active system
-    /// is the last one selected (G54 at first), as GTK tracked it.
+    /// is the last one selected (G54 at first).
     Selected,
     /// Repetier: no work coordinate systems; Zero's `G10 L20` is sent as `G92` (the connection
     /// translates it), and the selector is unavailable.
@@ -145,7 +144,7 @@ pub fn zero_axes_command(wcs: Wcs, axes: &[Axis]) -> String {
 
 /// The line that sets the rotary `axis` of `wcs` so its current position reads
 /// `calibration_deg` (Preferences > Machine > rotary calibration; 0 for a plain zero):
-/// `G10 L20 P2 A12.5`, as GTK's A/B/C Zero buttons send it. The value is rounded to 3
+/// `G10 L20 P2 A12.5`, as the A/B/C Zero buttons send it. The value is rounded to 3
 /// decimals, with trailing zeros dropped (`0.30000000000000004` is sent as `0.3`).
 ///
 /// # Arguments

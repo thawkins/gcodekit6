@@ -143,11 +143,11 @@ impl DesignPath {
     pub fn from_svg_path(d: &str) -> Option<Self> {
         // Build the Lyon path directly from the SVG data
         if let Some(lyon_path) = Self::build_lyon_path_from_svg_data(d) {
-            // from_lyon_path ya construye el sketch y el original_path correctamente
+            // from_lyon_path already builds the sketch and original_path correctly
             return Some(Self::from_lyon_path(&lyon_path));
         }
 
-        // Fallback: usar Sketch::from_svg
+        // Fallback: use Sketch::from_svg
         let svg = format!(
             r#"<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="1000" viewBox="0 0 1000 1000"><path d="{}"/></svg>"#,
             d

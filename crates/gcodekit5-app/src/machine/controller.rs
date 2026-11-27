@@ -208,8 +208,8 @@ impl MachineController {
         Ok(())
     }
 
-    /// Turns Repetier pen mode on or off (the active device profile's Pen Mode), as GTK's
-    /// `RepetierSender` applied it: on a Repetier connection, a program streamed from then on
+    /// Turns Repetier pen mode on or off (the active device profile's Pen Mode):
+    /// on a Repetier connection, a program streamed from then on
     /// has `M3`/`M4` written as `G0 Z0` (pen down) and `M5` as `G0 Z5` (pen up), and a
     /// command that repeats the pen's state is skipped. Manual lines are sent as typed; other
     /// protocols ignore it.

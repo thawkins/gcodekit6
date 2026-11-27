@@ -635,11 +635,11 @@ impl CommunicatorState {
     /// Check if a transition from this state to `target` is valid.
     ///
     /// Returns `true` for valid transitions:
-    /// - Disconnected → Connecting
-    /// - Connecting → Connected, Error, Disconnected
-    /// - Connected → Stalled, Error, Disconnected
-    /// - Stalled → Connected, Error, Disconnected
-    /// - Error → Disconnected, Connecting
+    /// - Disconnected -> Connecting
+    /// - Connecting -> Connected, Error, Disconnected
+    /// - Connected -> Stalled, Error, Disconnected
+    /// - Stalled -> Connected, Error, Disconnected
+    /// - Error -> Disconnected, Connecting
     pub fn can_transition_to(&self, target: CommunicatorState) -> bool {
         use CommunicatorState::*;
         if *self == target {

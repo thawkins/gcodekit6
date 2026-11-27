@@ -199,7 +199,7 @@ pub struct DxfArc {
 pub struct DxfPolyline {
     /// Vertices
     pub vertices: Vec<Point>,
-    /// Bulge factors para cada segmento (0 = recta, >0 = arco)
+    /// Bulge factor of each segment (0 = straight, >0 = arc)
     pub bulges: Vec<f64>,
     /// Whether the polyline is closed
     pub closed: bool,

@@ -137,7 +137,7 @@ impl DesignerState {
         // Store shape-to-toolpath mapping
         let mut shape_toolpaths: Vec<(DrawingObject, Vec<crate::Toolpath>, bool)> = Vec::new();
 
-        // Obtener el ID del objeto seleccionado (si hay)
+        // The selected shape's ID, if any
         let selected_ids = self
             .canvas
             .selection_manager
@@ -185,11 +185,11 @@ impl DesignerState {
         // ------ Loop Shape --------
         for (shape, toolpaths, pocket_fallback_to_profile) in shape_toolpaths.iter() {
             // ============================================================
-            // Obtener parámetros efectivos para G-code
+            // Effective parameters for the G-code
             // ============================================================
             let effective_params = self.get_effective_laser_params(shape);
 
-            // Aplicar override si estamos en modo láser
+            // Apply the override in laser mode
             if gcode_gen.is_laser_2d {
                 self.apply_laser_generator_params(effective_params.as_ref());
             }
@@ -247,7 +247,7 @@ impl DesignerState {
         shape: &DrawingObject,
         raster: &crate::model::RasterImage,
     ) {
-        // Generar G-code para raster
+        // Generate G-code for the raster
         use crate::engraving::ImageEngraver;
 
         if raster.image_data.is_empty() && raster.original_path.is_none() {
@@ -258,11 +258,11 @@ impl DesignerState {
             return;
         }
 
-        // Calcular esquina inferior izquierda
+        // Compute the bottom-left corner
         let start_x = raster.center.x - raster.width_mm / 2.0;
         let start_y = raster.center.y - raster.height_mm / 2.0;
 
-        // Añadir comentarios
+        // Add comments
         gcode.push_str(&format!("\n; Raster Image ID={}\n", shape.id));
         gcode.push_str(&format!("; Name: {}\n", shape.name));
         gcode.push_str(&format!("; Position: ({:.3}, {:.3})\n", start_x, start_y));
@@ -271,7 +271,7 @@ impl DesignerState {
             raster.width_mm, raster.height_mm
         ));
 
-        // Crear parámetros y generar G-code
+        // Build the parameters and generate G-code
         let params = raster.engraving_params();
 
         let engraver_result = if let Some(path) = &raster.original_path {

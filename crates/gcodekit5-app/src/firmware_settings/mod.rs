@@ -1,4 +1,4 @@
-//! Toolkit-free model of the firmware settings page, shared by the GTK and egui front ends:
+//! Toolkit-free model of the firmware settings page:
 //! the GRBL and Repetier setting definitions, the category of each setting, the list filter,
 //! the Repetier `EPR:` line parser, the command that writes a setting, and when a settings
 //! command may be sent.
@@ -468,7 +468,7 @@ pub enum SettingsBlocked {
 /// * `job_running` - Whether a program streams (the app's machine-busy predicate).
 /// * `lines_answered` - Whether every command line sent so far has had its reply.
 /// * `state` - The latest reported machine state (`Idle`, `Run`, ...), if any; an unknown
-///   state does not block, as in the GTK front end.
+///   state does not block.
 pub fn settings_blocked(
     connected: bool,
     job_running: bool,

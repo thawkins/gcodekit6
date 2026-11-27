@@ -4,10 +4,10 @@
 //! tool geometry, and machine capabilities with advanced formulas and adjustments.
 //!
 //! # Formulas
-//! - RPM = (Surface Speed * 1000) / (π * Diameter) * adjustments
+//! - RPM = (Surface Speed * 1000) / (pi * Diameter) * adjustments
 //! - Feed Rate = RPM * Chip Load * Flutes * adjustments
 //! - Power = (Specific Cutting Force * Chip Area * Cutting Speed) / 60000
-//! - Deflection = (Force * Stick_out³) / (3 * E * I)
+//! - Deflection = (Force * Stick_out^3) / (3 * E * I)
 
 use gcodekit5_core::data::materials::{Material, MaterialCategory};
 use gcodekit5_core::data::tools::{Tool, ToolCoating, ToolGeometry, ToolMaterial};
@@ -135,7 +135,7 @@ pub struct CalculationResult {
     pub chip_load_mm: f32,
     /// Chip Load per tooth (inch/tooth)
     pub chip_load_inch: f32,
-    /// Material Removal Rate (mm³/min)
+    /// Material Removal Rate (mm^3/min)
     pub material_removal_rate: f32,
     /// Estimated spindle power required (kW)
     pub power_required_kw: f32,
@@ -489,7 +489,7 @@ impl SpeedsFeedsCalculator {
         adjusted
     }
 
-    /// Calculate Material Removal Rate (mm³/min)
+    /// Calculate Material Removal Rate (mm^3/min)
     fn calculate_mrr(feed_rate: f32, width_of_cut: f32, depth_of_cut: f32) -> f32 {
         feed_rate * width_of_cut * depth_of_cut
     }
@@ -522,18 +522,18 @@ impl SpeedsFeedsCalculator {
     }
     /// Estimate tool deflection (mm)
     fn estimate_deflection(input: &CalculationInput, rpm: f32, power_kw: f32) -> f32 {
-        // Deflection formula: δ = (F * L³) / (3 * E * I)
+        // Deflection formula: delta = (F * L^3) / (3 * E * I)
         // Returns deflection in millimeters (mm)
         //
         // Where:
         //   F = cutting force (Newtons)
         //   L = stick-out length (meters)
-        //   E = modulus of elasticity (Pascals = N/m²)
-        //   I = area moment of inertia (m⁴)
+        //   E = modulus of elasticity (Pascals = N/m^2)
+        //   I = area moment of inertia (m^4)
 
         // Estimate cutting force from power and RPM
         // Power (W) = Torque (Nm) * Angular Velocity (rad/s)
-        // Torque = Power / (2π * RPM / 60)
+        // Torque = Power / (2 * pi * RPM / 60)
         let rpm = rpm.max(1.0);
         let torque_nm = (power_kw * 1000.0) / (2.0 * PI * rpm / 60.0);
 
@@ -554,7 +554,7 @@ impl SpeedsFeedsCalculator {
             ToolMaterial::Diamond => 1_050_000.0 * 1_000_000.0, // 1050 GPa
         };
 
-        // Moment of inertia for circular cross-section: I = (π * d⁴) / 64
+        // Moment of inertia for circular cross-section: I = (pi * d^4) / 64
         // d must be in meters
         let diameter_m = input.tool.diameter / 1000.0;
         let i_m4 = (PI * diameter_m.powi(4)) / 64.0;

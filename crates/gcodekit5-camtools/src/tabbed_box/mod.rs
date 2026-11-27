@@ -400,7 +400,7 @@ impl TabbedBoxMaker {
         let kerf = self.params.burn;
         let half_kerf = kerf / 2.0;
 
-        // Bottom edge: left to right (0,0) → (width,0)
+        // Bottom edge: left to right (0,0) -> (width,0)
         if let Some(&c) = edge_chars.first() {
             if c == 'f' || c == 'F' {
                 let base_path = self.draw_finger_edge(width, c == 'f');
@@ -425,7 +425,7 @@ impl TabbedBoxMaker {
             Point::new(start_x + width + half_kerf, start_y - half_kerf),
         );
 
-        // Right edge: bottom to top (width,0) → (width,height)
+        // Right edge: bottom to top (width,0) -> (width,height)
         if let Some(&c) = edge_chars.get(1) {
             if c == 'f' || c == 'F' {
                 let base_path = self.draw_finger_edge(height, c == 'f');
@@ -450,7 +450,7 @@ impl TabbedBoxMaker {
             Point::new(start_x + width + half_kerf, start_y + height + half_kerf),
         );
 
-        // Top edge: right to left (width,height) → (0,height)
+        // Top edge: right to left (width,height) -> (0,height)
         if let Some(&c) = edge_chars.get(2) {
             if c == 'F' || c == 'f' {
                 let base_path = self.draw_finger_edge(width, c == 'f');
@@ -478,7 +478,7 @@ impl TabbedBoxMaker {
             Point::new(start_x - half_kerf, start_y + height + half_kerf),
         );
 
-        // Left edge: top to bottom (0,height) → (0,0)
+        // Left edge: top to bottom (0,height) -> (0,0)
         if let Some(&c) = edge_chars.get(3) {
             if c == 'f' || c == 'F' {
                 let base_path = self.draw_finger_edge(height, c == 'f');
@@ -1030,7 +1030,7 @@ impl TabbedBoxMaker {
         let key_floor = self.params.key_divider_type == KeyDividerType::WallsAndFloor
             || self.params.key_divider_type == KeyDividerType::FloorOnly;
 
-        // Wall 1: Front (x × h)
+        // Wall 1: Front (x by h)
         if has_front {
             self.start_new_group("Wall 1 (front)");
             let e = edges(has_bottom, has_right, has_top, has_left);
@@ -1042,7 +1042,7 @@ impl TabbedBoxMaker {
             }
         }
 
-        // Wall 2: Right (y × h)
+        // Wall 2: Right (y by h)
         if has_right {
             self.start_new_group("Wall 2 (right)");
             let e = edges_side(has_bottom, has_back, has_top, has_front);
@@ -1056,7 +1056,7 @@ impl TabbedBoxMaker {
             layout.next_row(h);
         }
 
-        // Wall 4: Left (y × h)
+        // Wall 4: Left (y by h)
         if has_left {
             self.start_new_group("Wall 4 (left)");
             let e = edges_side(has_bottom, has_front, has_top, has_back);
@@ -1068,7 +1068,7 @@ impl TabbedBoxMaker {
             }
         }
 
-        // Wall 3: Back (x × h)
+        // Wall 3: Back (x by h)
         if has_back {
             self.start_new_group("Wall 3 (back)");
             let e = edges(has_bottom, has_left, has_top, has_right);
@@ -1080,7 +1080,7 @@ impl TabbedBoxMaker {
             }
         }
 
-        // Top: x × y
+        // Top: x by y
         if has_top {
             self.start_new_group("Top");
             let e = edges_tb(has_front, has_right, has_back, has_left);
@@ -1088,7 +1088,7 @@ impl TabbedBoxMaker {
             self.add_path(self.draw_rectangular_wall(x, y, &e, start_x, start_y));
         }
 
-        // Bottom: x × y
+        // Bottom: x by y
         if has_bottom {
             self.start_new_group("Bottom");
             let e = edges_tb(has_front, has_right, has_back, has_left);

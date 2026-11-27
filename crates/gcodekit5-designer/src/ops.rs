@@ -523,7 +523,7 @@ pub fn perform_boolean(a: &Shape, b: &Shape, op: BooleanOp) -> Shape {
 }
 
 // ---
-// FUNCIÓN AUXILIAR: Ajustada al sistema de Cavalier
+// Helper: adapted to the Cavalier contours polyline
 fn interpolate_polyline_arcs(pline: &Polyline, tolerance: f64) -> Vec<[f64; 2]> {
     if pline.vertex_count() == 0 {
         return Vec::new();
@@ -532,17 +532,17 @@ fn interpolate_polyline_arcs(pline: &Polyline, tolerance: f64) -> Vec<[f64; 2]> 
     let mut points = Vec::new();
     let count = pline.vertex_count();
 
-    // Iteramos explícitamente por los índices para controlar el inicio y el fin del bucle cerrado
+    // Iterate by index to control the start and end of the closed loop
     for i in 0..count {
-        // Si está cerrado, el siguiente del último es el primero (0)
+        // When closed, the vertex after the last is the first (0)
         let (Some(v_start), Some(v_end)) = (pline.get(i), pline.get((i + 1) % count)) else {
             continue;
         };
 
-        // Añadimos siempre el inicio del segmento actual
+        // Always add the start of the current segment
         points.push([v_start.x, v_start.y]);
 
-        // Si el segmento actual es un arco (bulge)
+        // If the current segment is an arc (bulge)
         if v_start.bulge.abs() > 1e-6 {
             let (radius, center) =
                 cavalier_contours::polyline::seg_arc_radius_and_center(v_start, v_end);
@@ -578,7 +578,7 @@ fn interpolate_polyline_arcs(pline: &Polyline, tolerance: f64) -> Vec<[f64; 2]> 
         }
     }
 
-    // CORRECCIÓN DEDUP
+    // Drop consecutive duplicate points
     points.dedup_by(|a, b| (a[0] - b[0]).abs() < 1e-5 && (a[1] - b[1]).abs() < 1e-5);
 
     points
@@ -622,7 +622,7 @@ pub fn perform_offset(shape: &Shape, distance: f64) -> Shape {
         // polygon, such as an island inside the hole.
         let mut poly_sketch = csgrs::sketch::Sketch::new();
 
-        // --- CONTORNO EXTERIOR (Perfil del piñón / Triángulo) ---
+        // --- Exterior contour (sprocket profile / triangle) ---
         let mut ext_pline = Polyline::new();
         for coord in poly.exterior().0.iter() {
             ext_pline.add_vertex(PlineVertex::new(coord.x, coord.y, 0.0));
@@ -633,7 +633,7 @@ pub fn perform_offset(shape: &Shape, distance: f64) -> Shape {
         let offsets = safe_parallel_offset(&ext_pline, distance);
 
         for offset in offsets {
-            // Muestreamos con una tolerancia estricta de 0.01mm para máxima fidelidad en el piñón
+            // Sample with a tight 0.01 mm tolerance for full fidelity on the sprocket
             let pts = interpolate_polyline_arcs(&offset, 0.01);
             if pts.len() >= 3 {
                 poly_sketch = poly_sketch.union(&csgrs::sketch::Sketch::polygon(&pts, None));

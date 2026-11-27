@@ -42,8 +42,7 @@ impl DesignGear {
 
 impl DesignerShape for DesignGear {
     fn render(&self) -> Path {
-        // Pasar el ángulo en radianes o grados según espere generate_spur_gear
-        // Probablemente espera radianes
+        // generate_spur_gear takes the pressure angle in degrees, as stored
         let path = crate::parametric_shapes::generate_spur_gear(
             self.center,
             self.module,
@@ -82,7 +81,7 @@ impl DesignerShape for DesignGear {
             super::apply_linear_transform_to_parametric(t, &mut self.rotation, &mut self.mirrored);
         self.module *= sx;
         self.hole_radius *= sx;
-        // pressure_angle_deg NO se escala (es un ángulo)
+        // pressure_angle_deg is not scaled (it is an angle)
     }
 
     fn properties(&self) -> Vec<Property> {
