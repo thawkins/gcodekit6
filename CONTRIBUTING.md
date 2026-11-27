@@ -20,17 +20,38 @@ Be respectful, inclusive, and constructive. We welcome contributors of all backg
 
 ## Getting Started
 
-1. **Fork** the repository on GitHub
-2. **Clone** your fork locally
+1. **Fork** [thawkins/gcodekit6](https://github.com/thawkins/gcodekit6) on GitHub (the **Fork** button).
+2. **Clone** your fork and add the original repository as `upstream`:
+   ```bash
+   git clone https://github.com/<your-username>/gcodekit6.git
+   cd gcodekit6
+   git remote add upstream https://github.com/thawkins/gcodekit6.git
+   git remote -v   # origin is your fork, upstream is thawkins/gcodekit6
+   ```
 3. **Set up** the development environment (see [DEVELOPMENT.md](DEVELOPMENT.md))
 4. **Install pre-commit hooks**:
    ```bash
    git config core.hooksPath .githooks
    ```
    This enables automated checks (formatting, clippy, unit tests) before each commit. Skip with `git commit --no-verify` if needed.
-5. **Create a branch** for your changes
-6. **Make changes** following the guidelines below
-7. **Submit** a pull request
+5. **Create a branch** for your changes (never commit to `master`):
+   ```bash
+   git switch -c feature/my-new-feature
+   ```
+6. **Make changes** following the guidelines below, then check them:
+   ```bash
+   cargo fmt
+   cargo clippy --workspace --all-targets -- -D warnings -W clippy::unwrap_used
+   cargo nextest run --workspace
+   ```
+7. **Sync with upstream** before you push:
+   ```bash
+   git fetch upstream
+   git rebase upstream/master
+   # after fixing a conflict: git add <file> && git rebase --continue
+   ```
+8. **Push** to your fork (`git push --force-with-lease origin feature/my-new-feature` after a rebase)
+9. **Open a pull request** against `thawkins/gcodekit6`, base branch `master`
 
 ## Code Style
 
@@ -70,7 +91,7 @@ cargo clippy
 ```
 
 Key linting rules:
-- No `unwrap()` calls without justification (use `expect()` with explanation or proper error handling)
+- No `.unwrap()`: CI clippy rejects it in every target (`-W clippy::unwrap_used -D warnings`). Use `.expect("why")` in tests and `?` or explicit handling in production code
 - No wildcard imports (`use module::*`)
 - Cognitive complexity ≤ 30 per function
 - No `println!()` or `eprintln!()` in library code (use `tracing` instead)
@@ -189,17 +210,19 @@ This repository uses [Dependabot](https://docs.github.com/en/code-security/depen
 
 ### Before Submitting
 
-1. **Rebase** on latest `main`:
+1. **Rebase** on latest `master`:
    ```bash
-   git fetch origin
-   git rebase origin/main
+   git fetch upstream
+   git rebase upstream/master
    ```
+   (If you work in the main repository rather than a fork, use `origin` instead of `upstream`.)
 
-2. **Run all checks**:
+2. **Run all checks** (the full CI list is in [DEVELOPMENT.md](DEVELOPMENT.md#ci-gates)):
    ```bash
    cargo fmt --check
-   cargo clippy
+   cargo clippy --workspace --all-targets -- -D warnings -W clippy::unwrap_used
    cargo nextest run --workspace
+   cargo test --workspace --doc
    ```
 
 3. **Update CHANGELOG.md** with your changes
@@ -214,7 +237,7 @@ This repository uses [Dependabot](https://docs.github.com/en/code-security/depen
 
 Your PR will use the [PR template](.github/pull_request_template.md). Ensure:
 
-- [ ] No new `unwrap()` calls (unless justified with comment)
+- [ ] No `.unwrap()` calls (CI clippy rejects them in every target; use `.expect("why")` in tests and `?` or handling in production)
 - [ ] `cargo fmt` passed
 - [ ] `cargo clippy` has no new warnings
 - [ ] Tests added for new functionality
@@ -247,21 +270,19 @@ Your PR will use the [PR template](.github/pull_request_template.md). Ensure:
 All new features must include tests:
 
 ```rust
-#[cfg(test)]
-mod tests {
-    use super::*;
+// crates/<crate>/tests/test_new_feature_basic.rs
+use gcodekit5_core::new_feature;
 
-    #[test]
-    fn test_new_feature() {
-        // Arrange
-        let input = create_test_input();
-        
-        // Act
-        let result = new_feature(input);
-        
-        // Assert
-        assert_eq!(result, expected_output);
-    }
+#[test]
+fn test_new_feature_basic() {
+    // Arrange
+    let input = create_test_input();
+
+    // Act
+    let result = new_feature(input);
+
+    // Assert
+    assert_eq!(result, expected_output);
 }
 ```
 
@@ -281,16 +302,27 @@ fn test_issue_123_serial_timeout() {
 
 ### Test Organization
 
+Tests do not go inline in `src/`. Each crate sets `autotests = false` and builds one test
+binary, `tests/all.rs`:
+
 ```
 crates/gcodekit5-core/
 ├── src/
 │   └── lib.rs
-└── tests/           # Integration tests
-    └── gcode_tests.rs
-
-// Unit tests go in the same file as the code
-// Integration tests go in tests/ directory
+└── tests/
+    ├── all.rs                          # the crate's one test binary
+    └── test_<component>_<scenario>.rs  # one file per unit under test
 ```
+
+To add a test file, create `crates/<crate>/tests/test_<component>_<scenario>.rs` and add one
+line to that crate's `tests/all.rs`:
+
+```rust
+#[path = "test_x.rs"]
+mod test_x;
+```
+
+Run that file alone with `cargo nextest run -p <crate> -E 'test(test_x::)'`.
 
 ### Running Tests
 
@@ -401,12 +433,12 @@ Include:
 | `good first issue` | Good for newcomers |
 | `help wanted` | Extra attention needed |
 | `documentation` | Documentation improvements |
-| `P0`, `P1`, `P2`, `P3` | Priority levels |
+
+There are no priority labels yet.
 
 ## Questions?
 
-- Open a [Discussion](https://github.com/thawkins/gcodekit5/discussions)
-- Check existing [Issues](https://github.com/thawkins/gcodekit5/issues)
+- Check existing [Issues](https://github.com/thawkins/gcodekit6/issues), or open one
 - Read the [Documentation](docs/)
 
 Thank you for contributing! 🎉

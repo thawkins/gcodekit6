@@ -21,10 +21,11 @@ Fixes #
 
 <!-- Complete this checklist before requesting review -->
 
-- [ ] No new `unwrap()` calls (unless justified with comment)
+- [ ] No `.unwrap()` calls (CI clippy runs `-W clippy::unwrap_used -D warnings` on every target and fails on any; use `.expect("why")` in tests, `?` or handling in production)
 - [ ] `cargo fmt` passed
 - [ ] `cargo clippy` has no new warnings
 - [ ] Tests added for new functionality
+- [ ] `cargo nextest run --workspace` and `cargo test --workspace --doc` pass
 - [ ] kittest snapshots updated if UI changed
 - [ ] Public APIs documented with `///`
 - [ ] Error cases handled (no silent failures)

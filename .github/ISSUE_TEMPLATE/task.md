@@ -1,13 +1,13 @@
 ---
 name: TASK
-about: Development task from PLAN.md
+about: A development task
 title: "[TASK] "
 labels: task
 assignees: ''
 ---
 
 ## Description
-Task description from PLAN.md
+Task description
 
 ## Acceptance Criteria
 - Criteria 1

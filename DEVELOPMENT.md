@@ -35,6 +35,8 @@ source ~/.cargo/env
 
 #### Linux (Ubuntu/Debian)
 
+This is the same package list CI installs (`.github/actions/install-system-deps/action.yml`).
+
 ```bash
 # Install development tools
 sudo apt update
@@ -71,13 +73,22 @@ See [docs/MACOS_BUILD.md](docs/MACOS_BUILD.md) for detailed macOS instructions.
 
 See [docs/WINDOWS_BUILD.md](docs/WINDOWS_BUILD.md) for Windows setup (Rust MSVC toolchain, no extra libraries).
 
+### Check the Rust Version
+
+The workspace sets `rust-version = "1.95"`, so cargo refuses an older compiler:
+
+```bash
+rustc -V          # must print 1.95.0 or later
+rustup update     # upgrade an older rustup-managed toolchain
+```
+
 ## Clone and Build
 
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/thawkins/gcodekit5.git
-cd gcodekit5
+git clone https://github.com/thawkins/gcodekit6.git
+cd gcodekit6
 ```
 
 ### 2. Configure Git Hooks
@@ -102,9 +113,11 @@ cargo build --release
 ### 4. Verify the Build
 
 ```bash
-# Check that the binary runs
-cargo run --release -- --version
+# The main window opens
+cargo run --release
 ```
+
+The binary takes no flags: every command-line argument is opened as a file.
 
 ## Running the Application
 
@@ -125,6 +138,16 @@ RUST_LOG=gcodekit5_communication=debug cargo run
 
 ```bash
 cargo run --release
+```
+
+### Faster Iteration
+
+```bash
+# Type-check without producing a binary
+cargo check
+
+# Build or check one crate only
+cargo build -p gcodekit5-core
 ```
 
 ### Using the Development Container
@@ -170,8 +193,8 @@ timeout 1500 cargo nextest run --workspace
 # Run tests for a specific crate
 cargo nextest run -p gcodekit5-core
 
-# Run tests matching a name
-cargo nextest run -E 'test(test_grbl_status_parser)'
+# Run tests whose name matches a filter (here: one test file's module)
+cargo nextest run -p gcodekit5-communication -E 'test(test_reply_ledger::)'
 
 # Run one test file (each crate has one `all` test binary)
 cargo nextest run -p gcodekit5-core -E 'test(test_foo::)'
@@ -212,17 +235,38 @@ cargo clippy --fix
 
 ### Pre-Commit Checks
 
-The git hooks run automatically, but you can run them manually:
+`.githooks/pre-commit` runs these three commands and aborts the commit if one fails:
 
 ```bash
-# Run the same checks as pre-commit
-cargo fmt --check && cargo clippy && cargo nextest run --workspace
+cargo fmt --check
+cargo clippy --all-targets -- -D warnings
+cargo test --lib
 ```
+
+The hook is lighter than CI: it skips the integration tests under `crates/*/tests/`.
+
+### CI Gates
+
+Copied from `.github/workflows/code-quality.yml` at commit `b0bac4c1`. A PR must pass all of them:
+
+```bash
+cargo machete                                   # no unused dependencies
+! cargo tree --workspace -e normal | grep -E '^.*(gtk4|libadwaita|sourceview5|glib-sys) '   # check-no-gtk
+cargo clippy --workspace --all-targets -- -D warnings -W clippy::unwrap_used
+cargo nextest run --workspace --profile ci
+cargo test --workspace --doc
+cargo fmt --all -- --check
+cargo deny check
+cargo bench --no-run --workspace
+```
+
+`-W clippy::unwrap_used` with `-D warnings` makes every `.unwrap()` an error, in tests too.
+If this list and the workflow disagree, the workflow is right; update this section.
 
 ## Project Structure
 
 ```
-gcodekit5/
+gcodekit6/
 ├── Cargo.toml              # Workspace root
 ├── src/                    # Main binary
 │   └── main.rs
@@ -278,7 +322,7 @@ RUST_LOG=debug,hyper=warn cargo run
             "request": "launch",
             "name": "Debug GCodeKit5",
             "cargo": {
-                "args": ["build", "--bin=gcodekit5", "--package=gcodekit5"],
+                "args": ["build", "--bin=gcodekit5", "--package=gcodekit5-design"],
                 "filter": {
                     "name": "gcodekit5",
                     "kind": "bin"
@@ -392,7 +436,7 @@ sudo apt install flatpak-builder
 
 ## Getting Help
 
-- **Issues**: [GitHub Issues](https://github.com/thawkins/gcodekit5/issues)
+- **Issues**: [GitHub Issues](https://github.com/thawkins/gcodekit6/issues)
 - **Documentation**: See `docs/` folder
 - **Architecture**: See [docs/adr/](docs/adr/) for design decisions
 - **Coordinate System**: See [docs/COORDINATE_SYSTEM.md](docs/COORDINATE_SYSTEM.md)
