@@ -6,11 +6,11 @@ Un *perfil de dispositivo* es independiente de la conexión activa de la máquin
 
 ## Panel izquierdo: lista de dispositivos
 - **Buscar** filtra los perfiles por nombre/descripción.
-- El perfil que coincide con la conexión actual muestra un distintivo de **Conectado**.
+- El perfil activo (el elegido con **Establecer como activo**) muestra un distintivo **Activo**.
 - **Agregar dispositivo** crea un nuevo perfil.
 
 ## Panel derecho: editar pestañas
-Los perfiles de dispositivo se editan mediante pestañas (p. ej., Conexión, Área de trabajo, Capacidades).
+Los perfiles de dispositivo se editan mediante cuatro pestañas: General, Conexión, Dimensiones, Capacidades.
 
 ### Botones de acción
 - **Guardar** - Guarda los cambios en el perfil del dispositivo.
@@ -25,11 +25,13 @@ Los perfiles de dispositivo se editan mediante pestañas (p. ej., Conexión, Ár
 
 ### Conexión
 Configurar cómo acceder al controlador:
+- Tipo de conexión: Serie, TCP/IP o WebSocket.
 - Puerto serie y velocidad de transmisión.
-- Host/puerto TCP (si es compatible).
-- Tiempo de espera de conexión / reconexión automática.
+- Host/puerto TCP (TCP/IP y WebSocket).
+- Tiempo de espera de conexión.
+- **Reconexión automática**: si la conexión se pierde, la aplicación intenta reabrirla hasta 10 veces, esperando 1 s, 2 s y después 5 s entre intentos.
 
-### Área de trabajo / límites de recorrido
+### Dimensiones (límites de recorrido)
 Establecer los límites de recorrido de la máquina (X/Y/Z mín./máx.). Estas funciones se utilizan en toda la aplicación para:
 - Superposiciones de límites del visualizador
 - Comportamientos de ajuste al dispositivo del diseñador

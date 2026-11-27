@@ -2,9 +2,9 @@
 
 Settings controls application behavior. Menu -->> Edit/Preferences
 - General
-- Controller
+- Machine
 - User Interface
-- File Procesing
+- File Processing
 - Shortcuts
 - Advanced
 

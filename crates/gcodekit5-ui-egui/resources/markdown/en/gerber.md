@@ -5,17 +5,19 @@ The Gerber to G-Code tool allows you to convert standard Gerber files (commonly 
 ## Usage
 
 1.  **Select Directory**: Click "Browse..." to select the folder containing your Gerber files. The tool will automatically detect and map common layer files (e.g., Top Copper, Drill Holes).
-2.  **Layer Type**: Select the layer you want to process from the dropdown. The detected file for that layer will be shown below.
+2.  **Layer Type**: Select the layer you want to process from the dropdown. The detected file for that layer will be shown below. The **Board Outline** layer cuts around the outside of the board edge, offset by the tool radius.
 3.  **Parameters**:
     *   **Board Width/Height**: Dimensions of your PCB stock.
     *   **Offset X/Y**: Shift the origin of the G-Code.
     *   **Feed Rate**: Cutting speed in mm/min.
     *   **Spindle Speed**: Spindle RPM.
     *   **Cut Depth**: Z-depth for the cut (negative for cutting into material).
+    *   **Outline Step Down**: For the Board Outline layer, the most Z drops per pass on the way down to Cut Depth (default 0.5 mm).
     *   **Safe Z**: Retract height for rapid moves.
     *   **Tool Diameter**: Diameter of your engraving bit (V-bit or end mill).
     *   **Isolation Width**: Additional width to clear around traces.
     *   **Remove Excess Copper**: (Rubout) If checked, generates toolpaths to remove all copper not part of the traces.
+    *   **Use Board Outline for Rubout**: Limits the rubout to the board outline file. Without it, or when no outline file is found, the rubout covers the copper bounds.
 4.  **Alignment Holes**:
     *   **Generate Alignment Holes**: Adds drilling operations for alignment pins.
     *   **Hole Diameter**: Diameter of the alignment holes.
@@ -28,4 +30,4 @@ The Drill Holes layer reads the Excellon drill file (`.drl`, `.xln`, `.exc`, a n
 
 ## Output
 
-Click **Generate G-Code** to create the toolpath. The result will be loaded into the G-Code Editor/Visualizer.
+Click **Generate** to create the toolpath, then **Send to Editor** to load it into the G-Code Editor, or **Preview** to load it and show it in the Visualizer.

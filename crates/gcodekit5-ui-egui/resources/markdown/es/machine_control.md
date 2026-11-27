@@ -23,13 +23,13 @@ Si tiene problemas de conexión:
 ## Movimientos en manual
 - Utilice el panel de control en pantalla.
 - Utilice el control manual con teclado (si está habilitado) para un posicionamiento rápido.
-- Configure **Paso (mm)** y **Avance manual** para controlar el movimiento.
+- Configure **Paso** y **Avance de jog:** para controlar el movimiento.
 
 ---
-## Inicio / Desbloqueo / Reinicio
-- **Inicio** ejecuta el ciclo de inicio del firmware (requiere `$22=1` en GRBL).
-- **Desbloqueo** borra las alarmas si el controlador está en estado de alarma.
-- **Reinicio** realiza un reinicio suave.
+## Ir a origen / Desbloquear / Reiniciar
+- **Ir a origen** ejecuta el ciclo de homing (Hacer homing ($H)).
+- **Desbloquear** borra las alarmas si el controlador está en estado de alarma.
+- **Reiniciar** (menú Máquina, Ctrl+Shift+K) realiza un reinicio suave. El botón **PARADA DE EMERGENCIA** envía el mismo reinicio suave (M112 con firmware Repetier).
 
 ---
 ## Transmisión de un trabajo

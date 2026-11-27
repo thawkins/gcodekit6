@@ -2,7 +2,7 @@
 
 En el Menú -->> Editar/Preferencias se controla el comportamiento de la aplicación. Directorio de trabajo, Tema, etc.
 - General
-- Controlador
+- Máquina
 - Interfaz de usuario
 - Procesamiento de archivo
 - Atajos

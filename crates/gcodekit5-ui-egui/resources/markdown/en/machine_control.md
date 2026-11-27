@@ -22,13 +22,13 @@ If you have connection problems:
 ## Manual Movement
 - Use the on-screen control panel.
 - Use manual keyboard control (if enabled) for quick positioning.
-- Configure the **Step (mm)** and **Manual Feed** to control the movement.
+- Configure the **Step** and **Jog Feed:** to control the movement.
 
 ---
-## Start / Unlock / Reset
-- **Start** executes the firmware startup cycle (requires `$22=1` in GRBL).
+## Home / Unlock / Reset
+- **Home** runs the homing cycle (Home machine ($H)).
 - **Unlock** clears alarms if the controller is in an alarm state.
-- **Reset** performs a soft reset.
+- **Reset** (Machine menu, Ctrl+Shift+K) performs a soft reset. The **E-STOP** button sends the same soft reset (M112 on Repetier firmware).
 
 ---
 ## Transmitting a Job

@@ -14,14 +14,14 @@ Use the left panel to quickly find tools:
 - **Diameter min/max** filters help narrow large catalogs.
 
 ## Right panel: edit tool details
-Tools are edited with tabbed sections (Geometry, Materials, Notes, etc.).
+Tools are edited with four tabs: Basic Info, Geometry, Manufacturer, Notes.
 
 ### Geometry (most important)
 - **Diameter**: cutting diameter
 - **Shaft diameter**: shank diameter (holder compatibility)
 - **Flute length**: axial cutting length
-- **Overall length**: total tool length
-- **Flutes**: number of cutting flutes
+- **Length (mm):** total tool length
+- **Number of Flutes:** number of cutting flutes
 - **Corner radius** (if applicable)
 - **Tip angle** (drills / spot drills / V-bits)
 

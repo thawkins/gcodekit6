@@ -1,6 +1,6 @@
 # Diseñador
 
-El diseñador tiene dos modos diferenciados de trabajo: "Laser 2D" y "CNC 3D". Se puede entrar en ellos de dos formas, una desde el menú Archivo del Diseñador, haciendo "Nuevo 2D" o "Nuevo 3D". También se puede cambiar de modo mediante la selección de Tipo de Maquina del panel izquierdo.
+El diseñador tiene dos modos diferenciados de trabajo: "Láser 2D" y "CNC 3D". Se puede entrar en ellos de dos formas, una desde el menú **Archivo** de la aplicación, haciendo "Nuevo 2D" (Ctrl+N) o "Nuevo 3D". También se puede cambiar de modo mediante la selección de Tipo de Máquina del panel izquierdo.
 
 En el modo Láser 2D no existe la coordenada Z por lo que está inhabilitada. Este modo se usa principalmente para grabado y corte por láser. En él se puede crear y editar objetos mediante las herramientas propias e importar diseños vectoriales como DXF y SVG. También se pueden importar Imágenes jpg, png etc para el grabado.
 
@@ -24,7 +24,7 @@ En el modo Láser 2D no existe la coordenada Z por lo que está inhabilitada. Es
 ## Propiedades globales
   <img src="../../help_images/global_properties.png" alt="Propiedades Globales" width="600">
 
-Pulsando el botón "Configuración de Herramienta" se abre la ventana para la configuración Global de trabajo. Esta Configuración se utilizará para todos los objetos vectoriales que tengan marcado el CheckBox "Usar Valores Globales" en las propiedades de objeto "Configuración Láser (Objeto)"
+Pulsando el botón "Configuración de Herramienta" se abre la ventana para la configuración Global de trabajo. Esta Configuración se utilizará para todos los objetos vectoriales que tengan marcado el CheckBox "Usar valores globales" en las propiedades de objeto "Configuración Láser (Objeto)"
 
 ---
 ## Panel de Propiedades individuales de objeto
@@ -34,7 +34,7 @@ Pulsando el botón "Configuración de Herramienta" se abre la ventana para la co
         <li> Tamaño</li>
         <li> Rotación</li>
         <li> Esquina (radio/redondeo)</li>
-        <li> Operaciones Geométricas (desfase, chaflán)</li>
+        <li> Operaciones geométricas (desfase, chaflán)</li>
         <li> Propiedades CAM</li>
         <li> Configuración individual Láser (velocidad, potencia y pasadas) de un objeto determinado</li>
 
@@ -46,7 +46,7 @@ Pulsando el botón "Configuración de Herramienta" se abre la ventana para la co
 ## Panel de Objetos
   <img src="../../help_images/order_objects_1.png" width="300">
       En el panel de objetos aparece la lista de objetos con:
-        <li> Número de orden</li>Láser 2D
+        <li> Número de orden</li>
         <li> Tipo de objeto (Rectángulo, Circulo, Path, etc.) e identificación #</li>
         <li> Nombre del Objeto</li>
         <li> El número de orden es editable y sirve para organizar los objetos para que al generar el G-code, los objetos se ejecuten es ese orden.</li>

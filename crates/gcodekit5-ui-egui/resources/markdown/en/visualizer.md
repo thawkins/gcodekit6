@@ -3,11 +3,11 @@
 
 The Visualizer displays a preview of the toolpaths and (optionally) the machine's work area limits.
 
-The visualizer is 3D and has display controls in the upper right corner: Front, Side, Rear, Isometric, etc. It also includes controls for Snap to Drawing, Top View, Zoom + and -, Scroll Bar Display, and Orbit.
+The visualizer is 3D and has display controls in the upper right corner: Top View, Bottom View, Front View, Left View, Right View and four Isometric views, plus Zoom In, Fit and Zoom Out. The sidebar has Fit to Content, Reset View, Fit to Device Working Area, and the 2D (Top-down 2D view) and 3D (Rotatable 3D view) buttons.
 
 - Show/Hide Quick Moves
 - Show/Hide Cutting Moves
-- Show/Hide Tool
+- Show Laser/Spindle
 - Show/Hide Grid. The grid spacing can be defined.
 - Show/Hide Machine Boundaries
 
