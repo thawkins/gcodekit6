@@ -51,22 +51,6 @@ fn bench_command_batch_creation(c: &mut Criterion) {
     });
 }
 
-// ---------------------------------------------------------------------------
-// Command state lifecycle benchmarks
-// ---------------------------------------------------------------------------
-
-fn bench_command_lifecycle(c: &mut Criterion) {
-    c.bench_function("command_lifecycle", |b| {
-        b.iter(|| {
-            let mut cmd = GcodeCommand::new(black_box("G1 X10 Y20 F500"));
-            cmd.mark_sent();
-            cmd.mark_ok();
-            cmd.mark_done();
-            black_box(&cmd);
-        });
-    });
-}
-
 fn bench_command_number_generator(c: &mut Criterion) {
     let generator = CommandNumberGenerator::new();
     c.bench_function("command_number_next_1000", |b| {
@@ -156,7 +140,6 @@ criterion_group!(
     bench_command_creation,
     bench_command_with_sequence,
     bench_command_batch_creation,
-    bench_command_lifecycle,
     bench_command_number_generator,
 );
 criterion_group!(

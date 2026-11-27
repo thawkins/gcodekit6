@@ -3,17 +3,11 @@
 //! maths, stock removal Z convention, processors, file decoding, stream errors,
 //! backup naming and UTC timestamps.
 
-use std::fs;
-use std::sync::Arc;
-
-use gcodekit5_visualizer::gcode::arc::arc_sweep;
-use gcodekit5_visualizer::gcode::processors::{ArcExpander, PatternRemover};
 use gcodekit5_visualizer::visualizer::{
     StockZeroReference, ToolpathCache, detect_stock_zero_reference, is_content_replacement,
 };
 use gcodekit5_visualizer::{
-    CommandProcessor, DecimalProcessor, FileStreamReader, GCodeCommand, GcodeCommand, GcodeState,
-    GcodeStreamReader, Point3D, StockSimulator3D, ToolpathSegment, ToolpathSegmentType, Visualizer,
+    GCodeCommand, Point3D, StockSimulator3D, ToolpathSegment, ToolpathSegmentType, Visualizer,
 };
 
 fn parse(gcode: &str) -> Visualizer {
@@ -31,15 +25,6 @@ fn move_intensities(vis: &Visualizer) -> Vec<Option<f32>> {
             }
             GCodeCommand::Dwell { .. } => None,
         })
-        .collect()
-}
-
-fn process(processor: &dyn CommandProcessor, line: &str) -> Vec<String> {
-    processor
-        .process(&GcodeCommand::new(line), &GcodeState::default())
-        .expect("process")
-        .into_iter()
-        .map(|c| c.command)
         .collect()
 }
 
@@ -109,24 +94,6 @@ fn test_visualizer_content_replacement_detects_edits_and_new_files() {
         !is_content_replacement(program, ""),
         "cleared buffer keeps view"
     );
-}
-
-// --------------------------------------------------------------- arc maths
-
-#[test]
-fn test_arc_sweep_quarter_and_full_circle() {
-    let ccw = arc_sweep((0.0, 0.0), (1.0, 0.0), (0.0, 1.0), false).expect("arc");
-    assert!((ccw.sweep - std::f64::consts::FRAC_PI_2).abs() < 1e-9);
-    let cw = arc_sweep((0.0, 0.0), (1.0, 0.0), (0.0, 1.0), true).expect("arc");
-    assert!((cw.sweep + 3.0 * std::f64::consts::FRAC_PI_2).abs() < 1e-9);
-
-    let full = arc_sweep((0.0, 0.0), (1.0, 0.0), (1.0, 0.0), true).expect("arc");
-    assert!((full.sweep + std::f64::consts::TAU).abs() < 1e-9);
-    let (x, y) = full.point_at((0.0, 0.0), 0.5);
-    assert!((x + 1.0).abs() < 1e-9 && y.abs() < 1e-9);
-
-    assert_eq!(full.segment_count(std::f64::consts::PI / 36.0, 4, 128), 72);
-    assert!(arc_sweep((0.0, 0.0), (0.0, 0.0), (1.0, 0.0), false).is_none());
 }
 
 // ----------------------------------------------------------- toolpath cache
@@ -276,74 +243,6 @@ fn test_stock_removal_detection_ignores_toolpath_z() {
         detect_stock_zero_reference("G0 Z5\n; Generated G-code from Designer tool\n"),
         None
     );
-}
-
-// --------------------------------------------------------------- processors
-
-#[test]
-fn test_pattern_remover_compiles_once_and_handles_invalid_pattern() {
-    let remover = PatternRemover::new("^M3");
-    assert!(remover.is_valid());
-    assert!(process(&remover, "M3 S100").is_empty());
-    assert_eq!(process(&remover, "G1 X1"), vec!["G1 X1"]);
-
-    let invalid = PatternRemover::new("(");
-    assert!(!invalid.is_valid());
-    assert_eq!(process(&invalid, "M3 S100"), vec!["M3 S100"]);
-}
-
-#[test]
-fn test_decimal_processor_leaves_comments_untouched() {
-    let processor = DecimalProcessor::with_precision(2);
-    assert_eq!(
-        process(
-            &processor,
-            "g1 x1.23456 (Keep 1.23456 here) y2.5 ; note 3.14159"
-        ),
-        vec!["G1 X1.23 (Keep 1.23456 here) Y2.5 ; note 3.14159"]
-    );
-    assert_eq!(
-        process(&processor, "G0 X1.005 (unclosed 9.87654"),
-        vec!["G0 X1 (unclosed 9.87654"]
-    );
-}
-
-#[test]
-fn test_arc_expander_description_matches_behaviour() {
-    let expander: Arc<dyn CommandProcessor> = Arc::new(ArcExpander::new());
-    assert!(!expander.description().starts_with("Expands"));
-    assert_eq!(
-        process(expander.as_ref(), "G2 X10 Y0 I5 J0"),
-        vec!["G2 X10 Y0 I5 J0"]
-    );
-}
-
-// ------------------------------------------------------------- input files
-
-#[test]
-fn test_file_stream_read_error_is_not_eof() {
-    // Reading a directory fails with EISDIR on Linux; that must surface as an
-    // error, not be mistaken for the end of the file.
-    let dir = tempfile::tempdir().expect("tempdir");
-    if let Ok(mut reader) = FileStreamReader::new(dir.path()) {
-        assert!(reader.read_line().is_err());
-        assert!(!reader.is_eof());
-    }
-}
-
-#[test]
-fn test_file_stream_reads_non_utf8_lossily() {
-    let dir = tempfile::tempdir().expect("tempdir");
-    let path = dir.path().join("s.nc");
-    fs::write(&path, b"G1 (\xff)\nG0 X1\n").expect("write");
-    let mut reader = FileStreamReader::new(&path).expect("reader");
-    assert_eq!(reader.total_lines(), Some(2));
-    let first = reader.read_line().expect("read").expect("line");
-    assert!(first.starts_with("G1 ("));
-    let second = reader.read_line().expect("read").expect("line");
-    assert_eq!(second.trim(), "G0 X1");
-    assert!(reader.read_line().expect("read").is_none());
-    assert!(reader.is_eof());
 }
 
 // --------------------------------------------------------------- timestamps

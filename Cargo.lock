@@ -2221,7 +2221,6 @@ dependencies = [
  "serde_json",
  "thiserror 2.0.21",
  "tracing",
- "uuid",
  "zip",
 ]
 
@@ -2332,14 +2331,10 @@ dependencies = [
 name = "gcodekit5-visualizer"
 version = "2.0.0-alpha.3"
 dependencies = [
- "criterion",
  "gcodekit5-camtools",
  "gcodekit5-core",
  "glam 0.34.3",
  "proptest",
- "regex",
- "serde",
- "tempfile",
  "tracing",
 ]
 

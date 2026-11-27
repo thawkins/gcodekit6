@@ -32,10 +32,7 @@ pub use probe::{
 
 pub use error::{Error, Result};
 
-pub use gcode::{
-    CommandId, CommandListener, CommandListenerHandle, CommandNumberGenerator, CommandResponse,
-    CommandState, GcodeCommand, NoOpCommandListener,
-};
+pub use gcode::{CommandNumberGenerator, GcodeCommand};
 
 // Re-export type aliases for convenience
 pub use types::{

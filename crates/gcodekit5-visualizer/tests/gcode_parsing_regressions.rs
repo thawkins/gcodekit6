@@ -1,15 +1,7 @@
 //! Regression tests for G-code parsing, arc handling, bounds and statistics.
 
-use std::fs;
-use std::sync::Arc;
-
-use gcodekit5_visualizer::gcode::processors::ArcExpander;
-use gcodekit5_visualizer::gcode::words::{parse_line, strip_comments};
 use gcodekit5_visualizer::visualizer::{ArcSegment, Vector3};
-use gcodekit5_visualizer::{
-    CommandProcessor, CommentProcessor, FileStreamReader, GCodeCommand, GcodeCommand, GcodeParser,
-    GcodeState, GcodeStreamReader, ProcessorPipeline, Visualizer,
-};
+use gcodekit5_visualizer::{GCodeCommand, Visualizer};
 
 fn parse(gcode: &str) -> Visualizer {
     let mut vis = Visualizer::new();
@@ -19,45 +11,6 @@ fn parse(gcode: &str) -> Visualizer {
 
 fn approx(a: f32, b: f32) -> bool {
     (a - b).abs() < 1e-3
-}
-
-#[test]
-fn test_words_strip_paren_comment_keeps_following_words() {
-    assert_eq!(strip_comments("G1 (move) X10").trim(), "G1   X10".trim());
-    let words = parse_line("g1(c)x-1.5 ; Y99");
-    assert_eq!(words.len(), 2);
-    assert_eq!(words[1].letter, 'X');
-    assert_eq!(words[1].value, -1.5);
-}
-
-#[test]
-fn test_parser_multiple_g_words_on_one_line() {
-    let mut parser = GcodeParser::new();
-    parser.parse("G90 G1 X10 F500").expect("parse");
-    let state = parser.get_state();
-    assert_eq!(state.motion_mode, 1);
-    assert_eq!(state.distance_mode, 90);
-    assert_eq!(state.feed_rate, 500.0);
-
-    parser.parse("G1X5F1200").expect("parse");
-    assert_eq!(parser.get_state().feed_rate, 1200.0);
-}
-
-#[test]
-fn test_parser_paren_comment_mid_line_keeps_axis_words() {
-    let mut parser = GcodeParser::new();
-    let cmd = parser.parse("G1 (move) X10").expect("parse");
-    assert!(cmd.command.contains("X10"));
-}
-
-#[test]
-fn test_pipeline_updates_motion_mode_for_short_codes() {
-    let pipeline = ProcessorPipeline::new();
-    let mut state = GcodeState::default();
-    pipeline
-        .process_commands(&[GcodeCommand::new("G1 X1 F100")], &mut state)
-        .expect("process");
-    assert_eq!(state.motion_mode, 1);
 }
 
 #[test]
@@ -180,44 +133,6 @@ fn test_arc_segment_full_circle_length() {
     let p = Vector3::new(10.0, 0.0, 0.0);
     let arc = ArcSegment::new(p, p, Vector3::new(0.0, 0.0, 0.0), true);
     assert!((arc.length() - std::f32::consts::TAU * 10.0).abs() < 1e-2);
-}
-
-#[test]
-fn test_comment_processor_removes_comment_text() {
-    let out = CommentProcessor::new()
-        .process(
-            &GcodeCommand::new("G1 X10 (move fast) Y5"),
-            &GcodeState::default(),
-        )
-        .expect("process");
-    assert!(!out[0].command.contains("move"));
-    assert!(out[0].command.contains("Y5"));
-}
-
-#[test]
-fn test_arc_expander_does_not_duplicate_arcs() {
-    let processor: Arc<dyn CommandProcessor> = Arc::new(ArcExpander::new());
-    let out = processor
-        .process(
-            &GcodeCommand::new("G02 X10 Y0 I5 J0"),
-            &GcodeState::default(),
-        )
-        .expect("process");
-    assert_eq!(out.len(), 1);
-}
-
-#[test]
-fn test_file_stream_seek_mid_file_not_eof() {
-    let dir = tempfile::tempdir().expect("tempdir");
-    let path = dir.path().join("s.nc");
-    fs::write(&path, "L1\nL2\nL3\n").expect("write");
-    let mut reader = FileStreamReader::new(&path).expect("reader");
-    reader.seek_to_line(2).expect("seek");
-    assert!(!reader.is_eof());
-    assert_eq!(
-        reader.read_line().expect("read").as_deref().map(str::trim),
-        Some("L3")
-    );
 }
 
 #[test]
