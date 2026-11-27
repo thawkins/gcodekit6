@@ -54,23 +54,26 @@ sudo usermod -aG dialout $USER
 3. Check for triggered limit switches
 4. See [Machine Control](10-machine-control.md) for alarm handling
 
-### Auto-Detection Fails
+### Connection Rejected: Firmware Mismatch
 
-**Symptoms**: Firmware type shows "Unknown" after connecting.
+**Symptoms**: The connection closes right after connecting with "Connection rejected: active
+machine is configured as ... but the device responded as ...".
 
-**Solutions**:
-1. Ensure the controller is fully booted before connecting
-2. Check the console for startup messages
-3. Try disconnecting and reconnecting
+**Cause**: The app does not detect the firmware. It uses the **Controller** field of the
+active device profile, and closes the connection when the controller identifies itself as a
+different protocol (for example a Repetier board on a GRBL profile).
+
+**Solution**: In the Device Manager, set the profile's **Controller** to match your firmware,
+or make the right profile active with **Set Active**. See
+[Supported Controllers](05-supported-controllers.md).
 
 ## Diagnostic Steps
 
 1. Open the **Console** panel and observe messages during connection
 2. Enable debug logging: `RUST_LOG=debug ./target/release/gcodekit5`
-3. Check the **Safety & Diagnostics** panel for communication health indicators
-4. Verify the firmware responds to manual commands (type `$$` in the console for GRBL)
+3. Verify the firmware responds to manual commands (type `$$` in the console for GRBL)
 
 ## Still Having Issues?
 
-- [GitHub Issues](https://github.com/thawkins/gcodekit5/issues)
+- [GitHub Issues](https://github.com/thawkins/gcodekit6/issues)
 - [FAQ](92-faq.md)

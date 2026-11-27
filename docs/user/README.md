@@ -2,8 +2,6 @@
 
 Welcome to the GCodeKit5 User Guide. This documentation covers all features of GCodeKit5, a modern CNC machine controller and CAM suite.
 
-**Version**: 0.50.2-alpha.0
-
 ---
 
 ## Table of Contents
@@ -14,8 +12,8 @@ Welcome to the GCodeKit5 User Guide. This documentation covers all features of G
 - [Quick Start](03-quick-start.md) — Get up and running in 5 minutes
 
 ### Connecting to Your Machine
-- [Device Setup](04-device-setup.md) — Serial, TCP/IP, and WebSocket connections
-- [Supported Controllers](05-supported-controllers.md) — GRBL, grblHAL, TinyG, g2core, FluidNC, Smoothieware
+- [Device Setup](04-device-setup.md) — Device profiles, Serial, TCP/IP, and WebSocket connections
+- [Supported Controllers](05-supported-controllers.md) — GRBL and Repetier (grblHAL and FluidNC via GRBL)
 - [Troubleshooting Connections](06-connection-troubleshooting.md) — Common connection issues
 
 ### Machine Operation
@@ -35,13 +33,15 @@ Welcome to the GCodeKit5 User Guide. This documentation covers all features of G
 
 ### CAM Tools
 - [CAM Tools Overview](50-camtools.md) — All built-in G-code generators
+- [Touch Probe Guide](PROBING.md) — Probe routines for work offsets and tool length
 
 ### Tools, Materials & Settings
 - [Tool Library & Materials](60-tool-library.md) — Managing tools and material database
 - [Application Settings](70-settings.md) — Preferences and configuration
+- [6-Axis Support](6AXIS.md) — Machines with A, B and C axes
 
 ### Safety & Advanced
-- [Safety & Diagnostics](85-safety-diagnostics.md) — E-Stop, interlocks, communication health
+- [Safety](85-safety-diagnostics.md) — E-STOP and feed hold
 - [Help System](87-help-system.md) — Built-in help browser
 
 ### Appendix
@@ -71,6 +71,5 @@ Welcome to the GCodeKit5 User Guide. This documentation covers all features of G
 ## Getting Help
 
 - **Built-in Help**: Use the Help menu or press the Help button on any panel
-- **GitHub Issues**: [Report bugs or request features](https://github.com/thawkins/gcodekit5/issues)
-- **Discussions**: [Ask questions and share ideas](https://github.com/thawkins/gcodekit5/discussions)
+- **GitHub Issues**: [Report bugs or request features](https://github.com/thawkins/gcodekit6/issues)
 - **Email**: tim.thawkins@gmail.com
