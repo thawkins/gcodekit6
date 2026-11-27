@@ -1,8 +1,8 @@
-# Build Statistics
+# Build statistics snapshot, 2026-11-27, 2.0.0-alpha.3
 
 - **Date**: 2026-11-27
 - **Version**: 2.0.0-alpha.3
-- **Host**: TimWorkFed01.local, Linux 7.3.4 (Fedora 45), 8 CPUs
+- **Host**: developer workstation, Fedora 45 (Linux 7.3.4), 8 CPUs
 - **Toolchain**: cargo 1.102.0-nightly (ae8f06eb4 2026-11-21), rustc 1.102.0-nightly (6c709eb42 2026-11-25)
 
 ## Build phases

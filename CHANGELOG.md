@@ -1,3 +1,10 @@
+# Changelog
+
+All notable changes to this project are documented here. The format follows
+[Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
+[Semantic Versioning](https://semver.org/). Release notes are generated from the
+`## [x.y.z]` sections by `scripts/release_notes.py`.
+
 ## [2.0.0-alpha.4] - 2026-11-28
 
 ### Added
