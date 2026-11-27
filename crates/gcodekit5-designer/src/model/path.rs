@@ -15,6 +15,7 @@ use csgrs::traits::CSG;
 use nalgebra::Matrix4;
 
 use super::{DesignerShape, LaserParams, Point, Property, PropertyValue};
+use crate::geometry::point_segment_distance;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ParametricPathSource {
@@ -42,27 +43,6 @@ pub struct DesignPath {
     #[serde(default)]
     pub parametric_source: Option<ParametricPathSource>,
     pub laser_params: LaserParams,
-}
-
-fn distance_to_line_segment(x1: f64, y1: f64, x2: f64, y2: f64, px: f64, py: f64) -> f64 {
-    let dx = x2 - x1;
-    let dy = y2 - y1;
-
-    if dx == 0.0 && dy == 0.0 {
-        let dx = px - x1;
-        let dy = py - y1;
-        return (dx * dx + dy * dy).sqrt();
-    }
-
-    let t = ((px - x1) * dx + (py - y1) * dy) / (dx * dx + dy * dy);
-    let t_clamped = t.clamp(0.0, 1.0);
-
-    let proj_x = x1 + t_clamped * dx;
-    let proj_y = y1 + t_clamped * dy;
-
-    let dx = px - proj_x;
-    let dy = py - proj_y;
-    (dx * dx + dy * dy).sqrt()
 }
 
 impl DesignPath {
@@ -130,13 +110,11 @@ impl DesignPath {
                 }
                 lyon::path::Event::Line { to, .. } => {
                     if let Some(from) = prev_point {
-                        let dist = distance_to_line_segment(
-                            from.x as f64,
-                            from.y as f64,
-                            to.x as f64,
-                            to.y as f64,
-                            point.x,
-                            point.y,
+                        let dist = point_segment_distance(
+                            point,
+                            &Point::new(from.x as f64, from.y as f64),
+                            &Point::new(to.x as f64, to.y as f64),
+                            0.0,
                         );
                         min_distance = min_distance.min(dist);
                     }
@@ -144,13 +122,11 @@ impl DesignPath {
                 }
                 lyon::path::Event::End { close, .. } => {
                     if close && let (Some(from), Some(to)) = (prev_point, first_point) {
-                        let dist = distance_to_line_segment(
-                            from.x as f64,
-                            from.y as f64,
-                            to.x as f64,
-                            to.y as f64,
-                            point.x,
-                            point.y,
+                        let dist = point_segment_distance(
+                            point,
+                            &Point::new(from.x as f64, from.y as f64),
+                            &Point::new(to.x as f64, to.y as f64),
+                            0.0,
                         );
                         min_distance = min_distance.min(dist);
                     }

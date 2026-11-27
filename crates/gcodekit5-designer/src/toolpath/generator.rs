@@ -3,6 +3,7 @@
 use super::*;
 
 use crate::Ellipse;
+use crate::geometry::point_in_polygon;
 use crate::model::TextLayout;
 use lyon::path::iterator::PathIterator;
 use rusttype::OutlineBuilder;
@@ -1824,18 +1825,4 @@ fn group_contours_even_odd(contours: &[Vec<Point>]) -> Vec<(usize, Vec<usize>)> 
             (i, holes)
         })
         .collect()
-}
-
-/// Even-odd ray-casting test: returns true if `p` lies inside the closed polygon `poly`.
-fn point_in_polygon(p: &Point, poly: &[Point]) -> bool {
-    let mut inside = false;
-    let mut j = poly.len() - 1;
-    for i in 0..poly.len() {
-        let (a, b) = (&poly[i], &poly[j]);
-        if (a.y > p.y) != (b.y > p.y) && p.x < (b.x - a.x) * (p.y - a.y) / (b.y - a.y) + a.x {
-            inside = !inside;
-        }
-        j = i;
-    }
-    inside
 }

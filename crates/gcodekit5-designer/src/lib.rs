@@ -36,6 +36,7 @@ pub mod commands;
 pub mod dxf_parser;
 pub mod font_manager;
 pub mod gcode_gen;
+pub mod geometry;
 pub mod import;
 pub mod model;
 pub mod model3d;

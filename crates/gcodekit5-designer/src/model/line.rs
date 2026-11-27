@@ -12,6 +12,7 @@ use csgrs::traits::CSG;
 use nalgebra::{Matrix4, Vector3};
 
 use super::{DesignerShape, LaserParams, Point, Property, PropertyValue};
+use crate::geometry::point_segment_distance;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DesignLine {
@@ -36,30 +37,7 @@ impl DesignLine {
     }
 
     pub fn distance_to_point(&self, point: &Point) -> f64 {
-        // Vector de start a end
-        let dx = self.end.x - self.start.x;
-        let dy = self.end.y - self.start.y;
-
-        // If the line is a point
-        if dx == 0.0 && dy == 0.0 {
-            let dx = point.x - self.start.x;
-            let dy = point.y - self.start.y;
-            return (dx * dx + dy * dy).sqrt();
-        }
-
-        // Projection of the point onto the line
-        let t =
-            ((point.x - self.start.x) * dx + (point.y - self.start.y) * dy) / (dx * dx + dy * dy);
-
-        // Find the nearest point on the segment
-        let t_clamped = t.clamp(0.0, 1.0);
-        let proj_x = self.start.x + t_clamped * dx;
-        let proj_y = self.start.y + t_clamped * dy;
-
-        // Distance to the projected point
-        let dx = point.x - proj_x;
-        let dy = point.y - proj_y;
-        (dx * dx + dy * dy).sqrt()
+        point_segment_distance(point, &self.start, &self.end, 0.0)
     }
 
     pub fn current_angle_degrees(&self) -> f64 {
