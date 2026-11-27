@@ -1,243 +1,97 @@
-# GCodeKit5 Design File Format (.gck4)
+# GCodeKit5 Design File Format (.gckd)
 
-This document describes the GCodeKit5 design file format used for saving and loading CAD/CAM designs.
+The designer saves designs as JSON files with the `.gckd` extension. Open also accepts `.gck5`
+files. The format stores shapes, viewport, toolpath parameters and metadata.
 
-## Overview
-
-GCodeKit5 uses JSON-based design files with the `.gck4` extension. The format stores complete design state including shapes, viewport settings, toolpath parameters, and metadata.
+The full schema is the `DesignFile` and `ShapeData` structs in
+`crates/gcodekit5-designer/src/serialization.rs`. This page covers the stable core and the
+defaults. Lengths are millimetres (`f64` in the shape data).
 
 ## File Structure
 
 ```json
 {
-  "version": "1.0",
+  "version": "1.1",
+  "design_mode": "2d",
   "metadata": {
     "name": "Design Name",
     "created": "2026-01-30T10:00:00Z",
     "modified": "2026-01-30T12:00:00Z",
-    "author": "Optional Author",
-    "description": "Optional Description"
-  },
-  "viewport": {
-    "zoom": 1.0,
-    "pan_x": 0.0,
-    "pan_y": 0.0
-  },
-  "shapes": [...],
-  "default_properties": {...},
-  "toolpath_params": {...}
-}
-```
-
-## Version
-
-| Version | Description |
-|---------|-------------|
-| 1.0 | Initial format (current) |
-
-## Metadata
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `name` | string | Design name |
-| `created` | ISO 8601 datetime | Creation timestamp |
-| `modified` | ISO 8601 datetime | Last modification timestamp |
-| `author` | string | Optional author name |
-| `description` | string | Optional description |
-
-## Viewport State
-
-| Field | Type | Default | Description |
-|-------|------|---------|-------------|
-| `zoom` | float | 1.0 | Zoom level (1.0 = 100%) |
-| `pan_x` | float | 0.0 | Horizontal pan offset (mm) |
-| `pan_y` | float | 0.0 | Vertical pan offset (mm) |
-
-## Shape Data
-
-Each shape in the `shapes` array has the following structure:
-
-### Common Properties
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `id` | integer | Unique shape identifier |
-| `shape_type` | string | Type of shape (see below) |
-| `name` | string | Display name |
-| `x` | float | X position (mm) |
-| `y` | float | Y position (mm) |
-| `width` | float | Width (mm) |
-| `height` | float | Height (mm) |
-| `rotation` | float | Rotation angle (degrees) |
-| `selected` | boolean | Selection state |
-| `group_id` | integer? | Optional group ID |
-
-### Shape Types
-
-| Type | Description | Additional Fields |
-|------|-------------|-------------------|
-| `rectangle` | Rectangle/slot | `corner_radius`, `is_slot` |
-| `circle` | Circle | - |
-| `ellipse` | Ellipse | - |
-| `line` | Line segment | - |
-| `triangle` | Triangle | - |
-| `polygon` | Regular polygon | `sides` |
-| `path` | Bezier path | `path_data` (SVG path) |
-| `text` | Text shape | `text_content`, `font_*` |
-| `gear` | Involute gear | `teeth`, `module`, `pressure_angle` |
-| `sprocket` | Roller chain sprocket | `teeth`, `pitch`, `roller_diameter` |
-
-### Operation Properties
-
-| Field | Type | Default | Description |
-|-------|------|---------|-------------|
-| `operation_type` | string | "profile" | `"profile"` or `"pocket"` |
-| `use_custom_values` | boolean | false | Use shape-specific toolpath settings |
-| `pocket_depth` | float | 0.0 | Total pocket depth (mm) |
-| `start_depth` | float | 0.0 | Starting depth (mm) |
-| `step_down` | float | 0.0 | Depth per pass (mm) |
-| `step_in` | float | 0.0 | Stepover distance (mm) |
-| `ramp_angle` | float | 0.0 | Ramp entry angle (degrees) |
-| `pocket_strategy` | string | "ContourParallel" | Pocket toolpath strategy |
-| `raster_fill_ratio` | float | 0.5 | Raster fill ratio (0-1) |
-
-### Modifier Properties
-
-| Field | Type | Default | Description |
-|-------|------|---------|-------------|
-| `offset` | float | 0.0 | Contour offset (mm) |
-| `fillet` | float | 0.0 | Fillet radius (mm) |
-| `chamfer` | float | 0.0 | Chamfer size (mm) |
-| `lock_aspect_ratio` | boolean | true | Lock aspect ratio during resize |
-
-### Text Properties
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `text_content` | string | Text string |
-| `font_size` | float | Font size (points) |
-| `font_family` | string | Font family name |
-| `font_bold` | boolean | Bold weight |
-| `font_italic` | boolean | Italic style |
-
-### Path Properties
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `path_data` | string | SVG path data (M, L, C, Q, Z commands) |
-
-### Gear Properties
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `teeth` | integer | Number of teeth |
-| `module` | float | Module (mm) |
-| `pressure_angle` | float | Pressure angle (degrees, typically 20) |
-
-### Sprocket Properties
-
-| Field | Type | Description |
-|-------|------|-------------|
-| `teeth` | integer | Number of teeth |
-| `pitch` | float | Chain pitch (mm) |
-| `roller_diameter` | float | Roller diameter (mm) |
-
-## Toolpath Parameters
-
-Global toolpath generation settings:
-
-| Field | Type | Default | Description |
-|-------|------|---------|-------------|
-| `feed_rate` | float | 1000.0 | Feed rate (mm/min) |
-| `spindle_speed` | float | 3000.0 | Spindle speed (RPM) |
-| `tool_diameter` | float | 3.175 | Tool diameter (mm) |
-| `cut_depth` | float | -5.0 | Default cut depth (mm) |
-| `stock_width` | float | 200.0 | Stock width (mm) |
-| `stock_height` | float | 200.0 | Stock height (mm) |
-| `stock_thickness` | float | 10.0 | Stock thickness (mm) |
-| `safe_z_height` | float | 10.0 | Safe Z height (mm) |
-
-## Default Properties
-
-The `default_properties` field stores a `ShapeData` object used as a template for new shapes. It contains the default operation type, depths, and other settings applied to newly created shapes.
-
-## Pocket Strategies
-
-| Strategy | Description |
-|----------|-------------|
-| `ContourParallel` | Offset contours from outside in |
-| `ZigZag` | Back-and-forth raster pattern |
-| `Spiral` | Continuous spiral from outside in |
-| `Adaptive` | Adaptive clearing (constant engagement) |
-
-## Example File
-
-```json
-{
-  "version": "1.0",
-  "metadata": {
-    "name": "Example Design",
-    "created": "2026-01-30T10:00:00Z",
-    "modified": "2026-01-30T10:00:00Z",
     "author": "",
     "description": ""
   },
-  "viewport": {
-    "zoom": 1.0,
-    "pan_x": 0.0,
-    "pan_y": 0.0
-  },
-  "shapes": [
-    {
-      "id": 1,
-      "shape_type": "rectangle",
-      "name": "Main Pocket",
-      "x": 10.0,
-      "y": 10.0,
-      "width": 50.0,
-      "height": 30.0,
-      "rotation": 0.0,
-      "selected": false,
-      "operation_type": "pocket",
-      "use_custom_values": true,
-      "pocket_depth": -5.0,
-      "start_depth": 0.0,
-      "step_down": 1.0,
-      "step_in": 1.5,
-      "corner_radius": 3.0,
-      "is_slot": false
-    }
-  ],
-  "toolpath_params": {
-    "feed_rate": 1000.0,
-    "spindle_speed": 12000.0,
-    "tool_diameter": 3.175,
-    "cut_depth": -5.0,
-    "stock_width": 100.0,
-    "stock_height": 100.0,
-    "stock_thickness": 10.0,
-    "safe_z_height": 5.0
-  }
+  "viewport": { "zoom": 1.0, "pan_x": 0.0, "pan_y": 0.0 },
+  "shapes": [],
+  "default_properties": null,
+  "toolpath_params": {}
 }
 ```
 
-## Error Handling
+| Field | Description |
+|-------|-------------|
+| `version` | Format version written by the app: `"1.1"` |
+| `design_mode` | `"2d"` (default) or `"3d"` |
+| `metadata` | `name`, `created` and `modified` (UTC, ISO 8601); optional `author`, `description` |
+| `viewport` | `zoom` and pan offset `pan_x`, `pan_y` |
+| `shapes` | Array of `ShapeData` objects |
+| `default_properties` | Optional `ShapeData` used as the template for new shapes |
+| `toolpath_params` | Global toolpath settings (below) |
 
-The loader handles:
-- Missing optional fields (uses defaults)
-- Unknown shape types (returns error)
-- Invalid JSON (returns parse error)
-- File I/O errors (returns I/O error)
+## Shapes
 
-All errors are returned as `anyhow::Result` with context messages.
+Every shape has `id`, `shape_type`, `x`, `y`, `width`, `height` and `selected`, plus optional
+`name`, `rotation` (degrees) and `group_id`. Operation fields include `operation_type`
+(`"profile"` or `"pocket"`), `pocket_depth`, `start_depth`, `step_down`, `step_in` and
+`pocket_strategy`.
 
-## Compatibility
+### Shape Types
 
-- Forward compatibility: Unknown fields are ignored
-- Backward compatibility: Missing fields use defaults via `#[serde(default)]`
+Written by the app: `rectangle`, `circle`, `line`, `ellipse`, `path`, `text`, `triangle`,
+`polygon`, `gear`, `sprocket`, `raster_image`. The reader also accepts the legacy `polyline` type.
+
+### Pocket Strategies
+
+`pocket_strategy` is one of:
+
+| Value | Description |
+|-------|-------------|
+| `"ContourParallel"` | Offset contours (default) |
+| `{"Raster": {"angle": <deg>, "bidirectional": <bool>}}` | Raster (zig-zag) lines at an angle |
+| `"Adaptive"` | Adaptive clearing |
+
+### Shape Defaults
+
+| Field | Default |
+|-------|---------|
+| `raster_fill_ratio` | 0.5 |
+| `lock_aspect_ratio` | false |
+
+Other missing shape fields take their type's zero value or the default named in `ShapeData`.
+
+## Toolpath Parameters
+
+| Field | Default |
+|-------|---------|
+| `feed_rate` | 1000.0 (mm/min) |
+| `spindle_speed` | 3000.0 (RPM) |
+| `tool_diameter` | 3.175 |
+| `cut_depth` | -5.0 |
+| `step_down` | 1.0 |
+| `stock_width` | 200.0 |
+| `stock_height` | 200.0 |
+| `stock_thickness` | 10.0 |
+| `safe_z_height` | stock thickness + 5.0 (15.0) |
+
+## Loading and Compatibility
+
+- Missing fields use their serde defaults; unknown fields are ignored.
+- Invalid JSON or a file I/O failure returns an error (`anyhow::Result` with context).
+- An unknown `shape_type` is an error in the shape converter (`DesignFile::to_drawing_object`).
+  The app's load path (`DesignerState::load_from_file_report`) skips such a shape and lists it in
+  the `LoadReport`; a later save writes the file without it.
 
 ## Related Files
 
-- `crates/gcodekit5-designer/src/serialization.rs` - Implementation
-- `crates/gcodekit5-designer/src/designer_state/file_io.rs` - File I/O methods
-- `crates/gcodekit5-designer/tests/io/serialization.rs` - Tests
+- `crates/gcodekit5-designer/src/serialization.rs` - Format and conversion
+- `crates/gcodekit5-designer/src/designer_state/file_io.rs` - Save and load on `DesignerState`
+- `crates/gcodekit5-designer/tests/test_design_file_round_trip.rs` - Round-trip tests
