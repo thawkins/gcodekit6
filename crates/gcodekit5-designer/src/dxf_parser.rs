@@ -318,7 +318,8 @@ pub struct DxfFile {
     pub entities: Vec<DxfEntity>,
     /// Entities organized by layer
     pub layers: HashMap<String, Vec<DxfEntity>>,
-    /// Unsupported entity types encountered (e.g. ACIS solids), mapped to occurrence count
+    /// Entity types in the ENTITIES section that were skipped (e.g. ACIS solids, INSERT,
+    /// MTEXT, HATCH), mapped to occurrence count
     pub unsupported_entities: HashMap<String, usize>,
     /// Values that were not numbers and were replaced by a default
     pub replaced_numbers: usize,
@@ -538,6 +539,40 @@ fn parse_opt<T: DxfNumber>(value: &str) -> Option<T> {
 /// DXF parser for parsing DXF file contents
 pub struct DxfParser;
 
+/// The characters of Windows code page 1252 for the bytes 0x80..=0x9F; the other
+/// bytes above 0x7F are the Latin-1 code points. Undefined bytes map to U+FFFD.
+const CP1252_HIGH: [char; 32] = [
+    '\u{20AC}', '\u{FFFD}', '\u{201A}', '\u{0192}', '\u{201E}', '\u{2026}', '\u{2020}', '\u{2021}',
+    '\u{02C6}', '\u{2030}', '\u{0160}', '\u{2039}', '\u{0152}', '\u{FFFD}', '\u{017D}', '\u{FFFD}',
+    '\u{FFFD}', '\u{2018}', '\u{2019}', '\u{201C}', '\u{201D}', '\u{2022}', '\u{2013}', '\u{2014}',
+    '\u{02DC}', '\u{2122}', '\u{0161}', '\u{203A}', '\u{0153}', '\u{FFFD}', '\u{017E}', '\u{0178}',
+];
+
+/// Decodes the bytes of a DXF file to text.
+///
+/// DXF files from AutoCAD 2007 on are UTF-8; older files are written in the drawing's
+/// code page (`$DWGCODEPAGE`, in practice ANSI_1252 for most western drawings), so a
+/// non-ASCII layer name or text would make a strict UTF-8 read fail. Content that is not
+/// valid UTF-8 is therefore read as Windows-1252.
+///
+/// # Arguments
+/// * `bytes` - The raw file content.
+///
+/// # Returns
+/// The decoded text.
+pub fn decode_dxf_bytes(bytes: &[u8]) -> String {
+    match std::str::from_utf8(bytes) {
+        Ok(text) => text.to_string(),
+        Err(_) => bytes
+            .iter()
+            .map(|&b| match b {
+                0x80..=0x9F => CP1252_HIGH[usize::from(b - 0x80)],
+                _ => char::from(b),
+            })
+            .collect(),
+    }
+}
+
 impl DxfParser {
     /// Parse DXF content from a string
     pub fn parse(content: &str) -> Result<DxfFile> {
@@ -641,15 +676,32 @@ impl DxfParser {
                                 file.add_entity(DxfEntity::Polyline(spline_entity));
                             }
                         }
-                        // ACIS-based solids (3DSOLID/BODY/REGION) are not parseable without a CAD kernel; track and discard.
-                        "3DSOLID" | "BODY" | "REGION" => {
-                            *file
-                                .unsupported_entities
-                                .entry(entity_type.to_string())
-                                .or_insert(0) += 1;
+                        // Every other entity (ACIS solids, INSERT block references, MTEXT,
+                        // HATCH, DIMENSION, ...) is skipped and counted, so the import can
+                        // say what was discarded. The scan is not aligned to group-code
+                        // pairs, so a value "0" followed by a numeric group code also lands
+                        // here: a group code is an integer, an entity type is a word.
+                        // VERTEX and SEQEND belong to the POLYLINE parser.
+                        // `0 / ENDSEC` closes the section; without this the later sections
+                        // (OBJECTS, ...) would be scanned, and counted, as entities.
+                        "ENDSEC" => {
+                            in_entities = false;
                             i += 1;
                         }
-                        _ => i += 1,
+                        other => {
+                            if !other.is_empty()
+                                && other.parse::<i64>().is_err()
+                                && other.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
+                                && other != "VERTEX"
+                                && other != "SEQEND"
+                            {
+                                *file
+                                    .unsupported_entities
+                                    .entry(other.to_string())
+                                    .or_insert(0) += 1;
+                            }
+                            i += 1;
+                        }
                     }
                     continue;
                 }
@@ -910,7 +962,7 @@ impl DxfParser {
 
     /// Parse a POLYLINE entity
     fn parse_polyline(lines: &[&str], index: &mut usize) -> Result<DxfPolyline> {
-        let mut raw_vertices: Vec<(Point, i32)> = Vec::new();
+        let mut raw_vertices: Vec<(Point, i32, f64)> = Vec::new();
         let mut closed = false;
         let mut layer = "0".to_string();
         let mut color = 256u16;
@@ -979,6 +1031,7 @@ impl DxfParser {
                 let mut vx: Option<f64> = None;
                 let mut vy: Option<f64> = None;
                 let mut vertex_flags: i32 = 0;
+                let mut bulge = 0.0;
 
                 // Parse VERTEX body
                 while *index < lines.len() {
@@ -1007,12 +1060,14 @@ impl DxfParser {
                             }
                         }
                         "70" => vertex_flags = parse_or(v_value, 0),
+                        // Bulge of the segment that starts at this vertex.
+                        "42" => bulge = parse_or(v_value, 0.0),
                         _ => {}
                     }
                 }
 
                 if let (Some(x), Some(y)) = (vx, vy) {
-                    raw_vertices.push((Point::new(x, y), vertex_flags));
+                    raw_vertices.push((Point::new(x, y), vertex_flags, bulge));
                 }
             } else {
                 // Found unexpected entity type inside POLYLINE sequence
@@ -1032,32 +1087,45 @@ impl DxfParser {
         let mut vertices: Vec<Point> = if is_spline_fit {
             let curve_vertices: Vec<Point> = raw_vertices
                 .iter()
-                .filter(|(_, flags)| flags & 8 != 0)
-                .map(|(p, _)| *p)
+                .filter(|(_, flags, _)| flags & 8 != 0)
+                .map(|(p, _, _)| *p)
                 .collect();
             if curve_vertices.is_empty() {
-                raw_vertices.into_iter().map(|(p, _)| p).collect()
+                raw_vertices.iter().map(|(p, _, _)| *p).collect()
             } else {
                 curve_vertices
             }
         } else {
-            raw_vertices.into_iter().map(|(p, _)| p).collect()
+            raw_vertices.iter().map(|(p, _, _)| *p).collect()
         };
 
         // 3D polylines (flag 8) and polyface meshes (flag 64) use world coordinates;
         // 2D polylines are in the OCS.
         let is_ocs = header_flags & (8 | 16 | 64) == 0;
+
+        // Bulges describe arcs between the vertices of a plain 2D polyline only; the
+        // curve vertices of a spline-fit polyline and 3D/mesh vertices are joined by lines.
+        let mut bulges: Vec<f64> = if is_ocs && !is_spline_fit {
+            raw_vertices.iter().map(|(_, _, b)| *b).collect()
+        } else {
+            vec![0.0; vertices.len()]
+        };
+
         let mut elevation = elevation.unwrap_or(0.0);
         if is_ocs && extrusion_is_negative_z(extrusion_z) {
+            // Mirroring reverses the turning direction of every bulge arc.
             for v in &mut vertices {
                 v.x = -v.x;
+            }
+            for b in &mut bulges {
+                *b = -*b;
             }
             elevation = -elevation;
         }
 
         Ok(DxfPolyline {
             vertices,
-            bulges: vec![],
+            bulges,
             closed,
             layer,
             color,

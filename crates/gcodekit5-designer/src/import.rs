@@ -12,7 +12,7 @@
 //! - Coordinate system transformation
 //! - Scale and offset adjustment
 
-use crate::dxf_parser::{DxfEntity, DxfFile, DxfParser};
+use crate::dxf_parser::{DxfEntity, DxfFile, DxfParser, decode_dxf_bytes};
 use crate::model::{
     DesignCircle as Circle, DesignEllipse as Ellipse, DesignLine as Line, DesignPath as PathShape,
     DesignRectangle as Rectangle, DesignerShape, Point, Shape,
@@ -476,6 +476,46 @@ impl SvgImporter {
 /// Shapes converted from DXF entities, paired with their Z metadata.
 type ConvertedEntities = (Vec<Shape>, Vec<(f64, f64)>);
 
+/// The largest angle one cubic Bezier spans in an imported DXF circle, arc or ellipse.
+/// A cubic over pi/8 strays from the true circle by about 7e-8 of the radius (0.00004 mm
+/// at r = 500 mm), so the accuracy no longer degrades with the radius as a fixed polygon
+/// did.
+const DXF_ARC_PIECE: f32 = std::f32::consts::PI / 8.0;
+
+/// Appends an elliptic arc (a circle when both radii are equal) to `builder` as cubic
+/// Beziers, starting from the point the builder is at.
+///
+/// # Arguments
+/// * `builder` - Path builder positioned at the arc's start point.
+/// * `center` - Centre of the ellipse.
+/// * `radii` - Semi-axes along the rotated x and y axes.
+/// * `rotation` - Rotation of the x semi-axis, radians.
+/// * `start` - Parametric start angle, radians.
+/// * `sweep` - Parametric sweep, radians (positive is counter-clockwise).
+fn append_dxf_arc(
+    builder: &mut lyon::path::path::Builder,
+    center: lyon::math::Point,
+    radii: lyon::math::Vector,
+    rotation: f32,
+    start: f32,
+    sweep: f32,
+) {
+    let pieces = (sweep.abs() / DXF_ARC_PIECE).ceil().max(1.0) as usize;
+    let step = sweep / pieces as f32;
+    for i in 0..pieces {
+        let arc = lyon::geom::Arc {
+            center,
+            radii,
+            x_rotation: lyon::math::Angle::radians(rotation),
+            start_angle: lyon::math::Angle::radians(start + step * i as f32),
+            sweep_angle: lyon::math::Angle::radians(step),
+        };
+        arc.for_each_cubic_bezier(&mut |c| {
+            builder.cubic_bezier_to(c.ctrl1, c.ctrl2, c.to);
+        });
+    }
+}
+
 /// DXF importer for converting DXF files to Designer shapes
 pub struct DxfImporter {
     pub scale: f64,
@@ -501,10 +541,9 @@ impl DxfImporter {
     /// # Returns
     /// Imported design with converted shapes
     pub fn import_file(&self, path: &str) -> Result<ImportedDesign> {
-        let content =
-            std::fs::read_to_string(path).map_err(|e| anyhow!("Failed to read DXF file: {}", e))?;
+        let bytes = std::fs::read(path).map_err(|e| anyhow!("Failed to read DXF file: {}", e))?;
 
-        self.import_string(&content)
+        self.import_string(&decode_dxf_bytes(&bytes))
     }
 
     /// Import DXF from string content
@@ -586,17 +625,16 @@ impl DxfImporter {
                     let center = point(circle.center.x as f32, circle.center.y as f32);
                     let radius = circle.radius as f32;
 
-                    let steps = 64; // Número de puntos para un círculo suave
                     let start_point = center + lyon::math::vector(radius, 0.0);
                     builder.begin(start_point);
-
-                    for i in 1..=steps {
-                        let angle = 2.0 * std::f32::consts::PI * (i as f32 / steps as f32);
-                        let x = center.x + radius * angle.cos();
-                        let y = center.y + radius * angle.sin();
-                        builder.line_to(point(x, y));
-                    }
-
+                    append_dxf_arc(
+                        &mut builder,
+                        center,
+                        vector(radius, radius),
+                        0.0,
+                        0.0,
+                        2.0 * std::f32::consts::PI,
+                    );
                     builder.close();
                     Some(builder.build())
                 }
@@ -614,24 +652,17 @@ impl DxfImporter {
                         sweep_angle += 2.0 * std::f32::consts::PI;
                     }
 
-                    let steps = 64; // Número de puntos para un arco suave
-                    let steps =
-                        (steps as f32 * sweep_angle / (2.0 * std::f32::consts::PI)).ceil() as usize;
-                    let steps = steps.max(4); // Mínimo 4 puntos para arcos pequeños
-
-                    // Punto inicial
                     let start_point =
                         center + vector(radius * start_angle.cos(), radius * start_angle.sin());
                     builder.begin(start_point);
-
-                    // Generar puntos intermedios
-                    for i in 1..=steps {
-                        let t = start_angle + sweep_angle * (i as f32 / steps as f32);
-                        let x = center.x + radius * t.cos();
-                        let y = center.y + radius * t.sin();
-                        builder.line_to(point(x, y));
-                    }
-
+                    append_dxf_arc(
+                        &mut builder,
+                        center,
+                        vector(radius, radius),
+                        0.0,
+                        start_angle,
+                        sweep_angle,
+                    );
                     builder.end(false);
                     Some(builder.build())
                 }
@@ -656,7 +687,6 @@ impl DxfImporter {
                         sweep_angle += 2.0 * std::f32::consts::PI;
                     }
 
-                    let steps = 64;
                     let mut builder = Path::builder();
 
                     let start_x = center.x + major_radius * rotation.cos() * start_angle.cos()
@@ -665,16 +695,14 @@ impl DxfImporter {
                         + major_radius * rotation.sin() * start_angle.cos()
                         + minor_radius * rotation.cos() * start_angle.sin();
                     builder.begin(point(start_x, start_y));
-
-                    for i in 1..=steps {
-                        let t = start_angle + sweep_angle * (i as f32 / steps as f32);
-                        let x = center.x + major_radius * rotation.cos() * t.cos()
-                            - minor_radius * rotation.sin() * t.sin();
-                        let y = center.y
-                            + major_radius * rotation.sin() * t.cos()
-                            + minor_radius * rotation.cos() * t.sin();
-                        builder.line_to(point(x, y));
-                    }
+                    append_dxf_arc(
+                        &mut builder,
+                        center,
+                        vector(major_radius, minor_radius),
+                        rotation,
+                        start_angle,
+                        sweep_angle,
+                    );
 
                     let is_complete = (sweep_angle - 2.0 * std::f32::consts::PI).abs() < 0.001;
                     if is_complete {

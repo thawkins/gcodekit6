@@ -60,10 +60,8 @@ pub fn msgids() -> Vec<&'static str> {
         n_!("Error importing file:"),
         n_!("3D depth detected"),
         n_!("Object with depth: Switching to CNC 3D mode."),
-        n_!("Unsupported 3D solids discarded"),
-        n_!(
-            "This DXF file contains ACIS solid entities (3D solids) that are not supported and were discarded:"
-        ),
+        n_!("Unsupported DXF entities discarded"),
+        n_!("This DXF file contains entity types that are not supported and were discarded:"),
         n_!("Invalid numbers replaced"),
         n_!(
             "values in this DXF file were not numbers and were replaced by defaults, so some geometry may be wrong."
@@ -290,7 +288,7 @@ impl DesignerPane {
     /// Adds the imported shapes, with their depth, then fits the view.
     ///
     /// # Returns
-    /// The warnings to show: CNC mode switched on, solids discarded, numbers replaced.
+    /// The warnings to show: CNC mode switched on, unsupported DXF entities discarded, numbers replaced.
     fn add_imported(&mut self, mut design: ImportedDesign, tr: &Translator) -> Vec<String> {
         let unsupported = std::mem::take(&mut design.unsupported_entities);
         let mut z = std::mem::take(&mut design.z_metadata);
@@ -341,8 +339,10 @@ impl DesignerPane {
                 .collect();
             messages.push(format!(
                 "{}: {} {}",
-                tr.tr("Unsupported 3D solids discarded"),
-                tr.tr("This DXF file contains ACIS solid entities (3D solids) that are not supported and were discarded:"),
+                tr.tr("Unsupported DXF entities discarded"),
+                tr.tr(
+                    "This DXF file contains entity types that are not supported and were discarded:"
+                ),
                 details.join(", ")
             ));
         }
