@@ -1,7 +1,9 @@
 # ADR-008: Internal Units System
 
 ## Status
-Accepted
+Accepted (amended)
+
+Amended 2026-11-28: dimensions are `f64` mm (owner decision OD-2); the display helpers stay `f32`; `parse_length` returns `Result<f32, String>`. This ADR is the canonical statement of the units rules.
 
 ## Date
 2026-02-18
@@ -21,12 +23,13 @@ pub enum MeasurementSystem { Metric, Imperial }
 pub enum FeedRateUnits { MmPerMin, MmPerSec, InPerMin, InPerSec }
 
 pub fn format_length(value_mm: f32, system: MeasurementSystem) -> String;
-pub fn format_feed_rate(rate_mm_min: f32, units: FeedRateUnits) -> String;
-pub fn parse_length(input: &str, system: MeasurementSystem) -> Option<f32>;
+pub fn format_feed_rate(value_mm_per_min: f32, units: FeedRateUnits) -> String;
+pub fn parse_length(input: &str, system: MeasurementSystem) -> Result<f32, String>;
 ```
 
 Key rules:
-- Dimensions are `f32` in mm, displayed to 2 decimal places (0.01mm precision)
+- Machine positions and designer geometry are `f64` mm (`CNCPoint` in `crates/gcodekit5-core/src/data/mod.rs`, `Point` in `crates/gcodekit5-designer/src/model/mod.rs`); the `gcodekit5_core::units` display helpers take `f32` (`format_length(value_mm: f32, ...)`), and its parse and feed-rate conversion helpers return `f32`
+- Dimensions are displayed to 2 decimal places (0.01mm precision)
 - DateTime values are stored in UTC, converted to locale in the UI layer
 - Text strings are internally UTF-8
 - The UI listens for measurement system changes and re-renders displayed values
@@ -47,5 +50,5 @@ Key rules:
 
 ## Alternatives Considered
 - **Store in user's preferred units**: Simpler display but every calculation needs unit awareness
-- **Use f64 everywhere**: Better precision but unnecessary for CNC (0.01mm is sufficient) and doubles memory
+- **Use f32 for geometry**: Less memory, but not what the code does. Owner decision OD-2 (2026-11-28) records `f64` mm for positions and designer geometry; only the display helpers use `f32`
 - **Unit-typed wrappers** (e.g., `Millimeters(f32)`): Type-safe but adds verbosity to every arithmetic operation

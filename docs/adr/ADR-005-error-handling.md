@@ -3,6 +3,8 @@
 ## Status
 Accepted
 
+Amended 2026-11-28: replaced example types that never existed with the real error types; the `unwrap()`/`expect()` rule now defers to AGENTS-LANGUAGE.md.
+
 ## Context
 
 GCodeKit5 handles errors from many sources:
@@ -26,57 +28,42 @@ We adopt a **layered error handling strategy**:
 
 ### 1. Library Crates: Use `thiserror` for Typed Errors
 
-```rust
-use thiserror::Error;
+The real typed errors include:
 
+- `gcodekit5_core::Error` (`crates/gcodekit5-core/src/error.rs`), with `Result<T>` as its alias.
+- `SettingsError` (`crates/gcodekit5-settings/src/migrate.rs`).
+- `MachineError` (`crates/gcodekit5-app/src/machine/types.rs`).
+
+```rust
+// crates/gcodekit5-core/src/error.rs
 #[derive(Error, Debug)]
-pub enum CommunicationError {
-    #[error("Serial port not found: {port}")]
-    PortNotFound { port: String },
-    
-    #[error("Connection timeout after {timeout_ms}ms")]
-    Timeout { timeout_ms: u64 },
-    
-    #[error("Protocol error: {message}")]
-    Protocol { message: String },
-    
-    #[error(transparent)]
+pub enum Error {
+    /// Standard I/O error
+    #[error("I/O error: {0}")]
     Io(#[from] std::io::Error),
+
+    /// Generic error
+    #[error("{0}")]
+    Other(String),
 }
 ```
 
 ### 2. Application Layer: Use `anyhow` for Context
 
-```rust
-use anyhow::{Context, Result};
+`anyhow` is a dependency of the communication, devicedb, camtools, designer, app and ui-egui crates and of the root binary. Add context where an error crosses a boundary:
 
-fn load_device_profile(path: &Path) -> Result<DeviceProfile> {
-    let content = std::fs::read_to_string(path)
-        .with_context(|| format!("Failed to read device profile: {}", path.display()))?;
-    
-    serde_json::from_str(&content)
-        .with_context(|| "Invalid JSON in device profile")
+```rust
+// crates/gcodekit5-ui-egui/src/panes/editor/buffer.rs
+pub fn load(path: &Path) -> anyhow::Result<Self> {
+    let text = std::fs::read_to_string(path)
+        .with_context(|| format!("cannot read {}", path.display()))?;
+    // ...
 }
 ```
 
 ### 3. UI Layer: Convert to User-Friendly Messages
 
-```rust
-fn show_error_to_user(error: &anyhow::Error) {
-    let message = format_error_chain(error);
-    show_error_dialog(&message);
-}
-
-fn format_error_chain(error: &anyhow::Error) -> String {
-    let mut messages = vec![error.to_string()];
-    let mut source = error.source();
-    while let Some(err) = source {
-        messages.push(err.to_string());
-        source = err.source();
-    }
-    messages.join("\n  Caused by: ")
-}
-```
+The front end shows a translated prefix followed by the error's `Display` text in a notice or status message, for example `format!("{}: {e}", tr.tr("Save Error"))` in `crates/gcodekit5-ui-egui/src/panes/cam_tools/requests.rs`.
 
 ### Guidelines
 
@@ -90,14 +77,9 @@ fn format_error_chain(error: &anyhow::Error) -> String {
 
 ### Banned Patterns
 
+The rule for `unwrap()` and `expect()` is in the "Core Code Rules" section of [AGENTS-LANGUAGE.md](../../AGENTS-LANGUAGE.md), which is canonical. In short: neither is allowed on user-facing production paths; handle or propagate the error instead.
+
 ```rust
-// ❌ Don't use unwrap() without justification
-let value = map.get("key").unwrap();
-
-// ✅ Use expect() with explanation if truly unreachable
-let value = map.get("key").expect("key always present after init");
-
-// ✅ Or handle the error properly
 let value = map.get("key").ok_or_else(|| anyhow!("Missing key"))?;
 ```
 

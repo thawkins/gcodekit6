@@ -9,15 +9,17 @@ This directory contains Architecture Decision Records (ADRs) for GCodeKit5. ADRs
 | [ADR-001](ADR-001-gtk4-ui-framework.md) | GTK4 UI Framework | Superseded by ADR-012 | 2026-01-26 |
 | [ADR-002](ADR-002-coordinate-system.md) | Coordinate System (Y-flip) | Accepted | 2026-01-26 |
 | [ADR-003](ADR-003-modular-crates.md) | Modular Crates Structure | Accepted | 2026-01-26 |
-| [ADR-004](ADR-004-interior-mutability.md) | Interior Mutability Patterns | Accepted | 2026-01-26 |
+| [ADR-004](ADR-004-interior-mutability.md) | Interior Mutability Patterns | Superseded in part by ADR-012 | 2026-01-26 |
 | [ADR-005](ADR-005-error-handling.md) | Error Handling Strategy | Accepted | 2026-01-26 |
-| [ADR-006](ADR-006-event-bus-system.md) | Unified Event Bus System | Proposed | 2026-01-30 |
-| [ADR-007](ADR-007-paned-layout.md) | Paned Layout for Resizable Panels | Accepted | 2026-02-18 |
-| [ADR-008](ADR-008-units-system.md) | Internal Units System | Accepted | 2026-02-18 |
-| [ADR-009](ADR-009-communication-protocol.md) | Communication Protocol Architecture | Accepted | 2026-02-18 |
+| [ADR-006](ADR-006-event-bus-system.md) | Unified Event Bus System | Rejected | 2026-01-30 |
+| [ADR-007](ADR-007-paned-layout.md) | Paned Layout for Resizable Panels | Superseded by ADR-012 | 2026-02-18 |
+| [ADR-008](ADR-008-units-system.md) | Internal Units System | Accepted (amended) | 2026-02-18 |
+| [ADR-009](ADR-009-communication-protocol.md) | Communication Protocol Architecture | Accepted (amended) | 2026-02-18 |
 | [ADR-010](ADR-010-dependency-management.md) | Dependency Management Strategy | Accepted | 2026-02-18 |
 | [ADR-011](ADR-011-egui-craft-libs-pin.md) | egui and craft-libs Pin | Accepted | 2026-11-25 |
 | [ADR-012](ADR-012-egui-craft-libs.md) | egui and craft-libs Front End | Accepted | 2026-11-27 |
+
+ADR numbers and filenames are never reused or changed. When a decision changes, update its Status and add an `Amended YYYY-MM-DD: <what>` line under it.
 
 ## ADR Template
 
@@ -27,7 +29,7 @@ When creating a new ADR, use this template:
 # ADR-NNN: Title
 
 ## Status
-[Proposed | Accepted | Deprecated | Superseded by ADR-XXX]
+[Proposed | Accepted | Rejected | Deprecated | Superseded by ADR-XXX]
 
 ## Context
 What is the issue that we're seeing that is motivating this decision or change?
