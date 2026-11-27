@@ -12,7 +12,7 @@
 ;
 ; --- Material Settings ---
 ; Material thickness: 5.08 mm
-; Burn / Tool Dia: 0.101600006 mm
+; Burn / Tool Dia: 0.1016 mm
 ;
 ; --- Finger Joint Settings ---
 ; Finger width: 1.5 * thickness = 7.62 mm

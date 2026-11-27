@@ -205,7 +205,7 @@ pub(super) fn show_state(
     ui.horizontal_wrapped(|ui| {
         let feed = report.and_then(|r| r.feed_rate).map_or_else(
             || "-".to_string(),
-            |f| format!("{:.2} {feed_units}", feed_to_display(f as f32, feed_units)),
+            |f| format!("{:.2} {feed_units}", feed_to_display(f, feed_units)),
         );
         let spindle = report
             .and_then(|r| r.spindle_speed)

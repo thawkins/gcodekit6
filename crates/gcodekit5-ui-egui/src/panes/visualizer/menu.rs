@@ -75,8 +75,8 @@ pub fn cursor_on_plane(camera: &Camera, rect: egui::Rect, pos: egui::Pos2) -> Op
 pub fn coordinates_text(at: Vec2, units: MeasurementSystem) -> String {
     format!(
         "X {}  Y {}",
-        format_length(at.x, units),
-        format_length(at.y, units)
+        format_length(f64::from(at.x), units),
+        format_length(f64::from(at.y), units)
     )
 }
 

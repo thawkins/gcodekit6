@@ -182,8 +182,8 @@ pub struct ProfileForm {
 }
 
 /// Rounds `value` to two decimals, as a length is stored.
-fn round2(value: f32) -> f64 {
-    format!("{value:.2}").parse().unwrap_or(f64::from(value))
+fn round2(value: f64) -> f64 {
+    format!("{value:.2}").parse().unwrap_or(value)
 }
 
 /// Parses a plain number field.
@@ -215,7 +215,7 @@ impl ProfileForm {
         units: MeasurementSystem,
         feed_units: FeedRateUnits,
     ) -> Self {
-        let len = |mm: f64| format_length(mm as f32, units);
+        let len = |mm: f64| format_length(mm, units);
         Self {
             name: profile.name.clone(),
             description: profile.description.clone(),
@@ -239,7 +239,7 @@ impl ProfileForm {
             has_coolant: profile.has_coolant,
             pen_mode: profile.pen_mode,
             num_axes: profile.num_axes.to_string(),
-            max_feed_rate: format_feed_rate(profile.max_feed_rate as f32, feed_units),
+            max_feed_rate: format_feed_rate(profile.max_feed_rate, feed_units),
             max_s_value: format!("{:.0}", profile.max_s_value),
             spindle_watts: format!("{:.0}", profile.cnc_spindle_watts),
             max_spindle_speed_rpm: profile.max_spindle_speed_rpm.to_string(),
@@ -378,7 +378,7 @@ impl ProfileForm {
             0.0
         };
         // Stored as whole numbers.
-        p.max_feed_rate = f64::from(feed).round();
+        p.max_feed_rate = feed.round();
         p.max_s_value = f64::from(max_s).round();
         p.cnc_spindle_watts = f64::from(spindle_watts).round();
         p.max_spindle_speed_rpm = max_rpm;
@@ -405,7 +405,7 @@ impl ProfileForm {
     /// * `limits` - The reported values.
     /// * `units` - The units the form's lengths are in.
     pub fn sync(&mut self, limits: &ReportedLimits, units: MeasurementSystem) {
-        let len = |mm: f64| format_length(mm as f32, units);
+        let len = |mm: f64| format_length(mm, units);
         if let Some(x) = limits.x_max {
             self.x_max = len(x);
         }

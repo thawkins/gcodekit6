@@ -148,7 +148,6 @@ pub fn parse_array_input(
     let length = |name: &'static str, text: &str| {
         units::parse_length(text, system)
             .ok()
-            .map(f64::from)
             .filter(|v| v.is_finite())
             .ok_or((name, n_!("Enter a number")))
     };

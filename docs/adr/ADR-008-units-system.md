@@ -3,7 +3,7 @@
 ## Status
 Accepted (amended)
 
-Amended 2026-11-28: dimensions are `f64` mm (owner decision OD-2); the display helpers stay `f32`; `parse_length` returns `Result<f32, String>`. The UI reads the unit setting each frame instead of listening for changes. This ADR is the canonical statement of the units rules.
+Amended 2026-11-28: dimensions are `f64` mm (owner decision OD-2); the `gcodekit5_core::units` format, parse and feed-rate helpers take and return `f64` as well (audit item C-12); `parse_length` returns `Result<f64, String>`. The UI reads the unit setting each frame instead of listening for changes. This ADR is the canonical statement of the units rules.
 
 ## Date
 2026-02-18
@@ -22,14 +22,14 @@ The `gcodekit5_core::units` module provides the conversion API:
 pub enum MeasurementSystem { Metric, Imperial }
 pub enum FeedRateUnits { MmPerMin, MmPerSec, InPerMin, InPerSec }
 
-pub fn format_length(value_mm: f32, system: MeasurementSystem) -> String;
-pub fn format_feed_rate(value_mm_per_min: f32, units: FeedRateUnits) -> String;
-pub fn parse_length(input: &str, system: MeasurementSystem) -> Result<f32, String>;
+pub fn format_length(value_mm: f64, system: MeasurementSystem) -> String;
+pub fn format_feed_rate(value_mm_per_min: f64, units: FeedRateUnits) -> String;
+pub fn parse_length(input: &str, system: MeasurementSystem) -> Result<f64, String>;
 ```
 
 Key rules:
-- Machine positions and designer geometry are `f64` mm (`CNCPoint` in `crates/gcodekit5-core/src/data/mod.rs`, `Point` in `crates/gcodekit5-designer/src/model/mod.rs`); the `gcodekit5_core::units` display helpers take `f32` (`format_length(value_mm: f32, ...)`), and its parse and feed-rate conversion helpers return `f32`
-- Dimensions are displayed to 2 decimal places (0.01mm precision)
+- Machine positions and designer geometry are `f64` mm (`CNCPoint` in `crates/gcodekit5-core/src/data/mod.rs`, `Point` in `crates/gcodekit5-designer/src/model/mod.rs`); the `gcodekit5_core::units` display, parse and feed-rate conversion helpers take and return `f64` too (`format_length(value_mm: f64, ...)`)
+- `format_length` and `format_feed_rate` show 3 decimal places in either unit (`25.400` mm, `1.000` in); the Machine Control DRO and status bar use their own `format_length` (`crates/gcodekit5-ui-egui/src/panes/machine_control/dro.rs`), which shows mm to 2 decimal places and inches to 3
 - DateTime values are stored in UTC, converted to locale in the UI layer
 - Text strings are internally UTF-8
 - The UI has no change listener: each frame it reads `config().ui.measurement_system` and `feed_rate_units` from the settings and formats values with them (for example the status bar in `crates/gcodekit5-ui-egui/src/app.rs`), so a change shows on the next frame
@@ -41,7 +41,7 @@ Key rules:
 - Single representation eliminates unit mismatch bugs in calculations
 - Conversion logic is centralized and testable
 - New features don't need to handle unit variants
-- Consistent precision across the application (0.01mm)
+- One place sets display precision for each kind of value (the `units` helpers, the DRO formatter)
 
 **Negative:**
 - Rounding errors accumulate during metric↔imperial roundtrips
@@ -50,5 +50,5 @@ Key rules:
 
 ## Alternatives Considered
 - **Store in user's preferred units**: Simpler display but every calculation needs unit awareness
-- **Use f32 for geometry**: Less memory, but not what the code does. Owner decision OD-2 (2026-11-28) records `f64` mm for positions and designer geometry; only the display helpers use `f32`
+- **Use f32 for geometry**: Less memory, but not what the code does. Owner decision OD-2 (2026-11-28) records `f64` mm for positions, designer geometry and the `units` helpers
 - **Unit-typed wrappers** (e.g., `Millimeters(f32)`): Type-safe but adds verbosity to every arithmetic operation

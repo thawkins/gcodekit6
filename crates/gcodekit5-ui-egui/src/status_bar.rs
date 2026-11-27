@@ -113,7 +113,7 @@ pub fn job_times(progress: Progress, elapsed: Duration) -> (String, String) {
 /// * `feed_units` - The feed rate units to show.
 pub fn feed_spindle_text(status: &MachineStatus, feed_units: FeedRateUnits) -> Option<String> {
     let report = status.report.as_ref().filter(|_| status.connected)?;
-    let feed = crate::panes::machine_control::feed_to_display(report.feed_rate? as f32, feed_units);
+    let feed = crate::panes::machine_control::feed_to_display(report.feed_rate?, feed_units);
     Some(format!(
         "F: {feed:.2} {feed_units}  S: {} RPM",
         report.spindle_speed?

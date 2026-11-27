@@ -29,6 +29,9 @@ pub struct SpoilboardSurfacingGenerator {
     params: SpoilboardSurfacingParameters,
 }
 
+/// How close (mm) a row must be to the far edge to count as the last row.
+const EDGE_TOLERANCE_MM: f64 = 1e-6;
+
 impl SpoilboardSurfacingGenerator {
     pub fn new(params: SpoilboardSurfacingParameters) -> Self {
         Self { params }
@@ -86,9 +89,12 @@ impl SpoilboardSurfacingGenerator {
             let target_x = if going_right { p.width } else { 0.0 };
             gcode.push_str(&format!("G1 X{:.3} F{:.1}\n", target_x, p.feed_rate));
 
-            if current_y < p.height {
+            // Summed steps drift (16 x 12.7 is 203.19999999999996, not 203.2), so a row
+            // within EDGE_TOLERANCE_MM of the far edge counts as on it; otherwise the drift
+            // adds a duplicate pass at the edge.
+            if p.height - current_y > EDGE_TOLERANCE_MM {
                 current_y += step_dist;
-                if current_y > p.height {
+                if current_y > p.height - EDGE_TOLERANCE_MM {
                     current_y = p.height;
                 }
                 gcode.push_str(&format!("G1 Y{:.3} F{:.1}\n", current_y, p.feed_rate));
