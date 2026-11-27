@@ -6,7 +6,7 @@
 //! forms and back ends, shared parameter types, and the answer to an unsaved-changes prompt.
 //!
 //! Depends on `gcodekit5-core`, `gcodekit5-communication` and
-//! `gcodekit5-settings` (which holds the shared translation tables).
+//! `gcodekit5-settings`; owns the embedded translation tables ([`i18n`]).
 //!
 //! Rule: no process-global device state. Machine state lives in the instance that owns the
 //! connection (`MachineController` here, `Machine` in the egui front end); do not add a
@@ -43,7 +43,6 @@ pub mod types;
 pub mod unsaved_changes;
 pub mod work_zero;
 
-pub use gcodekit5_settings::{tr, trn};
 // Controller types and serial-port listing the front ends use, re-exported so a front
 // end reaches the communication layer only through the application layer.
 pub use gcodekit5_communication::firmware::ControllerProtocol;

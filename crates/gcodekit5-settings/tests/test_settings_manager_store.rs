@@ -4,7 +4,7 @@
 
 use craft_settings::SettingsStore;
 use gcodekit5_settings::migrate::ConfigDirs;
-use gcodekit5_settings::{Config, SettingsManager, SettingsPersistence};
+use gcodekit5_settings::{Config, SettingsManager};
 use std::path::PathBuf;
 
 /// A fresh `target/temp/settings_manager_store/<test>-<pid>` directory.
@@ -49,16 +49,17 @@ fn test_manager_save_reloads_through_manager_and_store() {
 }
 
 #[test]
-fn test_persistence_save_leaves_legacy_config_json_untouched() {
-    let root = scratch("test_persistence_save_leaves_legacy_config_json_untouched");
+fn test_manager_apply_leaves_legacy_config_json_untouched() {
+    let root = scratch("test_manager_apply_leaves_legacy_config_json_untouched");
     let legacy = legacy_with_config(&root);
     let before = std::fs::read(legacy.join("config.json")).expect("read legacy");
     let dirs = ConfigDirs::new(legacy.clone(), root.join("new"));
 
-    let (mut persistence, error) = SettingsPersistence::load_from_dirs(&dirs);
+    let (mut manager, error) = SettingsManager::open(dirs.clone());
     assert!(error.is_none(), "{error:?}");
-    persistence.config_mut().ui.language = "it".to_string();
-    persistence.persist().expect("save");
+    let mut config = manager.config().clone();
+    config.ui.language = "it".to_string();
+    manager.apply(config).expect("save");
 
     assert_eq!(
         std::fs::read(legacy.join("config.json")).expect("read legacy"),

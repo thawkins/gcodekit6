@@ -1,21 +1,16 @@
 //! GCodeKit5 Settings Crate
 //!
-//! Handles application configuration, settings persistence, and UI view models.
+//! Application configuration ([`Config`]), loading and saving it through the
+//! craft-settings store ([`SettingsManager`]), and the one-time import of the
+//! GTK build's settings ([`migrate`]).
 #![deny(unsafe_code)]
 
 pub mod config;
-pub mod controller;
-pub mod i18n;
 pub mod manager;
 pub mod migrate;
-pub mod persistence;
-pub mod view_model;
 
 pub use config::{
     Config, ConnectionSettings, ConnectionType, FileProcessingSettings, MachineSettings,
     ProbeSettings, Theme, UiSettings,
 };
-pub use controller::{SettingUiModel, SettingsController};
 pub use manager::SettingsManager;
-pub use persistence::SettingsPersistence;
-pub use view_model::{KeyboardShortcut, Setting, SettingValue, SettingsCategory, SettingsDialog};

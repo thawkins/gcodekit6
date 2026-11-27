@@ -5,7 +5,7 @@
 //!
 //! ## Modules
 //!
-//! - [`aliases`]: Type aliases for `Rc<RefCell<T>>`, `Arc<Mutex<T>>`, callbacks, etc.
+//! - [`aliases`]: Type aliases for `Arc<Mutex<T>>`, `Arc<RwLock<T>>`, callbacks, etc.
 
 pub mod aliases;
 

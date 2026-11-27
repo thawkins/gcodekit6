@@ -1,13 +1,9 @@
-//! Regression tests for settings persistence: tolerant loading of partial
-//! config files and real factory-default restoration.
+//! Regression tests for settings loading: tolerant loading of partial config
+//! files, and a damaged `config.toml` kept aside rather than overwritten.
 
-// Rust 2024 makes `std::env::set_var` unsafe; tests may opt in for it.
-#![allow(unsafe_code)]
-
-use gcodekit5_core::shared;
-use gcodekit5_settings::{
-    Config, SettingValue, SettingsController, SettingsDialog, SettingsPersistence,
-};
+use gcodekit5_settings::migrate::ConfigDirs;
+use gcodekit5_settings::{Config, SettingsManager};
+use std::path::PathBuf;
 
 #[test]
 fn test_config_load_partial_json_uses_defaults() {
@@ -19,87 +15,6 @@ fn test_config_load_partial_json_uses_defaults() {
     assert_eq!(config.machine.x_limit, 400.0);
     assert_eq!(config.machine.y_limit, 200.0);
     config.validate().expect("defaults should validate");
-}
-
-#[test]
-fn test_settings_restore_defaults_uses_factory_values() {
-    let mut persistence = SettingsPersistence::new();
-    persistence.config_mut().machine.x_limit = 555.0;
-    let mut dialog = SettingsDialog::new();
-    persistence.populate_dialog(&mut dialog);
-
-    let controller = SettingsController::new(shared(dialog), shared(persistence));
-    controller.restore_defaults();
-
-    let dialog = controller.dialog.borrow();
-    match &dialog.get_setting("x_limit").expect("x_limit").value {
-        SettingValue::Float(v) => assert_eq!(*v, 200.0),
-        other => panic!("unexpected value {:?}", other),
-    }
-}
-
-#[test]
-fn test_settings_invalid_numeric_input_is_ignored() {
-    let persistence = SettingsPersistence::new();
-    let mut dialog = SettingsDialog::new();
-    persistence.populate_dialog(&mut dialog);
-    let controller = SettingsController::new(shared(dialog), shared(persistence));
-
-    controller.update_setting("window_width", "abc");
-    let dialog = controller.dialog.borrow();
-    match &dialog
-        .get_setting("window_width")
-        .expect("window_width")
-        .value
-    {
-        SettingValue::Integer(v) => assert_eq!(*v, 1400),
-        other => panic!("unexpected value {:?}", other),
-    }
-}
-
-#[test]
-fn test_settings_listener_can_read_dialog_during_update() {
-    let persistence = SettingsPersistence::new();
-    let mut dialog = SettingsDialog::new();
-    persistence.populate_dialog(&mut dialog);
-    let controller = std::rc::Rc::new(SettingsController::new(shared(dialog), shared(persistence)));
-
-    let seen = std::rc::Rc::new(std::cell::RefCell::new(Vec::<String>::new()));
-    {
-        let dialog = controller.dialog.clone();
-        let seen = seen.clone();
-        controller.on_setting_changed(move |id, _value| {
-            // Reading the dialog from inside a listener used to panic with
-            // "already mutably borrowed".
-            let dialog = dialog.borrow();
-            let current = dialog
-                .get_setting(id)
-                .expect("setting exists")
-                .value
-                .as_str();
-            seen.borrow_mut().push(current);
-        });
-    }
-    {
-        // A listener that registers another listener must not panic either.
-        let ctrl = std::rc::Rc::downgrade(&controller);
-        controller.on_setting_changed(move |_, _| {
-            if let Some(ctrl) = ctrl.upgrade() {
-                ctrl.on_setting_changed(|_, _| {});
-            }
-        });
-    }
-
-    controller.update_setting("window_width", "1600");
-    controller.restore_defaults();
-    controller.discard_changes();
-
-    let seen = seen.borrow();
-    assert_eq!(seen.first().map(String::as_str), Some("1600"));
-    assert!(
-        seen.len() >= 2,
-        "restore/discard should also notify: {seen:?}"
-    );
 }
 
 #[test]
@@ -131,112 +46,72 @@ fn test_config_merge_ignores_unpopulated_ui_section() {
     assert_eq!(base.ui.window_width, 1024);
 }
 
-#[test]
-fn test_unreadable_config_is_backed_up_before_it_is_replaced() {
-    // Audit A-01: a config.json that failed to load was silently replaced by
-    // defaults on the next automatic save.
-    let dir = tempfile::tempdir().expect("tempdir");
-    let path = dir.path().join("config.json");
-    std::fs::write(&path, "{ not json").expect("write");
+/// Fresh settings folders under `target/temp/config_regression/<test>-<pid>`.
+fn scratch(test: &str) -> ConfigDirs {
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../target/temp/config_regression")
+        .join(format!("{test}-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&root);
+    std::fs::create_dir_all(&root).expect("create scratch dir");
+    ConfigDirs::new(root.join("legacy"), root.join("config"))
+}
 
-    let (mut persistence, error) = SettingsPersistence::load_or_default(&path);
-    assert!(error.is_some(), "load error must be reported");
-
-    persistence.persist_to(&path).expect("save");
-    let backups: Vec<_> = std::fs::read_dir(dir.path())
-        .expect("read dir")
-        .filter_map(|e| e.ok())
-        .map(|e| e.file_name().to_string_lossy().into_owned())
-        .filter(|n| n.starts_with("config.json.bak-"))
-        .collect();
-    assert_eq!(backups.len(), 1, "{backups:?}");
-    let backup = std::fs::read_to_string(dir.path().join(&backups[0])).expect("backup");
-    assert_eq!(backup, "{ not json");
-    assert!(SettingsPersistence::load_from_file(&path).is_ok());
-
-    // Later saves do not back up again.
-    persistence.persist_to(&path).expect("second save");
-    let count = std::fs::read_dir(dir.path())
-        .expect("read dir")
-        .filter(|e| {
-            e.as_ref()
-                .is_ok_and(|e| e.file_name().to_string_lossy().contains(".bak-"))
+/// The `config.broken-*` copies craft-settings moved aside in `dir`.
+fn quarantined(dir: &std::path::Path) -> Vec<PathBuf> {
+    std::fs::read_dir(dir)
+        .expect("read config dir")
+        .map(|e| e.expect("dir entry").path())
+        .filter(|p| {
+            p.file_name()
+                .and_then(|n| n.to_str())
+                .is_some_and(|n| n.starts_with("config.broken-"))
         })
-        .count();
-    assert_eq!(count, 1);
+        .collect()
 }
 
+/// Audit A-01 on the live load path: a `config.toml` that cannot be read is moved aside
+/// (craft-settings' quarantine) and the user is told where, instead of being replaced by
+/// defaults on the next save. The quarantined copy survives later saves byte for byte.
 #[test]
-fn test_missing_config_loads_defaults_without_error() {
-    let dir = tempfile::tempdir().expect("tempdir");
-    let (_, error) = SettingsPersistence::load_or_default(&dir.path().join("config.json"));
-    assert!(error.is_none());
-}
+fn test_damaged_config_toml_is_quarantined_and_reported() {
+    let dirs = scratch("test_damaged_config_toml_is_quarantined_and_reported");
+    std::fs::create_dir_all(&dirs.config).expect("create config dir");
+    let damaged = "[ui\nlanguage = ";
+    std::fs::write(dirs.config.join("config.toml"), damaged).expect("write damaged file");
 
-#[test]
-fn test_preferences_save_keeps_folder_remembered_by_file_dialogs() {
-    // Audit E2-05: saving Preferences restored the folder the dialog was
-    // filled with, undoing the folder a file dialog remembered since.
-    let mut persistence = SettingsPersistence::new();
-    persistence.config_mut().file_processing.output_directory = "/start".into();
-    let mut dialog = SettingsDialog::new();
-    persistence.populate_dialog(&mut dialog);
-    persistence.config_mut().file_processing.output_directory = "/picked".into();
-    persistence.load_from_dialog(&dialog).expect("load");
-    assert_eq!(
-        persistence.config().file_processing.output_directory,
-        std::path::PathBuf::from("/picked")
+    let (mut manager, problem) = SettingsManager::open(dirs.clone());
+    let problem = problem.expect("the damaged file is reported");
+    assert!(
+        problem.contains("config.toml was damaged and moved to"),
+        "{problem}"
     );
-}
-
-#[test]
-fn test_second_preferences_save_keeps_folder_picked_after_first_save() {
-    // #88 review: the first save left the dialog's old folder as its baseline,
-    // so a second save still restored it over the folder a file dialog chose.
-    // nextest runs each test in its own process, so pointing the config
-    // directory at a temporary folder does not leak into other tests; the
-    // binary-wide lock covers an in-process `cargo test` run.
-    let _env = crate::global_env_lock();
-    let dir = tempfile::tempdir().expect("tempdir");
-    // SAFETY: the binary-wide env lock is held and this test starts no thread
-    // that reads the environment.
-    unsafe {
-        std::env::set_var("XDG_CONFIG_HOME", dir.path());
-    }
-
-    let persistence = shared(SettingsPersistence::new());
-    persistence
-        .borrow_mut()
-        .config_mut()
-        .file_processing
-        .output_directory = "/start".into();
-    let mut dialog = SettingsDialog::new();
-    persistence.borrow().populate_dialog(&mut dialog);
-    let controller = SettingsController::new(shared(dialog), persistence.clone());
-
-    controller.update_setting("default_directory", "/chosen");
-    controller.save().expect("first save");
     assert_eq!(
-        persistence
-            .borrow()
-            .config()
-            .file_processing
-            .output_directory,
-        std::path::PathBuf::from("/chosen")
+        manager.config(),
+        &Config::default(),
+        "defaults in its place"
     );
-    persistence
-        .borrow_mut()
-        .config_mut()
-        .file_processing
-        .output_directory = "/picked".into();
-    controller.save().expect("second save");
 
+    let moved = quarantined(&dirs.config);
+    assert_eq!(moved.len(), 1, "{moved:?}");
+    assert!(
+        problem.contains(&moved[0].display().to_string()),
+        "{problem}"
+    );
     assert_eq!(
-        persistence
-            .borrow()
-            .config()
-            .file_processing
-            .output_directory,
-        std::path::PathBuf::from("/picked")
+        std::fs::read_to_string(&moved[0]).expect("read quarantined file"),
+        damaged
+    );
+
+    let mut config = manager.config().clone();
+    config.ui.language = "de".to_string();
+    manager.apply(config).expect("save over the defaults");
+    let (reloaded, problem) = SettingsManager::open(dirs.clone());
+    assert!(problem.is_none(), "{problem:?}");
+    assert_eq!(reloaded.config().ui.language, "de");
+    assert_eq!(quarantined(&dirs.config), moved, "no second quarantine");
+    assert_eq!(
+        std::fs::read_to_string(&moved[0]).expect("read quarantined file"),
+        damaged,
+        "a save leaves the quarantined copy alone"
     );
 }

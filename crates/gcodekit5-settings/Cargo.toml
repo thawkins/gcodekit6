@@ -19,10 +19,6 @@ tracing = { workspace = true }
 thiserror = { workspace = true }
 craft-settings = { workspace = true }
 
-[build-dependencies]
-# Parses po/*.po into the embedded translation tables (src/i18n.rs); no msgfmt.
-polib = "0.3"
-
 [dev-dependencies]
 tempfile = { workspace = true }
 

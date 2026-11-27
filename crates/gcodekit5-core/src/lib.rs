@@ -36,8 +36,6 @@ pub use gcode::{CommandNumberGenerator, GcodeCommand};
 
 // Re-export type aliases for convenience
 pub use types::{
-    Callback, DataCallback, Shared, SharedHashMap, SharedOption, SharedVec, ThreadSafe,
-    ThreadSafeDeque, ThreadSafeMap, ThreadSafeOption, ThreadSafeRw, ThreadSafeRwMap, ThreadSafeVec,
-    UiCallback, UiDataCallback, shared, shared_none, shared_some, thread_safe, thread_safe_deque,
-    thread_safe_map, thread_safe_rw, thread_safe_vec,
+    Callback, DataCallback, ThreadSafe, ThreadSafeRw, ThreadSafeRwMap, ThreadSafeVec, thread_safe,
+    thread_safe_rw, thread_safe_vec,
 };

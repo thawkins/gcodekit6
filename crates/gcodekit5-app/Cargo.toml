@@ -21,6 +21,10 @@ serde_json = { workspace = true }
 tracing = { workspace = true }
 dirs = "7.0"
 
+[build-dependencies]
+# Parses po/*.po into the embedded translation tables (src/i18n.rs); no msgfmt.
+polib = "0.3"
+
 [features]
 # The loopback transport of `test_support`, for tests only (enabled from dev-dependencies).
 test-support = []

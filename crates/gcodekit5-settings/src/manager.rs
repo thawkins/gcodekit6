@@ -104,19 +104,6 @@ impl SettingsManager {
             .ok_or_else(|| Error::other("No settings folder (none on this platform, or isolated)"))
     }
 
-    /// The settings file (`config.toml` in the craft-settings folder).
-    pub fn config_file_path() -> Result<PathBuf> {
-        Ok(Self::config_dirs()?.config.join(CONFIG_FILE))
-    }
-
-    /// Ensure the legacy config directory exists.
-    pub fn ensure_config_dir() -> Result<PathBuf> {
-        let dir = Self::config_directory()?;
-        std::fs::create_dir_all(&dir)
-            .map_err(|e| Error::other(format!("Failed to create config directory: {}", e)))?;
-        Ok(dir)
-    }
-
     /// Loads the settings from `dirs`, importing the legacy files first when
     /// that has not happened yet. Never fails: problems give defaults (for the
     /// affected part) and are described in the returned message.
