@@ -256,6 +256,18 @@ pub struct ToolpathParameters {
     pub stock_thickness: f32,
     #[serde(default = "default_safe_z_height")]
     pub safe_z_height: f32,
+    /// Depth below the stock top where cutting starts, in mm (0 for files before it was saved).
+    #[serde(default)]
+    pub start_depth: f64,
+    /// Stock origin X in mm (0 for files before it was saved).
+    #[serde(default)]
+    pub stock_origin_x: f32,
+    /// Stock origin Y in mm (0 for files before it was saved).
+    #[serde(default)]
+    pub stock_origin_y: f32,
+    /// Stock origin Z in mm (0 for files before it was saved).
+    #[serde(default)]
+    pub stock_origin_z: f32,
 }
 
 fn default_feed_rate() -> f64 {
@@ -302,6 +314,10 @@ impl Default for ToolpathParameters {
             stock_height: default_stock_height(),
             stock_thickness: default_stock_thickness(),
             safe_z_height: default_safe_z_height(),
+            start_depth: 0.0,
+            stock_origin_x: 0.0,
+            stock_origin_y: 0.0,
+            stock_origin_z: 0.0,
         }
     }
 }

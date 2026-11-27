@@ -1182,6 +1182,12 @@ msgstr ""
 msgid "Loaded:"
 msgstr ""
 
+msgid "Shapes not loaded (a save removes them):"
+msgstr ""
+
+msgid "Images whose file is missing:"
+msgstr ""
+
 msgid "Open Failed"
 msgstr ""
 

@@ -8,7 +8,8 @@
 //! - Open loads a `.gckd` / `.gck5` file through the model's serialization into a copy of
 //!   the design, so a file that cannot be read leaves the design as it was. Like GTK, a
 //!   non-positive step down becomes 0.1 mm and the ids continue after the loaded shapes;
-//!   a stored zoom that is not usable fits the view instead.
+//!   a stored zoom that is not usable fits the view instead. The notice names the shapes the
+//!   file could not restore (an unknown shape type) and the images whose file is missing.
 //! - Save writes through the model's serialization to a temporary file beside the target,
 //!   then renames it (`crate::files`): a read-only target is refused and a failed save
 //!   leaves the design modified.
@@ -33,7 +34,7 @@ use std::path::Path;
 use gcodekit5_app::i18n::Translator;
 use gcodekit5_designer::DesignerState;
 use gcodekit5_designer::commands::{DesignerCommand, PasteShapes};
-use gcodekit5_designer::designer_state::MachineMode;
+use gcodekit5_designer::designer_state::{MachineMode, ShapeLoadIssue};
 use gcodekit5_designer::image_importer::ImageImporter;
 use gcodekit5_designer::import::{DxfImporter, ImportedDesign, StlImporter, SvgImporter};
 
@@ -50,6 +51,8 @@ pub fn msgids() -> Vec<&'static str> {
         n_!("New 2D design created"),
         n_!("New 3D design created"),
         n_!("Loaded:"),
+        n_!("Shapes not loaded (a save removes them):"),
+        n_!("Images whose file is missing:"),
         n_!("Open Failed"),
         n_!("Saved:"),
         n_!("Save Failed"),
@@ -122,15 +125,18 @@ impl DesignerPane {
     /// Whether the file was opened.
     pub fn open_design(&mut self, path: &Path, tr: &Translator) -> bool {
         let mut next = self.state.clone();
-        if let Err(error) = next.load_from_file(path) {
-            tracing::warn!(%error, path = %path.display(), "cannot open design");
-            self.notice = Some(format!(
-                "{}: {}: {error:#}",
-                tr.tr("Open Failed"),
-                path.display()
-            ));
-            return false;
-        }
+        let report = match next.load_from_file_report(path) {
+            Ok(report) => report,
+            Err(error) => {
+                tracing::warn!(%error, path = %path.display(), "cannot open design");
+                self.notice = Some(format!(
+                    "{}: {}: {error:#}",
+                    tr.tr("Open Failed"),
+                    path.display()
+                ));
+                return false;
+            }
+        };
         let mut max_id = 0;
         for obj in next.canvas.shapes_mut() {
             max_id = max_id.max(obj.id);
@@ -148,7 +154,29 @@ impl DesignerPane {
             let area = self.work_area();
             editing::zoom_fit(&mut self.state, area);
         }
-        self.notice = Some(format!("{} {}", tr.tr("Loaded:"), path.display()));
+        let mut notice = format!("{} {}", tr.tr("Loaded:"), path.display());
+        let list = |issues: &[ShapeLoadIssue]| {
+            issues
+                .iter()
+                .map(ShapeLoadIssue::label)
+                .collect::<Vec<_>>()
+                .join(", ")
+        };
+        if !report.skipped.is_empty() {
+            notice.push_str(&format!(
+                "\n{} {}",
+                tr.tr("Shapes not loaded (a save removes them):"),
+                list(&report.skipped)
+            ));
+        }
+        if !report.missing_images.is_empty() {
+            notice.push_str(&format!(
+                "\n{} {}",
+                tr.tr("Images whose file is missing:"),
+                list(&report.missing_images)
+            ));
+        }
+        self.notice = Some(notice);
         true
     }
 
