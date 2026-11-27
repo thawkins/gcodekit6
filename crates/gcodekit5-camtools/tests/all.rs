@@ -31,6 +31,8 @@ mod test_camtools_validation_gaps;
 mod test_drill_press_plane;
 #[path = "test_gerber_input_safety.rs"]
 mod test_gerber_input_safety;
+#[path = "test_gerber_outline_compensation.rs"]
+mod test_gerber_outline_compensation;
 #[path = "test_job_preamble_modal_header.rs"]
 mod test_job_preamble_modal_header;
 #[path = "test_probe_mode_restore.rs"]

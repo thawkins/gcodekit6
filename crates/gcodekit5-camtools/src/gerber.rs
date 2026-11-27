@@ -91,6 +91,15 @@ pub struct GerberParameters {
     /// `cut_depth`, which is only the isolation depth; holes normally go through the board.
     pub alignment_hole_depth: f32,
     pub cut_depth: f32,
+    /// Board Outline layer only: the most Z each pass of the outline cut goes down (mm,
+    /// positive). The outline is cut in passes from the surface to `cut_depth`; the default
+    /// cuts thin stock (down to 0.5 mm) in a single pass. Left out of a preset file when it
+    /// is the default, so presets without it (GTK's) load and round-trip unchanged.
+    #[serde(
+        default = "default_outline_step_down",
+        skip_serializing_if = "is_default_outline_step_down"
+    )]
+    pub outline_step_down: f32,
     pub safe_z: f32,
     pub tool_diameter: f32,
     pub isolation_width: f32,
@@ -104,6 +113,17 @@ pub struct GerberParameters {
 
 fn default_gerber_num_axes() -> u8 {
     3
+}
+
+/// Default [`GerberParameters::outline_step_down`] (mm).
+const DEFAULT_OUTLINE_STEP_DOWN: f32 = 0.5;
+
+fn default_outline_step_down() -> f32 {
+    DEFAULT_OUTLINE_STEP_DOWN
+}
+
+fn is_default_outline_step_down(v: &f32) -> bool {
+    *v == DEFAULT_OUTLINE_STEP_DOWN
 }
 
 impl Default for GerberParameters {
@@ -122,6 +142,7 @@ impl Default for GerberParameters {
             // Through a 1.6 mm board plus a little into the spoilboard.
             alignment_hole_depth: -1.8,
             cut_depth: -0.1,
+            outline_step_down: DEFAULT_OUTLINE_STEP_DOWN,
             safe_z: 5.0,
             tool_diameter: 0.1,
             isolation_width: 0.0,
@@ -389,8 +410,8 @@ impl GerberConverter {
             anyhow::bail!("The layer file has no Gerber shapes to cut");
         }
 
-        // If it's a copper layer, we perform isolation routing (Union + Offset)
-        // Otherwise (Outline, Silk, Drill), we just trace the paths (Engrave/Cut)
+        // Copper: isolation routing (union + offset). Board outline: a tool-compensated cut
+        // outside the board edge in step-down passes. Others (silk, mask): trace the paths.
         let is_copper = matches!(
             params.layer_type,
             GerberLayerType::TopCopper | GerberLayerType::BottomCopper
@@ -402,6 +423,8 @@ impl GerberConverter {
                 writeln!(gcode, "; Rubout (Remove Excess Copper)")?;
                 Self::generate_rubout_from_sketches(params, sketches, &mut gcode)?;
             }
+        } else if params.layer_type == GerberLayerType::BoardOutline {
+            Self::generate_outline_from_sketches(params, sketches, &mut gcode)?;
         } else {
             Self::generate_simple_trace_from_sketches(params, sketches, &mut gcode)?;
         }
@@ -945,7 +968,105 @@ impl GerberConverter {
 
         let polylines = Self::sketch_to_polylines(&merged);
         let paths = polylines.into_iter().map(|(p, _)| p).collect();
-        Self::polylines_to_gcode(params, paths, gcode)
+        Self::polylines_to_gcode(params, paths, &[params.cut_depth], gcode)
+    }
+
+    /// Cuts the board out along the outline layer's strokes, with the tool on the waste side.
+    ///
+    /// The board edge is the centreline of each closed outline stroke. The merged stroke is a
+    /// ring whose exterior lies half a stroke width outside the centreline and whose hole
+    /// lies half a width inside; the half width is half the gap between the two. The cut
+    /// path is the centreline offset by the tool radius: outward for an outer outline, into
+    /// the hole for a cutout (a ring inside another ring's hole), so the finished board keeps
+    /// its drawn size. A stroke that does not close (no hole) has no inside or outside; it is
+    /// traced along its exterior as before and logged at `warn`. Each path is cut in passes
+    /// of at most `outline_step_down` down to `cut_depth`.
+    ///
+    /// # Errors
+    /// A step-down that is not above 0 on a device with a Z axis.
+    fn generate_outline_from_sketches(
+        params: &GerberParameters,
+        sketches: Vec<Sketch<()>>,
+        gcode: &mut String,
+    ) -> Result<()> {
+        let Some(merged) = merge_sketches(&sketches) else {
+            return Ok(());
+        };
+        let depths = Self::step_down_depths(params)?;
+        let tool_radius = f64::from(params.tool_diameter) / 2.0;
+
+        // sketch_to_polylines emits each exterior followed by its own holes.
+        let mut rings: Vec<(Polyline<f64>, Vec<Polyline<f64>>)> = Vec::new();
+        for (poly, is_hole) in Self::sketch_to_polylines(&merged) {
+            match rings.last_mut() {
+                Some((_, holes)) if is_hole => holes.push(poly),
+                _ => rings.push((poly, Vec::new())),
+            }
+        }
+        // The board side of each closed stroke: its largest hole.
+        let inner: Vec<Option<&Polyline<f64>>> = rings
+            .iter()
+            .map(|(_, holes)| {
+                holes
+                    .iter()
+                    .max_by(|a, b| a.area().abs().total_cmp(&b.area().abs()))
+            })
+            .collect();
+
+        let mut paths = Vec::new();
+        for (i, (exterior, _)) in rings.iter().enumerate() {
+            let Some(hole) = inner[i] else {
+                warn!("Board outline stroke does not close; traced without tool compensation");
+                paths.push(exterior.clone());
+                continue;
+            };
+            let half_width = (0..hole.vertex_count())
+                .filter_map(|v| exterior.closest_point(hole.at(v).pos(), 1e-9))
+                .map(|c| c.distance)
+                .fold(f64::INFINITY, f64::min)
+                / 2.0;
+            let start = exterior.at(0).pos();
+            let is_cutout = inner
+                .iter()
+                .enumerate()
+                .any(|(j, h)| j != i && h.is_some_and(|h| h.winding_number(start) != 0));
+            let (ring, is_hole) = if is_cutout {
+                (clean_polyline(hole.clone()), true)
+            } else {
+                (clean_polyline(exterior.clone()), false)
+            };
+            let distance = tool_radius - half_width;
+            if distance.abs() < 1e-9 {
+                paths.push(ring);
+                continue;
+            }
+            let offset = Self::outward_offset(&ring, is_hole, distance);
+            if let Some(offsets) = offset_ring_or_warn("outline", || ring.parallel_offset(offset)) {
+                paths.extend(offsets);
+            }
+        }
+
+        Self::polylines_to_gcode(params, paths, &depths, gcode)
+    }
+
+    /// The Z of each outline pass: `outline_step_down` apart from the surface, the last at
+    /// `cut_depth`. A device without a Z axis gets one pass.
+    ///
+    /// # Errors
+    /// A step-down that is not above 0 on a device with a Z axis.
+    fn step_down_depths(params: &GerberParameters) -> Result<Vec<f32>> {
+        if params.num_axes < 3 {
+            return Ok(vec![params.cut_depth]);
+        }
+        let step = params.outline_step_down;
+        if !(step.is_finite() && step > 0.0) {
+            anyhow::bail!("Outline step down must be greater than 0");
+        }
+        let total = -params.cut_depth;
+        let passes = ((total / step).ceil() as usize).max(1);
+        Ok((1..=passes)
+            .map(|n| -(step * n as f32).min(total))
+            .collect())
     }
 
     fn generate_isolation_from_sketches(
@@ -972,7 +1093,7 @@ impl GerberConverter {
             }
         }
 
-        Self::polylines_to_gcode(params, isolation_paths, gcode)
+        Self::polylines_to_gcode(params, isolation_paths, &[params.cut_depth], gcode)
     }
 
     fn polyline_to_sketch(pline: &Polyline<f64>) -> Sketch<()> {
@@ -1196,9 +1317,12 @@ impl GerberConverter {
         Ok(())
     }
 
+    /// Emits each path at every Z in `depths` in turn, plunging at its start point between
+    /// passes and retracting once at the end. Without a Z axis each path is cut once.
     fn polylines_to_gcode(
         params: &GerberParameters,
         paths: Vec<Polyline<f64>>,
+        depths: &[f32],
         gcode: &mut String,
     ) -> Result<()> {
         let has_z = params.num_axes >= 3;
@@ -1215,13 +1339,6 @@ impl GerberConverter {
                 writeln!(gcode, "G0 Z{:.3}", params.safe_z)?;
             }
             writeln!(gcode, "G0 X{:.3} Y{:.3}", sx, sy)?;
-            if has_z {
-                writeln!(
-                    gcode,
-                    "G1 Z{:.3} F{:.1}",
-                    params.cut_depth, params.feed_rate
-                )?;
-            }
 
             let emit_segment =
                 |gcode: &mut String, p1: PlineVertex<f64>, p2: PlineVertex<f64>| -> Result<()> {
@@ -1287,17 +1404,23 @@ impl GerberConverter {
                     Ok(())
                 };
 
-            for i in 1..path.vertex_count() {
-                let p1 = path.at(i - 1);
-                let p2 = path.at(i);
-                emit_segment(gcode, p1, p2)?;
-            }
+            let passes = if has_z { depths.len() } else { 1 };
+            for depth in depths.iter().take(passes) {
+                if has_z {
+                    writeln!(gcode, "G1 Z{:.3} F{:.1}", depth, params.feed_rate)?;
+                }
+                for i in 1..path.vertex_count() {
+                    let p1 = path.at(i - 1);
+                    let p2 = path.at(i);
+                    emit_segment(gcode, p1, p2)?;
+                }
 
-            // Close loop if needed
-            if path.is_closed() {
-                let p1 = path.at(path.vertex_count() - 1);
-                let p2 = path.at(0);
-                emit_segment(gcode, p1, p2)?;
+                // Close loop if needed
+                if path.is_closed() {
+                    let p1 = path.at(path.vertex_count() - 1);
+                    let p2 = path.at(0);
+                    emit_segment(gcode, p1, p2)?;
+                }
             }
             if has_z {
                 writeln!(gcode, "G0 Z{:.3}", params.safe_z)?;

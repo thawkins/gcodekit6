@@ -9,7 +9,9 @@
 //! -0.1 mm below a safe Z of 5 mm. The generator checks nothing, so the page's limits are
 //! its own: feed, speed, tool and board above 0, a cut depth below the surface and a safe Z
 //! above it (on a device with a Z axis), and for alignment holes a diameter above 0, a margin
-//! that is not negative and a depth below the surface.
+//! that is not negative and a depth below the surface. The Board Outline layer is cut
+//! outside the board edge by the tool radius, in passes of at most the outline step-down
+//! (default 0.5 mm, above 0 on a device with a Z axis) down to the cut depth.
 //!
 //! Dependencies: `egui`, `gcodekit5-camtools` (converter, layer detection), `gcodekit5-app`
 //! (translations), `gcodekit5-core` (units), `serde_json` (presets).
@@ -40,6 +42,7 @@ const OFFSET_Y: &str = n_!("Offset Y:");
 const FEED_RATE: &str = n_!("Feed Rate:");
 const SPINDLE_SPEED: &str = n_!("Spindle Speed (RPM):");
 const CUT_DEPTH: &str = n_!("Cut Depth:");
+const OUTLINE_STEP_DOWN: &str = n_!("Outline Step Down:");
 const SAFE_Z: &str = n_!("Safe Z:");
 const TOOL_DIAMETER: &str = n_!("Tool Diameter:");
 const ISOLATION_WIDTH: &str = n_!("Isolation Width:");
@@ -147,6 +150,8 @@ pub struct GerberParams {
     pub alignment_hole_depth: String,
     /// Z of the isolation cut (negative is below the surface).
     pub cut_depth: String,
+    /// Board Outline layer: the most each pass of the outline cut goes down.
+    pub outline_step_down: String,
     /// Z of the moves between cuts.
     pub safe_z: String,
     /// Tool diameter.
@@ -189,6 +194,7 @@ impl GerberParams {
             alignment_hole_margin: len(5.0),
             alignment_hole_depth: len(-1.8),
             cut_depth: len(-0.1),
+            outline_step_down: len(0.5),
             safe_z: len(5.0),
             tool_diameter: len(0.1),
             isolation_width: len(0.0),
@@ -216,6 +222,7 @@ impl GerberParams {
             &mut self.alignment_hole_margin,
             &mut self.alignment_hole_depth,
             &mut self.cut_depth,
+            &mut self.outline_step_down,
             &mut self.safe_z,
             &mut self.tool_diameter,
             &mut self.isolation_width,
@@ -278,6 +285,13 @@ impl GerberParams {
         let offset_x = len(OFFSET_X, &self.offset_x, true, &any);
         let offset_y = len(OFFSET_Y, &self.offset_y, true, &any);
         let cut_depth = len(CUT_DEPTH, &self.cut_depth, has_z, &below);
+        let outline = self.layer_type == GerberLayerType::BoardOutline;
+        let outline_step_down = len(
+            OUTLINE_STEP_DOWN,
+            &self.outline_step_down,
+            outline && has_z,
+            &positive,
+        );
         let safe_z = len(SAFE_Z, &self.safe_z, has_z, &positive);
         let tool_diameter = len(TOOL_DIAMETER, &self.tool_diameter, true, &positive);
         let isolation_width = len(ISOLATION_WIDTH, &self.isolation_width, true, &not_negative);
@@ -332,6 +346,7 @@ impl GerberParams {
             alignment_hole_margin: hole_margin as f32,
             alignment_hole_depth: hole_depth as f32,
             cut_depth: cut_depth as f32,
+            outline_step_down: outline_step_down as f32,
             safe_z: safe_z as f32,
             tool_diameter: tool_diameter as f32,
             isolation_width: isolation_width as f32,
@@ -453,6 +468,14 @@ fn show_fields(ui: &mut egui::Ui, p: &mut GerberParams, tr: &Translator, errors:
         field_row(ui, tr, FEED_RATE, &mut p.feed_rate, "", errors);
         field_row(ui, tr, SPINDLE_SPEED, &mut p.spindle_speed, "", errors);
         field_row(ui, tr, CUT_DEPTH, &mut p.cut_depth, unit, errors);
+        field_row(
+            ui,
+            tr,
+            OUTLINE_STEP_DOWN,
+            &mut p.outline_step_down,
+            unit,
+            errors,
+        );
         field_row(ui, tr, SAFE_Z, &mut p.safe_z, unit, errors);
         field_row(ui, tr, TOOL_DIAMETER, &mut p.tool_diameter, unit, errors);
         field_row(
