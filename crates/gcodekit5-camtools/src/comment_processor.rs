@@ -17,6 +17,8 @@ pub use gcodekit5_core::gcode::words::Word;
 ///
 /// Parenthesised comments may appear anywhere (several per line); a `;` outside parentheses
 /// starts a comment that runs to the end of the line. An unclosed `(` comments out the rest.
+/// Nested parentheses are tracked, so `(a(b)c) G1` has code `G1` and comment `a(b)c`; a `)`
+/// outside any comment is kept as code.
 ///
 /// # Arguments
 /// * `line` - One line of G-code.
@@ -29,21 +31,28 @@ pub fn split_comments(line: &str) -> (String, Vec<String>) {
     let mut code = String::with_capacity(line.len());
     let mut comments = Vec::new();
     let mut current = String::new();
-    let mut in_paren = false;
+    // Nesting depth of `( ... )`: nested comments are not valid RS274, but a comment must
+    // still end at its matching `)` so its tail is not read as code. Inner parentheses stay
+    // part of the comment text.
+    let mut depth = 0usize;
     let mut chars = line.chars();
     while let Some(ch) = chars.next() {
-        if in_paren {
-            if ch == ')' {
+        if depth > 0 {
+            if ch == '(' {
+                depth += 1;
+            } else if ch == ')' {
+                depth -= 1;
+            }
+            if depth == 0 {
                 comments.push(current.trim().to_string());
                 current.clear();
-                in_paren = false;
                 // Keep words on either side of an inline comment separate.
                 code.push(' ');
             } else {
                 current.push(ch);
             }
         } else if ch == '(' {
-            in_paren = true;
+            depth = 1;
         } else if ch == ';' {
             comments.push(chars.as_str().trim().to_string());
             break;
@@ -51,7 +60,7 @@ pub fn split_comments(line: &str) -> (String, Vec<String>) {
             code.push(ch);
         }
     }
-    if in_paren {
+    if depth > 0 {
         comments.push(current.trim().to_string());
     }
     // Removing an inline comment can leave double spaces; normalise to single spaces.

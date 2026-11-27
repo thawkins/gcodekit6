@@ -27,6 +27,8 @@ mod homing_safety;
 mod probe_routines;
 #[path = "test_camtools_validation_gaps.rs"]
 mod test_camtools_validation_gaps;
+#[path = "test_comment_processor_nesting.rs"]
+mod test_comment_processor_nesting;
 #[path = "test_drill_press_plane.rs"]
 mod test_drill_press_plane;
 #[path = "test_gerber_input_safety.rs"]
