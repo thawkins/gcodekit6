@@ -153,7 +153,7 @@ impl DesignerState {
             };
 
             if !selected_ids.is_empty() && !selected_ids.contains(&shape_obj.id) {
-                continue; // Saltar si no está en la selección
+                continue; // skip shapes outside the selection
             }
 
             let built = cam.shape_toolpaths(&mut self.toolpath_generator, shape_obj);

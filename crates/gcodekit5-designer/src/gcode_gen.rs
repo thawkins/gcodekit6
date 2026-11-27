@@ -572,7 +572,7 @@ impl ToolpathToGcode {
 
         let line_prefix = self.get_line_prefix(st.line_number);
 
-        let min_radius_mm = 0.25; // Limite de radio mas pequeño
+        let min_radius_mm = 0.25; // smallest arc radius emitted as an arc
 
         // A tiny arc, or one without a centre, is cut as a straight line.
         let is_small_arc = segment.center.is_none_or(|center| {

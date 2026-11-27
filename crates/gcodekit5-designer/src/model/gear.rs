@@ -47,7 +47,7 @@ impl DesignerShape for DesignGear {
             self.center,
             self.module,
             self.teeth,
-            self.pressure_angle_deg, // Convertir a radianes
+            self.pressure_angle_deg, // in degrees
             self.hole_radius,
         );
 
