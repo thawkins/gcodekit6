@@ -78,7 +78,7 @@ impl DeviceManagerWindow {
 
     /// The notice, the delete question, the action bar and the form.
     fn details(&mut self, ui: &mut egui::Ui, machine: &Machine, tr: &Translator) {
-        manager_ui::notice(ui, self.notice.as_ref());
+        manager_ui::notice(ui, self.notice.get());
         self.confirm(ui, tr);
         if self.edit.is_none() {
             manager_ui::placeholder(

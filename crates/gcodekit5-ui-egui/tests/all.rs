@@ -128,6 +128,8 @@ mod test_help;
 mod test_hidpi;
 #[path = "test_icons.rs"]
 mod test_icons;
+#[path = "test_library_notice.rs"]
+mod test_library_notice;
 #[path = "test_machine_control_layout.rs"]
 mod test_machine_control_layout;
 #[path = "test_machine_jog.rs"]

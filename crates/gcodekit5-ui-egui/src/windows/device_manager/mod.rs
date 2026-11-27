@@ -37,6 +37,8 @@ use gcodekit5_core::units::{FeedRateUnits, MeasurementSystem};
 use gcodekit5_devicedb::{DeviceManager, DeviceProfile};
 use gcodekit5_settings::ConnectionSettings;
 
+use crate::windows::manager_ui::LibraryNotice;
+
 mod view;
 
 /// The form's tabs.
@@ -91,15 +93,12 @@ struct ConfirmDelete {
 pub struct DeviceManagerWindow {
     /// The profiles and their file; `None` without a settings folder.
     store: Option<DeviceManager>,
-    /// Why the file could not be read or repaired, until the window shows it.
-    load_error: Option<String>,
-    /// The backup of an unreadable file the notice last named.
-    backup_named: Option<PathBuf>,
     search: String,
     edit: Option<Edit>,
     confirm_delete: Option<ConfirmDelete>,
-    /// The latest notice and whether it reports a failure.
-    notice: Option<(String, bool)>,
+    /// The latest notice and the profiles file's load (or repair) error and backup it
+    /// reports.
+    notice: LibraryNotice,
     /// The active profile or its values changed since [`Self::take_changed`].
     changed: bool,
     /// Sync from Device was clicked; the app answers with [`Self::sync_from`].
@@ -121,12 +120,10 @@ impl DeviceManagerWindow {
         });
         Self {
             store,
-            load_error,
-            backup_named: None,
             search: String::new(),
             edit: None,
             confirm_delete: None,
-            notice: None,
+            notice: LibraryNotice::new(load_error),
             changed: false,
             sync_requested: false,
         }
@@ -142,31 +139,16 @@ impl DeviceManagerWindow {
             let text = n_!("No settings folder: device profiles cannot be loaded or saved.");
             self.say(tr.tr(text).into_owned(), true);
         }
-        if let Some(error) = self.load_error.take() {
-            let title = tr.tr(n_!("Device profiles could not be read:"));
-            self.say(format!("{title} {error}"), true);
-        }
+        let title = tr.tr(n_!("Device profiles could not be read:"));
+        self.notice.show_load_error(&title);
         self.name_backup(tr);
     }
 
     /// Adds the path of a backup the profiles file got since the last notice to the notice.
     fn name_backup(&mut self, tr: &Translator) {
-        let Some(backup) = self.store.as_ref().and_then(DeviceManager::last_backup) else {
-            return;
-        };
-        if self.backup_named.as_ref() == Some(&backup) {
-            return;
-        }
-        let note = format!(
-            "{} {}",
-            tr.tr(n_!("A copy of the unreadable profiles file was kept in")),
-            backup.display()
-        );
-        self.notice = Some(match self.notice.take() {
-            Some((text, _)) => (format!("{text} {note}"), true),
-            None => (note, true),
-        });
-        self.backup_named = Some(backup);
+        let backup = self.store.as_ref().and_then(DeviceManager::last_backup);
+        let kept_in = tr.tr(n_!("A copy of the unreadable profiles file was kept in"));
+        self.notice.name_backup(backup, &kept_in);
     }
 
     /// The profiles, by name.
@@ -187,7 +169,7 @@ impl DeviceManagerWindow {
 
     /// The latest notice (a refusal, a save's result), if any.
     pub fn notice(&self) -> Option<&str> {
-        self.notice.as_ref().map(|(text, _)| text.as_str())
+        self.notice.text()
     }
 
     /// Whether the active profile, or which profile is active, changed since the last call.
@@ -201,7 +183,7 @@ impl DeviceManagerWindow {
     }
 
     fn say(&mut self, text: String, error: bool) {
-        self.notice = Some((text, error));
+        self.notice.say(text, error);
     }
 
     fn active_id(&self) -> Option<String> {
@@ -248,7 +230,7 @@ impl DeviceManagerWindow {
             return;
         };
         self.confirm_delete = None;
-        self.notice = None;
+        self.notice.clear();
         let form = ProfileForm::from_profile(&profile, units, feed_units);
         self.edit = Some(Edit {
             id: profile.id.clone(),

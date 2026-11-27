@@ -28,6 +28,8 @@ use gcodekit5_app::tools_manager_backend::ToolsManagerBackend;
 use gcodekit5_core::data::tools::{Tool, ToolId};
 use gcodekit5_settings::config::Config;
 
+use crate::windows::manager_ui::LibraryNotice;
+
 mod view;
 
 /// The form's tabs.
@@ -133,17 +135,13 @@ impl UiState {
 pub struct ToolsManagerWindow {
     /// The library and its file; `None` without a settings folder.
     backend: Option<ToolsManagerBackend>,
-    /// Why the file could not be read, until the window shows it.
-    load_error: Option<String>,
-    /// The backup of an unreadable file the notice last named.
-    backup_named: Option<PathBuf>,
     filter: ToolFilter,
     /// The tool last opened (remembered in the settings, as GTK does).
     last_selected: Option<String>,
     edit: Option<Edit>,
     question: Option<Question>,
-    /// The latest notice and whether it reports a failure.
-    notice: Option<(String, bool)>,
+    /// The latest notice and the library file's load error and backup it reports.
+    notice: LibraryNotice,
     /// The library changed since [`Self::take_changed`].
     changed: bool,
     file_request: Option<ToolsFileRequest>,
@@ -169,9 +167,11 @@ impl ToolsManagerWindow {
     /// * `config` - The settings holding the remembered filters.
     pub fn new(file: Option<PathBuf>, config: &Config) -> Self {
         let backend = file.map(ToolsManagerBackend::with_storage_path);
-        let load_error = backend
-            .as_ref()
-            .and_then(|b| b.load_error().map(str::to_string));
+        let notice = LibraryNotice::new(
+            backend
+                .as_ref()
+                .and_then(|b| b.load_error().map(str::to_string)),
+        );
         let ui = &config.ui;
         let filter = ToolFilter {
             search: ui.tools_manager_search.clone(),
@@ -188,13 +188,11 @@ impl ToolsManagerWindow {
         };
         Self {
             backend,
-            load_error,
-            backup_named: None,
             filter,
             last_selected: ui.tools_manager_selected_tool.clone(),
             edit: None,
             question: None,
-            notice: None,
+            notice,
             changed: false,
             file_request: None,
             stored_ui: UiState::of(config),
@@ -211,10 +209,8 @@ impl ToolsManagerWindow {
             let text = n_!("No settings folder: custom tools cannot be loaded or saved.");
             self.say(tr.tr(text).into_owned(), true);
         }
-        if let Some(error) = self.load_error.take() {
-            let title = tr.tr(n_!("The custom tools file could not be read:"));
-            self.say(format!("{title} {error}"), true);
-        }
+        let title = tr.tr(n_!("The custom tools file could not be read:"));
+        self.notice.show_load_error(&title);
         if self.edit.is_none()
             && let Some(id) = self.last_selected.clone()
         {
@@ -240,7 +236,7 @@ impl ToolsManagerWindow {
 
     /// The latest notice (a save's result, a refusal), if any.
     pub fn notice(&self) -> Option<&str> {
-        self.notice.as_ref().map(|(text, _)| text.as_str())
+        self.notice.text()
     }
 
     /// The list's search text and filters.
@@ -317,33 +313,19 @@ impl ToolsManagerWindow {
     }
 
     fn say(&mut self, text: String, error: bool) {
-        self.notice = Some((text, error));
+        self.notice.say(text, error);
     }
 
     /// Adds the path of a backup the library file got since the last notice to the notice.
     fn name_backup(&mut self, tr: &Translator) {
-        let Some(backup) = self
+        let backup = self
             .backend
             .as_ref()
-            .and_then(|b| b.last_backup().map(Path::to_path_buf))
-        else {
-            return;
-        };
-        if self.backup_named.as_ref() == Some(&backup) {
-            return;
-        }
-        let note = format!(
-            "{} {}",
-            tr.tr(n_!(
-                "A copy of the unreadable custom tools file was kept in"
-            )),
-            backup.display()
-        );
-        self.notice = Some(match self.notice.take() {
-            Some((text, _)) => (format!("{text} {note}"), true),
-            None => (note, true),
-        });
-        self.backup_named = Some(backup);
+            .and_then(|b| b.last_backup().map(Path::to_path_buf));
+        let kept_in = tr.tr(n_!(
+            "A copy of the unreadable custom tools file was kept in"
+        ));
+        self.notice.name_backup(backup, &kept_in);
     }
 
     /// Whether the open form holds changes not saved yet.
@@ -366,7 +348,7 @@ impl ToolsManagerWindow {
         self.question = None;
         match next {
             Next::New => {
-                self.notice = None;
+                self.notice.clear();
                 self.edit = Some(Edit {
                     original: None,
                     form: ToolForm::default(),
@@ -374,7 +356,7 @@ impl ToolsManagerWindow {
                 });
             }
             Next::Select(id) => {
-                self.notice = None;
+                self.notice.clear();
                 self.load(&id);
             }
             Next::Close => self.edit = None,
