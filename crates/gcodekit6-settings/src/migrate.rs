@@ -113,15 +113,18 @@ impl ConfigDirs {
     ///
     /// # Returns
     /// `None` when there is no platform config folder, or when
-    /// `GCODEKIT6_CONFIG_DIR` is set but empty (isolated: nothing is read or
-    /// written).
+    /// `GCODEKIT6_CONFIG_DIR` (or, unset, the pre-rename `GCODEKIT5_CONFIG_DIR`)
+    /// is set but empty (isolated: nothing is read or written).
     pub fn platform() -> Option<Self> {
         let legacy = SettingsManager::config_directory().ok()?;
         let resolved = paths::resolve(
             APP_ID,
             &Portable::DEFAULT,
             &Location::Auto,
-            &Probe::default(),
+            &Probe {
+                env: Box::new(|name| crate::rename::config_dir_var(name, &|n| std::env::var_os(n))),
+                ..Probe::default()
+            },
         );
         Some(Self::new(legacy, resolved.dir?))
     }

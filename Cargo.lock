@@ -2276,6 +2276,7 @@ version = "2.0.0-alpha.5"
 dependencies = [
  "anyhow",
  "dirs",
+ "gcodekit6-settings",
  "gcodekit6-ui-egui",
  "mutants",
  "tracing-subscriber",
@@ -2332,6 +2333,7 @@ dependencies = [
  "tempfile",
  "thiserror 2.0.21",
  "toml",
+ "tracing",
 ]
 
 [[package]]

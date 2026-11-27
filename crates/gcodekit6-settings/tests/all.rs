@@ -27,3 +27,5 @@ mod test_settings_keyboard_shortcuts;
 mod test_settings_manager_store;
 #[path = "test_settings_migrate.rs"]
 mod test_settings_migrate;
+#[path = "test_settings_rename.rs"]
+mod test_settings_rename;

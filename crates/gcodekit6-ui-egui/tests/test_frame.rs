@@ -198,3 +198,22 @@ fn test_edge_drag_resizes_window() {
         "no resize from the bottom edge: {sent:?}"
     );
 }
+
+/// An environment with exactly the named variable set.
+fn env_with(set: &'static str) -> impl Fn(&str) -> Option<std::ffi::OsString> {
+    move |name| (name == set).then(|| std::ffi::OsString::from("app"))
+}
+
+#[test]
+fn titlebar_prefix_reads_gcodekit6_by_default() {
+    let prefix = gcodekit6_ui_egui::titlebar_prefix(&|_| None);
+    assert_eq!(prefix.var_name(), "GCODEKIT6_TITLEBAR");
+    let prefix = gcodekit6_ui_egui::titlebar_prefix(&env_with("GCODEKIT6_TITLEBAR"));
+    assert_eq!(prefix.var_name(), "GCODEKIT6_TITLEBAR");
+}
+
+#[test]
+fn titlebar_prefix_falls_back_to_gcodekit5_variable() {
+    let prefix = gcodekit6_ui_egui::titlebar_prefix(&env_with("GCODEKIT5_TITLEBAR"));
+    assert_eq!(prefix.var_name(), "GCODEKIT5_TITLEBAR");
+}

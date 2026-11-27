@@ -82,6 +82,7 @@ opt-level = 1
 
 [dependencies]
 gcodekit6-ui-egui = { path = "crates/gcodekit6-ui-egui" }
+gcodekit6-settings = { path = "crates/gcodekit6-settings" }
 
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
 anyhow = { workspace = true }

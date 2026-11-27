@@ -17,6 +17,7 @@ toml = "1.1"
 dirs = "7.0"
 thiserror = { workspace = true }
 craft-settings = { workspace = true }
+tracing = { workspace = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }

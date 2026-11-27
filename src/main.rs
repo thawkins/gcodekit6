@@ -22,8 +22,15 @@ fn main() -> anyhow::Result<()> {
         CliAction::Run(files) => files,
     };
 
+    // Carry the GCodeKit5 folders over before anything (the Windows log file included)
+    // creates the GCodeKit6 ones; the outcome is logged once logging is up.
+    let renamed = gcodekit6_settings::rename::migrate_renamed_folders(
+        &gcodekit6_settings::rename::platform_bases(),
+    );
+
     // Initialize logging
     init_logging()?;
+    renamed.iter().for_each(|migration| migration.log());
 
     // Launch the egui + craft-libs front end, opening any files named on the command line.
     gcodekit6_ui_egui::run(gcodekit6_ui_egui::LaunchOptions {

@@ -54,7 +54,7 @@ pub fn run(options: LaunchOptions) -> anyhow::Result<()> {
     let (settings, settings_problem) = AppState::load_settings();
     gcodekit6_app::i18n::set_language(&settings.config().ui.language);
     let decision = craft_window::policy::decide_for(
-        craft_window::Prefix::new("GCODEKIT6"),
+        titlebar_prefix(&|name| std::env::var_os(name)),
         craft_window::policy::Backend::from_env(),
         frame::title_bar_pref(&settings.config().ui),
     );
@@ -77,6 +77,25 @@ pub fn run(options: LaunchOptions) -> anyhow::Result<()> {
     )
     .map_err(|e| anyhow::anyhow!("eframe failed: {e}"))?;
     Ok(())
+}
+
+/// The prefix of the title-bar override variable: `GCODEKIT6` (`GCODEKIT6_TITLEBAR`), or
+/// the pre-rename `GCODEKIT5` when only `GCODEKIT5_TITLEBAR` is set, so an existing
+/// override keeps working.
+///
+/// # Arguments
+/// * `env` - reads one environment variable
+///
+/// # Returns
+/// The prefix craft-window reads the override with.
+pub fn titlebar_prefix(env: &dyn Fn(&str) -> Option<std::ffi::OsString>) -> craft_window::Prefix {
+    let current = craft_window::Prefix::new("GCODEKIT6");
+    let old = craft_window::Prefix::new("GCODEKIT5");
+    if env(&current.var_name()).is_none() && env(&old.var_name()).is_some() {
+        old
+    } else {
+        current
+    }
 }
 
 /// The main window's viewport before the frame policy is applied: it opens maximized, with

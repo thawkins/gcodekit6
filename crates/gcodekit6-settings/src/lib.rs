@@ -2,12 +2,14 @@
 //!
 //! Application configuration ([`Config`]), loading and saving it through the
 //! craft-settings store ([`SettingsManager`]), and the one-time import of the
-//! legacy settings ([`migrate`]).
+//! legacy settings ([`migrate`]) and of the pre-rename GCodeKit5 folders
+//! ([`rename`]).
 #![deny(unsafe_code)]
 
 pub mod config;
 pub mod manager;
 pub mod migrate;
+pub mod rename;
 
 pub use config::{
     Config, ConnectionSettings, ConnectionType, FileProcessingSettings, MachineSettings, Theme,
