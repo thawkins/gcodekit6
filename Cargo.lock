@@ -2203,7 +2203,7 @@ dependencies = [
 
 [[package]]
 name = "gcodekit5-app"
-version = "2.0.0-alpha.4"
+version = "2.0.0-alpha.5"
 dependencies = [
  "anyhow",
  "dirs",
@@ -2222,7 +2222,7 @@ dependencies = [
 
 [[package]]
 name = "gcodekit5-camtools"
-version = "2.0.0-alpha.4"
+version = "2.0.0-alpha.5"
 dependencies = [
  "anyhow",
  "cavalier_contours",
@@ -2244,7 +2244,7 @@ dependencies = [
 
 [[package]]
 name = "gcodekit5-communication"
-version = "2.0.0-alpha.4"
+version = "2.0.0-alpha.5"
 dependencies = [
  "anyhow",
  "gcodekit5-core",
@@ -2258,7 +2258,7 @@ dependencies = [
 
 [[package]]
 name = "gcodekit5-core"
-version = "2.0.0-alpha.4"
+version = "2.0.0-alpha.5"
 dependencies = [
  "chrono",
  "criterion",
@@ -2272,7 +2272,7 @@ dependencies = [
 
 [[package]]
 name = "gcodekit5-design"
-version = "2.0.0-alpha.4"
+version = "2.0.0-alpha.5"
 dependencies = [
  "anyhow",
  "dirs",
@@ -2283,7 +2283,7 @@ dependencies = [
 
 [[package]]
 name = "gcodekit5-designer"
-version = "2.0.0-alpha.4"
+version = "2.0.0-alpha.5"
 dependencies = [
  "anyhow",
  "cavalier_contours",
@@ -2308,7 +2308,7 @@ dependencies = [
 
 [[package]]
 name = "gcodekit5-devicedb"
-version = "2.0.0-alpha.4"
+version = "2.0.0-alpha.5"
 dependencies = [
  "anyhow",
  "chrono",
@@ -2322,7 +2322,7 @@ dependencies = [
 
 [[package]]
 name = "gcodekit5-settings"
-version = "2.0.0-alpha.4"
+version = "2.0.0-alpha.5"
 dependencies = [
  "craft-settings",
  "dirs",
@@ -2336,7 +2336,7 @@ dependencies = [
 
 [[package]]
 name = "gcodekit5-ui-egui"
-version = "2.0.0-alpha.4"
+version = "2.0.0-alpha.5"
 dependencies = [
  "anyhow",
  "bytemuck",
@@ -2373,7 +2373,7 @@ dependencies = [
 
 [[package]]
 name = "gcodekit5-visualizer"
-version = "2.0.0-alpha.4"
+version = "2.0.0-alpha.5"
 dependencies = [
  "gcodekit5-camtools",
  "gcodekit5-core",

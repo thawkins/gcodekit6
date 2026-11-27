@@ -133,8 +133,12 @@ cd gcodekit6
 # Build release version (optimized)
 cargo build --release
 
-# Run the application
+# Run the application (optionally with files to open)
 ./target/release/gcodekit5
+
+# Print the version or the usage
+./target/release/gcodekit5 --version
+./target/release/gcodekit5 --help
 ```
 
 The GTK4 front end has been removed; egui is the only front end. Features ported from it,

@@ -1,6 +1,6 @@
 # GCodeKit5 - Specification Document
 
-**Version**: 2.0.0-alpha.4
+**Version**: 2.0.0-alpha.5
 **Last Updated**: 2026-11-28
 **Status**: Alpha Release
 
@@ -12,7 +12,7 @@ code. Release history: [CHANGELOG.md](CHANGELOG.md).
 GCodeKit5 is a desktop G-code sender for GRBL-family CNC and laser machines, with a 2D/3D
 designer, CAM tool generators and a toolpath visualizer in one window. The UI is egui on
 wgpu with the craft-libs widget crates ([ADR-012](docs/adr/ADR-012-egui-craft-libs.md)).
-The binary is `gcodekit5` (`src/main.rs`); it opens any files named on the command line.
+The binary is `gcodekit5` (`src/main.rs`); it opens any files named on the command line. `--version` prints the version and `--help` (or `-h`) a short usage, both without opening the window (`src/lib.rs` `parse_args`).
 
 User guides: [docs/user/](docs/user/README.md), including
 [6-axis machines](docs/user/6AXIS.md) and [probing](docs/user/PROBING.md).

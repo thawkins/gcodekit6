@@ -5,12 +5,13 @@ All notable changes to this project are documented here. The format follows
 [Semantic Versioning](https://semver.org/). Release notes are generated from the
 `## [x.y.z]` sections by `scripts/release_notes.py`.
 
-## [Unreleased]
+## [2.0.0-alpha.5] - 2026-11-28
 
 ### Added
 - **Command-line flags**: `gcodekit5 --version` prints the version and `gcodekit5 --help` (or `-h`) a short usage; both exit before the window opens. Every other argument is still opened as a file
 
 ### Changed
+- **Documentation matches the code** (doc-refactor audit, `docs/reports/2026-11-28-doc-refactor-audit.md`, #83-#103): the user manual and in-app help give the real E-STOP (Ctrl+Shift+K), feed hold and numpad jog keys; README, SPEC, ARCHITECTURE, the ADRs, the contributor and ops docs describe the egui app as built; about 50 stale plans, status logs and GTK-era docs are deleted; the agent instruction files `AGENTS.md` and `AGENTS-LANGUAGE.md` drop from about 10,800 to about 3,500 tokens; the link check reports no broken links
 - **Package metadata**: the repository URL is https://github.com/thawkins/gcodekit6, and the package and crate descriptions name GCodeKit5 and only the controllers it supports (GRBL, grblHAL and FluidNC through the GRBL protocol, Repetier)
 - **Tooling**: the pre-commit hook and the monthly dependency review run `cargo nextest` instead of `cargo test`; Dependabot no longer watches npm
 - **Units helpers use `f64`**: `gcodekit5_core::units::{format_length, format_feed_rate, parse_length, parse_feed_rate, feed_rate_from_mm_per_min, feed_rate_to_mm_per_min}` take and return `f64`, matching the `f64` mm dimensions (owner decision OD-2); callers no longer cast to and from `f32`. Displayed strings are unchanged. Imperial lengths convert exactly (`1 1/2` in is 38.1 mm, not 38.099999999999994), and the tabbed box G-code header shows the burn of a 0.004 in setting as `0.1016 mm` instead of `0.101600006 mm`
