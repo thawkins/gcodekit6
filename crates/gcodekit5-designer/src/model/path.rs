@@ -1091,19 +1091,6 @@ where
 impl DesignerShape for DesignPath {
     fn render(&self) -> Path {
         if let Some(path) = &self.original_path {
-            let mut y_values = Vec::new();
-            for event in path.iter() {
-                match event {
-                    lyon::path::Event::Begin { at } => {
-                        y_values.push(at.y);
-                    }
-                    lyon::path::Event::Line { to, .. } => {
-                        y_values.push(to.y);
-                    }
-                    _ => {}
-                }
-            }
-
             return path.clone();
         }
 
@@ -1173,21 +1160,6 @@ impl DesignerShape for DesignPath {
     }
 
     fn transform(&mut self, t: &Transform) {
-        // Show values ​​Y before
-        if let Some(path) = &self.original_path {
-            let mut y_before = Vec::new();
-            for event in path.iter() {
-                match event {
-                    lyon::path::Event::Begin { at } => y_before.push(at.y),
-                    lyon::path::Event::Line { to, .. } => y_before.push(to.y),
-                    _ => {}
-                }
-                if y_before.len() > 5 {
-                    break;
-                }
-            }
-        }
-
         // `rotation` is a render-time rotation applied on top of the stored
         // geometry (see renderers, ops and G-code generation). The transform
         // below is baked into the geometry itself, so it must not also be added
@@ -1253,20 +1225,6 @@ impl DesignerShape for DesignPath {
                 }
             }
             self.original_path = Some(builder.build());
-
-            if let Some(path) = &self.original_path {
-                let mut y_after = Vec::new();
-                for event in path.iter() {
-                    match event {
-                        lyon::path::Event::Begin { at } => y_after.push(at.y),
-                        lyon::path::Event::Line { to, .. } => y_after.push(to.y),
-                        _ => {}
-                    }
-                    if y_after.len() > 5 {
-                        break;
-                    }
-                }
-            }
         }
     }
 

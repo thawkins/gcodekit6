@@ -56,18 +56,10 @@ impl ToolpathToGcode {
     }
 
     /// Creates a new G-code generator with line numbers enabled.
-    pub fn with_line_numbers(_units: Units, safe_z: f64, enabled: bool) -> Self {
-        Self {
-            safe_z,
-            line_numbers_enabled: enabled,
-            num_axes: 3,
-            is_laser_2d: false,
-            min_point_distance: 0.1,
-            curve_simplification_tolerance: 0.05,
-            machine_limits: None,
-            continuous_z_between_passes: false,
-            z_min_limit: None,
-        }
+    pub fn with_line_numbers(units: Units, safe_z: f64, enabled: bool) -> Self {
+        let mut generator = Self::new(units, safe_z);
+        generator.line_numbers_enabled = enabled;
+        generator
     }
 
     /// Activate 2D laser mode

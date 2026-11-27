@@ -30,6 +30,24 @@ pub fn clean_polyline(mut pline: Polyline) -> Polyline {
     pline
 }
 
+/// Offsets `pline` by `distance`, catching a panic inside cavalier_contours.
+///
+/// # Arguments
+/// * `pline` - The polyline to offset.
+/// * `distance` - The signed offset distance in mm.
+///
+/// # Returns
+/// The offset polylines, or an empty `Vec` (logged at warn) when the offset
+/// algorithm panics.
+pub fn safe_parallel_offset(pline: &Polyline, distance: f64) -> Vec<Polyline> {
+    panic::catch_unwind(panic::AssertUnwindSafe(|| pline.parallel_offset(distance))).unwrap_or_else(
+        |_| {
+            tracing::warn!(distance, "Polyline offset failed; using an empty result");
+            Vec::new()
+        },
+    )
+}
+
 fn cross(ax: f64, ay: f64, bx: f64, by: f64) -> f64 {
     ax * by - ay * bx
 }
@@ -630,10 +648,7 @@ pub fn perform_offset(shape: &Shape, distance: f64) -> Shape {
         ext_pline.set_is_closed(true);
         let ext_pline = clean_polyline(ext_pline);
 
-        let offsets = panic::catch_unwind(panic::AssertUnwindSafe(|| {
-            ext_pline.parallel_offset(distance)
-        }))
-        .unwrap_or_default();
+        let offsets = safe_parallel_offset(&ext_pline, distance);
 
         for offset in offsets {
             // Muestreamos con una tolerancia estricta de 0.01mm para máxima fidelidad en el piñón
@@ -654,10 +669,7 @@ pub fn perform_offset(shape: &Shape, distance: f64) -> Shape {
 
             // Holes wind the other way round, so the same outward offset of
             // the shape is the opposite offset of the hole ring.
-            let offsets = panic::catch_unwind(panic::AssertUnwindSafe(|| {
-                int_pline.parallel_offset(-distance)
-            }))
-            .unwrap_or_default();
+            let offsets = safe_parallel_offset(&int_pline, -distance);
 
             // A hole's offset is cut out of the shape, as in `perform_chamfer`;
             // a union would fill the hole in.
@@ -740,10 +752,7 @@ pub fn perform_chamfer(shape: &Shape, distance: f64) -> Shape {
         let ext_pline = clean_polyline(ext_pline);
 
         // Offset inward
-        let inward_offsets = panic::catch_unwind(panic::AssertUnwindSafe(|| {
-            ext_pline.parallel_offset(-distance)
-        }))
-        .unwrap_or_default();
+        let inward_offsets = safe_parallel_offset(&ext_pline, -distance);
 
         for mut inward in inward_offsets {
             // Remove bulges to make it "chamfered"
@@ -756,9 +765,7 @@ pub fn perform_chamfer(shape: &Shape, distance: f64) -> Shape {
             let inward = clean_polyline(inward);
 
             // Offset back outward
-            let outward_offsets =
-                panic::catch_unwind(panic::AssertUnwindSafe(|| inward.parallel_offset(distance)))
-                    .unwrap_or_default();
+            let outward_offsets = safe_parallel_offset(&inward, distance);
 
             for mut offset in outward_offsets {
                 // Remove bulges again
@@ -785,10 +792,7 @@ pub fn perform_chamfer(shape: &Shape, distance: f64) -> Shape {
             int_pline.set_is_closed(true);
             let int_pline = clean_polyline(int_pline);
 
-            let inward_offsets = panic::catch_unwind(panic::AssertUnwindSafe(|| {
-                int_pline.parallel_offset(-distance)
-            }))
-            .unwrap_or_default();
+            let inward_offsets = safe_parallel_offset(&int_pline, -distance);
 
             for mut inward in inward_offsets {
                 for i in 0..inward.vertex_count() {
@@ -799,10 +803,7 @@ pub fn perform_chamfer(shape: &Shape, distance: f64) -> Shape {
 
                 let inward = clean_polyline(inward);
 
-                let outward_offsets = panic::catch_unwind(panic::AssertUnwindSafe(|| {
-                    inward.parallel_offset(distance)
-                }))
-                .unwrap_or_default();
+                let outward_offsets = safe_parallel_offset(&inward, distance);
 
                 for mut offset in outward_offsets {
                     for i in 0..offset.vertex_count() {
