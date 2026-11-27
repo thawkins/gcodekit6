@@ -1,11 +1,11 @@
 //! The canvas's toolpath preview: the toolpaths the G-code is made from, drawn over the
 //! shapes while the toolbox's "Show Toolpaths" is on.
 //!
-//! Ported from the GTK `designer_canvas/toolpath_preview.rs`. The per-shape parameters are
-//! resolved exactly as G-code generation resolves them: in CNC mode shapes without custom
-//! values use the global and default CAM values and depths are measured from the stock top;
-//! in laser mode the shape's own values apply. Hidden shapes are left out, as the export
-//! leaves them out.
+//! Ported from the GTK `designer_canvas/toolpath_preview.rs`. Each shape's toolpaths come
+//! from the designer crate's CAM dispatch ([`CamSettings::shape_toolpaths`]), the same code
+//! G-code export runs, so the effective parameters (defaults for shapes without custom
+//! values, depths from the stock top, global laser feed and power) cannot drift from the
+//! export. Hidden shapes are left out, as the export leaves them out.
 //!
 //! The toolpaths are built on a worker thread from a copy of the visible shapes, so a large
 //! design never stalls the frame. The pane counts changes to the design (its revision); a
@@ -22,7 +22,7 @@
 //! build starts again until the design changes. GTK also showed the progress in the status
 //! bar; egui shows it only beside Show Toolpaths.
 //!
-//! Dependencies: `egui`, `gcodekit5-designer` (toolpath generator, model).
+//! Dependencies: `egui`, `gcodekit5-designer` (CAM dispatch, toolpath generator).
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
@@ -31,154 +31,10 @@ use std::sync::mpsc::{Receiver, TryRecvError, channel};
 use egui::{Painter, Pos2, Shape as EguiShape, Stroke};
 use gcodekit5_designer::DesignerState;
 use gcodekit5_designer::canvas::DrawingObject;
-use gcodekit5_designer::designer_state::MachineMode;
-use gcodekit5_designer::model::{DesignPath, DesignerShape, Shape};
-use gcodekit5_designer::shapes::OperationType;
+use gcodekit5_designer::designer_state::cam::CamSettings;
 use gcodekit5_designer::toolpath::{Toolpath, ToolpathGenerator, ToolpathSegmentType};
 
 use super::{CanvasView, ShapeFlags};
-
-/// The settings a build needs to resolve each shape's effective CAM parameters.
-#[derive(Clone, Debug)]
-struct PreviewSettings {
-    is_cnc_mode: bool,
-    /// Global step down from the tool settings (mm).
-    global_step_down: f64,
-    /// Stock top Z (mm); G-code assumes 10 mm when no stock is configured.
-    stock_top_z: f64,
-    /// Default CAM properties for shapes that do not use custom values.
-    defaults: DrawingObject,
-    feed_rate: f64,
-    spindle_speed: u32,
-    tool_diameter: f64,
-}
-
-impl PreviewSettings {
-    /// The settings of `state`.
-    fn of(state: &DesignerState) -> Self {
-        Self {
-            is_cnc_mode: state.machine_mode() == MachineMode::Cnc3D,
-            global_step_down: state.tool_settings.step_down,
-            stock_top_z: state
-                .stock_material
-                .as_ref()
-                .map_or(10.0, |s| f64::from(s.thickness)),
-            defaults: state.default_properties_shape.clone(),
-            feed_rate: state.tool_settings.feed_rate,
-            spindle_speed: state.tool_settings.spindle_speed,
-            tool_diameter: state.tool_settings.tool_diameter,
-        }
-    }
-
-    /// The shape with the CAM parameters G-code generation would use.
-    fn effective_object(&self, shape: &DrawingObject) -> DrawingObject {
-        if !self.is_cnc_mode {
-            return shape.clone();
-        }
-        let mut effective = shape.clone();
-        if !shape.use_custom_values {
-            effective.operation_type = self.defaults.operation_type;
-            effective.step_in = self.defaults.step_in;
-            effective.ramp_angle = self.defaults.ramp_angle;
-            effective.pocket_strategy = self.defaults.pocket_strategy;
-            effective.raster_fill_ratio = self.defaults.raster_fill_ratio;
-            effective.step_down = if self.global_step_down > 0.0 {
-                self.global_step_down as f32
-            } else {
-                self.defaults.step_down
-            };
-        }
-        if effective.step_down <= 0.0 {
-            effective.step_down = 0.1;
-        }
-        if effective.pocket_depth < 0.0 {
-            effective.pocket_depth = 0.0;
-        }
-        effective
-    }
-
-    /// `(start_depth, cut_depth)` for the toolpath generator.
-    fn depths(&self, effective: &DrawingObject) -> (f64, f64) {
-        if self.is_cnc_mode {
-            // Machine Z is absolute (table at 0, stock top at stock thickness); passes start
-            // at the stock top and descend to the object's Z.
-            let start_z = self.stock_top_z - effective.start_depth;
-            (self.stock_top_z, (self.stock_top_z - start_z).max(0.0))
-        } else {
-            (effective.start_depth, 0.0)
-        }
-    }
-}
-
-/// The toolpaths of one shape, with the per-shape parameters and generator calls of G-code
-/// generation.
-fn shape_toolpaths(
-    generator: &mut ToolpathGenerator,
-    settings: &PreviewSettings,
-    shape: &DrawingObject,
-) -> Vec<Toolpath> {
-    let obj = settings.effective_object(shape);
-    let (start_depth, cut_depth) = settings.depths(&obj);
-    generator.set_pocket_strategy(obj.pocket_strategy);
-    generator.set_start_depth(start_depth);
-    generator.set_cut_depth(cut_depth);
-    generator.set_step_in(f64::from(obj.step_in));
-    generator.set_ramp_angle(f64::from(obj.ramp_angle));
-    generator.set_raster_fill_ratio(obj.raster_fill_ratio);
-
-    let is_pocket = obj.operation_type == OperationType::Pocket;
-    let step_down = f64::from(obj.step_down);
-    let step_in = f64::from(obj.step_in);
-    let depth = obj.effective_pocket_depth();
-    let effective_shape = obj.get_effective_shape();
-    match &effective_shape {
-        Shape::Rectangle(r) if is_pocket => {
-            generator.generate_rectangle_pocket(r, depth, step_down, step_in)
-        }
-        Shape::Rectangle(r) => generator.generate_rectangle_contour(r, step_down),
-        Shape::Circle(c) if is_pocket => {
-            generator.generate_circle_pocket(c, depth, step_down, step_in)
-        }
-        Shape::Circle(c) => generator.generate_circle_contour(c, step_down),
-        Shape::Line(l) => generator.generate_line_contour(l, step_down),
-        Shape::Ellipse(e) if is_pocket => {
-            generator.generate_ellipse_pocket(e, depth, step_down, step_in)
-        }
-        Shape::Ellipse(e) => generator.generate_ellipse_contour(e, step_down),
-        Shape::Path(p) if is_pocket => generator.generate_path_pocket(p, depth, step_down, step_in),
-        Shape::Path(p) => generator.generate_path_contour(p, step_down),
-        Shape::Text(text) if is_pocket => {
-            let pocket = generator.generate_text_pocket_toolpath(text, step_down);
-            let length: f64 = pocket.iter().map(Toolpath::total_length).sum();
-            if length <= 1e-9 {
-                // As G-code generation: profile the glyphs when the pocket cuts nothing.
-                generator.generate_text_toolpath(text, step_down)
-            } else {
-                pocket
-            }
-        }
-        Shape::Text(text) => generator.generate_text_toolpath(text, step_down),
-        Shape::Triangle(t) if is_pocket => {
-            generator.generate_triangle_pocket(t, depth, step_down, step_in)
-        }
-        Shape::Triangle(t) => generator.generate_triangle_contour(t, step_down),
-        Shape::Polygon(p) if is_pocket => {
-            generator.generate_polygon_pocket(p, depth, step_down, step_in)
-        }
-        Shape::Polygon(p) => generator.generate_polygon_contour(p, step_down),
-        // Raster images are engraved line by line, not as a vector toolpath.
-        Shape::RasterImage(_) => Vec::new(),
-        // Gears and sprockets go through their rendered outline, as in G-code.
-        Shape::Gear(_) | Shape::Sprocket(_) => {
-            let path = DesignPath::from_lyon_path(&effective_shape.render());
-            if is_pocket {
-                generator.generate_path_pocket(&path, depth, step_down, step_in)
-            } else {
-                generator.generate_path_contour(&path, step_down)
-            }
-        }
-    }
-}
 
 /// Builds the toolpaths of `shapes`.
 ///
@@ -186,21 +42,18 @@ fn shape_toolpaths(
 /// The toolpaths, or `None` when `cancel` was set before the last shape was done.
 fn build(
     shapes: &[DrawingObject],
-    settings: &PreviewSettings,
+    settings: &CamSettings,
     cancel: &AtomicBool,
     done: &AtomicUsize,
 ) -> Option<Vec<Toolpath>> {
+    // `shape_toolpaths` sets every generator parameter per shape.
     let mut generator = ToolpathGenerator::new();
-    generator.set_feed_rate(settings.feed_rate);
-    generator.set_spindle_speed(settings.spindle_speed);
-    generator.set_tool_diameter(settings.tool_diameter);
-    generator.set_step_in(settings.tool_diameter * 0.4);
     let mut toolpaths = Vec::new();
     for shape in shapes {
         if cancel.load(Ordering::Relaxed) {
             return None;
         }
-        toolpaths.extend(shape_toolpaths(&mut generator, settings, shape));
+        toolpaths.extend(settings.shape_toolpaths(&mut generator, shape).toolpaths);
         done.fetch_add(1, Ordering::Relaxed);
     }
     Some(toolpaths)
@@ -377,7 +230,7 @@ impl ToolpathPreview {
             let (sender, receiver) = channel();
             let shapes = visible(state, flags);
             let total = shapes.len();
-            let settings = PreviewSettings::of(state);
+            let settings = CamSettings::of(state);
             let cancel = Arc::new(AtomicBool::new(false));
             let done = Arc::new(AtomicUsize::new(0));
             let (worker_cancel, worker_done) = (Arc::clone(&cancel), Arc::clone(&done));
