@@ -430,7 +430,8 @@ pub(crate) fn parse_length_mm(s: &str) -> Option<f64> {
 ///
 /// `width`/`height` give the physical size; `viewBox` gives the user-unit extent that
 /// maps onto it, honouring `preserveAspectRatio` (default `xMidYMid meet`). Without a
-/// viewBox, user units are scaled by the width/height unit only (`px` → 25.4/96 mm).
+/// viewBox, one user unit is a CSS px (25.4/96 mm) when the size carries a unit, and
+/// 1 mm when it is unitless (historical behaviour).
 pub(crate) fn root_transform(svg: &XmlTag) -> (Affine, (f64, f64)) {
     let width_attr = svg.attr("width");
     let height_attr = svg.attr("height");
@@ -442,16 +443,13 @@ pub(crate) fn root_transform(svg: &XmlTag) -> (Affine, (f64, f64)) {
         .filter(|v| v.len() == 4 && v[2] > 0.0 && v[3] > 0.0);
 
     let Some(vb) = viewbox else {
-        // No viewBox: user units are CSS pixels when the size is given in px etc.
-        // Derive the unit factor from the width attribute's unit.
-        let unit_factor = width_attr
+        // No viewBox: per SVG one user unit is one CSS pixel (25.4/96 mm) whatever
+        // unit `width`/`height` use; the unit only sets the physical document size.
+        // A unitless (or absent) size keeps the historical one user unit = 1 mm.
+        let has_unit = width_attr
             .or(height_attr)
-            .and_then(|w| {
-                let n = parse_numbers(w).first().copied()?;
-                let mm = parse_length_mm(w)?;
-                (n.abs() > 1e-12).then_some(mm / n)
-            })
-            .unwrap_or(1.0);
+            .is_some_and(|w| w.trim().ends_with(|c: char| c.is_ascii_alphabetic()));
+        let unit_factor = if has_unit { 25.4 / 96.0 } else { 1.0 };
         let w = width_mm.unwrap_or(100.0);
         let h = height_mm.unwrap_or(100.0);
         return (Affine::scale(unit_factor, unit_factor), (w, h));

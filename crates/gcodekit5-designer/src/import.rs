@@ -97,6 +97,7 @@ impl ImportedShape {
                 let mut rect =
                     Rectangle::new(c.x - r.width / 2.0, c.y - r.height / 2.0, r.width, r.height);
                 rect.rotation = -r.rotation;
+                rect.corner_radius = r.corner_radius;
                 Shape::Rectangle(rect)
             }
             Self::Circle(c) => Shape::Circle(Circle::new(flip(c.center), c.radius)),
@@ -180,6 +181,42 @@ fn ellipse_path(cx: f64, cy: f64, rx: f64, ry: f64) -> Path {
         p(cx + rx, cy - K * ry),
         p(cx + rx, cy),
     );
+    b.close();
+    b.build()
+}
+
+/// Resolves an SVG `<rect>`'s corner radii in user units.
+///
+/// Follows the SVG rules: a missing or negative `rx`/`ry` takes the other value
+/// (both missing means square corners), and each is clamped to half its side.
+fn rect_corner_radii(tag: &svg_parse::XmlTag, w: f64, h: f64) -> (f64, f64) {
+    let valid = |name: &str| tag.attr_f64(name).filter(|v| *v >= 0.0);
+    let (rx, ry) = match (valid("rx"), valid("ry")) {
+        (Some(rx), Some(ry)) => (rx, ry),
+        (Some(r), None) | (None, Some(r)) => (r, r),
+        (None, None) => (0.0, 0.0),
+    };
+    (rx.min(w / 2.0), ry.min(h / 2.0))
+}
+
+/// Builds a rectangle outline with elliptical corners (radii `rx`, `ry`) in local
+/// coordinates, each corner a cubic quarter-ellipse.
+fn rounded_rect_path(x: f64, y: f64, w: f64, h: f64, rx: f64, ry: f64) -> Path {
+    // Cubic Bezier circle constant.
+    const K: f64 = 0.552_284_749_830_793_4;
+    let p = |x: f64, y: f64| point(x as f32, y as f32);
+    let (x1, y1) = (x + w, y + h);
+    let (kx, ky) = (K * rx, K * ry);
+    let mut b = Path::builder();
+    b.begin(p(x + rx, y));
+    b.line_to(p(x1 - rx, y));
+    b.cubic_bezier_to(p(x1 - rx + kx, y), p(x1, y + ry - ky), p(x1, y + ry));
+    b.line_to(p(x1, y1 - ry));
+    b.cubic_bezier_to(p(x1, y1 - ry + ky), p(x1 - rx + kx, y1), p(x1 - rx, y1));
+    b.line_to(p(x + rx, y1));
+    b.cubic_bezier_to(p(x + rx - kx, y1), p(x, y1 - ry + ky), p(x, y1 - ry));
+    b.line_to(p(x, y + ry));
+    b.cubic_bezier_to(p(x, y + ry - ky), p(x + rx - kx, y), p(x + rx, y));
     b.close();
     b.build()
 }
@@ -346,12 +383,19 @@ impl SvgImporter {
                 if w <= 0.0 || h <= 0.0 {
                     return None;
                 }
+                let (rx, ry) = rect_corner_radii(tag, w, h);
                 let center = ctm.apply(Point::new(x + w / 2.0, y + h / 2.0));
-                if ctm.is_axis_aligned() {
+                // A designer rectangle has one circular corner radius, so it is kept
+                // only while the corners stay circular after the transform.
+                let circular = |rx_mm: f64, ry_mm: f64| (rx_mm - ry_mm).abs() < 1e-9;
+                if ctm.is_axis_aligned() && circular(rx * ctm.a.abs(), ry * ctm.d.abs()) {
                     let (sw, sh) = (w * ctm.a.abs(), h * ctm.d.abs());
-                    let rect = Rectangle::new(center.x - sw / 2.0, center.y - sh / 2.0, sw, sh);
+                    let mut rect = Rectangle::new(center.x - sw / 2.0, center.y - sh / 2.0, sw, sh);
+                    rect.corner_radius = rx * ctm.a.abs();
                     Some(ImportedShape::Rect(rect))
-                } else if let Some((s, angle)) = ctm.as_similarity() {
+                } else if let Some((s, angle)) = ctm.as_similarity()
+                    && circular(rx, ry)
+                {
                     let mut rect = Rectangle::new(
                         center.x - w * s / 2.0,
                         center.y - h * s / 2.0,
@@ -359,7 +403,13 @@ impl SvgImporter {
                         h * s,
                     );
                     rect.rotation = angle;
+                    rect.corner_radius = rx * s;
                     Some(ImportedShape::Rect(rect))
+                } else if rx > 0.0 && ry > 0.0 {
+                    Some(transformed_path(
+                        &rounded_rect_path(x, y, w, h, rx, ry),
+                        ctm,
+                    ))
                 } else {
                     let corners = [
                         Point::new(x, y),
