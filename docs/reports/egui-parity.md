@@ -25,8 +25,9 @@ keys, the shortcuts popover, the empty-design box, preview Cancel, the settings 
 job-end console lines, Save G-code, Unlock in ALARM and the stock tooltip) or were the two Gap
 rows, ported by G8.
 
-One row per user-visible feature from `docs/user/*.md` and the SPEC.md feature list
-(section 2.2 and the panels/dialogs of section 5). Rows marked *(GTK)* are user-visible GTK
+One row per user-visible feature from `docs/user/*.md` and the feature list of the
+pre-2.0.0-alpha.4 SPEC.md (its section 2.2 and the panels/dialogs of section 5; SPEC.md was rewritten
+as an as-built spec in #94). Rows marked *(GTK)* are user-visible GTK
 features that the docs do not list but that a user of the GTK build would miss.
 
 Status values:
@@ -295,7 +296,7 @@ The two rules differ on purpose; both are pinned by tests
 | Help browser with topics, links, images | 87-help-system | Ported | `test_help::help_opens_topic_by_id_and_renders_headings_and_images`, `test_help::help_internal_link_navigates_and_back_forward_return` |
 | F1 opens help | 87-help-system | Ported | `test_help::help_f1_command_opens_index` |
 
-## SPEC.md feature list (2.2) not covered above
+## Former SPEC.md feature list (2.2) not covered above
 
 | Feature | Source doc | egui status | Evidence |
 | --- | --- | --- | --- |

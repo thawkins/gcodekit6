@@ -309,46 +309,47 @@ different project, and repetitions.
 
 | ID | Question | Decision | Effect |
 |---|---|---|---|
-| OD-1 | Canonical repo URL | **Decided: `github.com/thawkins/gcodekit6`** | D04, D06, D07, D10, D15 fix the URLs and are Proposed. C-5 and C-11 are code/config follow-ups |
-| OD-2 | Dimension type | **Decided: document `f64`** (match code); drop the f32 rule from AGENTS.md; update ADR-008 | D02 and D09 are Proposed |
+| OD-1 | Canonical repo URL | **Decided: `github.com/thawkins/gcodekit6`** | D04, D06, D07, D10, D15 fixed the URLs (Done). C-5 and C-11 are code/config follow-ups |
+| OD-2 | Dimension type | **Decided: document `f64`** (match code); drop the f32 rule from AGENTS.md; update ADR-008 | D02 and D09 applied it (Done) |
 | OD-3 (new) | In-app "Project website" points at `feveal/gcodekit5-design` | Pinned by a frozen test (C-11): **Deliberate - do not fix** in this train | none |
 
 ## 10. Cleanup train ledger
 
-Status vocabulary: Proposed / Blocked - owner decision OD-n / Deliberate - do not fix. No row is Blocked.
+Status vocabulary: Proposed / Blocked - owner decision OD-n / Deliberate - do not fix / Done (#PR). No row is Blocked.
+Drain finished 2026-11-28: every ticket merged; the link check (`python3 -I target/temp/docaudit/linkcheck.py`, appendix A) reports 0 broken links in all four slices.
 `V0` means the shared validation `git diff --stat origin/master -- . ':!*.md'` prints nothing.
 `LC` means `python3 -I target/temp/docaudit/linkcheck.py` reports 0 broken for the slice.
 `HT` means `cargo nextest run -p gcodekit5-ui-egui -E 'test(test_help::)'` passes.
 
 | ID | Surviving claim / reader behaviour | Evidence | Canonical home | Pins | Frozen boundary | Validation | Dependency | Status |
 |---|---|---|---|---|---|---|---|---|
-| L01 | User finds the correct E-STOP, feed hold and jog keys | `commands.rs:247-375` | docs/user/90-shortcuts.md mirrors `commands.rs` | 70-settings links 90 | commands.rs | V0, LC, `rg -n -i 'escape\|wasd\|space' docs/user/{03,10,80,85,90}*.md` returns no key claims | - | Proposed (D01) |
-| L02 | Safety page lists only real controls (E-STOP, feed hold, jog clamp) | parity rows 96/101/286-288 | docs/user/85-safety-diagnostics.md (filename kept) | README:44, 60:63, 80:38 | - | V0, LC | - | Proposed (D01) |
-| L03 | Override ranges feed 10-200 %, spindle 50-200 % | `overrides.rs:217-219` | docs/user/12-overrides.md | - | - | V0 | - | Proposed (D01) |
-| L04 | Visualizer mouse/keys/toggles match UI | `commands.rs` VIS keys; sidebar msgids | docs/user/30-visualizer.md | - | - | V0 | - | Proposed (D01) |
-| L05 | Agents use only real tools, scripts and deps | ROOT-1..5,13,15,16,20 | AGENTS.md / AGENTS-LANGUAGE.md | auto-load names | code-quality.yml | V0, `rg -n 'codeindex\|check-test-env\|tool-rename-guard\|tokio\|rayon\|unwrap_used = \|1\.85\|QUICKSTART\|PLAN\.md\|team_create' AGENTS*.md` returns nothing | - | Proposed (D02) |
-| L06 | Dimensions are f64 mm | `core/src/data/mod.rs:96-100` | ADR-008 (AGENTS links) | - | units.rs | V0 | OD-2 decided | Proposed (D02, D09) |
+| L01 | User finds the correct E-STOP, feed hold and jog keys | `commands.rs:247-375` | docs/user/90-shortcuts.md mirrors `commands.rs` | 70-settings links 90 | commands.rs | V0, LC, `rg -n -i 'escape\|wasd\|space' docs/user/{03,10,80,85,90}*.md` returns no key claims | - | Done (D01 #86) |
+| L02 | Safety page lists only real controls (E-STOP, feed hold, jog clamp) | parity rows 96/101/286-288 | docs/user/85-safety-diagnostics.md (filename kept) | README:44, 60:63, 80:38 | - | V0, LC | - | Done (D01 #86) |
+| L03 | Override ranges feed 10-200 %, spindle 50-200 % | `overrides.rs:217-219` | docs/user/12-overrides.md | - | - | V0 | - | Done (D01 #86) |
+| L04 | Visualizer mouse/keys/toggles match UI | `commands.rs` VIS keys; sidebar msgids | docs/user/30-visualizer.md | - | - | V0 | - | Done (D01 #86) |
+| L05 | Agents use only real tools, scripts and deps | ROOT-1..5,13,15,16,20 | AGENTS.md / AGENTS-LANGUAGE.md | auto-load names | code-quality.yml | V0, `rg -n 'codeindex\|check-test-env\|tool-rename-guard\|tokio\|rayon\|unwrap_used = \|1\.85\|QUICKSTART\|PLAN\.md\|team_create' AGENTS*.md` returns nothing | - | Done (D02 #84) |
+| L06 | Dimensions are f64 mm | `core/src/data/mod.rs:96-100` | ADR-008 (AGENTS links) | - | units.rs | V0 | OD-2 decided | Done (D02 #84, D09 #96) |
 | L07 | Greeting canary lines | AGENTS.md:175, AGENTS-LANGUAGE.md:3 | AGENTS*.md | session canary | - | - | - | Deliberate - do not fix (owner's canary) |
-| L08 | In-app help labels match msgids (11 topics x en/es) | USER-12..22, 2.1 | resources/markdown | include_str, test_help pins | resources.rs, test_help.rs | V0, HT | - | Proposed (D03) |
+| L08 | In-app help labels match msgids (11 topics x en/es) | USER-12..22, 2.1 | resources/markdown | include_str, test_help pins | resources.rs, test_help.rs | V0, HT | - | Done (D03 #91) |
 | L09 | designer.md heading "Main Actions in 2D Laser Mode" | test_help.rs | in-app designer.md | frozen test | test_help.rs | HT | - | Deliberate - do not fix |
 | L10 | In-app "Project website" URL | test_help.rs:236 | in-app index.md | frozen test | test_help.rs | HT | OD-3 | Deliberate - do not fix |
-| L11 | Install/connection chapters say egui/wgpu deps, gcodekit6 URL, MSRV 1.95, real controller support | USER-1,2,5,11; ROOT-24 | docs/user/{README,01,02,04,05,06,87,92} | README TOC | - | V0, LC, `rg -n -i 'gtk\|adwaita\|opengl\|gcodekit5\.git\|1\.88' docs/user` returns nothing | OD-1 decided | Proposed (D04) |
-| L12 | Feature chapters describe only implemented UI | USER-6..10, 2.1 | docs/user/{15,20,40,50,60,70,6AXIS,PROBING} | 70 cited by settings.rs:13 | - | V0, LC | - | Proposed (D05) |
-| L13 | README capability, keys, commands, URL true; no CHANGELOG copy | ROOT-24..28 | README.md | Cargo.toml `readme` | - | V0, LC | OD-1 decided | Proposed (D06) |
-| L14 | Contributor commands run as written; CI gates in one place | ROOT-32,33,35,44; MISC-8,10 | DEVELOPMENT.md, CONTRIBUTING.md | forge names | .githooks, workflows | V0, LC | OD-1 decided | Proposed (D07) |
-| L15 | Architecture types and graph come from the code | ROOT-29; MISC-6,7; GTK4.md salvage | ARCHITECTURE.md, COORDINATE_SYSTEM.md, file_format.md | README/DEVELOPMENT links | - | V0, LC | - | Proposed (D08) |
-| L16 | ADR statuses and named types match the code | DESIGN-1..10,12 | docs/adr | ADR filenames (Cargo.toml, deny.toml, dependabot cite ADR-011) | - | V0, LC | OD-2 decided | Proposed (D09) |
-| L17 | Ops docs (macOS, scripts, dependencies, grblHAL/FluidNC) true | MISC-2,4,5,11,13,16 | docs/MACOS_BUILD.md, scripts/README.md, docs/dependency_management.md, docs/GRBLHAL_FLUIDNC_SUPPORT.md | DEVELOPMENT links | scripts/*, dependabot.yml | V0, LC | OD-1 decided | Proposed (D10) |
-| L18 | Reports reflect HEAD (parity test refs, ticket statuses, UAT script) | DESIGN-21,22,28 | docs/reports, docs/howto/HOWTO.UAT.md | CHANGELOG:34 | - | V0, LC | - | Proposed (D11) |
-| L19 | SPEC is an as-built spec | ROOT-30,31 | SPEC.md | AGENTS push ritual | - | V0, LC | - | Proposed (D12) |
-| L20 | Stale root plans removed | ROOT-23,36-39 | git history | inbound links listed in D13 | - | V0 (except `IMPROVEMENTS_SUMMARY.txt`), LC | D05, D12 | Proposed (D13) |
-| L21 | Stale docs subdirs removed | DESIGN-13..20,23-27,29,30 | git history | inbound listed in D14 | - | V0 (except `docs/audits/unwrap_audit.csv`), LC | D04, D08 | Proposed (D14) |
-| L22 | Stale docs/ root files removed | MISC-1,3,4,12,14,15; USER-26 | MACOS_BUILD, WINDOWS_BUILD | inbound listed in D15 | - | V0, LC | D10 | Proposed (D15) |
-| L23 | Bare counts become commands; CHANGELOG gets a title | ROOT-41,43 | STATS.md, BUILDSTATS.md, CHANGELOG.md | release_notes.py | scripts/release_notes.py | V0, `python3 -I scripts/release_notes.py 2.0.0-alpha.4 --out target/temp/rn.md` exits 0, output identical before/after | - | Proposed (D16) |
+| L11 | Install/connection chapters say egui/wgpu deps, gcodekit6 URL, MSRV 1.95, real controller support | USER-1,2,5,11; ROOT-24 | docs/user/{README,01,02,04,05,06,87,92} | README TOC | - | V0, LC, `rg -n -i 'gtk\|adwaita\|opengl\|gcodekit5\.git\|1\.88' docs/user` returns nothing | OD-1 decided | Done (D04 #87) |
+| L12 | Feature chapters describe only implemented UI | USER-6..10, 2.1 | docs/user/{15,20,40,50,60,70,6AXIS,PROBING} | 70 cited by settings.rs:13 | - | V0, LC | - | Done (D05 #89) |
+| L13 | README capability, keys, commands, URL true; no CHANGELOG copy | ROOT-24..28 | README.md | Cargo.toml `readme` | - | V0, LC | OD-1 decided | Done (D06 #85) |
+| L14 | Contributor commands run as written; CI gates in one place | ROOT-32,33,35,44; MISC-8,10 | DEVELOPMENT.md, CONTRIBUTING.md | forge names | .githooks, workflows | V0, LC | OD-1 decided | Done (D07 #88) |
+| L15 | Architecture types and graph come from the code | ROOT-29; MISC-6,7; GTK4.md salvage | ARCHITECTURE.md, COORDINATE_SYSTEM.md, file_format.md | README/DEVELOPMENT links | - | V0, LC | - | Done (D08 #93) |
+| L16 | ADR statuses and named types match the code | DESIGN-1..10,12 | docs/adr | ADR filenames (Cargo.toml, deny.toml, dependabot cite ADR-011) | - | V0, LC | OD-2 decided | Done (D09 #96) |
+| L17 | Ops docs (macOS, scripts, dependencies, grblHAL/FluidNC) true | MISC-2,4,5,11,13,16 | docs/MACOS_BUILD.md, scripts/README.md, docs/dependency_management.md, docs/GRBLHAL_FLUIDNC_SUPPORT.md | DEVELOPMENT links | scripts/*, dependabot.yml | V0, LC | OD-1 decided | Done (D10 #92) |
+| L18 | Reports reflect HEAD (parity test refs, ticket statuses, UAT script) | DESIGN-21,22,28 | docs/reports, docs/howto/HOWTO.UAT.md | CHANGELOG:34 | - | V0, LC | - | Done (D11 #90) |
+| L19 | SPEC is an as-built spec | ROOT-30,31 | SPEC.md | AGENTS push ritual | - | V0, LC | - | Done (D12 #94) |
+| L20 | Stale root plans removed | ROOT-23,36-39 | git history | inbound links listed in D13 | - | V0 (except `IMPROVEMENTS_SUMMARY.txt`), LC | D05, D12 | Done (D13 #101) |
+| L21 | Stale docs subdirs removed | DESIGN-13..20,23-27,29,30 | git history | inbound listed in D14 | - | V0 (except `docs/audits/unwrap_audit.csv`), LC | D04, D08 | Done (D14 #100) |
+| L22 | Stale docs/ root files removed | MISC-1,3,4,12,14,15; USER-26 | MACOS_BUILD, WINDOWS_BUILD | inbound listed in D15 | - | V0, LC | D10 | Done (D15 #99) |
+| L23 | Bare counts become commands; CHANGELOG gets a title | ROOT-41,43 | STATS.md, BUILDSTATS.md, CHANGELOG.md | release_notes.py | scripts/release_notes.py | V0, `python3 -I scripts/release_notes.py 2.0.0-alpha.4 --out target/temp/rn.md` exits 0, output identical before/after | - | Done (D16 #97) |
 | L24 | CHANGELOG `## [x.y.z]` and dated `[Unreleased]` headings | release_notes.py | CHANGELOG.md | release.yml | - | `grep -c '^## \[' CHANGELOG.md` unchanged | - | Deliberate - do not fix |
-| L25 | Agent files cost <= ~4k tokens with all true rules intact | 6 | AGENTS*.md | auto-load | - | V0, `wc -c`, operative-token diff | D02 | Proposed (D17) |
-| L26 | Drill Press help topic, Gerber links, overscan, es parity | USER-23,24,25,28 | resources/markdown | include_str, test_help | - | V0, HT | D03 | Proposed (D18) |
-| L27 | Copilot reads AGENTS.md pointer | MISC-9 | `.github/copilot-instructions.md` | GitHub path | - | V0 | - | Proposed (D19) |
+| L25 | Agent files cost <= ~4k tokens with all true rules intact | 6 | AGENTS*.md | auto-load | - | V0, `wc -c`, operative-token diff | D02 | Done (D17 #98) |
+| L26 | Drill Press help topic, Gerber links, overscan, es parity | USER-23,24,25,28 | resources/markdown | include_str, test_help | - | V0, HT | D03 | Done (D18 #102) |
+| L27 | Copilot reads AGENTS.md pointer | MISC-9 | `.github/copilot-instructions.md` | GitHub path | - | V0 | - | Done (D19 #95) |
 | L28 | Historical CHANGELOG entries (GTK, `.cargo` notes, `docs/bugfixes/` typo) | ROOT-42 | CHANGELOG.md | - | - | - | - | Deliberate - do not fix |
 
 Prevention: no guard is added in this train, because CI/test files are frozen. Two follow-ups are recorded

@@ -15,7 +15,7 @@
 -     ▪️ [Planeado de Sufridera](help:spoilboard_surfacing)
 -     ▪️ [Rejilla en la Sufridera](help:spoilboard_grid)
 -     ▪️ [De Gerber a G-Code](help:gerber)
--     ▪️ [Taladro de Columna](help:drill_press)
+-     ▪️ [Taladradora de columna](help:drill_press)
 - [Configuración de dispositivos](help:device_config): recupera/guarda la configuración y las capacidades de GRBL.
 - [Administrador de dispositivos](help:device_manager): administra los perfiles y las conexiones de los dispositivos.
 - [Herramientas CNC](help:tools_manager): administra las definiciones de herramientas.
