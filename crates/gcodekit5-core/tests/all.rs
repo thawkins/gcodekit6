@@ -21,6 +21,8 @@ pub fn global_env_lock() -> std::sync::MutexGuard<'static, ()> {
 mod audit_regression_tests;
 #[path = "six_axis_position_tests.rs"]
 mod six_axis_position_tests;
+#[path = "test_gcode_words_arc.rs"]
+mod test_gcode_words_arc;
 #[path = "test_type_aliases.rs"]
 mod test_type_aliases;
 #[path = "test_units.rs"]
