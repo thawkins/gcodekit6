@@ -3,7 +3,7 @@
 ## Status
 Accepted (amended)
 
-Amended 2026-11-28: dimensions are `f64` mm (owner decision OD-2); the display helpers stay `f32`; `parse_length` returns `Result<f32, String>`. This ADR is the canonical statement of the units rules.
+Amended 2026-11-28: dimensions are `f64` mm (owner decision OD-2); the display helpers stay `f32`; `parse_length` returns `Result<f32, String>`. The UI reads the unit setting each frame instead of listening for changes. This ADR is the canonical statement of the units rules.
 
 ## Date
 2026-02-18
@@ -32,7 +32,7 @@ Key rules:
 - Dimensions are displayed to 2 decimal places (0.01mm precision)
 - DateTime values are stored in UTC, converted to locale in the UI layer
 - Text strings are internally UTF-8
-- The UI listens for measurement system changes and re-renders displayed values
+- The UI has no change listener: each frame it reads `config().ui.measurement_system` and `feed_rate_units` from the settings and formats values with them (for example the status bar in `crates/gcodekit5-ui-egui/src/app.rs`), so a change shows on the next frame
 - G-code parser preserves the source unit mode but the visualizer works in mm
 
 ## Consequences

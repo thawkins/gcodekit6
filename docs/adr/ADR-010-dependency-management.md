@@ -3,7 +3,7 @@
 ## Status
 Accepted
 
-Amended 2026-11-28: dropped the third package ecosystem (no `package.json` exists) and the GTK dependency-count claim; `cargo audit` is a manual monthly step, not CI; unused dependencies are caught by `cargo machete` in CI; recorded the real `cargo deny` bans and sources settings.
+Amended 2026-11-28: dropped the third package ecosystem (no `package.json` exists) and the GTK dependency-count claim; `cargo audit` is a manual monthly step, not CI; unused dependencies are caught by `cargo machete` in CI; recorded the real `cargo deny` licenses, bans and sources settings.
 
 ## Date
 2026-02-18
@@ -22,7 +22,7 @@ Implement a multi-layered dependency management strategy:
 ### Auditing
 - **`cargo deny check`** runs in the Code Quality workflow on every push and pull request to `master`, `develop` and `devel`:
   - **Advisories**: Deny known vulnerabilities (RustSec database)
-  - **Licenses**: Allowlist of permissive licenses (MIT, Apache-2.0, BSD, etc.)
+  - **Licenses**: an allowlist in `deny.toml` of permissive licenses (MIT, Apache-2.0, BSD-2/3-Clause, ISC, Zlib and others) plus the weak-copyleft MPL-2.0 and EUPL-1.2, with per-crate exceptions for two crates
   - **Bans**: Duplicate crate versions are allowed (`multiple-versions = "allow"`)
   - **Sources**: crates.io, plus an allowlist of git repositories (craft-libs and its egui and winit forks, core2)
 - **`cargo audit`** runs by hand as part of `scripts/monthly-dependency-review.sh`; it is not in CI
