@@ -27,6 +27,8 @@ mod test_chamfer_dimensions;
 mod test_default_properties_inheritance;
 #[path = "test_design_file_round_trip.rs"]
 mod test_design_file_round_trip;
+#[path = "test_designer_export_rules.rs"]
+mod test_designer_export_rules;
 #[path = "test_designer_hygiene.rs"]
 mod test_designer_hygiene;
 #[path = "test_dxf_import_fidelity.rs"]

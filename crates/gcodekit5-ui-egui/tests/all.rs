@@ -76,6 +76,8 @@ mod test_designer_canvas;
 mod test_designer_editing;
 #[path = "test_designer_editor_handoff.rs"]
 mod test_designer_editor_handoff;
+#[path = "test_designer_export_rules.rs"]
+mod test_designer_export_rules;
 #[path = "test_designer_files.rs"]
 mod test_designer_files;
 #[path = "test_designer_files_app.rs"]

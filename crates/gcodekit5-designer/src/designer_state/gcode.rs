@@ -70,8 +70,17 @@ impl DesignerState {
 
     /// Returns a safety violation summary when any object starts at/above safe Z in CNC mode.
     ///
-    /// Tuple format: (safe_z, violating_count, max_object_start_z).
-    pub fn safe_z_clearance_violation_summary(&self) -> Option<(f64, usize, f64)> {
+    /// # Arguments
+    /// * `is_exported` - Whether a shape takes part in the export (e.g. not hidden in the
+    ///   view); shapes it rejects are not checked.
+    ///
+    /// # Returns
+    /// `(safe_z, violating_count, max_object_start_z)`, or `None` when no exported shape
+    /// starts at or above Safe Z (always `None` outside CNC mode).
+    pub fn safe_z_clearance_violation_summary(
+        &self,
+        is_exported: impl Fn(&DrawingObject) -> bool,
+    ) -> Option<(f64, usize, f64)> {
         if self.machine_mode() != MachineMode::Cnc3D {
             return None;
         }
@@ -85,7 +94,7 @@ impl DesignerState {
         let mut violating_count = 0usize;
         let mut max_start_z = f64::NEG_INFINITY;
 
-        for shape in self.canvas.shape_store.iter() {
+        for shape in self.canvas.shape_store.iter().filter(|o| is_exported(o)) {
             let start_z = self.effective_cnc_start_depth_from_shape(shape);
             if start_z >= safe_z {
                 violating_count += 1;
@@ -305,6 +314,8 @@ impl DesignerState {
                     (effective_start_depth, 0.0)
                 };
 
+            self.toolpath_generator
+                .set_tool_diameter(self.tool_settings.tool_diameter);
             self.toolpath_generator
                 .set_pocket_strategy(effective_shape_obj.pocket_strategy);
             self.toolpath_generator
@@ -612,31 +623,7 @@ impl DesignerState {
                 ));
 
                 // Crear parámetros y generar G-code
-                let params = crate::engraving::EngravingParams {
-                    width_mm: raster.width_mm as f32,
-                    height_mm: Some(raster.height_mm as f32),
-                    feed_rate: raster.feed_rate as f32,
-                    travel_rate: raster.travel_rate as f32,
-                    min_power: raster.min_power as f32,
-                    max_power: raster.max_power as f32,
-                    ppi: raster.ppi as f32,
-                    scan_direction: if raster.scan_direction == "vertical" {
-                        crate::engraving::ScanDirection::Vertical
-                    } else {
-                        crate::engraving::ScanDirection::Horizontal
-                    },
-                    bidirectional: raster.bidirectional,
-                    invert: raster.invert,
-                    mirror_x: false,
-                    mirror_y: false,
-                    rotation: crate::engraving::RotationAngle::Degrees0,
-                    halftone: crate::engraving::HalftoneMethod::from_name(&raster.dithering),
-                    halftone_threshold: raster.halftone_threshold,
-                    offset_x: start_x as f32,
-                    offset_y: start_y as f32,
-                    power_scale: 1000.0,
-                    line_spacing: 1.0,
-                };
+                let params = raster.engraving_params();
 
                 let engraver_result = if let Some(path) = &raster.original_path {
                     ImageEngraver::from_file(path, params)
