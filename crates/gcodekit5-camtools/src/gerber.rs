@@ -359,9 +359,7 @@ impl GerberConverter {
 
         // Initialization sequence
         writeln!(gcode, "; Initialization sequence")?;
-        writeln!(gcode, "G21 ; Set units to millimeters")?;
-        writeln!(gcode, "G90 ; Absolute positioning")?;
-        writeln!(gcode, "G17 ; XY plane selection")?;
+        crate::job_preamble::push_modal_header(&mut gcode, true);
         writeln!(gcode)?;
 
         // Work zero is set at the current (jogged) tool position. The X/Y offsets are applied

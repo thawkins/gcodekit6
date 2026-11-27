@@ -1,7 +1,11 @@
 //! # Job Preamble Helpers
 //!
-//! Shared start-of-job handling for the laser generators (bitmap engraver, tabbed box,
-//! jigsaw puzzle).
+//! Shared start-of-job handling for the G-code generators. [`push_work_setup`] and
+//! [`travel_z_line`] serve the bitmap engraver, tabbed box, drill press, spoilboard grid and
+//! spoilboard surfacing; [`push_modal_header`] serves those plus the Gerber generator.
+//!
+//! The Gerber and probe generators deliberately do not use the work setup: they zero the work
+//! offset at the current position (`G10 L20`) instead of keeping the user's G54 offsets.
 //!
 //! Homing (`$H`) is optional and off by default. When it is enabled, the generators:
 //!
@@ -35,6 +39,22 @@
 /// below the switch trip point while staying within the soft-limit range (`0` to
 /// `-$132`).
 pub const HOMED_TRAVEL_Z_MACHINE: f32 = -1.0;
+
+/// Append the modal header every job starts with: millimetre units, absolute positioning and,
+/// when `with_plane` is set, the XY plane.
+///
+/// Blank lines after the header differ per generator and are left to the caller.
+///
+/// # Arguments
+/// * `gcode` - Program text to append to.
+/// * `with_plane` - Also emit `G17` (XY plane selection).
+pub fn push_modal_header(gcode: &mut String, with_plane: bool) {
+    gcode.push_str("G21 ; Set units to millimeters\n");
+    gcode.push_str("G90 ; Absolute positioning\n");
+    if with_plane {
+        gcode.push_str("G17 ; XY plane selection\n");
+    }
+}
 
 /// Append the work-coordinate setup for the start of a job.
 ///
