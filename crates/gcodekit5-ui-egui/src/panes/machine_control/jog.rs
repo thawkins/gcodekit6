@@ -2,7 +2,7 @@
 //! with the Z column.
 //!
 //! Every jog runs in the direction Preferences > Machine > Invert gives the axis
-//! (`device_status::jog_direction`, as in the GTK front end). Step and feed are mm and mm/min
+//! ([`JogPanel::set_inverted`]). Step and feed are mm and mm/min
 //! internally and shown, and typed, in the user's measurement system and feed units; the `$J`
 //! line is always G21 (mm), as GTK sends it.
 //!
@@ -30,7 +30,6 @@
 //! Dependencies: `egui`, `gcodekit5-app` (jog step presets, axes, invert, translations),
 //! `gcodekit5-core` (units).
 
-use gcodekit5_app::device_status::jog_direction;
 use gcodekit5_app::i18n::Translator;
 use gcodekit5_app::machine::Axis;
 use gcodekit5_app::machine::grbl_stream::{
@@ -145,10 +144,16 @@ const PAD_GAP: f32 = 5.0;
 /// Width of the X/Y pad, the gap, the Z column and the gap after it.
 pub(super) const PAD_ROW_WIDTH: f32 = 4.0 * PAD_BUTTON + 2.0 * PAD_GAP + 48.0 + 20.0 + 24.0;
 
-/// The signed jog distance for `axis` moved `distance_mm` in the direction the user asked
-/// for: negated when Preferences inverts the axis.
-pub(super) fn directed(axis: Axis, distance_mm: f32) -> f32 {
-    distance_mm * jog_direction(axis.letter())
+/// The slot of `axis` in [`JogPanel`]'s inversion table.
+fn axis_slot(axis: Axis) -> usize {
+    match axis {
+        Axis::X => 0,
+        Axis::Y => 1,
+        Axis::Z => 2,
+        Axis::A => 3,
+        Axis::B => 4,
+        Axis::C => 5,
+    }
 }
 
 /// The travel left from `mpos_mm` in `direction` (+1 or -1), on an axis with `travel_mm`.
@@ -208,6 +213,8 @@ pub(super) struct JogPanel {
     rotary_limit_deg: [f32; 3],
     /// Whether this frame drew the button of the pointer hold in progress.
     hold_button_drawn: bool,
+    /// X, Y, Z, A, B, C: whether Preferences > Machine > Invert reverses the axis.
+    inverted: [bool; 6],
 }
 
 /// A continuous jog in progress.
@@ -263,6 +270,30 @@ impl JogPanel {
             rotary_step_deg: 1.0,
             rotary_limit_deg: [360.0; 3],
             hold_button_drawn: false,
+            inverted: [false; 6],
+        }
+    }
+
+    /// Sets which axes jog in reverse (Preferences > Machine > Invert).
+    ///
+    /// # Arguments
+    /// * `inverted` - X, Y, Z, A, B, C: whether the axis is reversed.
+    pub(super) fn set_inverted(&mut self, inverted: [bool; 6]) {
+        self.inverted = inverted;
+    }
+
+    /// The axes [`JogPanel::set_inverted`] reversed.
+    pub(super) fn inverted(&self) -> [bool; 6] {
+        self.inverted
+    }
+
+    /// The signed jog distance for `axis` moved `distance_mm` in the direction the user
+    /// asked for: negated when Preferences inverts the axis.
+    pub(super) fn directed(&self, axis: Axis, distance_mm: f32) -> f32 {
+        if self.inverted[axis_slot(axis)] {
+            -distance_mm
+        } else {
+            distance_mm
         }
     }
 
@@ -452,7 +483,7 @@ impl JogPanel {
         let mpos = status
             .machine_position()
             .ok_or(n_!("Jog refused: the machine position is unknown."))?;
-        let direction = directed(button.axis, button.sign);
+        let direction = self.directed(button.axis, button.sign);
         let left = remaining_travel(mpos[button.index], travel, direction);
         let distance = direction * travel.min(left);
         // Less travel left than a jog line can write (it would be sent as `X0.00`).
@@ -516,7 +547,7 @@ impl JogPanel {
             if response.clicked() {
                 actions.push(Action::Move {
                     axis,
-                    distance_mm: directed(axis, sign * step),
+                    distance_mm: self.directed(axis, sign * step),
                     feed_mm_min: self.feed_mm_min,
                 });
             }
@@ -604,9 +635,9 @@ impl JogPanel {
                 (axis, sign),
                 (enabled, step),
                 actions,
-                |_| {
+                |panel| {
                     if limit > 0.0 {
-                        Ok(directed(axis, sign * limit))
+                        Ok(panel.directed(axis, sign * limit))
                     } else {
                         Err(n_!("Jog refused: no travel left in that direction."))
                     }

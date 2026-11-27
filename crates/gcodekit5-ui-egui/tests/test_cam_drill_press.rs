@@ -220,9 +220,43 @@ fn test_cam_drill_press_refuses_laser_mode() {
 }
 
 /// The pane reads `$32` from the device status every frame and shows the refusal.
+///
+/// `$32` lives in the process-wide device status, which every CAM test that opens the
+/// Drill Press reads. Under `cargo test` those tests share this process, so setting `$32=1`
+/// here would refuse their programs; the check runs in a child process of this test binary
+/// instead ([`laser_mode_child`]), whose device status no other test sees.
 #[test]
 fn test_cam_drill_press_pane_follows_the_laser_mode_setting() {
-    let _guard = crate::global_env_lock();
+    let exe = std::env::current_exe().expect("the test binary's path");
+    let output = std::process::Command::new(exe)
+        .args([
+            "--exact",
+            "test_cam_drill_press::laser_mode_child",
+            "--ignored",
+            "--nocapture",
+        ])
+        .env(LASER_CHILD_ENV, "1")
+        .output()
+        .expect("run the laser-mode check in a child process");
+    let log = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        output.status.success() && log.contains("1 passed"),
+        "laser-mode child failed:\n{log}\n{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+/// Set for the child process that runs [`laser_mode_child`].
+const LASER_CHILD_ENV: &str = "GCODEKIT5_TEST_LASER_CHILD";
+
+/// The body of [`test_cam_drill_press_pane_follows_the_laser_mode_setting`], run only in its
+/// child process (ignored otherwise, and a no-op if run without the child's variable).
+#[test]
+#[ignore = "run in a child process by test_cam_drill_press_pane_follows_the_laser_mode_setting"]
+fn laser_mode_child() {
+    if std::env::var_os(LASER_CHILD_ENV).is_none() {
+        return;
+    }
     gcodekit5_app::device_status::update_grbl_setting(32, "1".to_string());
     let mut h = open_tool(CamTool::DrillPress);
     let shown = h.query_by_label(LASER_MODE_REFUSAL).is_some();

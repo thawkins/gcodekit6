@@ -1,7 +1,7 @@
 //! Tests for Preferences that change what is sent to the machine
-//! (owner decision A-02, issue #76): comments, line length and jog direction.
+//! (owner decision A-02, issue #76): comments and line length. Jog direction is tested
+//! with the jog panel (`gcodekit5-ui-egui`'s `test_machine_jog`).
 
-use gcodekit5_app::device_status;
 use gcodekit5_app::machine::grbl_stream::prepare_program;
 
 #[test]
@@ -26,16 +26,6 @@ fn test_line_longer_than_maximum_is_refused() {
     assert!(prepare_program(&long, false, 80).is_ok());
     // 0 disables the check.
     assert!(prepare_program(&long, true, 0).is_ok());
-}
-
-#[test]
-fn test_inverted_axis_jogs_the_other_way() {
-    let _guard = crate::global_env_lock();
-    device_status::set_jog_inverted('Y', true);
-    assert_eq!(device_status::jog_direction('Y'), -1.0);
-    assert_eq!(device_status::jog_direction('X'), 1.0);
-    device_status::set_jog_inverted('Y', false);
-    assert_eq!(device_status::jog_direction('Y'), 1.0);
 }
 
 #[test]

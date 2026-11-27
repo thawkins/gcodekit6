@@ -41,7 +41,6 @@ mod wcs;
 use std::sync::{Arc, Mutex};
 use std::time::Instant;
 
-use gcodekit5_app::device_status::{jog_direction, set_jog_inverted};
 use gcodekit5_app::i18n::Translator;
 use gcodekit5_app::machine::grbl_stream::{GrblResponseLine, classify_response};
 use gcodekit5_app::machine::{
@@ -270,25 +269,20 @@ impl MachineControlPane {
     }
 
     /// Takes the settings that change how the pane jogs and shows values: the measurement
-    /// system and feed units, the X/Y/Z travel and the per-axis jog inversion (shared with
-    /// the GTK front end through `device_status::set_jog_inverted`).
+    /// system and feed units, the X/Y/Z travel and the per-axis jog inversion.
     ///
     /// # Arguments
     /// * `config` - The current settings.
     pub fn configure(&mut self, config: &Config) {
         let machine = &config.machine;
-        for axis in ['X', 'Y', 'Z', 'A', 'B', 'C'] {
-            let inverted = machine
-                .axis_direction_invert
-                .get(&axis.to_string())
-                .copied()
-                .unwrap_or(false);
-            // Written only on a change, so panes with the default settings never touch the
-            // process-wide table.
-            if (jog_direction(axis) < 0.0) != inverted {
-                set_jog_inverted(axis, inverted);
-            }
-        }
+        self.jog
+            .set_inverted(["X", "Y", "Z", "A", "B", "C"].map(|axis| {
+                machine
+                    .axis_direction_invert
+                    .get(axis)
+                    .copied()
+                    .unwrap_or(false)
+            }));
         self.units = config.ui.measurement_system;
         self.feed_units = config.ui.feed_rate_units;
         let travel = [machine.x_limit, machine.y_limit, machine.z_limit].map(|v| v as f32);
@@ -479,7 +473,9 @@ impl MachineControlPane {
     /// * `feed_mm_min` - Jog feed in mm/min.
     /// * `travel_mm` - Machine travel of X, Y and Z in mm.
     pub fn with_jog(mut self, step_mm: f32, feed_mm_min: f32, travel_mm: [f32; 3]) -> Self {
+        let inverted = self.jog.inverted();
         self.jog = jog::JogPanel::new(step_mm, feed_mm_min, travel_mm);
+        self.jog.set_inverted(inverted);
         self
     }
 
@@ -534,7 +530,7 @@ impl MachineControlPane {
             return;
         }
         let (step, feed) = (self.jog.step_mm(), self.jog.feed_mm_min());
-        let distance = jog::directed(axis, sign * step);
+        let distance = self.jog.directed(axis, sign * step);
         self.with_controller(|c| c.jog(axis, distance, feed));
     }
 

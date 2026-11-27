@@ -304,15 +304,6 @@ fn test_hold_refused_without_position() {
 /// C2: Preferences > Machine > Invert reverses an axis for step and hold jogs alike.
 #[test]
 fn test_inverted_z_jogs_negative() {
-    /// Puts Z back to not inverted however the test ends, panics included.
-    struct RestoreZ;
-    impl Drop for RestoreZ {
-        fn drop(&mut self) {
-            gcodekit5_app::device_status::set_jog_inverted('Z', false);
-        }
-    }
-    let _lock = crate::global_env_lock();
-    let _restore = RestoreZ;
     let mut config = loopback_config();
     config
         .machine
