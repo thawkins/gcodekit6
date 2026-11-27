@@ -40,9 +40,11 @@
 
 mod cam_presets;
 pub mod designer_files;
+mod flows;
 mod library_windows;
 mod machine_windows;
 mod managers;
+mod text_focus;
 
 use std::cell::RefCell;
 use std::path::{Path, PathBuf};
@@ -79,10 +81,12 @@ use crate::panes::visualizer::VisualizerPane;
 use crate::theme;
 use crate::windows::{AboutWindow, HelpWindow, SettingsOutcome, SettingsWindow, help};
 use crate::workspace::{JogKey, Page, PaneContext, PaneId, Workspace};
-use designer_files::{DesignFlow, DesignNext, EditorNext, OPEN_BEHIND_HANDOFF};
+use designer_files::{DesignNext, EditorNext, OPEN_BEHIND_HANDOFF};
+use flows::{Flows, QuitFlow};
 use gcodekit5_app::materials_manager_backend::MATERIALS_FILE;
 use gcodekit5_app::tools_manager_backend::TOOLS_FILE;
 use managers::Managers;
+use text_focus::TextFocus;
 
 /// The GTK build's device profiles file, in the legacy settings folder.
 const DEVICES_FILE: &str = "devices.json";
@@ -308,25 +312,6 @@ impl AppState {
     }
 }
 
-/// Where the quit decision stands.
-#[derive(Debug, Default)]
-struct QuitFlow {
-    /// The quit prompt queued or on screen, while a quit is being decided.
-    asking: Option<ConfirmRequest>,
-    /// The user agreed to stop the running job for this quit.
-    stop_job: bool,
-    /// The documents whose changes the user chose to discard for this quit.
-    discarded: DirtyState,
-    /// The user chose to discard the CNC Tools page's unsaved tool for this quit.
-    discarded_tool: bool,
-    /// The user chose to discard the Materials Manager's unsaved material for this quit.
-    discarded_material: bool,
-    /// The user chose to discard the Device Manager's unsaved profile for this quit.
-    discarded_device: bool,
-    /// Quitting was decided: the app sent `Close` and lets the close request through.
-    confirmed: bool,
-}
-
 /// What to do once the editor's G-code is saved.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum AfterSave {
@@ -354,20 +339,12 @@ pub struct GcodeKitApp {
     queue: Vec<Command>,
     /// Window commands the dispatched commands asked for, sent at the end of the frame.
     viewport_commands: Vec<egui::ViewportCommand>,
-    /// The text field the user was typing in, kept while a menu is up (a click on the menu
-    /// bar takes the focus from it) so Edit > Cut / Copy / Paste act on its text.
-    text_field: Option<egui::Id>,
-    /// Frames [`GcodeKitApp::text_field`] is kept after its field lost the focus with no menu
-    /// up: the press and release that open a menu.
-    text_field_grace: u8,
-    /// The text field to give the focus back to at the start of the next frame.
-    refocus: Option<egui::Id>,
+    /// The text field the user was typing in, for Edit > Cut / Copy / Paste from a menu.
+    text_focus: TextFocus,
     /// File dialogs and confirmations, answered on a later frame.
     dialogs: Dialogs,
     /// The context [`GcodeKitApp::dialogs`] wakes when an answer comes in, once known.
     wake_ctx: Arc<OnceLock<egui::Context>>,
-    /// The last dialog answer no feature has taken yet (until the editor and designer can).
-    last_dialog_answer: Option<DialogAnswer>,
     /// The Preferences window.
     settings_window: SettingsWindow,
     /// The About window.
@@ -382,8 +359,8 @@ pub struct GcodeKitApp {
     managers: Managers,
     /// The last command dispatched.
     last_dispatched: Option<Command>,
-    /// The quit being decided, if any.
-    quit: QuitFlow,
+    /// The prompts and dialogs in flight: quit, editor save and prompt, design steps.
+    flows: Flows,
     /// The G-code editor, also drawn by the workspace.
     editor: Rc<RefCell<EditorPane>>,
     /// The editor's dirty flag as last copied to [`AppState::dirty`].
@@ -394,13 +371,6 @@ pub struct GcodeKitApp {
     designer_dirty: bool,
     /// The CAM tools, also drawn by the workspace.
     cam_tools: Rc<RefCell<CamToolsPane>>,
-    /// What waits for the editor's save dialog to be answered.
-    after_save: Option<AfterSave>,
-    /// What waits for the editor's unsaved-changes prompt (File > Open or a handoff); one
-    /// at a time.
-    editor_prompt: Option<EditorNext>,
-    /// The design's New / Open / Save waiting for a dialog.
-    design: DesignFlow,
     /// The egui frame whose machine events were last polled.
     machine_polled: Option<u64>,
     /// The key that ran each jog command of this frame's key presses (see
@@ -421,12 +391,12 @@ impl std::fmt::Debug for GcodeKitApp {
             .field("workspace", &self.workspace)
             .field("menus", &self.menus)
             .field("dialogs", &self.dialogs)
-            .field("last_dialog_answer", &self.last_dialog_answer)
+            .field("last_dialog_answer", &self.flows.last_dialog_answer)
             .field("settings_window", &self.settings_window)
             .field("about_window", &self.about_window)
             .field("help_window", &self.help_window)
             .field("last_dispatched", &self.last_dispatched)
-            .field("quit", &self.quit)
+            .field("quit", &self.flows.quit)
             .finish_non_exhaustive()
     }
 }
@@ -530,12 +500,9 @@ impl GcodeKitApp {
             menus,
             queue: Vec::new(),
             viewport_commands: Vec::new(),
-            text_field: None,
-            text_field_grace: 0,
-            refocus: None,
+            text_focus: TextFocus::default(),
             dialogs,
             wake_ctx,
-            last_dialog_answer: None,
             settings_window,
             about_window,
             help_window: HelpWindow::default(),
@@ -543,15 +510,12 @@ impl GcodeKitApp {
             settings_notice,
             managers,
             last_dispatched: None,
-            quit: QuitFlow::default(),
+            flows: Flows::default(),
             editor,
             editor_dirty: false,
             designer,
             designer_dirty: false,
             cam_tools,
-            after_save: None,
-            editor_prompt: None,
-            design: DesignFlow::default(),
             machine_polled: None,
             jog_keys: Vec::new(),
             panel_visibility,
@@ -600,7 +564,7 @@ impl GcodeKitApp {
     /// * `source` - What asked to quit.
     pub fn request_quit(&mut self, source: QuitSource) {
         tracing::debug!(?source, "quit requested");
-        if self.quit.confirmed {
+        if self.flows.quit.confirmed {
             // Our own Close comes back as a close request: let it through.
             if source != QuitSource::WindowClose {
                 self.viewport_commands.push(egui::ViewportCommand::Close);
@@ -608,11 +572,12 @@ impl GcodeKitApp {
             return;
         }
         // While a save dialog for this quit is up, the quit waits for it.
-        let saving = self.after_save == Some(AfterSave::Quit) || self.design_saving_for_quit();
-        if self.quit.asking.is_none() && !saving {
+        let saving =
+            self.flows.after_save == Some(AfterSave::Quit) || self.design_saving_for_quit();
+        if self.flows.quit.asking.is_none() && !saving {
             self.continue_quit();
         }
-        if self.quit.asking.is_some() || saving {
+        if self.flows.quit.asking.is_some() || saving {
             self.viewport_commands
                 .push(egui::ViewportCommand::CancelClose);
         }
@@ -620,7 +585,7 @@ impl GcodeKitApp {
 
     /// Asks the next quit question, or closes the window when none is left.
     fn continue_quit(&mut self) {
-        let (state, quit) = (&self.state, &self.quit);
+        let (state, quit) = (&self.state, &self.flows.quit);
         let next = if state.job_running() && !quit.stop_job {
             Some(ConfirmRequest::StopJob)
         } else if state.dirty.editor && !quit.discarded.editor {
@@ -632,7 +597,7 @@ impl GcodeKitApp {
         };
         match next {
             Some(request) => {
-                self.quit.asking = Some(request);
+                self.flows.quit.asking = Some(request);
                 self.dialogs.confirm_quit(request);
                 // A minimized or hidden window cannot show its prompt: bring it back first.
                 self.viewport_commands.extend([
@@ -642,7 +607,7 @@ impl GcodeKitApp {
                 ]);
             }
             None => {
-                self.quit = QuitFlow {
+                self.flows.quit = QuitFlow {
                     confirmed: true,
                     ..QuitFlow::default()
                 };
@@ -653,10 +618,10 @@ impl GcodeKitApp {
 
     /// Acts on the answer to the quit prompt `request`.
     fn quit_answer(&mut self, request: ConfirmRequest, choice: ConfirmChoice) {
-        self.quit.asking = None;
+        self.flows.quit.asking = None;
         match (request, choice) {
             (ConfirmRequest::StopJob, ConfirmChoice::Yes) => {
-                self.quit.stop_job = true;
+                self.flows.quit.stop_job = true;
                 self.stop_job_for_quit();
                 self.continue_quit();
             }
@@ -667,9 +632,9 @@ impl GcodeKitApp {
                 match choice.as_unsaved() {
                     UnsavedChangesChoice::Discard => {
                         if request == ConfirmRequest::UnsavedGcode {
-                            self.quit.discarded.editor = true;
+                            self.flows.quit.discarded.editor = true;
                         } else {
-                            self.quit.discarded.designer = true;
+                            self.flows.quit.discarded.designer = true;
                         }
                         self.continue_quit();
                     }
@@ -727,7 +692,7 @@ impl GcodeKitApp {
     /// quit does not relaunch the app.
     fn cancel_quit(&mut self) {
         tracing::debug!("quit cancelled");
-        self.quit = QuitFlow::default();
+        self.flows.quit = QuitFlow::default();
         self.state.restart.store(false, Ordering::SeqCst);
     }
 
@@ -739,7 +704,7 @@ impl GcodeKitApp {
 
     /// Whether quitting was decided (the app sent `ViewportCommand::Close`).
     pub fn quit_confirmed(&self) -> bool {
-        self.quit.confirmed
+        self.flows.quit.confirmed
     }
 
     /// Draws the application UI into `ui`.
@@ -764,10 +729,10 @@ impl GcodeKitApp {
             self.handle_answer(answer);
         }
         self.workspace.begin_frame(&ctx);
-        if let Some(field) = self.refocus.take() {
+        if let Some(field) = self.text_focus.refocus.take() {
             ctx.memory_mut(|m| m.request_focus(field));
         }
-        self.track_text_field(&ctx);
+        self.text_focus.track(&ctx);
         self.dispatch_keys(&ctx);
         self.update_firmware_settings(&ctx);
         self.workspace.frame(&self.state.machine);
@@ -982,22 +947,6 @@ impl GcodeKitApp {
         self.queue.extend(requested);
     }
 
-    /// Keeps [`GcodeKitApp::text_field`]: the text field with the keyboard, kept while a menu
-    /// of the bar is up and for the frames that open one.
-    fn track_text_field(&mut self, ctx: &egui::Context) {
-        let menu_up = craft_menu::bar::is_open(ctx) || craft_menu::bar::is_focused(ctx);
-        if ctx.text_edit_focused() {
-            self.text_field = ctx.memory(|m| m.focused());
-            self.text_field_grace = 2;
-        } else if menu_up {
-            self.text_field_grace = 2;
-        } else if self.text_field_grace > 0 {
-            self.text_field_grace -= 1;
-        } else {
-            self.text_field = None;
-        }
-    }
-
     /// Edit > Cut / Copy / Paste chosen while a text field had the keyboard: gives the field
     /// its focus back and asks egui for the clipboard event, so the text is cut, copied or
     /// pasted, never the designer's shapes. (The keys never get here while typing: the
@@ -1012,12 +961,12 @@ impl GcodeKitApp {
             Command::Paste => egui::ViewportCommand::RequestPaste,
             _ => return false,
         };
-        let Some(field) = self.text_field else {
+        let Some(field) = self.text_focus.field else {
             return false;
         };
         // The press on the menu is still being handled this frame: the field takes the focus
         // back at the start of the next one, when egui delivers the clipboard event.
-        self.refocus = Some(field);
+        self.text_focus.refocus = Some(field);
         self.viewport_commands.push(request);
         true
     }
@@ -1093,13 +1042,13 @@ impl GcodeKitApp {
                 if self.refuse_open_during_job() {
                     return;
                 }
-                if self.editor_prompt.is_some() {
+                if self.flows.editor_prompt.is_some() {
                     // One editor prompt at a time: its answer must not reach this Open.
                     tracing::warn!("editor prompt already up; open refused");
                     let message = self.state.translator.tr(OPEN_BEHIND_HANDOFF).into_owned();
                     self.editor.borrow_mut().set_notice(message);
                 } else if self.editor.borrow().buffer().is_dirty() {
-                    self.editor_prompt = Some(EditorNext::Open);
+                    self.flows.editor_prompt = Some(EditorNext::Open);
                     self.dialogs.confirm(ConfirmRequest::UnsavedGcode);
                 } else {
                     self.ask_open_gcode();
@@ -1107,7 +1056,7 @@ impl GcodeKitApp {
             }
             Command::FileSave => self.save_editor(None),
             Command::FileSaveAs => {
-                self.after_save = None;
+                self.flows.after_save = None;
                 self.ask_save_gcode();
             }
             Command::OpenSettings => self
@@ -1297,7 +1246,7 @@ impl GcodeKitApp {
             || self.handle_firmware_settings_answer(&answer)
             || self.handle_library_answer(&answer)
         {
-            self.last_dialog_answer = Some(answer);
+            self.flows.last_dialog_answer = Some(answer);
             return;
         }
         match &answer {
@@ -1322,23 +1271,25 @@ impl GcodeKitApp {
             DialogAnswer::Unavailable {
                 asked: Asked::Confirm(ConfirmRequest::UnsavedGcode),
                 reason,
-            } if self.editor_prompt == Some(EditorNext::Open) => {
+            } if self.flows.editor_prompt == Some(EditorNext::Open) => {
                 // Not opening without the answer: unsaved G-code would be lost.
                 tracing::warn!(%reason, "unsaved-changes prompt unavailable; open abandoned");
-                self.editor_prompt = None;
+                self.flows.editor_prompt = None;
             }
             DialogAnswer::Confirm {
                 request: ConfirmRequest::UnsavedGcode,
                 choice,
-            } if self.editor_prompt == Some(EditorNext::Open) => {
-                self.editor_prompt = None;
+            } if self.flows.editor_prompt == Some(EditorNext::Open) => {
+                self.flows.editor_prompt = None;
                 match choice.as_unsaved() {
                     UnsavedChangesChoice::Save => self.save_editor(Some(AfterSave::Open)),
                     UnsavedChangesChoice::Discard => self.ask_open_gcode(),
                     UnsavedChangesChoice::Cancel => {}
                 }
             }
-            DialogAnswer::QuitConfirm { request, choice } if self.quit.asking == Some(*request) => {
+            DialogAnswer::QuitConfirm { request, choice }
+                if self.flows.quit.asking == Some(*request) =>
+            {
                 self.quit_answer(*request, *choice);
             }
             DialogAnswer::Confirm {
@@ -1353,7 +1304,7 @@ impl GcodeKitApp {
             DialogAnswer::Unavailable {
                 asked: Asked::Quit(request),
                 reason,
-            } if self.quit.asking == Some(*request) => {
+            } if self.flows.quit.asking == Some(*request) => {
                 // Quitting without the answer could lose unsaved work: stay open, and the
                 // next quit asks again.
                 tracing::warn!(?request, %reason, "quit prompt unavailable; quit cancelled");
@@ -1379,7 +1330,7 @@ impl GcodeKitApp {
                 tracing::debug!(?answer, "dialog answer not consumed yet");
             }
         }
-        self.last_dialog_answer = Some(answer);
+        self.flows.last_dialog_answer = Some(answer);
     }
 
     /// Opens `path` in the editor and hands its text to the machine as the program to
@@ -1528,7 +1479,7 @@ impl GcodeKitApp {
             let result = self.editor.borrow_mut().buffer_mut().save();
             self.after_saving(result, then);
         } else {
-            self.after_save = then;
+            self.flows.after_save = then;
             self.ask_save_gcode();
         }
     }
@@ -1536,7 +1487,7 @@ impl GcodeKitApp {
     /// Saves the editor's G-code to `path`, chosen in the save dialog.
     fn save_editor_as(&mut self, path: &Path) {
         let result = self.editor.borrow_mut().buffer_mut().save_as(path);
-        let then = self.after_save.take();
+        let then = self.flows.after_save.take();
         self.after_saving(result, then);
     }
 
@@ -1572,7 +1523,7 @@ impl GcodeKitApp {
 
     /// The save dialog was closed without saving: a quit waiting for it is cancelled.
     fn abandon_after_save(&mut self) {
-        if self.after_save.take() == Some(AfterSave::Quit) {
+        if self.flows.after_save.take() == Some(AfterSave::Quit) {
             self.cancel_quit();
         }
     }
@@ -1589,7 +1540,7 @@ impl GcodeKitApp {
 
     /// The last dialog answer [`GcodeKitApp::ui`] took.
     pub fn last_dialog_answer(&self) -> Option<&DialogAnswer> {
-        self.last_dialog_answer.as_ref()
+        self.flows.last_dialog_answer.as_ref()
     }
 
     /// The front end's state.

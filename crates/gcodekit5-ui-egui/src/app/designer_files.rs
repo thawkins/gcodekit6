@@ -181,7 +181,7 @@ impl GcodeKitApp {
     /// Runs `next` now, or first asks about the design's unsaved changes.
     fn design_then(&mut self, next: DesignNext) {
         if self.designer.borrow().is_modified() {
-            self.design.after_confirm = Some(next);
+            self.flows.design.after_confirm = Some(next);
             self.dialogs.confirm(ConfirmRequest::UnsavedDesign);
         } else {
             self.run_design_next(next);
@@ -220,7 +220,7 @@ impl GcodeKitApp {
 
     /// Asks where to save the design; `then` waits for the answer.
     fn ask_save_design(&mut self, then: Option<DesignNext>) {
-        self.design.after_save = Some(then);
+        self.flows.design.after_save = Some(then);
         let name = self.design_file_name("gckd");
         self.ask_file(FilePurpose::SaveDesign, Some(&name));
     }
@@ -267,7 +267,7 @@ impl GcodeKitApp {
 
     /// Whether a quit waits for the design's save dialog.
     pub(super) fn design_saving_for_quit(&self) -> bool {
-        self.design.after_save == Some(Some(DesignNext::Quit))
+        self.flows.design.after_save == Some(Some(DesignNext::Quit))
     }
 
     /// Acts on a dialog answer that belongs to the design.
@@ -287,7 +287,7 @@ impl GcodeKitApp {
                         let path = with_default_extension(path, "gckd");
                         let saved = designer.save_design(&path, &tr);
                         drop(designer);
-                        let then = self.design.after_save.take().flatten();
+                        let then = self.flows.design.after_save.take().flatten();
                         self.after_design_saving(saved, then);
                     }
                     FilePurpose::ImportDesign => {
@@ -325,15 +325,15 @@ impl GcodeKitApp {
                 if let DialogAnswer::Unavailable { reason, .. } = answer {
                     tracing::warn!(%reason, "design save dialog unavailable");
                 }
-                if self.design.after_save.take() == Some(Some(DesignNext::Quit)) {
+                if self.flows.design.after_save.take() == Some(Some(DesignNext::Quit)) {
                     self.cancel_quit();
                 }
             }
             DialogAnswer::Confirm {
                 request: ConfirmRequest::UnsavedDesign,
                 choice,
-            } if self.design.after_confirm.is_some() => {
-                let Some(next) = self.design.after_confirm.take() else {
+            } if self.flows.design.after_confirm.is_some() => {
+                let Some(next) = self.flows.design.after_confirm.take() else {
                     return true;
                 };
                 match choice.as_unsaved() {
@@ -345,8 +345,8 @@ impl GcodeKitApp {
             DialogAnswer::Confirm {
                 request: ConfirmRequest::UnsavedGcode,
                 choice,
-            } if matches!(self.editor_prompt, Some(EditorNext::ToEditor(_))) => {
-                let Some(EditorNext::ToEditor(what)) = self.editor_prompt.take() else {
+            } if matches!(self.flows.editor_prompt, Some(EditorNext::ToEditor(_))) => {
+                let Some(EditorNext::ToEditor(what)) = self.flows.editor_prompt.take() else {
                     return true;
                 };
                 match choice.as_unsaved() {
@@ -358,18 +358,18 @@ impl GcodeKitApp {
             DialogAnswer::Unavailable {
                 asked: Asked::Confirm(ConfirmRequest::UnsavedGcode),
                 reason,
-            } if matches!(self.editor_prompt, Some(EditorNext::ToEditor(_))) => {
+            } if matches!(self.flows.editor_prompt, Some(EditorNext::ToEditor(_))) => {
                 // Without the answer the editor's edits could be lost: send nothing.
                 tracing::warn!(%reason, "unsaved-changes prompt unavailable; G-code not sent");
-                self.editor_prompt = None;
+                self.flows.editor_prompt = None;
             }
             DialogAnswer::Unavailable {
                 asked: Asked::Confirm(ConfirmRequest::UnsavedDesign),
                 reason,
-            } if self.design.after_confirm.is_some() => {
+            } if self.flows.design.after_confirm.is_some() => {
                 // Without the answer the unsaved design could be lost: do nothing.
                 tracing::warn!(%reason, "unsaved-changes prompt unavailable; design kept");
-                self.design.after_confirm = None;
+                self.flows.design.after_confirm = None;
             }
             DialogAnswer::Cancelled { .. }
             | DialogAnswer::Unavailable { .. }
@@ -414,7 +414,7 @@ impl GcodeKitApp {
         if self.refuse_editor_gcode_during_job(handoff) {
             return;
         }
-        if let Some(waiting) = self.editor_prompt {
+        if let Some(waiting) = self.flows.editor_prompt {
             // One question at a time: a request while one waits (another handoff's or File >
             // Open's) is dropped, said on its pane, and its program discarded so a later
             // answer cannot deliver it.
@@ -432,7 +432,7 @@ impl GcodeKitApp {
             return;
         }
         if self.editor.borrow().buffer().is_dirty() {
-            self.editor_prompt = Some(EditorNext::ToEditor(handoff));
+            self.flows.editor_prompt = Some(EditorNext::ToEditor(handoff));
             self.dialogs.confirm(ConfirmRequest::UnsavedGcode);
         } else {
             self.send_to_editor(handoff);
