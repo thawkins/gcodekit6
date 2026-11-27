@@ -9,6 +9,8 @@
 //!   which is the opposite of the camtools flag;
 //! - a halftoned off dot is laser off, so `min_power` is not applied to halftoned images;
 //! - halftoning works per pixel (cell size 1);
+//! - every burn gets an [`OVERSCAN_MM`] laser-off run-up and run-out, and the image origin is
+//!   kept at least [`OVERSCAN_MM`] from 0 so the run-up stays at or above X/Y 0;
 //! - transparent pixels are composited onto white before engraving.
 
 use anyhow::{Context, Result};
@@ -89,6 +91,12 @@ impl Default for EngravingParams {
     }
 }
 
+/// Laser-off run-up and run-out (mm) around every burn of a designer raster image.
+///
+/// The image origin is kept at least this far from 0 on both axes, so a run-up never goes
+/// below X/Y 0.
+pub const OVERSCAN_MM: f32 = 2.5;
+
 impl EngravingParams {
     /// Convert PPI to pixels per mm
     pub fn pixels_per_mm(&self) -> f32 {
@@ -119,8 +127,9 @@ impl EngravingParams {
                 halftone_threshold: self.halftone_threshold,
                 invert: !self.invert,
             },
-            offset_x: self.offset_x,
-            offset_y: self.offset_y,
+            offset_x: self.offset_x.max(OVERSCAN_MM),
+            offset_y: self.offset_y.max(OVERSCAN_MM),
+            overscan_mm: OVERSCAN_MM,
             ..EngravingParameters::default()
         }
     }

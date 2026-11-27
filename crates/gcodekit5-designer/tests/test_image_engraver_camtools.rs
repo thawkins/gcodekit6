@@ -72,8 +72,10 @@ fn test_designer_raster_is_the_camtools_program() {
                 invert: false,
                 ..ImageTransformations::default()
             },
-            offset_x: 1.0,
-            offset_y: 2.0,
+            // The designer keeps the origin 2.5 mm from 0 for the run-up.
+            offset_x: 2.5,
+            offset_y: 2.5,
+            overscan_mm: 2.5,
             ..EngravingParameters::default()
         },
     )
@@ -104,7 +106,8 @@ fn test_designer_raster_default_invert_burns_the_dark_side() {
             .generate_gcode()
             .expect("gcode")
     };
-    // The first burn of a line starts at the image's left edge (X10) only when black burns.
+    // The first burn of a line starts at the image's left edge (X10, run-up from X7.5) only
+    // when black burns.
     let first_segment = |gcode: &str| {
         gcode
             .lines()
@@ -114,7 +117,7 @@ fn test_designer_raster_default_invert_burns_the_dark_side() {
     };
     let dark = engrave(true);
     assert!(dark.contains("S1000"), "black burns at Max Power: {dark}");
-    assert!(first_segment(&dark).starts_with("G0 X10.000 "), "{dark}");
+    assert!(first_segment(&dark).starts_with("G0 X7.500 "), "{dark}");
     let light = engrave(false);
-    assert!(!first_segment(&light).starts_with("G0 X10.000 "), "{light}");
+    assert!(!first_segment(&light).starts_with("G0 X7.500 "), "{light}");
 }

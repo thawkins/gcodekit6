@@ -35,6 +35,12 @@ use super::common::{
 };
 pub use page::show;
 
+/// Laser-off run-up and run-out (mm) around every burn of a CAM engraving.
+///
+/// It is not a field on the page and not stored in presets. The image is not moved for it,
+/// so at an image origin of 0 the run-up reaches X/Y -2.5 mm with the laser off.
+pub const OVERSCAN_MM: f32 = 2.5;
+
 /// Field label msgids.
 const IMAGE_PATH: &str = n_!("Image Path:");
 const WIDTH: &str = n_!("Width:");
@@ -332,6 +338,7 @@ impl BitmapEngravingParams {
             offset_y: offset_y as f32,
             num_axes: self.num_axes,
             home_before_job: self.home_before,
+            overscan_mm: OVERSCAN_MM,
         };
         Ok((image, params))
     }
