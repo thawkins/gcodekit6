@@ -41,5 +41,7 @@ mod test_pocket_bounds;
 mod test_pocket_holes;
 #[path = "test_shape_model_mirror_bounds.rs"]
 mod test_shape_model_mirror_bounds;
+#[path = "test_text_layout.rs"]
+mod test_text_layout;
 #[path = "test_undo_order_and_groups.rs"]
 mod test_undo_order_and_groups;

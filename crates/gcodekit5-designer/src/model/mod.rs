@@ -37,7 +37,7 @@ pub use path::ParametricPathSource;
 pub use polygon::DesignPolygon;
 pub use rectangle::DesignRectangle;
 pub use sprocket::DesignSprocket;
-pub use text::DesignText;
+pub use text::{DesignText, TextLayout};
 pub use triangle::DesignTriangle;
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]

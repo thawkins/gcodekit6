@@ -4,7 +4,6 @@ mod generator;
 mod segment;
 
 use super::pocket_operations::{PocketGenerator, PocketOperation, PocketStrategy};
-use crate::font_manager;
 use crate::model::{
     DesignCircle as Circle, DesignGear, DesignLine as Line, DesignPath as PathShape,
     DesignPolygon as Polygon, DesignRectangle as Rectangle, DesignSprocket,
