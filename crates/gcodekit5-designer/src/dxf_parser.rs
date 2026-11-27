@@ -573,6 +573,18 @@ pub fn decode_dxf_bytes(bytes: &[u8]) -> String {
     }
 }
 
+/// The POLYLINE record's own fields, read before its vertices.
+struct PolylineHeader {
+    closed: bool,
+    layer: String,
+    color: u16,
+    thickness: f64,
+    /// Group code 70 polyline flags.
+    flags: i32,
+    /// Z of the extrusion direction (group code 230).
+    extrusion_z: f64,
+}
+
 impl DxfParser {
     /// Parse DXF content from a string
     pub fn parse(content: &str) -> Result<DxfFile> {
@@ -1013,16 +1025,35 @@ impl DxfParser {
 
     /// Parse a POLYLINE entity
     fn parse_polyline(lines: &[&str], index: &mut usize) -> Result<DxfPolyline> {
-        let mut raw_vertices: Vec<(Point, i32, f64)> = Vec::new();
-        let mut closed = false;
-        let mut layer = "0".to_string();
-        let mut color = 256u16;
-        let mut thickness = 0.0;
+        let header = Self::parse_polyline_header(lines, index);
         let mut elevation: Option<f64> = None;
-        let mut header_flags: i32 = 0;
-        let mut extrusion_z = 1.0;
+        let raw_vertices = Self::parse_polyline_vertices(lines, index, &mut elevation);
+        let (vertices, bulges, elevation) =
+            Self::polyline_geometry(&raw_vertices, &header, elevation);
 
-        // Parse POLYLINE header
+        Ok(DxfPolyline {
+            vertices,
+            bulges,
+            closed: header.closed,
+            layer: header.layer,
+            color: header.color,
+            elevation,
+            thickness: header.thickness,
+        })
+    }
+
+    /// POLYLINE phase 1: the group codes of the POLYLINE record itself, up to
+    /// its first VERTEX (or SEQEND), leaving `index` on that `0` code.
+    fn parse_polyline_header(lines: &[&str], index: &mut usize) -> PolylineHeader {
+        let mut header = PolylineHeader {
+            closed: false,
+            layer: "0".to_string(),
+            color: 256u16,
+            thickness: 0.0,
+            flags: 0,
+            extrusion_z: 1.0,
+        };
+
         while *index < lines.len() {
             let code = lines[*index].trim();
             *index += 1;
@@ -1039,22 +1070,32 @@ impl DxfParser {
             }
 
             match code {
-                "8" => layer = value.to_string(),
-                "62" => color = parse_or(value, 256),
+                "8" => header.layer = value.to_string(),
+                "62" => header.color = parse_or(value, 256),
                 "70" => {
-                    header_flags = parse_or(value, 0);
-                    closed = (header_flags & 1) != 0;
+                    header.flags = parse_or(value, 0);
+                    header.closed = (header.flags & 1) != 0;
                 }
-                "39" => thickness = parse_or(value, 0.0),
-                "230" => extrusion_z = parse_or(value, 1.0),
+                "39" => header.thickness = parse_or(value, 0.0),
+                "230" => header.extrusion_z = parse_or(value, 1.0),
                 // Ignore 10, 20, 30 in POLYLINE header
                 _ => {}
             }
 
             *index += 1;
         }
+        header
+    }
 
-        // Parse VERTEX entities
+    /// POLYLINE phase 2: the VERTEX records up to SEQEND, as
+    /// (point, vertex flags, bulge). The first vertex Z seen is stored in
+    /// `elevation`.
+    fn parse_polyline_vertices(
+        lines: &[&str],
+        index: &mut usize,
+        elevation: &mut Option<f64>,
+    ) -> Vec<(Point, i32, f64)> {
+        let mut raw_vertices: Vec<(Point, i32, f64)> = Vec::new();
         loop {
             if *index >= lines.len() {
                 break;
@@ -1079,46 +1120,8 @@ impl DxfParser {
             }
 
             if value == "VERTEX" {
-                let mut vx: Option<f64> = None;
-                let mut vy: Option<f64> = None;
-                let mut vertex_flags: i32 = 0;
-                let mut bulge = 0.0;
-
-                // Parse VERTEX body
-                while *index < lines.len() {
-                    let v_code = lines[*index].trim();
-
-                    if v_code == "0" {
-                        break; // End of VERTEX
-                    }
-
-                    *index += 1;
-                    if *index >= lines.len() {
-                        break;
-                    }
-
-                    let v_value = lines[*index].trim();
-                    *index += 1;
-
-                    match v_code {
-                        "10" => vx = parse_opt(v_value),
-                        "20" => vy = parse_opt(v_value),
-                        // The plane elevation is taken from the first vertex's Z; true
-                        // per-vertex 3D polylines are not yet supported (see 3DFACE/MESH).
-                        "30" => {
-                            if elevation.is_none() {
-                                elevation = parse_opt(v_value);
-                            }
-                        }
-                        "70" => vertex_flags = parse_or(v_value, 0),
-                        // Bulge of the segment that starts at this vertex.
-                        "42" => bulge = parse_or(v_value, 0.0),
-                        _ => {}
-                    }
-                }
-
-                if let (Some(x), Some(y)) = (vx, vy) {
-                    raw_vertices.push((Point::new(x, y), vertex_flags, bulge));
+                if let Some(vertex) = Self::parse_polyline_vertex(lines, index, elevation) {
+                    raw_vertices.push(vertex);
                 }
             } else {
                 // Found unexpected entity type inside POLYLINE sequence
@@ -1129,7 +1132,69 @@ impl DxfParser {
                 break;
             }
         }
+        raw_vertices
+    }
 
+    /// The body of one VERTEX record, up to the next `0` code: its point,
+    /// flags and bulge, or `None` when it lacks an X or Y.
+    fn parse_polyline_vertex(
+        lines: &[&str],
+        index: &mut usize,
+        elevation: &mut Option<f64>,
+    ) -> Option<(Point, i32, f64)> {
+        let mut vx: Option<f64> = None;
+        let mut vy: Option<f64> = None;
+        let mut vertex_flags: i32 = 0;
+        let mut bulge = 0.0;
+
+        // Parse VERTEX body
+        while *index < lines.len() {
+            let v_code = lines[*index].trim();
+
+            if v_code == "0" {
+                break; // End of VERTEX
+            }
+
+            *index += 1;
+            if *index >= lines.len() {
+                break;
+            }
+
+            let v_value = lines[*index].trim();
+            *index += 1;
+
+            match v_code {
+                "10" => vx = parse_opt(v_value),
+                "20" => vy = parse_opt(v_value),
+                // The plane elevation is taken from the first vertex's Z; true
+                // per-vertex 3D polylines are not yet supported (see 3DFACE/MESH).
+                "30" => {
+                    if elevation.is_none() {
+                        *elevation = parse_opt(v_value);
+                    }
+                }
+                "70" => vertex_flags = parse_or(v_value, 0),
+                // Bulge of the segment that starts at this vertex.
+                "42" => bulge = parse_or(v_value, 0.0),
+                _ => {}
+            }
+        }
+
+        match (vx, vy) {
+            (Some(x), Some(y)) => Some((Point::new(x, y), vertex_flags, bulge)),
+            _ => None,
+        }
+    }
+
+    /// POLYLINE phase 3: the vertices, bulges and elevation the polyline is
+    /// drawn with, after dropping spline control frames and mirroring an OCS
+    /// polyline whose extrusion points down -Z.
+    fn polyline_geometry(
+        raw_vertices: &[(Point, i32, f64)],
+        header: &PolylineHeader,
+        elevation: Option<f64>,
+    ) -> (Vec<Point>, Vec<f64>, f64) {
+        let header_flags = header.flags;
         // Spline-fit polylines (header flag bit 2) interleave the original control-frame
         // vertices (vertex flag bit 16) with the generated curve vertices (vertex flag bit
         // 8, "AcDbSplineVertex"). Rendering the control frame produces zig-zag artifacts,
@@ -1163,7 +1228,7 @@ impl DxfParser {
         };
 
         let mut elevation = elevation.unwrap_or(0.0);
-        if is_ocs && extrusion_is_negative_z(extrusion_z) {
+        if is_ocs && extrusion_is_negative_z(header.extrusion_z) {
             // Mirroring reverses the turning direction of every bulge arc.
             for v in &mut vertices {
                 v.x = -v.x;
@@ -1174,15 +1239,7 @@ impl DxfParser {
             elevation = -elevation;
         }
 
-        Ok(DxfPolyline {
-            vertices,
-            bulges,
-            closed,
-            layer,
-            color,
-            elevation,
-            thickness,
-        })
+        (vertices, bulges, elevation)
     }
 
     /// Parse a TEXT entity

@@ -12,7 +12,10 @@
 //! - Coordinate system transformation
 //! - Scale and offset adjustment
 
-use crate::dxf_parser::{DxfEntity, DxfFile, DxfParser, decode_dxf_bytes};
+use crate::dxf_parser::{
+    DxfArc, DxfCircle, DxfEllipse, DxfEntity, DxfFile, DxfLine, DxfParser, DxfPolyline,
+    decode_dxf_bytes,
+};
 use crate::model::{
     DesignCircle as Circle, DesignEllipse as Ellipse, DesignLine as Line, DesignPath as PathShape,
     DesignRectangle as Rectangle, DesignerShape, Point, Shape,
@@ -612,211 +615,12 @@ impl DxfImporter {
             };
 
             let path_opt = match entity {
-                DxfEntity::Line(line) => {
-                    let mut builder = Path::builder();
-                    builder.begin(point(line.start.x as f32, line.start.y as f32));
-                    builder.line_to(point(line.end.x as f32, line.end.y as f32));
-                    builder.end(false);
-                    Some(builder.build())
-                }
-
-                DxfEntity::Circle(circle) => {
-                    let mut builder = Path::builder();
-                    let center = point(circle.center.x as f32, circle.center.y as f32);
-                    let radius = circle.radius as f32;
-
-                    let start_point = center + lyon::math::vector(radius, 0.0);
-                    builder.begin(start_point);
-                    append_dxf_arc(
-                        &mut builder,
-                        center,
-                        vector(radius, radius),
-                        0.0,
-                        0.0,
-                        2.0 * std::f32::consts::PI,
-                    );
-                    builder.close();
-                    Some(builder.build())
-                }
-
-                DxfEntity::Arc(arc) => {
-                    let mut builder = Path::builder();
-                    let center = point(arc.center.x as f32, arc.center.y as f32);
-                    let radius = arc.radius as f32;
-
-                    let start_angle = arc.start_angle.to_radians() as f32;
-                    let end_angle = arc.end_angle.to_radians() as f32;
-
-                    let mut sweep_angle = end_angle - start_angle;
-                    if sweep_angle < 0.0 {
-                        sweep_angle += 2.0 * std::f32::consts::PI;
-                    }
-
-                    let start_point =
-                        center + vector(radius * start_angle.cos(), radius * start_angle.sin());
-                    builder.begin(start_point);
-                    append_dxf_arc(
-                        &mut builder,
-                        center,
-                        vector(radius, radius),
-                        0.0,
-                        start_angle,
-                        sweep_angle,
-                    );
-                    builder.end(false);
-                    Some(builder.build())
-                }
-
-                DxfEntity::Ellipse(ellipse) => {
-                    let center = point(ellipse.center.x as f32, ellipse.center.y as f32);
-
-                    let major_vec =
-                        vector(ellipse.major_axis.x as f32, ellipse.major_axis.y as f32);
-                    let major_radius =
-                        (major_vec.x * major_vec.x + major_vec.y * major_vec.y).sqrt();
-                    let minor_radius = major_radius * ellipse.ratio as f32;
-
-                    let rotation = major_vec.y.atan2(major_vec.x);
-
-                    let start_angle = ellipse.start_angle as f32;
-                    let end_angle = ellipse.end_angle as f32;
-
-                    // Calc sweep angle
-                    let mut sweep_angle = end_angle - start_angle;
-                    if sweep_angle < 0.0 {
-                        sweep_angle += 2.0 * std::f32::consts::PI;
-                    }
-
-                    let mut builder = Path::builder();
-
-                    let start_x = center.x + major_radius * rotation.cos() * start_angle.cos()
-                        - minor_radius * rotation.sin() * start_angle.sin();
-                    let start_y = center.y
-                        + major_radius * rotation.sin() * start_angle.cos()
-                        + minor_radius * rotation.cos() * start_angle.sin();
-                    builder.begin(point(start_x, start_y));
-                    append_dxf_arc(
-                        &mut builder,
-                        center,
-                        vector(major_radius, minor_radius),
-                        rotation,
-                        start_angle,
-                        sweep_angle,
-                    );
-
-                    let is_complete = (sweep_angle - 2.0 * std::f32::consts::PI).abs() < 0.001;
-                    if is_complete {
-                        builder.line_to(point(start_x, start_y));
-                    }
-
-                    builder.end(false);
-                    let path = builder.build();
-
-                    Some(path)
-                }
-
-                DxfEntity::Polyline(polyline) => {
-                    if polyline.vertices.is_empty() {
-                        None
-                    } else {
-                        use lyon::math::{point, vector};
-
-                        let mut builder = Path::builder();
-
-                        // Start at the first vertex
-                        let start = polyline.vertices[0];
-                        builder.begin(point(start.x as f32, start.y as f32));
-
-                        // Emits one polyline segment (straight or bulged arc) ending at v2.
-                        let mut add_segment = |v1: Point, v2: Point, bulge: f64| {
-                            let p1 = point(v1.x as f32, v1.y as f32);
-                            let p2 = point(v2.x as f32, v2.y as f32);
-
-                            let dist =
-                                ((v2.x - v1.x).powi(2) + (v2.y - v1.y).powi(2)).sqrt() as f32;
-
-                            if bulge.abs() < 0.0001 || dist < 1e-9 {
-                                // Straight line
-                                builder.line_to(p2);
-                            } else {
-                                let included_angle = 4.0 * bulge.abs().atan() as f32;
-
-                                let h = bulge.abs() as f32 * (dist / 2.0);
-
-                                let radius = ((dist / 2.0).powi(2) + h.powi(2)) / (2.0 * h);
-
-                                let dist_to_center = radius - h;
-
-                                let mid =
-                                    point((v1.x + v2.x) as f32 / 2.0, (v1.y + v2.y) as f32 / 2.0);
-
-                                let perp = vector(
-                                    -(v2.y - v1.y) as f32 / dist,
-                                    (v2.x - v1.x) as f32 / dist,
-                                );
-
-                                let center = if bulge > 0.0 {
-                                    mid + perp * dist_to_center
-                                } else {
-                                    mid - perp * dist_to_center
-                                };
-
-                                let start_vec = p1 - center;
-                                let start_angle = start_vec.y.atan2(start_vec.x);
-
-                                let sweep_angle = if bulge > 0.0 {
-                                    included_angle
-                                } else {
-                                    -included_angle
-                                };
-
-                                let arc_geom = lyon::geom::Arc {
-                                    center,
-                                    radii: vector(radius, radius),
-                                    x_rotation: lyon::math::Angle::radians(0.0),
-                                    start_angle: lyon::math::Angle::radians(start_angle),
-                                    sweep_angle: lyon::math::Angle::radians(sweep_angle),
-                                };
-
-                                arc_geom.for_each_cubic_bezier(&mut |ctrl| {
-                                    builder.cubic_bezier_to(ctrl.ctrl1, ctrl.ctrl2, ctrl.to);
-                                });
-                            }
-                        };
-
-                        // Bulge for the segment starting at vertex i (0 = straight line)
-                        let bulge_at = |i: usize| polyline.bulges.get(i).copied().unwrap_or(0.0);
-
-                        // Process each segment with its potential bulge
-                        let n = polyline.vertices.len();
-                        for i in 0..n - 1 {
-                            add_segment(
-                                polyline.vertices[i],
-                                polyline.vertices[i + 1],
-                                bulge_at(i),
-                            );
-                        }
-
-                        // A closed polyline's last vertex carries the bulge of the closing
-                        // segment back to the first vertex; without this it would be drawn
-                        // as a straight line (e.g. rounded ends of slots).
-                        if polyline.closed && n > 1 && bulge_at(n - 1).abs() >= 0.0001 {
-                            add_segment(
-                                polyline.vertices[n - 1],
-                                polyline.vertices[0],
-                                bulge_at(n - 1),
-                            );
-                        }
-
-                        if polyline.closed {
-                            builder.close();
-                        } else {
-                            builder.end(false);
-                        }
-                        Some(builder.build())
-                    }
-                }
-                _ => None,
+                DxfEntity::Line(line) => Some(dxf_line_path(line)),
+                DxfEntity::Circle(circle) => Some(dxf_circle_path(circle)),
+                DxfEntity::Arc(arc) => Some(dxf_arc_path(arc)),
+                DxfEntity::Ellipse(ellipse) => Some(dxf_ellipse_path(ellipse)),
+                DxfEntity::Polyline(polyline) => dxf_polyline_path(polyline),
+                DxfEntity::Text(_) => None,
             };
 
             if let Some(path) = path_opt {
@@ -829,6 +633,210 @@ impl DxfImporter {
 
         Ok((shapes, z_metadata))
     }
+}
+
+/// Entity phase of the DXF import: a LINE as an open path.
+fn dxf_line_path(line: &DxfLine) -> Path {
+    let mut builder = Path::builder();
+    builder.begin(point(line.start.x as f32, line.start.y as f32));
+    builder.line_to(point(line.end.x as f32, line.end.y as f32));
+    builder.end(false);
+    builder.build()
+}
+
+/// Entity phase of the DXF import: a CIRCLE as a closed path.
+fn dxf_circle_path(circle: &DxfCircle) -> Path {
+    let mut builder = Path::builder();
+    let center = point(circle.center.x as f32, circle.center.y as f32);
+    let radius = circle.radius as f32;
+
+    let start_point = center + lyon::math::vector(radius, 0.0);
+    builder.begin(start_point);
+    append_dxf_arc(
+        &mut builder,
+        center,
+        vector(radius, radius),
+        0.0,
+        0.0,
+        2.0 * std::f32::consts::PI,
+    );
+    builder.close();
+    builder.build()
+}
+
+/// Entity phase of the DXF import: an ARC (counter-clockwise from its start
+/// angle) as an open path.
+fn dxf_arc_path(arc: &DxfArc) -> Path {
+    let mut builder = Path::builder();
+    let center = point(arc.center.x as f32, arc.center.y as f32);
+    let radius = arc.radius as f32;
+
+    let start_angle = arc.start_angle.to_radians() as f32;
+    let end_angle = arc.end_angle.to_radians() as f32;
+
+    let mut sweep_angle = end_angle - start_angle;
+    if sweep_angle < 0.0 {
+        sweep_angle += 2.0 * std::f32::consts::PI;
+    }
+
+    let start_point = center + vector(radius * start_angle.cos(), radius * start_angle.sin());
+    builder.begin(start_point);
+    append_dxf_arc(
+        &mut builder,
+        center,
+        vector(radius, radius),
+        0.0,
+        start_angle,
+        sweep_angle,
+    );
+    builder.end(false);
+    builder.build()
+}
+
+/// Entity phase of the DXF import: an ELLIPSE (or elliptical arc) as a path,
+/// closed back to its start point when it sweeps a full turn.
+fn dxf_ellipse_path(ellipse: &DxfEllipse) -> Path {
+    let center = point(ellipse.center.x as f32, ellipse.center.y as f32);
+
+    let major_vec = vector(ellipse.major_axis.x as f32, ellipse.major_axis.y as f32);
+    let major_radius = (major_vec.x * major_vec.x + major_vec.y * major_vec.y).sqrt();
+    let minor_radius = major_radius * ellipse.ratio as f32;
+
+    let rotation = major_vec.y.atan2(major_vec.x);
+
+    let start_angle = ellipse.start_angle as f32;
+    let end_angle = ellipse.end_angle as f32;
+
+    // Calc sweep angle
+    let mut sweep_angle = end_angle - start_angle;
+    if sweep_angle < 0.0 {
+        sweep_angle += 2.0 * std::f32::consts::PI;
+    }
+
+    let mut builder = Path::builder();
+
+    let start_x = center.x + major_radius * rotation.cos() * start_angle.cos()
+        - minor_radius * rotation.sin() * start_angle.sin();
+    let start_y = center.y
+        + major_radius * rotation.sin() * start_angle.cos()
+        + minor_radius * rotation.cos() * start_angle.sin();
+    builder.begin(point(start_x, start_y));
+    append_dxf_arc(
+        &mut builder,
+        center,
+        vector(major_radius, minor_radius),
+        rotation,
+        start_angle,
+        sweep_angle,
+    );
+
+    let is_complete = (sweep_angle - 2.0 * std::f32::consts::PI).abs() < 0.001;
+    if is_complete {
+        builder.line_to(point(start_x, start_y));
+    }
+
+    builder.end(false);
+    builder.build()
+}
+
+/// Entity phase of the DXF import: a polyline as a path, with bulged segments
+/// as arcs; `None` for a polyline without vertices.
+fn dxf_polyline_path(polyline: &DxfPolyline) -> Option<Path> {
+    if polyline.vertices.is_empty() {
+        return None;
+    }
+
+    let mut builder = Path::builder();
+
+    // Start at the first vertex
+    let start = polyline.vertices[0];
+    builder.begin(point(start.x as f32, start.y as f32));
+
+    // Bulge for the segment starting at vertex i (0 = straight line)
+    let bulge_at = |i: usize| polyline.bulges.get(i).copied().unwrap_or(0.0);
+
+    // Process each segment with its potential bulge
+    let n = polyline.vertices.len();
+    for i in 0..n - 1 {
+        append_bulge_segment(
+            &mut builder,
+            polyline.vertices[i],
+            polyline.vertices[i + 1],
+            bulge_at(i),
+        );
+    }
+
+    // A closed polyline's last vertex carries the bulge of the closing
+    // segment back to the first vertex; without this it would be drawn
+    // as a straight line (e.g. rounded ends of slots).
+    if polyline.closed && n > 1 && bulge_at(n - 1).abs() >= 0.0001 {
+        append_bulge_segment(
+            &mut builder,
+            polyline.vertices[n - 1],
+            polyline.vertices[0],
+            bulge_at(n - 1),
+        );
+    }
+
+    if polyline.closed {
+        builder.close();
+    } else {
+        builder.end(false);
+    }
+    Some(builder.build())
+}
+
+/// Emits one polyline segment (straight or bulged arc) from `v1` ending at `v2`.
+fn append_bulge_segment(builder: &mut lyon::path::path::Builder, v1: Point, v2: Point, bulge: f64) {
+    let p1 = point(v1.x as f32, v1.y as f32);
+    let p2 = point(v2.x as f32, v2.y as f32);
+
+    let dist = ((v2.x - v1.x).powi(2) + (v2.y - v1.y).powi(2)).sqrt() as f32;
+
+    if bulge.abs() < 0.0001 || dist < 1e-9 {
+        // Straight line
+        builder.line_to(p2);
+        return;
+    }
+
+    let included_angle = 4.0 * bulge.abs().atan() as f32;
+
+    let h = bulge.abs() as f32 * (dist / 2.0);
+
+    let radius = ((dist / 2.0).powi(2) + h.powi(2)) / (2.0 * h);
+
+    let dist_to_center = radius - h;
+
+    let mid = point((v1.x + v2.x) as f32 / 2.0, (v1.y + v2.y) as f32 / 2.0);
+
+    let perp = vector(-(v2.y - v1.y) as f32 / dist, (v2.x - v1.x) as f32 / dist);
+
+    let center = if bulge > 0.0 {
+        mid + perp * dist_to_center
+    } else {
+        mid - perp * dist_to_center
+    };
+
+    let start_vec = p1 - center;
+    let start_angle = start_vec.y.atan2(start_vec.x);
+
+    let sweep_angle = if bulge > 0.0 {
+        included_angle
+    } else {
+        -included_angle
+    };
+
+    let arc_geom = lyon::geom::Arc {
+        center,
+        radii: vector(radius, radius),
+        x_rotation: lyon::math::Angle::radians(0.0),
+        start_angle: lyon::math::Angle::radians(start_angle),
+        sweep_angle: lyon::math::Angle::radians(sweep_angle),
+    };
+
+    arc_geom.for_each_cubic_bezier(&mut |ctrl| {
+        builder.cubic_bezier_to(ctrl.ctrl1, ctrl.ctrl2, ctrl.to);
+    });
 }
 
 /// STL importer for converting 3D STL files to Designer shapes via shadow projection
