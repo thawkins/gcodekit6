@@ -26,7 +26,7 @@ use cavalier_contours::polyline::{
 };
 use cavalier_contours::shape_algorithms::{Shape, ShapeOffsetOptions};
 
-use super::{PocketGenerator, PocketStrategy, add_center_cleanup, polygon_centroid};
+use super::{PocketGenerator, PocketStrategy, add_center_cleanup, polygon_centroid, z_step};
 use crate::model::Point;
 use crate::toolpath::{Toolpath, ToolpathSegment, ToolpathSegmentType};
 
@@ -492,11 +492,7 @@ impl PocketGenerator {
     /// Computes the Z level of each pass, as the hole-free pocket strategies do.
     fn z_levels(&self, step_down: f64) -> Vec<f64> {
         let total_depth = self.operation.depth.abs();
-        let z_step = if step_down > 0.0 {
-            step_down
-        } else {
-            total_depth
-        };
+        let z_step = z_step(step_down, total_depth);
         if z_step <= 0.0 {
             return Vec::new();
         }
@@ -509,7 +505,7 @@ impl PocketGenerator {
     /// Generates successive inward offsets of `shape`, starting one tool radius in.
     fn offset_levels(&self, shape: &Shape<f64>) -> Vec<Loops> {
         let mut levels = Vec::new();
-        let step = self.operation.stepover.max(0.01);
+        let step = self.stepover();
         let mut distance = self.operation.tool_diameter / 2.0;
         while levels.len() < MAX_OFFSET_LEVELS {
             let loops = shape_loops(&offset_shape(shape, distance));
@@ -703,7 +699,7 @@ impl PocketGenerator {
             });
 
         // Build the scanline spans once; they are identical for every Z pass.
-        let step = self.operation.stepover.max(0.01);
+        let step = self.stepover();
         let mut lines: Vec<Vec<(Point, Point)>> = Vec::new();
         let mut y = min_y + BOUNDARY_EPS;
         let mut forward = true;
