@@ -7,6 +7,7 @@ It uses a different G-code generation method than the one used in the Designer. 
 - A scanline engraving path (horizontal or vertical)
 - Optional bidirectional scanning to reduce travel time
 - Output power values scaled into the controller’s `S` range
+- A 2.5 mm laser-off run-up and run-out (overscan) on each burn line, so the head is at speed when the laser fires. This is why the job runs past the edges of the image.
 
 ## Key inputs
 ### Image file

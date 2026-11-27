@@ -9,6 +9,8 @@ CAM Tools provide generators and helpers that create G-code for common tasks.
 - [Speeds & Feeds Calculator](help:speeds_feeds_calculator) — reference RPM/feed starting points
 - [Spoilboard Surfacing](help:spoilboard_surfacing) — flatten a spoilboard
 - [Spoilboard Grid](help:spoilboard_grid) — grid marking/engraving
+- [Gerber to G-Code](help:gerber) — PCB isolation routing from Gerber files
+- [Drill Press](help:drill_press) — drill one hole, straight or helical
 
 ## Related
 - [Visualizer](help:visualizer)

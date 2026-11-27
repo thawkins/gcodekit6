@@ -7,6 +7,7 @@ Utiliza distínto método de generación de G-code que el utilizado en el Diseñ
 - Trayectoria de grabado de línea de escaneo (horizontal o vertical)
 - Escaneo bidireccional opcional para reducir el tiempo de desplazamiento
 - Valores de potencia de salida escalados al rango `S` del controlador
+- Un recorrido de 2,5 mm con el láser apagado antes y después de cada línea de grabado (overscan), para que el cabezal esté a velocidad cuando el láser se enciende. Por eso el trabajo sobrepasa los bordes de la imagen.
 
 ## Entradas clave
 ### Archivo de imagen

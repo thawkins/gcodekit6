@@ -15,6 +15,7 @@ Welcome to the built-in help.
 -     ▪️ [Speeds & Feeds Calculator](help:speeds_feeds_calculator)
 -     ▪️ [Spoilboard Surfacing](help:spoilboard_surfacing)
 -     ▪️ [Spoilboard Grid](help:spoilboard_grid)
+-     ▪️ [Gerber to G-Code](help:gerber)
 -     ▪️ [Drill Press](help:drill_press)
 - [Device Config](help:device_config) — retrieve/save GRBL settings and capabilities.
 - [Device Manager](help:device_manager) — manage device profiles and connections.
