@@ -24,7 +24,7 @@ use std::panic;
 use cavalier_contours::polyline::{Polyline, seg_arc_radius_and_center};
 use cavalier_contours::shape_algorithms::{Shape, ShapeOffsetOptions};
 
-use super::{PocketGenerator, PocketStrategy, add_center_cleanup, polygon_centroid, z_step};
+use super::{PocketGenerator, PocketStrategy, add_center_cleanup, polygon_centroid};
 use crate::geometry::{point_segment_distance, ray_crosses_edge, to_pline};
 use crate::model::Point;
 use crate::toolpath::{Toolpath, ToolpathSegment, ToolpathSegmentType};
@@ -432,19 +432,6 @@ impl PocketGenerator {
                 bidirectional,
             } => self.raster_pocket_with_holes(&shape, step_down, angle, bidirectional),
         }
-    }
-
-    /// Computes the Z level of each pass, as the hole-free pocket strategies do.
-    fn z_levels(&self, step_down: f64) -> Vec<f64> {
-        let total_depth = self.operation.depth.abs();
-        let z_step = z_step(step_down, total_depth);
-        if z_step <= 0.0 {
-            return Vec::new();
-        }
-        let z_passes = (total_depth / z_step).ceil() as u32;
-        (1..=z_passes)
-            .map(|z_pass| self.operation.start_depth - (z_step * z_pass as f64).min(total_depth))
-            .collect()
     }
 
     /// Generates successive inward offsets of `shape`, starting one tool radius in.

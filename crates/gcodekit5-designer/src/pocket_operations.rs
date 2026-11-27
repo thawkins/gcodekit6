@@ -11,6 +11,7 @@ use super::toolpath::{Toolpath, ToolpathSegment, ToolpathSegmentType};
 use crate::geometry::{prepare_polygon, safe_parallel_offset};
 use crate::model::{DesignCircle as Circle, DesignRectangle as Rectangle, Point};
 use crate::ops::clean_polyline;
+use cavalier_contours::polyline::Polyline;
 use std::f64::consts::PI;
 
 /// The smallest stepover and step-down (mm) the generators use. A smaller (or non-finite)
@@ -135,6 +136,79 @@ fn polygon_centroid(points: &[Point]) -> Option<Point> {
     cx /= 6.0 * area;
     cy /= 6.0 * area;
     Some(Point::new(cx, cy))
+}
+
+/// One Z pass of a pocket: the depth it cuts to and the depth of the pass before it.
+#[derive(Debug, Clone, Copy)]
+struct ZPass {
+    /// Depth of the previous pass (the start depth for the first pass).
+    prev_z: f64,
+    /// Depth this pass cuts to.
+    current_z: f64,
+    /// True for the first pass, which approaches from safe Z.
+    is_first: bool,
+}
+
+/// The vertices of an offset loop, closed by repeating the first one, or `None` when the
+/// loop has fewer than two vertices.
+fn closed_loop_points(path: &Polyline) -> Option<Vec<Point>> {
+    let mut points: Vec<Point> = path
+        .vertex_data
+        .iter()
+        .map(|v| Point::new(v.x, v.y))
+        .collect();
+    if points.len() < 2 {
+        return None;
+    }
+    points.push(points[0]);
+    Some(points)
+}
+
+/// Rotates `p` about the origin by `degrees` (counter-clockwise).
+fn rotate_deg(p: Point, degrees: f64) -> Point {
+    let cos_a = degrees.to_radians().cos();
+    let sin_a = degrees.to_radians().sin();
+    Point::new(p.x * cos_a - p.y * sin_a, p.x * sin_a + p.y * cos_a)
+}
+
+/// The `(min, max)` Y of `points`, or `None` when there are none.
+fn y_extent(points: &[Point]) -> Option<(f64, f64)> {
+    let first = points.first()?.y;
+    Some(points.iter().fold((first, first), |(min_y, max_y), p| {
+        (
+            if p.y < min_y { p.y } else { min_y },
+            if p.y > max_y { p.y } else { max_y },
+        )
+    }))
+}
+
+/// The X spans of the scanline `y` inside `polygon`, each inset by `tool_radius` at both ends;
+/// spans too short to hold the tool are dropped. Spans run left to right, or right to left
+/// (in reverse order) when `reverse` is set.
+fn raster_spans(polygon: &[Point], y: f64, tool_radius: f64, reverse: bool) -> Vec<(f64, f64)> {
+    let mut intersections = Vec::new();
+    for (i, &p1) in polygon.iter().enumerate() {
+        let p2 = polygon[(i + 1) % polygon.len()];
+        if ((p1.y <= y && p2.y > y) || (p2.y <= y && p1.y > y)) && (p2.y - p1.y).abs() > 1e-9 {
+            intersections.push(p1.x + (y - p1.y) * (p2.x - p1.x) / (p2.y - p1.y));
+        }
+    }
+    intersections.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+
+    let mut spans: Vec<(f64, f64)> = intersections
+        .as_chunks::<2>()
+        .0
+        .iter()
+        .map(|[x_start, x_end]| (x_start + tool_radius, x_end - tool_radius))
+        .filter(|(start_x, end_x)| start_x < end_x)
+        .collect();
+    if reverse {
+        spans.reverse();
+        for span in &mut spans {
+            *span = (span.1, span.0);
+        }
+    }
+    spans
 }
 
 /// Strategy for pocket milling.
@@ -658,267 +732,57 @@ impl PocketGenerator {
         vertices: &[Point],
         step_down: f64,
     ) -> Vec<Toolpath> {
-        let mut toolpaths = Vec::new();
         if vertices.is_empty() {
-            return toolpaths;
+            return Vec::new();
         }
+        let levels = self.polygon_offset_levels(vertices);
 
-        let polyline = prepare_polygon(vertices, POLYGON_DUPLICATE_TOLERANCE);
-
-        // Calculate Z passes
-        let total_depth = self.operation.depth.abs();
-        let z_step = z_step(step_down, total_depth);
-        let z_passes = (total_depth / z_step).ceil() as u32;
-        let tool_radius = self.operation.tool_diameter / 2.0;
-        let mut prev_z = self.operation.start_depth;
-        let mut is_first_z_pass = true;
-
-        for z_pass in 1..=z_passes {
-            let current_z = self.operation.start_depth - (z_step * z_pass as f64).min(total_depth);
-            let mut toolpath = Toolpath::new(self.operation.tool_diameter, current_z);
-
-            let mut current_offset = tool_radius;
-            let mut last_loop_centroid: Option<Point> = None;
+        self.toolpath_per_z_pass(step_down, |toolpath, pass| {
+            let mut last_loop_centroid = None;
             let mut is_first_stepin = true;
-
-            loop {
-                // Offset inwards
-                let polyline = clean_polyline(polyline.clone());
-                let offsets = safe_parallel_offset(&polyline, -current_offset);
-
-                if offsets.is_empty() {
-                    break;
-                }
-
-                for offset_path in offsets.iter() {
-                    let mut points = Vec::new();
-                    for v in &offset_path.vertex_data {
-                        points.push(Point::new(v.x, v.y));
-                    }
-
-                    if points.len() < 2 {
-                        continue;
-                    }
-
-                    // Close the loop
-                    points.push(points[0]);
-
-                    last_loop_centroid = polygon_centroid(&points);
-
-                    if self.operation.ramp_angle > 0.0 {
-                        self.add_helical_ramp(&mut toolpath, points[0], prev_z, current_z);
-                    } else if is_first_z_pass && is_first_stepin {
-                        // Very first step-in of first Z pass: use RapidMove to approach from safe Z
-                        toolpath.add_segment(ToolpathSegment::new(
-                            ToolpathSegmentType::RapidMove,
-                            Point::new(0.0, 0.0),
-                            points[0],
-                            self.operation.feed_rate,
-                            self.operation.spindle_speed,
-                        ));
-                        is_first_stepin = false;
-                    } else {
-                        // Subsequent step-ins or subsequent Z passes: use LinearMove
-                        let last_pt = toolpath.segments.last().map(|s| s.end).unwrap_or(points[0]);
-                        toolpath.add_segment(ToolpathSegment::new(
-                            ToolpathSegmentType::LinearMove,
-                            last_pt,
-                            points[0],
-                            self.operation.feed_rate,
-                            self.operation.spindle_speed,
-                        ));
-                        is_first_stepin = false;
-                    }
-
-                    // Add segments
-                    for window in points.windows(2) {
-                        toolpath.add_segment(ToolpathSegment::new(
-                            ToolpathSegmentType::LinearMove,
-                            window[0],
-                            window[1],
-                            self.operation.feed_rate,
-                            self.operation.spindle_speed,
-                        ));
-                    }
-                }
-
-                current_offset += self.stepover();
+            // Outside-in: every loop of every offset level, entering each one separately.
+            for points in levels.iter().flatten().filter_map(closed_loop_points) {
+                last_loop_centroid = polygon_centroid(&points);
+                self.add_entry_move(toolpath, points[0], pass, pass.is_first && is_first_stepin);
+                is_first_stepin = false;
+                self.add_loop_cut(toolpath, &points);
             }
-
-            // Final cleanup to remove residual core at the center (only if raster fill enabled)
-            if let Some(center_pt) = last_loop_centroid
-                && self.operation.raster_fill_ratio > 0.0
-            {
-                add_center_cleanup(
-                    &mut toolpath,
-                    center_pt,
-                    self.operation.tool_diameter,
-                    current_z,
-                    self.operation.feed_rate,
-                    self.operation.spindle_speed,
-                );
-            }
-
-            // Push main contour toolpath
-            toolpaths.push(toolpath);
-
-            prev_z = current_z;
-            is_first_z_pass = false;
-        }
-        toolpaths
+            self.add_center_cleanup_if_enabled(toolpath, last_loop_centroid, pass.current_z);
+        })
     }
 
     fn generate_adaptive_pocket(&self, vertices: &[Point], step_down: f64) -> Vec<Toolpath> {
-        let mut toolpaths = Vec::new();
         if vertices.is_empty() {
-            return toolpaths;
+            return Vec::new();
         }
-
-        let polyline = prepare_polygon(vertices, POLYGON_DUPLICATE_TOLERANCE);
-
-        // Calculate Z passes
-        let total_depth = self.operation.depth.abs();
-        let z_step = z_step(step_down, total_depth);
-        let z_passes = (total_depth / z_step).ceil() as u32;
-        let tool_radius = self.operation.tool_diameter / 2.0;
-
-        // Generate all offset levels first (Outside-In)
-        let mut levels = Vec::new();
-        let mut current_offset = tool_radius;
-        let mut innermost_centroid: Option<Point> = None;
-
-        loop {
-            let polyline = clean_polyline(polyline.clone());
-            let offsets = safe_parallel_offset(&polyline, -current_offset);
-
-            if offsets.is_empty() {
-                break;
-            }
-            levels.push(offsets);
-            current_offset += self.stepover();
-        }
-
-        // Reverse levels to go Inside-Out
+        // Inside-out: the innermost level first.
+        let mut levels = self.polygon_offset_levels(vertices);
         levels.reverse();
 
-        if let Some(first_level) = levels.first()
-            && let Some(first_path) = first_level.first()
-            && !first_path.vertex_data.is_empty()
-        {
-            let mut pts: Vec<Point> = first_path
-                .vertex_data
-                .iter()
-                .map(|v| Point::new(v.x, v.y))
-                .collect();
-            if let Some(first) = pts.first().copied() {
-                pts.push(first);
+        let innermost = levels.first().and_then(|level| level.first());
+        let innermost_centroid = innermost
+            .and_then(closed_loop_points)
+            .and_then(|points| polygon_centroid(&points));
+        let entry_point = innermost
+            .and_then(|path| path.vertex_data.first())
+            .map(|v| Point::new(v.x, v.y));
+
+        self.toolpath_per_z_pass(step_down, |toolpath, pass| {
+            if let Some(start_pt) = entry_point {
+                self.add_entry_move(toolpath, start_pt, pass, pass.is_first);
             }
-            innermost_centroid = polygon_centroid(&pts);
-        }
-
-        let mut prev_z = self.operation.start_depth;
-        let mut is_first_z_pass = true;
-
-        for z_pass in 1..=z_passes {
-            let current_z = self.operation.start_depth - (z_step * z_pass as f64).min(total_depth);
-            let mut toolpath = Toolpath::new(self.operation.tool_diameter, current_z);
-
-            // Entry for the first (innermost) level
-            if let Some(first_level) = levels.first()
-                && let Some(first_path) = first_level.first()
-                && !first_path.vertex_data.is_empty()
-            {
-                let start_pt = Point::new(first_path.vertex_data[0].x, first_path.vertex_data[0].y);
-
-                if self.operation.ramp_angle > 0.0 {
-                    self.add_helical_ramp(&mut toolpath, start_pt, prev_z, current_z);
-                } else if is_first_z_pass {
-                    // First Z pass: Rapid to start XY from safe Z
-                    toolpath.add_segment(ToolpathSegment::new(
-                        ToolpathSegmentType::RapidMove,
-                        Point::new(0.0, 0.0),
-                        start_pt,
-                        self.operation.feed_rate,
-                        self.operation.spindle_speed,
-                    ));
-                } else {
-                    // Subsequent Z passes: LinearMove to start XY, plunge handled by toolpath.depth
-                    toolpath.add_segment(ToolpathSegment::new(
-                        ToolpathSegmentType::LinearMove,
-                        start_pt, // Start from current position (will be handled by generator)
-                        start_pt,
-                        self.operation.feed_rate,
-                        self.operation.spindle_speed,
-                    ));
+            for points in levels.iter().flatten().filter_map(closed_loop_points) {
+                // The tool stays at cutting depth; traverse only when not already at the start.
+                let start_pt = points[0];
+                if let Some(last_pt) = toolpath.segments.last().map(|s| s.end)
+                    && last_pt.distance_to(&start_pt) > 0.1
+                {
+                    self.add_feed_move(toolpath, last_pt, start_pt);
                 }
+                self.add_loop_cut(toolpath, &points);
             }
-
-            for level in &levels {
-                for offset_path in level {
-                    let mut points = Vec::new();
-                    for v in &offset_path.vertex_data {
-                        points.push(Point::new(v.x, v.y));
-                    }
-
-                    if points.len() < 2 {
-                        continue;
-                    }
-
-                    // Close the loop
-                    points.push(points[0]);
-
-                    // If not connected to previous point, linear move to new start
-                    // (Tool is already at cutting depth, no need to retract)
-                    let start_pt = points[0];
-                    let needs_traverse = if let Some(last_seg) = toolpath.segments.last() {
-                        last_seg.end.distance_to(&start_pt) > 0.1
-                    } else {
-                        false // First contour already handled with RapidMove above
-                    };
-
-                    if needs_traverse {
-                        let last_pt = toolpath.segments.last().map(|s| s.end).unwrap_or(start_pt);
-                        toolpath.add_segment(ToolpathSegment::new(
-                            ToolpathSegmentType::LinearMove,
-                            last_pt,
-                            start_pt,
-                            self.operation.feed_rate,
-                            self.operation.spindle_speed,
-                        ));
-                    }
-
-                    // Add segments
-                    for window in points.windows(2) {
-                        toolpath.add_segment(ToolpathSegment::new(
-                            ToolpathSegmentType::LinearMove,
-                            window[0],
-                            window[1],
-                            self.operation.feed_rate,
-                            self.operation.spindle_speed,
-                        ));
-                    }
-                }
-            }
-            if let Some(center_pt) = innermost_centroid
-                && self.operation.raster_fill_ratio > 0.0
-            {
-                add_center_cleanup(
-                    &mut toolpath,
-                    center_pt,
-                    self.operation.tool_diameter,
-                    current_z,
-                    self.operation.feed_rate,
-                    self.operation.spindle_speed,
-                );
-            }
-
-            // Push main adaptive toolpath
-            toolpaths.push(toolpath);
-
-            prev_z = current_z;
-            is_first_z_pass = false;
-        }
-        toolpaths
+            self.add_center_cleanup_if_enabled(toolpath, innermost_centroid, pass.current_z);
+        })
     }
 
     fn generate_raster_pocket(
@@ -928,195 +792,161 @@ impl PocketGenerator {
         angle: f64,
         bidirectional: bool,
     ) -> Vec<Toolpath> {
-        let mut toolpaths = Vec::new();
-
-        if vertices.is_empty() {
-            return toolpaths;
-        }
-
-        // Rotate vertices to align with X axis
-        let cos_a = (-angle).to_radians().cos();
-        let sin_a = (-angle).to_radians().sin();
-
-        let rotate = |p: Point| -> Point {
-            Point::new(p.x * cos_a - p.y * sin_a, p.x * sin_a + p.y * cos_a)
+        // Work in a frame rotated so the raster lines run along X.
+        let rotated_vertices: Vec<Point> =
+            vertices.iter().map(|&p| rotate_deg(p, -angle)).collect();
+        let Some((min_y, max_y)) = y_extent(&rotated_vertices) else {
+            return Vec::new();
         };
-
-        let inv_rotate = |p: Point| -> Point {
-            let cos_inv = angle.to_radians().cos();
-            let sin_inv = angle.to_radians().sin();
-            Point::new(p.x * cos_inv - p.y * sin_inv, p.x * sin_inv + p.y * cos_inv)
-        };
-
-        let rotated_vertices: Vec<Point> = vertices.iter().map(|&p| rotate(p)).collect();
-
-        // Calculate bounding box of rotated vertices
-        let mut min_x = rotated_vertices[0].x;
-        let mut min_y = rotated_vertices[0].y;
-        let mut max_x = rotated_vertices[0].x;
-        let mut max_y = rotated_vertices[0].y;
-
-        for v in &rotated_vertices {
-            if v.x < min_x {
-                min_x = v.x;
-            }
-            if v.x > max_x {
-                max_x = v.x;
-            }
-            if v.y < min_y {
-                min_y = v.y;
-            }
-            if v.y > max_y {
-                max_y = v.y;
-            }
-        }
-
-        // Calculate Z passes
-        let total_depth = self.operation.depth.abs();
-        let z_step = z_step(step_down, total_depth);
-        let z_passes = (total_depth / z_step).ceil() as u32;
-
         let tool_radius = self.operation.tool_diameter / 2.0;
-        let mut prev_z = self.operation.start_depth;
-        let mut is_first_z_pass = true;
 
-        for z_pass in 1..=z_passes {
-            let current_z = self.operation.start_depth - (z_step * z_pass as f64).min(total_depth);
-            let mut toolpath = Toolpath::new(self.operation.tool_diameter, current_z);
-
-            // Scanline fill
+        self.toolpath_per_z_pass(step_down, |toolpath, pass| {
+            if rotated_vertices.len() < 3 {
+                return;
+            }
             let mut current_y = min_y + tool_radius;
             let limit_y = max_y - tool_radius;
             let mut forward = true;
 
             while current_y <= limit_y {
-                let mut intersections = Vec::new();
-
-                if rotated_vertices.len() < 3 {
-                    break;
+                let reverse = bidirectional && !forward;
+                for (start_x, end_x) in
+                    raster_spans(&rotated_vertices, current_y, tool_radius, reverse)
+                {
+                    let start_pt = rotate_deg(Point::new(start_x, current_y), angle);
+                    let end_pt = rotate_deg(Point::new(end_x, current_y), angle);
+                    self.add_raster_span(toolpath, start_pt, end_pt, pass);
                 }
-
-                for i in 0..rotated_vertices.len() {
-                    let p1 = rotated_vertices[i];
-                    let p2 = rotated_vertices[(i + 1) % rotated_vertices.len()];
-
-                    if ((p1.y <= current_y && p2.y > current_y)
-                        || (p2.y <= current_y && p1.y > current_y))
-                        && (p2.y - p1.y).abs() > 1e-9
-                    {
-                        let x = p1.x + (current_y - p1.y) * (p2.x - p1.x) / (p2.y - p1.y);
-                        intersections.push(x);
-                    }
-                }
-
-                intersections.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-
-                let mut segments = Vec::new();
-                for i in (0..intersections.len()).step_by(2) {
-                    if i + 1 < intersections.len() {
-                        let x_start = intersections[i];
-                        let x_end = intersections[i + 1];
-
-                        let seg_start_x = x_start + tool_radius;
-                        let seg_end_x = x_end - tool_radius;
-
-                        if seg_start_x < seg_end_x {
-                            segments.push((seg_start_x, seg_end_x));
-                        }
-                    }
-                }
-
-                if !forward && bidirectional {
-                    segments.reverse();
-                }
-
-                for (seg_start_x, seg_end_x) in segments {
-                    let (start_x, end_x) = if bidirectional && !forward {
-                        (seg_end_x, seg_start_x)
-                    } else {
-                        (seg_start_x, seg_end_x)
-                    };
-
-                    let start_pt = inv_rotate(Point::new(start_x, current_y));
-                    let end_pt = inv_rotate(Point::new(end_x, current_y));
-
-                    if !self.is_in_island(&start_pt) && !self.is_in_island(&end_pt) {
-                        // If close to previous end, linear move at cutting depth
-                        let is_connected = if let Some(last_seg) = toolpath.segments.last() {
-                            last_seg.end.distance_to(&start_pt) < self.operation.tool_diameter * 1.5
-                        } else {
-                            false
-                        };
-
-                        let is_first_segment = toolpath.segments.is_empty();
-
-                        if is_connected {
-                            // Close enough - traverse directly at cutting depth
-                            if let Some(last_seg) = toolpath.segments.last() {
-                                toolpath.add_segment(ToolpathSegment::new(
-                                    ToolpathSegmentType::LinearMove,
-                                    last_seg.end,
-                                    start_pt,
-                                    self.operation.feed_rate,
-                                    self.operation.spindle_speed,
-                                ));
-                            }
-                        } else if is_first_segment {
-                            // First segment of this Z pass - check if it's the very first Z pass
-                            if self.operation.ramp_angle > 0.0 {
-                                self.add_helical_ramp(&mut toolpath, start_pt, prev_z, current_z);
-                            } else if is_first_z_pass {
-                                // First Z pass: approach from safe Z with RapidMove
-                                toolpath.add_segment(ToolpathSegment::new(
-                                    ToolpathSegmentType::RapidMove,
-                                    Point::new(0.0, 0.0),
-                                    start_pt,
-                                    self.operation.feed_rate,
-                                    self.operation.spindle_speed,
-                                ));
-                            } else {
-                                // Subsequent Z passes: LinearMove to start, plunge via toolpath.depth
-                                toolpath.add_segment(ToolpathSegment::new(
-                                    ToolpathSegmentType::LinearMove,
-                                    start_pt, // Will be ignored, generator uses current position
-                                    start_pt,
-                                    self.operation.feed_rate,
-                                    self.operation.spindle_speed,
-                                ));
-                            }
-                        } else {
-                            // Not first segment, but not close - still traverse at cutting depth
-                            let last_point =
-                                toolpath.segments.last().map(|s| s.end).unwrap_or(start_pt);
-                            toolpath.add_segment(ToolpathSegment::new(
-                                ToolpathSegmentType::LinearMove,
-                                last_point,
-                                start_pt,
-                                self.operation.feed_rate,
-                                self.operation.spindle_speed,
-                            ));
-                        }
-
-                        toolpath.add_segment(ToolpathSegment::new(
-                            ToolpathSegmentType::LinearMove,
-                            start_pt,
-                            end_pt,
-                            self.operation.feed_rate,
-                            self.operation.spindle_speed,
-                        ));
-                    }
-                }
-
                 current_y += self.stepover();
                 forward = !forward;
             }
+        })
+    }
 
-            toolpaths.push(toolpath);
-            prev_z = current_z;
-            is_first_z_pass = false;
+    /// Computes the Z level of each pass: `step_down` steps from the start depth down to the
+    /// full depth, the last pass clamped to it.
+    fn z_levels(&self, step_down: f64) -> Vec<f64> {
+        let total_depth = self.operation.depth.abs();
+        let z_step = z_step(step_down, total_depth);
+        if z_step <= 0.0 {
+            return Vec::new();
         }
+        let z_passes = (total_depth / z_step).ceil() as u32;
+        (1..=z_passes)
+            .map(|z_pass| self.operation.start_depth - (z_step * z_pass as f64).min(total_depth))
+            .collect()
+    }
 
-        toolpaths
+    /// Builds one toolpath per Z pass, letting `cut` fill each one at its depth.
+    fn toolpath_per_z_pass(
+        &self,
+        step_down: f64,
+        mut cut: impl FnMut(&mut Toolpath, ZPass),
+    ) -> Vec<Toolpath> {
+        let mut prev_z = self.operation.start_depth;
+        self.z_levels(step_down)
+            .into_iter()
+            .enumerate()
+            .map(|(index, current_z)| {
+                let pass = ZPass {
+                    prev_z,
+                    current_z,
+                    is_first: index == 0,
+                };
+                let mut toolpath = Toolpath::new(self.operation.tool_diameter, current_z);
+                cut(&mut toolpath, pass);
+                prev_z = current_z;
+                toolpath
+            })
+            .collect()
+    }
+
+    /// Generates successive inward offsets of a polygon boundary, starting one tool radius
+    /// in and stepping by the stepover, until an offset vanishes (outermost level first).
+    fn polygon_offset_levels(&self, vertices: &[Point]) -> Vec<Vec<Polyline>> {
+        let polyline = clean_polyline(prepare_polygon(vertices, POLYGON_DUPLICATE_TOLERANCE));
+        let mut levels = Vec::new();
+        let mut current_offset = self.operation.tool_diameter / 2.0;
+        loop {
+            let offsets = safe_parallel_offset(&polyline, -current_offset);
+            if offsets.is_empty() {
+                return levels;
+            }
+            levels.push(offsets);
+            current_offset += self.stepover();
+        }
+    }
+
+    /// Moves the tool onto `start` at the pass depth: a helical ramp when ramping is enabled,
+    /// a rapid from safe Z when `rapid` is set, otherwise a feed move from the toolpath's last
+    /// point (or from `start` itself when the toolpath is empty).
+    fn add_entry_move(&self, toolpath: &mut Toolpath, start: Point, pass: ZPass, rapid: bool) {
+        if self.operation.ramp_angle > 0.0 {
+            self.add_helical_ramp(toolpath, start, pass.prev_z, pass.current_z);
+        } else if rapid {
+            toolpath.add_segment(ToolpathSegment::new(
+                ToolpathSegmentType::RapidMove,
+                Point::new(0.0, 0.0),
+                start,
+                self.operation.feed_rate,
+                self.operation.spindle_speed,
+            ));
+        } else {
+            let last_pt = toolpath.segments.last().map(|s| s.end).unwrap_or(start);
+            self.add_feed_move(toolpath, last_pt, start);
+        }
+    }
+
+    /// Appends a linear feed move from `from` to `to`.
+    fn add_feed_move(&self, toolpath: &mut Toolpath, from: Point, to: Point) {
+        toolpath.add_segment(ToolpathSegment::new(
+            ToolpathSegmentType::LinearMove,
+            from,
+            to,
+            self.operation.feed_rate,
+            self.operation.spindle_speed,
+        ));
+    }
+
+    /// Appends a feed move along each edge of the closed loop `points`.
+    fn add_loop_cut(&self, toolpath: &mut Toolpath, points: &[Point]) {
+        for window in points.windows(2) {
+            self.add_feed_move(toolpath, window[0], window[1]);
+        }
+    }
+
+    /// Clears the residual core at `center` when raster fill is enabled and a centre exists.
+    fn add_center_cleanup_if_enabled(
+        &self,
+        toolpath: &mut Toolpath,
+        center: Option<Point>,
+        z: f64,
+    ) {
+        if let Some(center_pt) = center
+            && self.operation.raster_fill_ratio > 0.0
+        {
+            add_center_cleanup(
+                toolpath,
+                center_pt,
+                self.operation.tool_diameter,
+                z,
+                self.operation.feed_rate,
+                self.operation.spindle_speed,
+            );
+        }
+    }
+
+    /// Cuts one raster span unless either end lies in an island: the first span of a pass
+    /// enters with [`Self::add_entry_move`], later spans link from the previous end at depth.
+    fn add_raster_span(&self, toolpath: &mut Toolpath, start: Point, end: Point, pass: ZPass) {
+        if self.is_in_island(&start) || self.is_in_island(&end) {
+            return;
+        }
+        match toolpath.segments.last().map(|s| s.end) {
+            Some(last_pt) => self.add_feed_move(toolpath, last_pt, start),
+            None => self.add_entry_move(toolpath, start, pass, pass.is_first),
+        }
+        self.add_feed_move(toolpath, start, end);
     }
 
     /// Generates offset paths for the pocket boundary.
