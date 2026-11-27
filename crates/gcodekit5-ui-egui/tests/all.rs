@@ -148,6 +148,8 @@ mod test_machine_quick_probe;
 mod test_machine_repetier_pane;
 #[path = "test_machine_rotary_jog.rs"]
 mod test_machine_rotary_jog;
+#[path = "test_machine_sidebar_width.rs"]
+mod test_machine_sidebar_width;
 #[path = "test_machine_work_zero.rs"]
 mod test_machine_work_zero;
 #[path = "test_machine_worker_messages.rs"]
