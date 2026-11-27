@@ -37,6 +37,8 @@ mod test_dxf_z_metadata;
 mod test_import_svg_rect_radius_units;
 #[path = "test_import_transforms_units.rs"]
 mod test_import_transforms_units;
+#[path = "test_laser_merge_and_arc_ramp.rs"]
+mod test_laser_merge_and_arc_ramp;
 #[path = "test_path_rotation.rs"]
 mod test_path_rotation;
 #[path = "test_pocket_bounds.rs"]

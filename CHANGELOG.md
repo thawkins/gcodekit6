@@ -1,3 +1,10 @@
+## [Unreleased]
+
+### Fixed
+- **Designer laser output on curves**: merging nearly collinear laser segments now keeps every merged point within the curve tolerance (0.05 mm), which was set but never used; before, an r = 50 mm arc could be cut up to 0.18 mm inside the drawn curve. Curved laser shapes (ellipses, paths, polygons with many points) now produce more G-code moves; straight lines are merged as before
+- **Designer laser point filter**: the last point of a run of cuts is no longer dropped when it is closer than 0.1 mm to the previous point, so closed laser contours close fully; after an arc the filter measures from the arc's end, not from the point before the arc
+- **Designer ramp over arcs**: ramped contours measure arcs by their length along the arc instead of the straight chord, so circles and rounded corners ramp at the requested angle (they were about 10% shallower)
+
 ## [2.0.0-alpha.3] - 2026-11-27
 
 Release page fixes only; the application is unchanged from 2.0.0-alpha.2.
