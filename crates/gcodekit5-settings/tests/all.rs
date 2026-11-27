@@ -19,6 +19,8 @@ pub fn global_env_lock() -> std::sync::MutexGuard<'static, ()> {
 
 #[path = "config_regression_tests.rs"]
 mod config_regression_tests;
+#[path = "test_settings_dropped_keys.rs"]
+mod test_settings_dropped_keys;
 #[path = "test_settings_keyboard_shortcuts.rs"]
 mod test_settings_keyboard_shortcuts;
 #[path = "test_settings_manager_store.rs"]

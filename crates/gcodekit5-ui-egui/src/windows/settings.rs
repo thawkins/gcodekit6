@@ -297,7 +297,7 @@ impl SettingsWindow {
             return SettingsOutcome::Closed;
         };
         // Start from the settings as they are now, not as they were when the window opened:
-        // recent files, probe and connection settings may have changed meanwhile.
+        // connection and other unedited settings may have changed meanwhile.
         let mut config = settings.config().clone();
         copy_edited(&draft.config, &mut config, self.title_bar_row);
         // An empty field means no default directory.
