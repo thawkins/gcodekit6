@@ -400,15 +400,16 @@ impl RepetierProcessor {
     }
 }
 
-/// Removes `( ... )` comments and everything after `;`.
+/// Removes `( ... )` comments (nested ones included) and everything after a
+/// `;` outside of them. A `;` inside parentheses is part of the comment.
 fn strip_comments(line: &str) -> String {
-    let line = line.split(';').next().unwrap_or_default();
     let mut out = String::with_capacity(line.len());
     let mut depth = 0usize;
     for c in line.chars() {
         match c {
             '(' => depth += 1,
             ')' => depth = depth.saturating_sub(1),
+            ';' if depth == 0 => break,
             _ if depth == 0 => out.push(c),
             _ => {}
         }

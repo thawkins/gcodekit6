@@ -338,15 +338,14 @@ fn test_bare_g92_resets_wco() {
 ///
 /// Repetier/Marlin firmware treats `;` as a line comment and has no
 /// parenthesis comments, so the processor strips both before sending. These
-/// assertions pin the current behaviour, including its known gaps.
+/// assertions pin that behaviour.
 #[test]
 fn test_comment_stripping_characterization() {
     let mut p = RepetierProcessor::new();
     // A removed comment between words leaves them separated.
     assert_eq!(translate(&mut p, "G1(c)X10"), vec!["G1 X10"]);
-    // Current gap: `;` is split off before parentheses are read, so the `;`
-    // inside the comment drops the whole line and the `G1` is lost.
-    assert!(translate(&mut p, "(a;b) G1").is_empty());
+    // A `;` inside parentheses is part of the comment; the `G1` is kept.
+    assert_eq!(translate(&mut p, "(a;b) G1"), vec!["G1"]);
     assert_eq!(translate(&mut p, "G1 X10 ; c"), vec!["G1 X10"]);
     assert_eq!(translate(&mut p, "G1 X10 (c) Y5"), vec!["G1 X10 Y5"]);
     // A comment-only line sends nothing.
