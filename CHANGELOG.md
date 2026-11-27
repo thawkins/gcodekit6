@@ -2,6 +2,8 @@
 
 ### Added
 - **Gerber Drill Holes layer drills Excellon files**: the layer reads the project's Excellon drill file (KiCad, Eagle, Altium: METRIC/INCH, LZ/TZ, explicit or FILE_FORMAT number formats, tool table, G85 and routed slots) and drills every hole to the Drill Depth (Z) field at the feed rate, smallest drill first, with a spindle stop and `M0` pause naming each drill. Holes get the same X/Y offset as the other layers so they line up with the isolation cut. Slots are routed (plunge at the start, cut to the end). `.drl`, `.xln`, `.exc` and `*drill*` files are drill files, and a `.txt` whose content starts with `M48`; before, the layer was refused
+- **WebSocket connections**: the WebSocket connection type of a device profile now connects (`ws://<host>:<port>/`, e.g. FluidNC on port 81) and streams, polls and sends real-time commands exactly as serial and TCP do
+- **Auto Reconnect**: with the device profile's Auto Reconnect on, a dropped serial, TCP or WebSocket connection is reopened (after 1 s, 2 s, then every 5 s, up to 10 attempts), shown as "Reconnecting... (n/10)" in the status bar, console and Machine Control pane; Disconnect cancels it. A job running when the link dropped is stopped and reported, and is not resumed. A network device profile's host and port now set the Machine Control connection
 
 ### Fixed
 - **Designer laser output on curves**: merging nearly collinear laser segments now keeps every merged point within the curve tolerance (0.05 mm), which was set but never used; before, an r = 50 mm arc could be cut up to 0.18 mm inside the drawn curve. Curved laser shapes (ellipses, paths, polygons with many points) now produce more G-code moves; straight lines are merged as before

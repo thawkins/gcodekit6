@@ -929,9 +929,10 @@ SLEEP
    - Keepalive messages every 30 seconds
 
 3. **WebSocket**
-   - Full WebSocket protocol support
-   - Automatic reconnection with exponential backoff
-   - Message queuing during disconnection
+   - Plain `ws://<host>:<port>/` (FluidNC and grblHAL boards; FluidNC's default port is 81), carrying the same GRBL text protocol as serial; no TLS
+   - Each write is one message, so real-time bytes (`?`, `!`, `~`, `0x18`, `0x80`-`0xFF`) go out unbuffered
+
+**Auto Reconnect** (device profile checkbox, all three connection types): when an open connection drops (not a user Disconnect), the app waits 1 s, 2 s, then 5 s between attempts, up to 10 attempts, showing "Reconnecting... (n/10)" in the status bar and the Machine Control pane; Disconnect cancels it. A job streaming when the link dropped is stopped and reported, and is never resumed after the reconnect. A network device profile (TCP/IP or WebSocket with a host) sets the Machine Control connection; a serial profile keeps the configured one.
 
 **Connection Workflow**:
 1. User selects connection parameters
@@ -2115,7 +2116,7 @@ See [FIRMWARE_CAPABILITIES_DATABASE.md](docs/FIRMWARE_CAPABILITIES_DATABASE.md) 
 
 ## Audit Follow-up (November 2026)
 - **Streaming**: GRBL character-counting flow control (bytes in flight ≤ 127). The job sender polls status (`?`, 200 ms) itself so the DRO, alarm state and overrides stay live; an `ALARM:`/`error:` reply stops the job with the reason.
-- **Connections**: device profiles carry a TCP host and port; connecting with a TCP profile opens a TCP stream through the same communicator as serial. WebSocket is not supported yet.
+- **Connections**: device profiles carry a TCP host and port; connecting with a TCP or WebSocket profile opens a TCP stream or a `ws://` WebSocket through the same communicator as serial. Auto Reconnect reopens a dropped connection (see 4.1).
 - **Machine Control**: rotary A/B/C axes shown from the profile/status; Pause/Resume/Stop only during a job; inch jog presets (0.0001–1 in); probe failures restore G90 once idle.
 - **Stop and busy guard**: Stop sends feed hold (`!`), waits for `Hold:0` (up to 10 s), then soft-resets (0x18), so the position is kept; E-Stop still resets at once. While a job streams, console lines (except `!`, `~`, `?`) and `$$`/`$n=v` are refused with a message; `$` commands also need Idle or Alarm. Pause state clears when the machine reports Run/Jog
 - **Designer**: property fields commit on Enter/focus-out (one undo step per edit); every property edit is undoable; unsaved-changes prompt (Save / Discard / Cancel) on New/Open/quit/language restart; the same prompt guards hand edits in the G-code editor (New/Open/quit/language restart) and unsaved tool edits in the Tools Manager; SVG transforms and viewBox units; DXF `$INSUNITS`.

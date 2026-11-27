@@ -159,6 +159,7 @@ impl PendingWrite {
             }
             MachineEvent::Disconnected => Some(WriteOutcome::NoReply),
             MachineEvent::Connected
+            | MachineEvent::Reconnecting { .. }
             | MachineEvent::StatusReport(_)
             | MachineEvent::Received(_)
             | MachineEvent::StreamProgress { .. }

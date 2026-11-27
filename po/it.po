@@ -4767,3 +4767,12 @@ msgstr "Seleziona il sistema di coordinate di lavoro attivo: il programma potreb
 
 msgid "the command line is empty"
 msgstr "la riga di comando è vuota"
+
+msgid "Reconnecting… ({attempt}/{max})"
+msgstr "Riconnessione… ({attempt}/{max})"
+
+msgid "connection lost: the job was stopped and will not resume"
+msgstr "connessione persa: il lavoro è stato fermato e non riprenderà"
+
+msgid "automatic reconnect failed"
+msgstr "riconnessione automatica non riuscita"

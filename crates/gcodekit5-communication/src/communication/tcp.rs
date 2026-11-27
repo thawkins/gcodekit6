@@ -88,49 +88,7 @@ impl RealTcpPort {
             return Err(Error::other("RealTcpPort requires Tcp driver type"));
         }
 
-        let address = format!("{}:{}", params.port, params.network_port);
-
-        // Resolve via ToSocketAddrs so hostnames (e.g. "fluidnc.local") and IPv6
-        // literals work; `SocketAddr::parse` only accepts numeric "ip:port".
-        let addrs: Vec<_> = (params.port.as_str(), params.network_port)
-            .to_socket_addrs()
-            .map_err(|e| Error::other(format!("Invalid address '{}': {}", address, e)))?
-            .collect();
-        if addrs.is_empty() {
-            return Err(Error::other(format!(
-                "Address '{}' did not resolve",
-                address
-            )));
-        }
-
-        // A hostname may resolve to several addresses (e.g. IPv6 and IPv4); try each in turn
-        // and only fail once all of them have been tried.
-        let timeout = Duration::from_millis(params.timeout_ms);
-        let mut last_err = None;
-        for socket_addr in &addrs {
-            match TcpStream::connect_timeout(socket_addr, timeout) {
-                Ok(stream) => {
-                    stream
-                        .set_read_timeout(Some(timeout))
-                        .map_err(|e| Error::other(format!("Failed to set read timeout: {}", e)))?;
-                    stream
-                        .set_write_timeout(Some(timeout))
-                        .map_err(|e| Error::other(format!("Failed to set write timeout: {}", e)))?;
-                    return Ok(RealTcpPort { stream });
-                }
-                Err(e) => {
-                    tracing::debug!("TCP connect to {} failed: {}", socket_addr, e);
-                    last_err = Some(e);
-                }
-            }
-        }
-
-        let e = last_err.map_or_else(|| "no addresses".to_string(), |e| e.to_string());
-        tracing::error!("Failed to connect to TCP server {}: {}", address, e);
-        Err(Error::other(format!(
-            "Failed to connect to {}: {}",
-            address, e
-        )))
+        connect_stream(params).map(|stream| RealTcpPort { stream })
     }
 
     /// Sets the read timeout of the underlying stream.
@@ -176,4 +134,60 @@ impl TcpPort for RealTcpPort {
         let _ = self.stream.shutdown(std::net::Shutdown::Both);
         Ok(())
     }
+}
+
+/// Opens a TCP stream to `params.port:params.network_port`, trying every address the
+/// host resolves to, with `params.timeout_ms` as the connect, read and write timeout.
+///
+/// Shared by the TCP and WebSocket transports, which both start from a plain TCP stream.
+///
+/// # Arguments
+/// * `params` - Host, port and timeout of the connection.
+///
+/// # Errors
+/// Fails if the address does not resolve or no resolved address accepts the connection.
+pub(crate) fn connect_stream(params: &ConnectionParams) -> Result<TcpStream> {
+    let address = format!("{}:{}", params.port, params.network_port);
+
+    // Resolve via ToSocketAddrs so hostnames (e.g. "fluidnc.local") and IPv6
+    // literals work; `SocketAddr::parse` only accepts numeric "ip:port".
+    let addrs: Vec<_> = (params.port.as_str(), params.network_port)
+        .to_socket_addrs()
+        .map_err(|e| Error::other(format!("Invalid address '{}': {}", address, e)))?
+        .collect();
+    if addrs.is_empty() {
+        return Err(Error::other(format!(
+            "Address '{}' did not resolve",
+            address
+        )));
+    }
+
+    // A hostname may resolve to several addresses (e.g. IPv6 and IPv4); try each in turn
+    // and only fail once all of them have been tried.
+    let timeout = Duration::from_millis(params.timeout_ms);
+    let mut last_err = None;
+    for socket_addr in &addrs {
+        match TcpStream::connect_timeout(socket_addr, timeout) {
+            Ok(stream) => {
+                stream
+                    .set_read_timeout(Some(timeout))
+                    .map_err(|e| Error::other(format!("Failed to set read timeout: {}", e)))?;
+                stream
+                    .set_write_timeout(Some(timeout))
+                    .map_err(|e| Error::other(format!("Failed to set write timeout: {}", e)))?;
+                return Ok(stream);
+            }
+            Err(e) => {
+                tracing::debug!("TCP connect to {} failed: {}", socket_addr, e);
+                last_err = Some(e);
+            }
+        }
+    }
+
+    let e = last_err.map_or_else(|| "no addresses".to_string(), |e| e.to_string());
+    tracing::error!("Failed to connect to {}: {}", address, e);
+    Err(Error::other(format!(
+        "Failed to connect to {}: {}",
+        address, e
+    )))
 }

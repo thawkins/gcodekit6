@@ -4690,3 +4690,12 @@ msgstr ""
 
 msgid "the command line is empty"
 msgstr ""
+
+msgid "Reconnecting… ({attempt}/{max})"
+msgstr ""
+
+msgid "connection lost: the job was stopped and will not resume"
+msgstr ""
+
+msgid "automatic reconnect failed"
+msgstr ""

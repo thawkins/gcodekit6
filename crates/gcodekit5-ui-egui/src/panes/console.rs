@@ -204,6 +204,15 @@ impl ConsolePane {
                 MachineEvent::Disconnected => self
                     .log
                     .add_message(MessageLevel::Info, tr.tr("Device disconnected")),
+                MachineEvent::Reconnecting {
+                    attempt,
+                    max_attempts,
+                } => self.log.add_message(
+                    MessageLevel::Warning,
+                    tr.tr(crate::machine::RECONNECTING)
+                        .replace("{attempt}", &attempt.to_string())
+                        .replace("{max}", &max_attempts.to_string()),
+                ),
                 MachineEvent::Error(message) => self.log.add_message(
                     MessageLevel::Error,
                     format!("{}: {}", tr.tr("Error"), worker_message(message, tr)),

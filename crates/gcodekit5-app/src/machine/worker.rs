@@ -19,7 +19,10 @@ use super::grbl_stream::{
 use super::types::{
     Command, MachineEvent, RealtimeCommand, SharedHook, StreamMode, realtime_label, worker_text,
 };
-use super::{HALT_MAX_WAIT, HALT_QUERY_INTERVAL, HALT_TIMEOUT, IDLE_WAIT, STATUS_INTERVAL};
+use super::{
+    HALT_MAX_WAIT, HALT_QUERY_INTERVAL, HALT_TIMEOUT, IDLE_WAIT, RECONNECT_ATTEMPTS,
+    RECONNECT_DELAYS, STATUS_INTERVAL,
+};
 
 /// Whether a command line has a Repetier equivalent: anything but a GRBL `$` command, except
 /// homing (`$H`, sent as `G28`) and jogging (`$J=`, sent as `G1` moves), which
@@ -64,6 +67,7 @@ pub(super) fn connection_params(cfg: &ConnectionSettings) -> ConnectionParams {
     };
     params.timeout_ms = cfg.timeout_ms;
     params.auto_reconnect = cfg.auto_reconnect;
+    params.max_retries = RECONNECT_ATTEMPTS;
     params
 }
 
@@ -237,6 +241,21 @@ pub(super) enum Exit {
     TransportError(String),
 }
 
+/// How an automatic reconnect ended.
+enum Reconnect {
+    /// The transport is open again.
+    Connected,
+    /// The worker gave up, or was told to stop; the transport is closed and
+    /// [`MachineEvent::Disconnected`] was reported.
+    Stopped,
+}
+
+/// How long the worker waits before reconnect attempt `attempt` (from 1).
+fn reconnect_delay(attempt: u32) -> Duration {
+    let index = usize::try_from(attempt.saturating_sub(1)).unwrap_or(usize::MAX);
+    RECONNECT_DELAYS[index.min(RECONNECT_DELAYS.len() - 1)]
+}
+
 impl WorkerState {
     pub(super) fn new(
         comm: Box<dyn Communicator>,
@@ -296,7 +315,16 @@ impl WorkerState {
         self.ready.store(true, Ordering::SeqCst);
         self.sink.emit(MachineEvent::Connected);
 
-        let exit = self.io_loop();
+        let mut exit = self.io_loop();
+        // Auto Reconnect: a dropped link (not a Disconnect) is reopened with backoff.
+        while params.auto_reconnect
+            && let Exit::TransportError(msg) = exit
+        {
+            match self.reconnect(msg, params) {
+                Reconnect::Connected => exit = self.io_loop(),
+                Reconnect::Stopped => return,
+            }
+        }
         if let Exit::TransportError(msg) = exit {
             self.sink.emit(MachineEvent::Error(msg));
         } else if self.jog_outstanding && self.repetier.is_none() {
@@ -311,6 +339,123 @@ impl WorkerState {
             tracing::warn!("machine transport disconnect failed: {e}");
         }
         self.sink.emit(MachineEvent::Disconnected);
+    }
+
+    /// Handles a dropped connection with Auto Reconnect on: reports the error, stops a
+    /// streaming program for good (it is not resumed after the reconnect), closes the
+    /// transport and reports [`MachineEvent::Disconnected`], then tries to reopen it up to
+    /// `params.max_retries` times, waiting [`RECONNECT_DELAYS`] before each attempt.
+    ///
+    /// While it waits, `ready` is false, so a Disconnect detaches the worker at once; a
+    /// shutdown ends the attempts. Commands that need the connection are refused.
+    ///
+    /// # Arguments
+    /// * `msg` - The transport error that ended the connection.
+    /// * `params` - The connection to reopen.
+    fn reconnect(&mut self, msg: String, params: &ConnectionParams) -> Reconnect {
+        self.sink.emit(MachineEvent::Error(msg));
+        if self.stream.is_some() {
+            self.sink.emit(MachineEvent::Error(
+                worker_text::JOB_STOPPED_CONNECTION_LOST.to_string(),
+            ));
+        }
+        self.end_stream(false);
+        self.ready.store(false, Ordering::SeqCst);
+        if let Err(e) = self.comm.disconnect() {
+            tracing::warn!("machine transport disconnect failed: {e}");
+        }
+        self.forget_connection();
+        self.sink.emit(MachineEvent::Disconnected);
+
+        let max_attempts = params.max_retries;
+        for attempt in 1..=max_attempts {
+            self.sink.emit(MachineEvent::Reconnecting {
+                attempt,
+                max_attempts,
+            });
+            if !self.wait_offline(reconnect_delay(attempt)) {
+                tracing::info!("reconnect cancelled");
+                return Reconnect::Stopped;
+            }
+            match self.comm.connect(params) {
+                Ok(()) => {
+                    tracing::info!(attempt, "machine connection reopened");
+                    self.ready.store(true, Ordering::SeqCst);
+                    self.sink.emit(MachineEvent::Connected);
+                    return Reconnect::Connected;
+                }
+                Err(e) => tracing::warn!(attempt, max_attempts, "reconnect failed: {e}"),
+            }
+        }
+        self.sink.emit(MachineEvent::Error(
+            worker_text::RECONNECT_FAILED.to_string(),
+        ));
+        self.sink.emit(MachineEvent::Disconnected);
+        Reconnect::Stopped
+    }
+
+    /// Forgets everything owed to the closed connection: lines in flight or queued, status
+    /// queries, a pause or reset, the controller's identity and the Repetier line numbers.
+    fn forget_connection(&mut self) {
+        self.reset_buffers();
+        self.paused = false;
+        self.jog_seen = false;
+        self.reset_at = None;
+        self.identity_checked = false;
+        self.lost_logged = false;
+        self.reply_latency = Duration::ZERO;
+        if let Some(link) = self.repetier.as_ref() {
+            self.repetier = Some(RepetierLink::new(link.pen_mode.clone()));
+        }
+    }
+
+    /// Waits `delay` with the transport closed, refusing commands that need it.
+    ///
+    /// # Returns
+    /// False if the worker was told to shut down (or the controller is gone).
+    fn wait_offline(&mut self, delay: Duration) -> bool {
+        let deadline = Instant::now() + delay;
+        loop {
+            let left = deadline.saturating_duration_since(Instant::now());
+            match self.commands.recv_timeout(left) {
+                Ok(Command::Shutdown) | Err(RecvTimeoutError::Disconnected) => return false,
+                Ok(cmd) => self.refuse_offline(cmd),
+                Err(RecvTimeoutError::Timeout) => return true,
+            }
+        }
+    }
+
+    /// Refuses `cmd` while the connection is being reopened: a program or line is reported
+    /// as not sent (and counted as answered), real-time bytes are dropped.
+    fn refuse_offline(&mut self, cmd: Command) {
+        match cmd {
+            Command::Stream(program, _, _) => {
+                let total = program.len();
+                self.sink
+                    .emit(MachineEvent::Error(worker_text::NOT_CONNECTED.to_string()));
+                self.streaming.store(false, Ordering::SeqCst);
+                self.sink
+                    .emit(MachineEvent::StreamStopped { acked: 0, total });
+            }
+            Command::Line(line, _) => {
+                self.sink.emit(MachineEvent::Error(format!(
+                    "{}: {line}",
+                    worker_text::NOT_CONNECTED
+                )));
+                self.drop_line(0);
+            }
+            Command::StateLine(line, seq, _) => {
+                self.sink.emit(MachineEvent::Error(format!(
+                    "{}: {line}",
+                    worker_text::NOT_CONNECTED
+                )));
+                self.drop_line(seq);
+            }
+            Command::Realtime(_) | Command::Pause | Command::Resume | Command::Stop => {
+                tracing::debug!("real-time command dropped while reconnecting");
+            }
+            Command::Shutdown => {}
+        }
     }
 
     fn io_loop(&mut self) -> Exit {

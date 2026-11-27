@@ -31,6 +31,7 @@ fn invalidates_result(event: &MachineEvent) -> bool {
         | MachineEvent::StreamHalted { .. }
         | MachineEvent::ProtocolMismatch { .. } => true,
         MachineEvent::Connected
+        | MachineEvent::Reconnecting { .. }
         | MachineEvent::StatusReport(_)
         | MachineEvent::StreamProgress { .. }
         | MachineEvent::StreamFinished { .. }

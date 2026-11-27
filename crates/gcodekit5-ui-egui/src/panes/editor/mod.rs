@@ -647,6 +647,7 @@ impl Pane for EditorPane {
                     self.follow_stream(*acked, *total);
                 }
                 MachineEvent::Connected
+                | MachineEvent::Reconnecting { .. }
                 | MachineEvent::Disconnected
                 | MachineEvent::StatusReport(_)
                 | MachineEvent::Received(_)

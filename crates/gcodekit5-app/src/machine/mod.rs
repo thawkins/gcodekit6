@@ -63,5 +63,15 @@ const MAX_UNANSWERED_QUERIES: usize = 256;
 /// stops the stream: a line the firmware keeps refusing (one longer than its buffer, a noisy
 /// link) would otherwise be replayed for ever.
 const MAX_REPETIER_RESENDS: u32 = 5;
+/// How long the worker waits before each automatic reconnect attempt: the first attempts
+/// come quickly (a controller rebooting), later ones at the last interval.
+const RECONNECT_DELAYS: [Duration; 3] = [
+    Duration::from_secs(1),
+    Duration::from_secs(2),
+    Duration::from_secs(5),
+];
+/// How many times the worker tries to reopen a dropped connection (Auto Reconnect) before it
+/// gives up: about 40 s in all with [`RECONNECT_DELAYS`].
+pub const RECONNECT_ATTEMPTS: u32 = 10;
 /// How long an idle worker waits for a command before reading the transport again.
 const IDLE_WAIT: Duration = Duration::from_millis(2);

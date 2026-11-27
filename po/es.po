@@ -4767,3 +4767,12 @@ msgstr "Seleccione el sistema de coordenadas de trabajo activo: el programa pued
 
 msgid "the command line is empty"
 msgstr "la línea de comando está vacía"
+
+msgid "Reconnecting… ({attempt}/{max})"
+msgstr "Reconectando… ({attempt}/{max})"
+
+msgid "connection lost: the job was stopped and will not resume"
+msgstr "conexión perdida: el trabajo se detuvo y no se reanudará"
+
+msgid "automatic reconnect failed"
+msgstr "la reconexión automática falló"

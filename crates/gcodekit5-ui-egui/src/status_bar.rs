@@ -34,6 +34,7 @@ pub const MSGIDS: &[&str] = &[
     n_!("Emergency stop (soft reset, {shortcut})"),
     n_!("Elapsed:"),
     n_!("Remaining:"),
+    crate::machine::RECONNECTING,
 ];
 
 /// What the status bar shows, as text.
@@ -127,9 +128,11 @@ pub fn feed_spindle_text(status: &MachineStatus, feed_units: FeedRateUnits) -> O
 /// * `tr` - Translator for the current UI language.
 pub fn summary(status: &MachineStatus, units: MeasurementSystem, tr: &Translator) -> Summary {
     let connection = if status.connected {
-        tr.tr("Connected")
+        tr.tr("Connected").into_owned()
+    } else if let Some(text) = crate::machine::reconnecting_text(status, tr) {
+        text
     } else {
-        tr.tr("Disconnected")
+        tr.tr("Disconnected").into_owned()
     };
     let progress = status.progress.filter(|p| p.total > 0).map(|p| {
         let fraction = (p.acked as f32 / p.total as f32).clamp(0.0, 1.0);
@@ -137,7 +140,7 @@ pub fn summary(status: &MachineStatus, units: MeasurementSystem, tr: &Translator
     });
     Summary {
         connected: status.connected,
-        connection: connection.into_owned(),
+        connection,
         state: status
             .report
             .as_ref()

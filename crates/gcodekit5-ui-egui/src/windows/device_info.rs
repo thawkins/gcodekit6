@@ -80,6 +80,7 @@ impl DeviceInfoPanel {
                     self.notice = None;
                 }
                 MachineEvent::Connected
+                | MachineEvent::Reconnecting { .. }
                 | MachineEvent::StatusReport(_)
                 | MachineEvent::StreamProgress { .. }
                 | MachineEvent::StreamHalted { .. }

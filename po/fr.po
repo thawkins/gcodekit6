@@ -4771,3 +4771,12 @@ msgstr "Sélectionnez le système de coordonnées pièce actif : le programme l'
 
 msgid "the command line is empty"
 msgstr "la ligne de commande est vide"
+
+msgid "Reconnecting… ({attempt}/{max})"
+msgstr "Reconnexion… ({attempt}/{max})"
+
+msgid "connection lost: the job was stopped and will not resume"
+msgstr "connexion perdue : la tâche a été arrêtée et ne reprendra pas"
+
+msgid "automatic reconnect failed"
+msgstr "la reconnexion automatique a échoué"

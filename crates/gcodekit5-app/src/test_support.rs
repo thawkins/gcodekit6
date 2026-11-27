@@ -11,6 +11,9 @@
 //! are handed out in order, at most [`LoopbackShared::reply_budget`] of them when it is set,
 //! each no sooner than [`LoopbackShared::reply_delay`] after its `?` (a slow link).
 //!
+//! [`LoopbackShared::link_down`] drops the link: every read and write fails as a pulled
+//! cable does, and a connect is refused until it is cleared.
+//!
 //! It stands in for a Repetier controller too: each numbered line gets its `ok`, and
 //! [`LoopbackShared::resend_once`] answers one line with `Resend:N` and `ok` instead.
 
@@ -68,6 +71,10 @@ pub struct LoopbackShared {
     /// `Resend:<n>` and `ok`, as Repetier firmware answers a checksum error, instead of the
     /// line's own `ok`; then cleared.
     pub resend_once: Mutex<Option<u32>>,
+    /// While set, the link is down: reads and writes fail and `connect` is refused.
+    pub link_down: AtomicBool,
+    /// How many times `connect` succeeded.
+    pub connects: AtomicUsize,
 }
 
 impl LoopbackShared {
@@ -212,9 +219,14 @@ fn is_realtime_byte(b: u8) -> bool {
 impl Communicator for Loopback {
     fn connect(&mut self, params: &ConnectionParams) -> gcodekit5_core::Result<()> {
         std::thread::sleep(self.shared.connect_delay);
-        if self.shared.fail_connect {
+        if self.shared.fail_connect || self.shared.link_down.load(Ordering::SeqCst) {
             return Err(gcodekit5_core::Error::other("loopback refused"));
         }
+        // A new link: nothing owed by the last one is still in flight.
+        self.carry.clear();
+        self.pending_acks.clear();
+        self.shared.outstanding.store(0, Ordering::SeqCst);
+        self.shared.connects.fetch_add(1, Ordering::SeqCst);
         self.params = Some(params.clone());
         self.shared.connected.store(true, Ordering::SeqCst);
         Ok(())
@@ -241,6 +253,12 @@ impl Communicator for Loopback {
     }
 
     fn send(&mut self, data: &[u8]) -> gcodekit5_core::Result<usize> {
+        if self.shared.link_down.load(Ordering::SeqCst) {
+            self.shared.connected.store(false, Ordering::SeqCst);
+            return Err(gcodekit5_core::Error::other(
+                "Connection lost: loopback link down",
+            ));
+        }
         if data.len() == 1 && self.carry.is_empty() && is_realtime_byte(data[0]) {
             self.shared
                 .log
@@ -276,6 +294,12 @@ impl Communicator for Loopback {
     }
 
     fn receive(&mut self) -> gcodekit5_core::Result<Vec<u8>> {
+        if self.shared.link_down.load(Ordering::SeqCst) {
+            self.shared.connected.store(false, Ordering::SeqCst);
+            return Err(gcodekit5_core::Error::other(
+                "Connection lost: loopback link down",
+            ));
+        }
         if let Some(data) = self
             .shared
             .inject
