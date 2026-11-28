@@ -52,25 +52,25 @@ pub struct BitmapEngravingPreset {
     /// Path of the source image.
     pub image_path: String,
     /// Output width (mm).
-    pub width_mm: f32,
+    pub width_mm: f64,
     /// Engraving feed rate (mm/min).
-    pub feed_rate: f32,
+    pub feed_rate: f64,
     /// Travel feed rate (mm/min).
-    pub travel_rate: f32,
+    pub travel_rate: f64,
     /// Minimum power (%).
     pub min_power: f32,
     /// Maximum power (%).
     pub max_power: f32,
     /// Resolution (pixels per mm).
-    pub pixels_per_mm: f32,
+    pub pixels_per_mm: f64,
     /// Line spacing multiplier.
-    pub line_spacing: f32,
+    pub line_spacing: f64,
     /// S value at 100 % power.
     pub power_scale: f32,
     /// Image origin X (mm).
-    pub offset_x: f32,
+    pub offset_x: f64,
     /// Image origin Y (mm).
-    pub offset_y: f32,
+    pub offset_y: f64,
     /// Scan direction id ("0" horizontal, "1" vertical).
     pub scan_direction: String,
     /// Bidirectional scanning.
@@ -417,14 +417,14 @@ impl<'a> LegacyReader<'a> {
     }
 
     /// Length stored as display text in `system`.
-    fn length(&mut self, key: &str, system: MeasurementSystem, out: &mut f32) {
+    fn length(&mut self, key: &str, system: MeasurementSystem, out: &mut f64) {
         if let Some(raw) = self.value.get(key) {
             let parsed = match raw {
                 Value::String(s) => units::parse_length(s, system).ok(),
                 _ => None,
             };
             match parsed {
-                Some(v) if v.is_finite() => *out = v as f32,
+                Some(v) if v.is_finite() => *out = v,
                 _ => self.bad(key, raw),
             }
         }

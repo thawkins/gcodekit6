@@ -32,7 +32,7 @@ impl TabbedBoxParams {
     pub fn apply_preset(&mut self, json: &str) -> Result<(), String> {
         let p: BoxParameters = serde_json::from_str(json).map_err(|e| e.to_string())?;
         let units = self.units;
-        let len = |mm: f32| common::format_len(f64::from(mm), units);
+        let len = |mm: f64| common::format_len(mm, units);
         self.width = len(p.x);
         self.depth = len(p.y);
         self.height = len(p.h);

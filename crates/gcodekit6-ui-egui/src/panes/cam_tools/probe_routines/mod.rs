@@ -412,7 +412,7 @@ impl ProbeParams {
     pub fn preset_json(&self, tr: &Translator) -> Result<String, String> {
         let preset = (|| {
             let feed = |label, text: &str| common::preset_number(label, text);
-            let n = |label, text: &str| common::preset_len(label, text, self.units).map(f64::from);
+            let n = |label, text: &str| common::preset_len(label, text, self.units);
             Ok(ProbePreset {
                 routine: Some(self.routine.id().to_string()),
                 safe_height: n(SAFE_HEIGHT, &self.safe_height)?,

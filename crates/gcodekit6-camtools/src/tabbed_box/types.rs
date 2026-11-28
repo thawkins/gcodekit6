@@ -70,21 +70,21 @@ impl From<i32> for KeyDividerType {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FingerJointSettings {
     /// Width of fingers in multiples of thickness
-    pub finger: f32,
+    pub finger: f64,
     /// Space between fingers in multiples of thickness
-    pub space: f32,
+    pub space: f64,
     /// Space at start and end in multiples of normal spaces
-    pub surrounding_spaces: f32,
+    pub surrounding_spaces: f64,
     /// Extra space to allow fingers to move in/out (multiples of thickness)
-    pub play: f32,
+    pub play: f64,
     /// Extra material for burn marks (multiples of thickness)
-    pub extra_length: f32,
+    pub extra_length: f64,
     /// Style of fingers
     pub style: FingerStyle,
     /// Height of dimple (friction fit bump)
-    pub dimple_height: f32,
+    pub dimple_height: f64,
     /// Length of dimple
-    pub dimple_length: f32,
+    pub dimple_length: f64,
 }
 
 impl Default for FingerJointSettings {
@@ -104,20 +104,20 @@ impl Default for FingerJointSettings {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BoxParameters {
-    pub x: f32,
-    pub y: f32,
-    pub h: f32,
-    pub thickness: f32,
+    pub x: f64,
+    pub y: f64,
+    pub h: f64,
+    pub thickness: f64,
     pub outside: bool,
     pub box_type: BoxType,
     pub finger_joint: FingerJointSettings,
-    pub burn: f32,
+    pub burn: f64,
     pub laser_passes: i32,
-    pub z_step_down: f32,
+    pub z_step_down: f64,
     pub laser_power: i32,
-    pub feed_rate: f32,
-    pub offset_x: f32,
-    pub offset_y: f32,
+    pub feed_rate: f64,
+    pub offset_x: f64,
+    pub offset_y: f64,
     pub dividers_x: u32,
     pub dividers_y: u32,
     pub optimize_layout: bool,
@@ -164,12 +164,12 @@ impl Default for BoxParameters {
 
 #[derive(Debug, Clone)]
 pub struct Point {
-    pub x: f32,
-    pub y: f32,
+    pub x: f64,
+    pub y: f64,
 }
 
 impl Point {
-    pub fn new(x: f32, y: f32) -> Self {
+    pub fn new(x: f64, y: f64) -> Self {
         Self { x, y }
     }
 }

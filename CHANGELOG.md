@@ -13,6 +13,7 @@ All notable changes to this project are documented here. The format follows
 ### Changed
 - **Logo shows 6**: the app icon, the in-app logo and the help logo show "6" instead of "5"; the 256 px app icon (Linux packages, Flatpak, macOS `.icns`) is now rendered from `assets/pictures/gcodekit6-design.svg`, so it is the flat logo rather than the old isometric bitmap
 - **Pre-commit hook leaves tests to CI**: `.githooks/pre-commit` runs `cargo fmt --check` and the CI clippy command (`--workspace --all-targets -D warnings -W clippy::unwrap_used`); the test suite runs in CI instead of on every commit
+- **Remaining dimension fields are `f64`**: the Tabbed Box, bitmap engraving (camtools engraver, designer image engraver, bitmap preset), Gerber and Excellon lengths, feeds and offsets, the designer stock (`.gckd` stock size, safe Z and origin), the CAM preset lengths and the Machine Control jog step, feed and travel are `f64` mm (owner decision OD-2), and the casts at their uses are gone. G-code is unchanged; presets now save lengths as typed (`12.7` instead of `12.699999809265137`), and files written by older versions load as before
 
 ### Fixed
 - **Flatpak upgrade keeps settings**: the Flatpak build reads the `com.github.thawkins.gcodekit5` sandbox (`~/.var/app/com.github.thawkins.gcodekit5`, read-only) and copies its `gcodekit5` config and data folders to GCodeKit6's on first start; the old folders are left unchanged

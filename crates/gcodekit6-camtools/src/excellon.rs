@@ -413,7 +413,7 @@ pub fn append_drill_program(
         anyhow::bail!("Feed rate must be greater than 0");
     }
     let safe_z = params.safe_z;
-    let at = |x: f64, y: f64| (x as f32 + params.offset_x, y as f32 + params.offset_y);
+    let at = |x: f64, y: f64| (x + params.offset_x, y + params.offset_y);
     for group in drill.tool_groups() {
         let size = group
             .diameter

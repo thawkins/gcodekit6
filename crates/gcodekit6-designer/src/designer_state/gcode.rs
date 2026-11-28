@@ -31,7 +31,7 @@ impl DesignerState {
         let stock_thickness = self
             .stock_material
             .as_ref()
-            .map(|s| s.thickness as f64)
+            .map(|s| s.thickness)
             .unwrap_or(10.0);
         stock_thickness - shape.start_depth
     }
@@ -56,7 +56,7 @@ impl DesignerState {
         let safe_z = self
             .stock_material
             .as_ref()
-            .map(|s| s.safe_z as f64)
+            .map(|s| s.safe_z)
             .unwrap_or(10.0);
 
         let mut violating_count = 0usize;
@@ -91,7 +91,7 @@ impl DesignerState {
         let safe_z = self
             .stock_material
             .as_ref()
-            .map(|s| s.safe_z as f64)
+            .map(|s| s.safe_z)
             .unwrap_or(10.0);
         let mut gcode_gen = ToolpathToGcode::new(safe_z)
             .with_continuous_z_between_passes(self.tool_settings.continuous_z_between_passes);
@@ -347,7 +347,7 @@ impl DesignerState {
                     let stock_top_z = self
                         .stock_material
                         .as_ref()
-                        .map(|s| s.thickness as f64)
+                        .map(|s| s.thickness)
                         .unwrap_or(10.0);
                     let object_final_z = self.effective_cnc_start_depth_from_shape(shape);
                     (stock_top_z - object_final_z).max(0.0)

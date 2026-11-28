@@ -25,13 +25,13 @@ fn outlines(p: BoxParameters) -> Vec<Vec<Point>> {
         .collect()
 }
 
-fn cross(o: &Point, a: &Point, b: &Point) -> f32 {
+fn cross(o: &Point, a: &Point, b: &Point) -> f64 {
     (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x)
 }
 
 /// Segments `ab` and `cd` cross or touch (collinear overlap included).
 fn segments_meet(a: &Point, b: &Point, c: &Point, d: &Point) -> bool {
-    const EPS: f32 = 1e-4;
+    const EPS: f64 = 1e-4;
     let on = |p: &Point, q: &Point, r: &Point| {
         r.x >= p.x.min(q.x) - EPS
             && r.x <= p.x.max(q.x) + EPS
@@ -133,14 +133,14 @@ fn test_tabbed_box_finger_styles_change_the_outline() {
 
 /// The x-ranges where an open edge path is crossed by the line `y = level`, with gaps
 /// narrower than `merge` (a slit inside one finger) closed up.
-fn cross_section(path: &[Point], level: f32, merge: f32) -> Vec<(f32, f32)> {
-    let mut xs: Vec<f32> = path
+fn cross_section(path: &[Point], level: f64, merge: f64) -> Vec<(f64, f64)> {
+    let mut xs: Vec<f64> = path
         .windows(2)
         .filter(|w| (w[0].y - level) * (w[1].y - level) < 0.0)
         .map(|w| w[0].x + (level - w[0].y) / (w[1].y - w[0].y) * (w[1].x - w[0].x))
         .collect();
-    xs.sort_by(f32::total_cmp);
-    let mut ranges: Vec<(f32, f32)> = Vec::new();
+    xs.sort_by(f64::total_cmp);
+    let mut ranges: Vec<(f64, f64)> = Vec::new();
     for pair in xs.chunks(2) {
         if let [a, b] = pair {
             match ranges.last_mut() {

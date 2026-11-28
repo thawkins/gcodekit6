@@ -85,19 +85,19 @@ pub fn clean_polyline(mut pline: Polyline<f64>) -> Polyline<f64> {
 #[serde(default)]
 pub struct GerberParameters {
     pub layer_type: GerberLayerType,
-    pub feed_rate: f32,
-    pub spindle_speed: f32,
-    pub board_width: f32,
-    pub board_height: f32,
-    pub offset_x: f32,
-    pub offset_y: f32,
+    pub feed_rate: f64,
+    pub spindle_speed: f64,
+    pub board_width: f64,
+    pub board_height: f64,
+    pub offset_x: f64,
+    pub offset_y: f64,
     pub generate_alignment_holes: bool,
-    pub alignment_hole_diameter: f32,
-    pub alignment_hole_margin: f32,
+    pub alignment_hole_diameter: f64,
+    pub alignment_hole_margin: f64,
     /// Z depth of the alignment holes (mm, negative = below the surface). Separate from
     /// `cut_depth`, which is only the isolation depth; holes normally go through the board.
-    pub alignment_hole_depth: f32,
-    pub cut_depth: f32,
+    pub alignment_hole_depth: f64,
+    pub cut_depth: f64,
     /// Board Outline layer only: the most Z each pass of the outline cut goes down (mm,
     /// positive). The outline is cut in passes from the surface to `cut_depth`; the default
     /// cuts thin stock (down to 0.5 mm) in a single pass. Left out of a preset file when it
@@ -106,10 +106,10 @@ pub struct GerberParameters {
         default = "default_outline_step_down",
         skip_serializing_if = "is_default_outline_step_down"
     )]
-    pub outline_step_down: f32,
-    pub safe_z: f32,
-    pub tool_diameter: f32,
-    pub isolation_width: f32,
+    pub outline_step_down: f64,
+    pub safe_z: f64,
+    pub tool_diameter: f64,
+    pub isolation_width: f64,
     pub rubout: bool,
     pub use_board_outline: bool,
     pub directory: Option<String>,
@@ -123,13 +123,13 @@ fn default_gerber_num_axes() -> u8 {
 }
 
 /// Default [`GerberParameters::outline_step_down`] (mm).
-const DEFAULT_OUTLINE_STEP_DOWN: f32 = 0.5;
+const DEFAULT_OUTLINE_STEP_DOWN: f64 = 0.5;
 
-fn default_outline_step_down() -> f32 {
+fn default_outline_step_down() -> f64 {
     DEFAULT_OUTLINE_STEP_DOWN
 }
 
-fn is_default_outline_step_down(v: &f32) -> bool {
+fn is_default_outline_step_down(v: &f64) -> bool {
     *v == DEFAULT_OUTLINE_STEP_DOWN
 }
 
@@ -1236,7 +1236,7 @@ impl GerberConverter {
             return Ok(());
         };
         let depths = Self::step_down_depths(params)?;
-        let tool_radius = f64::from(params.tool_diameter) / 2.0;
+        let tool_radius = params.tool_diameter / 2.0;
 
         // sketch_to_polylines emits each exterior followed by its own holes.
         let mut rings: Vec<(Polyline<f64>, Vec<Polyline<f64>>)> = Vec::new();
@@ -1297,7 +1297,7 @@ impl GerberConverter {
     ///
     /// # Errors
     /// A step-down that is not above 0 on a device with a Z axis.
-    fn step_down_depths(params: &GerberParameters) -> Result<Vec<f32>> {
+    fn step_down_depths(params: &GerberParameters) -> Result<Vec<f64>> {
         if params.num_axes < 3 {
             return Ok(vec![params.cut_depth]);
         }
@@ -1308,7 +1308,7 @@ impl GerberConverter {
         let total = -params.cut_depth;
         let passes = ((total / step).ceil() as usize).max(1);
         Ok((1..=passes)
-            .map(|n| -(step * n as f32).min(total))
+            .map(|n| -(step * n as f64).min(total))
             .collect())
     }
 
@@ -1323,7 +1323,7 @@ impl GerberConverter {
 
         // Offset
         let polylines = Self::sketch_to_polylines(&merged);
-        let isolation_offset = params.tool_diameter as f64 / 2.0 + params.isolation_width as f64;
+        let isolation_offset = params.tool_diameter / 2.0 + params.isolation_width;
 
         let mut isolation_paths = Vec::new();
         for (poly, is_hole) in polylines {
@@ -1403,7 +1403,7 @@ impl GerberConverter {
 
         // 2. Offset traces (Isolation)
         let polylines = Self::sketch_to_polylines(&merged);
-        let isolation_offset = params.tool_diameter as f64 / 2.0 + params.isolation_width as f64;
+        let isolation_offset = params.tool_diameter / 2.0 + params.isolation_width;
 
         let mut positive_sketch = Sketch::new();
         let mut negative_sketch = Sketch::new();
@@ -1454,7 +1454,7 @@ impl GerberConverter {
                 if params.use_board_outline {
                     warn!("No board outline file found; rubout uses the copper bounds");
                 }
-                let margin = isolation_offset + params.tool_diameter as f64;
+                let margin = isolation_offset + params.tool_diameter;
                 match Self::bounds_rectangle(&merged, margin) {
                     Some(rect) => rect,
                     None => return Ok(()),
@@ -1512,7 +1512,8 @@ impl GerberConverter {
             lyon_paths.push(builder.build());
         }
 
-        let spacing = params.tool_diameter * 0.8;
+        // The hatch is lyon geometry, which is `f32`.
+        let spacing = params.tool_diameter as f32 * 0.8;
         debug!("Generating hatch with spacing: {}", spacing);
         let mut hatch_lines = Vec::new();
         for path in lyon_paths {
@@ -1530,8 +1531,8 @@ impl GerberConverter {
             for event in path.iter() {
                 match event {
                     lyon::path::Event::Begin { at } => {
-                        let sx = at.x + params.offset_x;
-                        let sy = at.y + params.offset_y;
+                        let sx = f64::from(at.x) + params.offset_x;
+                        let sy = f64::from(at.y) + params.offset_y;
                         if has_z {
                             writeln!(gcode, "G0 Z{:.3}", params.safe_z)?;
                         }
@@ -1545,8 +1546,8 @@ impl GerberConverter {
                         }
                     }
                     lyon::path::Event::Line { to, .. } => {
-                        let tx = to.x + params.offset_x;
-                        let ty = to.y + params.offset_y;
+                        let tx = f64::from(to.x) + params.offset_x;
+                        let ty = f64::from(to.y) + params.offset_y;
                         writeln!(gcode, "G1 X{:.3} Y{:.3} F{:.1}", tx, ty, params.feed_rate)?;
                     }
                     _ => {}
@@ -1565,7 +1566,7 @@ impl GerberConverter {
     fn polylines_to_gcode(
         params: &GerberParameters,
         paths: Vec<Polyline<f64>>,
-        depths: &[f32],
+        depths: &[f64],
         gcode: &mut String,
     ) -> Result<()> {
         let has_z = params.num_axes >= 3;
@@ -1575,8 +1576,8 @@ impl GerberConverter {
             }
 
             let start = path.at(0).pos();
-            let sx = start.x as f32 + params.offset_x;
-            let sy = start.y as f32 + params.offset_y;
+            let sx = start.x + params.offset_x;
+            let sy = start.y + params.offset_y;
 
             if has_z {
                 writeln!(gcode, "G0 Z{:.3}", params.safe_z)?;
@@ -1585,8 +1586,8 @@ impl GerberConverter {
 
             let emit_segment =
                 |gcode: &mut String, p1: PlineVertex<f64>, p2: PlineVertex<f64>| -> Result<()> {
-                    let tx = p2.x as f32 + params.offset_x;
-                    let ty = p2.y as f32 + params.offset_y;
+                    let tx = p2.x + params.offset_x;
+                    let ty = p2.y + params.offset_y;
 
                     if p1.bulge.abs() > 1e-5 {
                         // Linearize arc
@@ -1637,8 +1638,8 @@ impl GerberConverter {
                             let ax = cx + radius.abs() * angle.cos();
                             let ay = cy + radius.abs() * angle.sin();
 
-                            let tax = ax as f32 + params.offset_x;
-                            let tay = ay as f32 + params.offset_y;
+                            let tax = ax + params.offset_x;
+                            let tay = ay + params.offset_y;
                             writeln!(gcode, "G1 X{:.3} Y{:.3}", tax, tay)?;
                         }
                     } else {

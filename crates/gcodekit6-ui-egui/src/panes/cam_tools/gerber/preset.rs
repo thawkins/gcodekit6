@@ -35,7 +35,7 @@ impl GerberParams {
     pub fn apply_preset(&mut self, json: &str) -> Result<(), String> {
         let p: GerberParameters = serde_json::from_str(json).map_err(|e| e.to_string())?;
         let units = self.units;
-        let len = |mm: f32| common::format_len(f64::from(mm), units);
+        let len = |mm: f64| common::format_len(mm, units);
         self.layer_type = p.layer_type;
         self.feed_rate = p.feed_rate.to_string();
         self.spindle_speed = p.spindle_speed.to_string();

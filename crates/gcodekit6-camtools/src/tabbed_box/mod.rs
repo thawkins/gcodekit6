@@ -10,9 +10,9 @@ pub use types::*;
 
 #[derive(Clone, Copy, Debug)]
 struct LayoutCursor {
-    x: f32,
-    y: f32,
-    spacing: f32,
+    x: f64,
+    y: f64,
+    spacing: f64,
 }
 
 /// The smallest box width, depth or height accepted (mm).
@@ -22,13 +22,13 @@ pub const MIN_THICKNESS_MM: f64 = 1.0;
 /// The thickest material accepted (mm).
 pub const MAX_THICKNESS_MM: f64 = 20.0;
 /// The smallest accepted magnitude of finger plus space (in thicknesses).
-pub const MIN_JOINT_WIDTH: f32 = 0.1;
+pub const MIN_JOINT_WIDTH: f64 = 0.1;
 /// The fewest laser passes accepted.
 pub const MIN_LASER_PASSES: f64 = 1.0;
 /// The smallest gap left between neighbouring panels (mm).
-pub const MIN_PANEL_GAP_MM: f32 = 5.0;
+pub const MIN_PANEL_GAP_MM: f64 = 5.0;
 /// The material left standing between two neighbouring cuts (mm).
-const PANEL_WEB_MM: f32 = 1.0;
+const PANEL_WEB_MM: f64 = 1.0;
 
 /// The gap between neighbouring panels for a burn (tool or beam diameter) of `burn` mm.
 ///
@@ -43,12 +43,12 @@ const PANEL_WEB_MM: f32 = 1.0;
 ///
 /// # Returns
 /// The gap in mm.
-pub fn panel_gap(burn: f32) -> f32 {
+pub fn panel_gap(burn: f64) -> f64 {
     MIN_PANEL_GAP_MM.max(2.0 * burn + PANEL_WEB_MM)
 }
 
 impl LayoutCursor {
-    fn new(spacing: f32) -> Self {
+    fn new(spacing: f64) -> Self {
         Self {
             x: 0.0,
             y: 0.0,
@@ -56,13 +56,13 @@ impl LayoutCursor {
         }
     }
 
-    fn place(&mut self, width: f32) -> (f32, f32) {
+    fn place(&mut self, width: f64) -> (f64, f64) {
         let position = (self.x, self.y);
         self.x += width + self.spacing;
         position
     }
 
-    fn next_row(&mut self, height: f32) {
+    fn next_row(&mut self, height: f64) {
         self.y += height + self.spacing;
         self.x = 0.0;
     }
@@ -70,10 +70,10 @@ impl LayoutCursor {
 
 pub struct TabbedBoxMaker {
     params: BoxParameters,
-    x: f32,
-    y: f32,
-    h: f32,
-    t: f32,
+    x: f64,
+    y: f64,
+    h: f64,
+    t: f64,
     paths: Vec<Vec<Point>>,
     /// Human-readable label of each entry in `paths` (same indices).
     path_labels: Vec<String>,
@@ -167,7 +167,7 @@ impl TabbedBoxMaker {
                 let clear = relief + 2.0 * finger_styles::SNAP_OUTER_SLIT * t;
                 let too_close = margins.iter().any(|&(n, m)| {
                     let nearest = match n {
-                        0 => f32::INFINITY,
+                        0 => f64::INFINITY,
                         1 => m - finger_styles::SNAP_OUTER_SLIT * t,
                         _ => m + finger - finger_styles::SNAP_SLIT_WALL * t,
                     };
@@ -188,7 +188,7 @@ impl TabbedBoxMaker {
     /// negative outside the panel), as the panels use it: `positive` for fingers, else
     /// notches. For tests that compare mating edges.
     #[doc(hidden)]
-    pub fn finger_edge(&self, length: f32, positive: bool) -> Vec<Point> {
+    pub fn finger_edge(&self, length: f64, positive: bool) -> Vec<Point> {
         self.draw_finger_edge(length, positive, true)
     }
 
@@ -224,15 +224,11 @@ impl TabbedBoxMaker {
             return Err("Z step down must not be negative".to_string());
         }
 
-        if params.x < MIN_SIDE_MM as f32
-            || params.y < MIN_SIDE_MM as f32
-            || params.h < MIN_SIDE_MM as f32
-        {
+        if params.x < MIN_SIDE_MM || params.y < MIN_SIDE_MM || params.h < MIN_SIDE_MM {
             return Err("All dimensions must be at least 20mm".to_string());
         }
 
-        if params.thickness < MIN_THICKNESS_MM as f32 || params.thickness > MAX_THICKNESS_MM as f32
-        {
+        if params.thickness < MIN_THICKNESS_MM || params.thickness > MAX_THICKNESS_MM {
             return Err("Material thickness must be between 1mm and 20mm".to_string());
         }
 
@@ -271,12 +267,12 @@ impl TabbedBoxMaker {
         Ok(())
     }
 
-    fn adjust_size(size: f32, thickness: f32) -> f32 {
+    fn adjust_size(size: f64, thickness: f64) -> f64 {
         size - 2.0 * thickness
     }
 
     /// Calculate number of fingers and leftover space for a given length
-    pub fn calc_fingers(&self, length: f32) -> (usize, f32) {
+    pub fn calc_fingers(&self, length: f64) -> (usize, f64) {
         let settings = &self.params.finger_joint;
         let t = self.t;
 
@@ -299,7 +295,7 @@ impl TabbedBoxMaker {
 
         // Calculate leftover space
         let leftover = if fingers > 0 {
-            length - (fingers as f32) * (space + finger) + space
+            length - (fingers as f64) * (space + finger) + space
         } else {
             length
         };
@@ -311,7 +307,7 @@ impl TabbedBoxMaker {
     ///
     /// `styled` false draws plain fingers whatever the style (an edge that gets half-lap
     /// slots cut into it afterwards).
-    fn draw_finger_edge(&self, length: f32, positive: bool, styled: bool) -> Vec<Point> {
+    fn draw_finger_edge(&self, length: f64, positive: bool, styled: bool) -> Vec<Point> {
         let mut path = Vec::new();
         let settings = &self.params.finger_joint;
         let t = self.t;
@@ -358,7 +354,7 @@ impl TabbedBoxMaker {
 
         // Springs, Barbs and Snap reshape the fingers only; the notches stay plain.
         let finger_h = base_y - tip_y;
-        let shape = |i: usize| -> Option<Vec<(f32, f32)>> {
+        let shape = |i: usize| -> Option<Vec<(f64, f64)>> {
             if !positive || !styled {
                 return None;
             }
@@ -379,7 +375,7 @@ impl TabbedBoxMaker {
 
         // Helper for dimpled side
         // Draws a side from (x, y1) to (x, y2) with a dimple if configured
-        let draw_side = |path: &mut Vec<Point>, x: f32, y1: f32, y2: f32| {
+        let draw_side = |path: &mut Vec<Point>, x: f64, y1: f64, y2: f64| {
             if dimple_h > 0.0 && dimple_l > 0.0 && (y2 - y1).abs() > dimple_l {
                 let mid_y = (y1 + y2) / 2.0;
                 let half_l = dimple_l / 2.0;
@@ -531,11 +527,11 @@ impl TabbedBoxMaker {
     /// Edges: [0]=bottom, [1]=right, [2]=top, [3]=left
     fn draw_rectangular_wall(
         &self,
-        width: f32,
-        height: f32,
+        width: f64,
+        height: f64,
         edges: &str,
-        start_x: f32,
-        start_y: f32,
+        start_x: f64,
+        start_y: f64,
     ) -> Vec<Point> {
         let mut path: Vec<Point> = Vec::new();
         let edge_chars: Vec<char> = edges.chars().collect();
@@ -660,10 +656,10 @@ impl TabbedBoxMaker {
 
         struct Item {
             group_index: usize,
-            width: f32,
-            height: f32,
-            original_min_x: f32,
-            original_min_y: f32,
+            width: f64,
+            height: f64,
+            original_min_x: f64,
+            original_min_y: f64,
         }
 
         let mut items = Vec::new();
@@ -681,10 +677,10 @@ impl TabbedBoxMaker {
                 continue;
             }
 
-            let mut min_x = f32::INFINITY;
-            let mut max_x = f32::NEG_INFINITY;
-            let mut min_y = f32::INFINITY;
-            let mut max_y = f32::NEG_INFINITY;
+            let mut min_x = f64::INFINITY;
+            let mut max_x = f64::NEG_INFINITY;
+            let mut min_y = f64::INFINITY;
+            let mut max_y = f64::NEG_INFINITY;
 
             for &path_idx in group {
                 if path_idx >= self.paths.len() {
@@ -695,10 +691,10 @@ impl TabbedBoxMaker {
                     continue;
                 }
 
-                let p_min_x = path.iter().map(|p| p.x).fold(f32::INFINITY, f32::min);
-                let p_max_x = path.iter().map(|p| p.x).fold(f32::NEG_INFINITY, f32::max);
-                let p_min_y = path.iter().map(|p| p.y).fold(f32::INFINITY, f32::min);
-                let p_max_y = path.iter().map(|p| p.y).fold(f32::NEG_INFINITY, f32::max);
+                let p_min_x = path.iter().map(|p| p.x).fold(f64::INFINITY, f64::min);
+                let p_max_x = path.iter().map(|p| p.x).fold(f64::NEG_INFINITY, f64::max);
+                let p_min_y = path.iter().map(|p| p.y).fold(f64::INFINITY, f64::min);
+                let p_max_y = path.iter().map(|p| p.y).fold(f64::NEG_INFINITY, f64::max);
 
                 min_x = min_x.min(p_min_x);
                 max_x = max_x.max(p_max_x);
@@ -706,7 +702,7 @@ impl TabbedBoxMaker {
                 max_y = max_y.max(p_max_y);
             }
 
-            if min_x == f32::INFINITY {
+            if min_x == f64::INFINITY {
                 continue;
             }
 
@@ -719,22 +715,20 @@ impl TabbedBoxMaker {
             });
         }
 
-        // Sort by height descending
-        items.sort_by(|a, b| {
-            b.height
-                .partial_cmp(&a.height)
-                .unwrap_or(std::cmp::Ordering::Equal)
-        });
+        // Sort by height descending. Heights within 0.1 um of each other (panels of one size
+        // whose outlines differ only by rounding) are a tie and keep their generation order;
+        // the sort is stable.
+        items.sort_by_key(|item| std::cmp::Reverse((item.height * 1e4).round() as i64));
 
         // Estimate target width as sqrt of total area * 1.5 (aspect ratio preference)
         // Or just ensure it's at least as wide as the widest item
-        let total_area: f32 = items.iter().map(|i| i.width * i.height).sum();
-        let max_item_width = items.iter().map(|i| i.width).fold(0.0, f32::max);
+        let total_area: f64 = items.iter().map(|i| i.width * i.height).sum();
+        let max_item_width = items.iter().map(|i| i.width).fold(0.0, f64::max);
         let target_width = (total_area.sqrt() * 1.5).max(max_item_width);
 
         let mut current_x = 0.0;
         let mut current_y = 0.0;
-        let mut row_height: f32 = 0.0;
+        let mut row_height: f64 = 0.0;
 
         // Store new positions: group_index -> (x, y)
         let mut new_positions = vec![(0.0, 0.0); self.path_groups.len()];
@@ -774,9 +768,9 @@ impl TabbedBoxMaker {
     fn apply_slots_to_path(
         &self,
         path: Vec<Point>,
-        slots: &[f32],
-        depth: f32,
-        slot_width: f32,
+        slots: &[f64],
+        depth: f64,
+        slot_width: f64,
     ) -> Vec<Point> {
         let mut new_path = Vec::new();
         let mut path_iter = path.into_iter();
@@ -909,12 +903,12 @@ impl TabbedBoxMaker {
     #[allow(clippy::too_many_arguments)]
     fn draw_divider(
         &self,
-        width: f32,
-        height: f32,
+        width: f64,
+        height: f64,
         edges: &str,
-        start_x: f32,
-        start_y: f32,
-        slots: &[f32],
+        start_x: f64,
+        start_y: f64,
+        slots: &[f64],
         slot_from_top: bool,
     ) -> Vec<Point> {
         let mut path: Vec<Point> = Vec::new();
@@ -1016,10 +1010,10 @@ impl TabbedBoxMaker {
 
     fn draw_divider_slots(
         &mut self,
-        start_x: f32,
-        start_y: f32,
-        length: f32,
-        thickness: f32,
+        start_x: f64,
+        start_y: f64,
+        length: f64,
+        thickness: f64,
         vertical: bool,
     ) {
         let settings = &self.params.finger_joint;
@@ -1068,19 +1062,19 @@ impl TabbedBoxMaker {
     fn add_divider_slots(
         &mut self,
         count: u32,
-        total_length: f32,
-        start_x: f32,
-        start_y: f32,
-        slot_depth: f32,
+        total_length: f64,
+        start_x: f64,
+        start_y: f64,
+        slot_depth: f64,
         vertical: bool,
     ) {
         if count == 0 {
             return;
         }
 
-        let spacing = total_length / (count as f32 + 1.0);
+        let spacing = total_length / (count as f64 + 1.0);
         for idx in 1..=count {
-            let offset = spacing * idx as f32;
+            let offset = spacing * idx as f64;
             if vertical {
                 self.draw_divider_slots(start_x + offset, start_y, slot_depth, self.t, true);
             } else {
@@ -1254,17 +1248,17 @@ impl TabbedBoxMaker {
         // Calculate slot positions
         let mut slots_x = Vec::new(); // For Y-dividers (spanning X)
         if self.params.dividers_x > 0 {
-            let spacing_x = x / (self.params.dividers_x as f32 + 1.0);
+            let spacing_x = x / (self.params.dividers_x as f64 + 1.0);
             for i in 1..=self.params.dividers_x {
-                slots_x.push(i as f32 * spacing_x);
+                slots_x.push(i as f64 * spacing_x);
             }
         }
 
         let mut slots_y = Vec::new(); // For X-dividers (spanning Y)
         if self.params.dividers_y > 0 {
-            let spacing_y = y / (self.params.dividers_y as f32 + 1.0);
+            let spacing_y = y / (self.params.dividers_y as f64 + 1.0);
             for i in 1..=self.params.dividers_y {
-                slots_y.push(i as f32 * spacing_y);
+                slots_y.push(i as f64 * spacing_y);
             }
         }
 
@@ -1311,8 +1305,8 @@ impl TabbedBoxMaker {
         // Normalize so (offset_x, offset_y) is always the minimum XY.
         // Without this, finger joints can protrude into negative coordinates even with 0 offsets.
         // Note: guard against accidental NaNs preventing normalization.
-        let mut min_x = f32::INFINITY;
-        let mut min_y = f32::INFINITY;
+        let mut min_x = f64::INFINITY;
+        let mut min_y = f64::INFINITY;
         for path in &self.paths {
             for p in path {
                 if p.x.is_finite() {
@@ -1435,8 +1429,8 @@ impl TabbedBoxMaker {
         // Ensure emitted coordinates honour user offsets (offset_x/offset_y represent desired minimum XY).
         // This also guards against any upstream layout producing negative min bounds.
         let (shift_x, shift_y) = {
-            let mut min_x = f32::INFINITY;
-            let mut min_y = f32::INFINITY;
+            let mut min_x = f64::INFINITY;
+            let mut min_y = f64::INFINITY;
             for path in &self.paths {
                 for p in path {
                     if p.x.is_finite() {
@@ -1487,7 +1481,7 @@ impl TabbedBoxMaker {
                 ));
 
                 for pass_num in 1..=self.params.laser_passes {
-                    let z_depth = -(pass_num as f32 - 1.0) * self.params.z_step_down;
+                    let z_depth = -(pass_num as f64 - 1.0) * self.params.z_step_down;
 
                     // Every pass sets its own height (pass 1 is the work Z0 focus height),
                     // so no panel inherits the previous panel's deepest pass.

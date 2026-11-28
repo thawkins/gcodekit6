@@ -147,3 +147,49 @@ fn test_format_1_1_file_without_new_fields_loads() -> anyhow::Result<()> {
     assert_eq!(stock, Some((150.0, (0.0, 0.0, 0.0))));
     Ok(())
 }
+
+/// A file saved while the stock fields were `f32` loads into the `f64` fields: the values an
+/// `f32` wrote (shortest `f32` text, as serde writes it) come back as those decimals.
+#[test]
+fn test_file_with_f32_stock_fields_loads_as_f64() -> anyhow::Result<()> {
+    let path = scratch("f32stock")?.join("old.gckd");
+    let json = r#"{
+  "version": "1.1",
+  "metadata": {
+    "name": "f32",
+    "created": "2024-05-01T00:00:00Z",
+    "modified": "2024-05-01T00:00:00Z"
+  },
+  "viewport": { "zoom": 1.0, "pan_x": 0.0, "pan_y": 0.0 },
+  "shapes": [],
+  "toolpath_params": {
+    "stock_width": 127.1,
+    "stock_height": 101.6,
+    "stock_thickness": 6.35,
+    "safe_z_height": 11.35,
+    "stock_origin_x": 0.1016,
+    "stock_origin_y": -2.54,
+    "stock_origin_z": 0.5
+  }
+}"#;
+    std::fs::write(&path, json)?;
+    let params = DesignFile::load_from_file(&path)?.toolpath_params;
+    assert_eq!(params.stock_width, 127.1);
+    assert_eq!(params.stock_height, 101.6);
+    assert_eq!(params.stock_thickness, 6.35);
+    assert_eq!(params.safe_z_height, 11.35);
+    let origin = (
+        params.stock_origin_x,
+        params.stock_origin_y,
+        params.stock_origin_z,
+    );
+    assert_eq!(origin, (0.1016, -2.54, 0.5));
+    let mut state = DesignerState::new();
+    assert!(state.load_from_file_report(&path)?.is_clean());
+    let stock = state
+        .stock_material
+        .as_ref()
+        .map(|s| (s.width, s.thickness, s.origin));
+    assert_eq!(stock, Some((127.1, 6.35, (0.1016, -2.54, 0.5))));
+    Ok(())
+}

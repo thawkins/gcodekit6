@@ -39,7 +39,7 @@ pub use page::show;
 ///
 /// It is not a field on the page and not stored in presets. The image is not moved for it,
 /// so at an image origin of 0 the run-up reaches X/Y -2.5 mm with the laser off.
-pub const OVERSCAN_MM: f32 = 2.5;
+pub const OVERSCAN_MM: f64 = 2.5;
 
 /// Field label msgids.
 const IMAGE_PATH: &str = n_!("Image Path:");
@@ -90,7 +90,7 @@ pub fn refusal_text(error: &str, tr: &gcodekit6_app::i18n::Translator) -> String
 }
 
 /// The most pixels one engraved line may have (width times pixels per mm).
-pub const MAX_LINE_PIXELS: f32 = 10_000.0;
+pub const MAX_LINE_PIXELS: f64 = 10_000.0;
 /// The most pixels the engraving may have in all (width times height in pixels).
 pub const MAX_PIXELS: f64 = 25_000_000.0;
 
@@ -302,7 +302,7 @@ impl BitmapEngravingParams {
             if min_power > max_power {
                 errors.push(FieldError::field(MIN_POWER, MIN_ABOVE_MAX));
             }
-            if (width as f32) * (pixels_per_mm as f32) > MAX_LINE_PIXELS {
+            if width * pixels_per_mm > MAX_LINE_PIXELS {
                 errors.push(FieldError::page(TOO_LARGE));
             }
         }
@@ -314,16 +314,16 @@ impl BitmapEngravingParams {
             return Err(errors);
         };
         let params = EngravingParameters {
-            width_mm: width as f32,
+            width_mm: width,
             height_mm: None,
-            feed_rate: feed_rate as f32,
-            travel_rate: travel_rate as f32,
+            feed_rate,
+            travel_rate,
             min_power: min_power as f32,
             max_power: max_power as f32,
-            pixels_per_mm: pixels_per_mm as f32,
+            pixels_per_mm,
             scan_direction: self.scan_direction,
             bidirectional: self.bidirectional,
-            line_spacing: line_spacing as f32,
+            line_spacing,
             power_scale: power_scale as f32,
             transformations: ImageTransformations {
                 mirror_x: self.mirror_x,
@@ -334,8 +334,8 @@ impl BitmapEngravingParams {
                 halftone_threshold: threshold as u8,
                 invert: self.invert,
             },
-            offset_x: offset_x as f32,
-            offset_y: offset_y as f32,
+            offset_x,
+            offset_y,
             num_axes: self.num_axes,
             home_before_job: self.home_before,
             overscan_mm: OVERSCAN_MM,
@@ -378,8 +378,13 @@ impl BitmapEngravingParams {
     pub fn preset_json(&self, tr: &Translator) -> Result<String, String> {
         let u = self.units;
         let preset = (|| {
-            // These are parsed as `f32` directly.
+            // Feeds and the resolution are parsed as `f64`, powers as `f32`, directly.
             let number = |label: &'static str, text: &str| {
+                text.trim()
+                    .parse::<f64>()
+                    .map_err(|_| FieldError::field(label, common::NOT_A_NUMBER))
+            };
+            let power = |label: &'static str, text: &str| {
                 text.trim()
                     .parse::<f32>()
                     .map_err(|_| FieldError::field(label, common::NOT_A_NUMBER))
@@ -398,11 +403,11 @@ impl BitmapEngravingParams {
                 width_mm: common::preset_len(WIDTH, &self.width, u)?,
                 feed_rate: number(FEED_RATE, &self.feed_rate)?,
                 travel_rate: number(TRAVEL_RATE, &self.travel_rate)?,
-                min_power: number(MIN_POWER, &self.min_power)?,
-                max_power: number(MAX_POWER, &self.max_power)?,
+                min_power: power(MIN_POWER, &self.min_power)?,
+                max_power: power(MAX_POWER, &self.max_power)?,
                 pixels_per_mm: number(PIXELS_PER_MM, &self.pixels_per_mm)?,
                 line_spacing: number(LINE_SPACING, &self.line_spacing)?,
-                power_scale: number(POWER_SCALE, &self.power_scale)?,
+                power_scale: power(POWER_SCALE, &self.power_scale)?,
                 offset_x: common::preset_len(OFFSET_X, &self.offset_x, u)?,
                 offset_y: common::preset_len(OFFSET_Y, &self.offset_y, u)?,
                 scan_direction: scan_id(self.scan_direction).to_string(),
@@ -449,7 +454,7 @@ impl BitmapEngravingParams {
         if !p.image_path.is_empty() {
             self.image = Some(PathBuf::from(&p.image_path));
         }
-        self.width = common::format_len(f64::from(p.width_mm), u);
+        self.width = common::format_len(p.width_mm, u);
         self.feed_rate = p.feed_rate.to_string();
         self.travel_rate = p.travel_rate.to_string();
         self.min_power = p.min_power.to_string();
@@ -457,8 +462,8 @@ impl BitmapEngravingParams {
         self.pixels_per_mm = p.pixels_per_mm.to_string();
         self.line_spacing = p.line_spacing.to_string();
         self.power_scale = p.power_scale.to_string();
-        self.offset_x = common::format_len(f64::from(p.offset_x), u);
-        self.offset_y = common::format_len(f64::from(p.offset_y), u);
+        self.offset_x = common::format_len(p.offset_x, u);
+        self.offset_y = common::format_len(p.offset_y, u);
         if let Some(v) = scan_from_id(&p.scan_direction) {
             self.scan_direction = v;
         }

@@ -103,33 +103,33 @@ impl Default for ImageTransformations {
 #[derive(Debug, Clone)]
 pub struct EngravingParameters {
     /// Output width in millimeters
-    pub width_mm: f32,
+    pub width_mm: f64,
     /// Output height in millimeters (auto-calculated if None based on aspect ratio)
-    pub height_mm: Option<f32>,
+    pub height_mm: Option<f64>,
     /// Feed rate for engraving moves (mm/min)
-    pub feed_rate: f32,
+    pub feed_rate: f64,
     /// Travel feed rate for rapid moves (mm/min)
-    pub travel_rate: f32,
+    pub travel_rate: f64,
     /// Minimum laser power (0-100%)
     pub min_power: f32,
     /// Maximum laser power (0-100%)
     pub max_power: f32,
     /// Resolution in pixels per millimeter
-    pub pixels_per_mm: f32,
+    pub pixels_per_mm: f64,
     /// Scan direction
     pub scan_direction: ScanDirection,
     /// Use bidirectional scanning (faster but may reduce quality)
     pub bidirectional: bool,
     /// Line spacing multiplier (1.0 = normal, >1.0 = faster with lines)
-    pub line_spacing: f32,
+    pub line_spacing: f64,
     /// Laser power scale (0-1000 for GRBL S parameter)
     pub power_scale: f32,
     /// Image transformations (halftoning, mirroring, rotation)
     pub transformations: ImageTransformations,
     /// X position of the image's lower-left corner in work coordinates (mm)
-    pub offset_x: f32,
+    pub offset_x: f64,
     /// Y position of the image's lower-left corner in work coordinates (mm)
-    pub offset_y: f32,
+    pub offset_y: f64,
     /// Number of axes on the target device (default 3).
     pub num_axes: u8,
     /// Home (`$H`) before engraving, keeping the G54 work offsets (default `false`).
@@ -143,7 +143,7 @@ pub struct EngravingParameters {
     /// machine is at feed rate when the laser fires, and runs out `overscan_mm` past its last
     /// pixel, both at S0. The run-up is not clamped: at an image origin of 0 it reaches
     /// X/Y `-overscan_mm` with the laser off. `0.0` emits no run-up or run-out.
-    pub overscan_mm: f32,
+    pub overscan_mm: f64,
 }
 
 impl Default for EngravingParameters {
@@ -174,9 +174,9 @@ impl Default for EngravingParameters {
 #[derive(Debug, Clone, Copy)]
 enum ScanAxes {
     /// Scan along X at a fixed Y position (mm)
-    X { y: f32 },
+    X { y: f64 },
     /// Scan along Y at a fixed X position (mm)
-    Y { x: f32 },
+    Y { x: f64 },
 }
 
 /// Laser engraving tool for bitmap images
@@ -196,7 +196,7 @@ impl BitmapImageEngraver {
 
     /// Create a new laser engraver from a DynamicImage
     pub fn from_image(img: DynamicImage, params: EngravingParameters) -> Result<Self> {
-        let positive = |v: f32| v.is_finite() && v > 0.0;
+        let positive = |v: f64| v.is_finite() && v > 0.0;
         if !positive(params.width_mm) || params.height_mm.is_some_and(|h| !positive(h)) {
             anyhow::bail!("Output width and height must be positive");
         }
@@ -234,6 +234,7 @@ impl BitmapImageEngraver {
         let width = gray.width();
         let height = gray.height();
         let output_width = (params.width_mm * params.pixels_per_mm) as u32;
+        // The aspect ratio is pixel maths and stays `f32`, as the page's size check computes it.
         let aspect_ratio = height as f32 / width as f32;
         let output_height = if let Some(h) = params.height_mm {
             (h * params.pixels_per_mm) as u32
@@ -464,24 +465,24 @@ impl BitmapImageEngraver {
     }
 
     /// Get the output dimensions in millimeters
-    pub fn output_size_mm(&self) -> (f32, f32) {
+    pub fn output_size_mm(&self) -> (f64, f64) {
         (
-            self.output_width as f32 / self.params.pixels_per_mm,
-            self.output_height as f32 / self.params.pixels_per_mm,
+            self.output_width as f64 / self.params.pixels_per_mm,
+            self.output_height as f64 / self.params.pixels_per_mm,
         )
     }
 
     /// Estimate engraving time in seconds
-    pub fn estimate_time(&self) -> f32 {
+    pub fn estimate_time(&self) -> f64 {
         let (width_mm, height_mm) = self.output_size_mm();
         let line_spacing = 1.0 / self.params.pixels_per_mm * self.params.line_spacing;
         let num_lines = (height_mm / line_spacing) as u32;
 
-        let engrave_time = (width_mm * num_lines as f32) / self.params.feed_rate * 60.0;
+        let engrave_time = (width_mm * num_lines as f64) / self.params.feed_rate * 60.0;
         let travel_time = if self.params.bidirectional {
             (height_mm / self.params.travel_rate) * 60.0
         } else {
-            (width_mm * num_lines as f32) / self.params.travel_rate * 60.0
+            (width_mm * num_lines as f64) / self.params.travel_rate * 60.0
         };
 
         engrave_time + travel_time
@@ -572,9 +573,9 @@ impl BitmapImageEngraver {
     ///
     /// `line_spacing` is a multiplier of the pixel pitch, so lines are sampled every
     /// `line_spacing` pixels rather than stretching the image.
-    fn scan_line_layout(&self, pixel_count: u32) -> (u32, f32) {
-        let step_px = self.params.line_spacing.max(f32::EPSILON);
-        let lines = ((pixel_count as f32 / step_px).ceil() as u32).clamp(1, pixel_count.max(1));
+    fn scan_line_layout(&self, pixel_count: u32) -> (u32, f64) {
+        let step_px = self.params.line_spacing.max(f64::EPSILON);
+        let lines = ((pixel_count as f64 / step_px).ceil() as u32).clamp(1, pixel_count.max(1));
         (lines, step_px)
     }
 
@@ -588,8 +589,8 @@ impl BitmapImageEngraver {
         &self,
         gcode: &mut String,
         image: &GrayImage,
-        pixel_width: f32,
-        line_spacing: f32,
+        pixel_width: f64,
+        line_spacing: f64,
         progress_callback: &mut F,
     ) -> Result<()>
     where
@@ -612,12 +613,12 @@ impl BitmapImageEngraver {
                 progress_callback(progress);
             }
 
-            let sampled_px = ((line as f32 * step_px) as u32).min(across_px - 1);
-            let across_pos = line as f32 * line_spacing;
+            let sampled_px = ((line as f64 * step_px) as u32).min(across_px - 1);
+            let across_pos = line as f64 * line_spacing;
             let start_along = if forward {
                 0.0
             } else {
-                along_px as f32 * pixel_width
+                along_px as f64 * pixel_width
             };
 
             // Turn off laser before rapid movement
@@ -681,24 +682,24 @@ impl BitmapImageEngraver {
         gcode: &mut String,
         powers: &[u32],
         axes: ScanAxes,
-        pixel_width: f32,
+        pixel_width: f64,
         forward: bool,
     ) {
         let n = powers.len();
         let mut in_burn = false;
         let mut first_segment_of_burst = true;
         let mut current_power = 0u32;
-        let mut segment_start = 0.0f32;
-        let mut segment_end = 0.0f32;
+        let mut segment_start = 0.0f64;
+        let mut segment_end = 0.0f64;
 
         for i in 0..n {
             let k = if forward { i } else { n - 1 - i };
             let power_value = powers[k];
             // Entry and exit edges of pixel k in the direction of travel
             let (entry, exit) = if forward {
-                (k as f32 * pixel_width, (k + 1) as f32 * pixel_width)
+                (k as f64 * pixel_width, (k + 1) as f64 * pixel_width)
             } else {
-                ((k + 1) as f32 * pixel_width, k as f32 * pixel_width)
+                ((k + 1) as f64 * pixel_width, k as f64 * pixel_width)
             };
 
             if power_value > 0 {
@@ -752,7 +753,7 @@ impl BitmapImageEngraver {
 
     /// Emit the laser-off run-out of [`EngravingParameters::overscan_mm`] past `end`
     /// (image-relative) in the direction of travel; nothing when the overscan is 0.
-    fn emit_runout(&self, gcode: &mut String, end: f32, axes: ScanAxes, forward: bool) {
+    fn emit_runout(&self, gcode: &mut String, end: f64, axes: ScanAxes, forward: bool) {
         let overscan = self.params.overscan_mm;
         if overscan <= 0.0 {
             return;
@@ -773,8 +774,8 @@ impl BitmapImageEngraver {
     fn emit_segment(
         &self,
         gcode: &mut String,
-        start: f32,
-        end: f32,
+        start: f64,
+        end: f64,
         axes: ScanAxes,
         power: u32,
         is_new_segment: bool,

@@ -284,7 +284,7 @@ impl MachineControlPane {
             }));
         self.units = config.ui.measurement_system;
         self.feed_units = config.ui.feed_rate_units;
-        let travel = [machine.x_limit, machine.y_limit, machine.z_limit].map(|v| v as f32);
+        let travel = [machine.x_limit, machine.y_limit, machine.z_limit];
         self.limits = [
             machine.x_limit,
             machine.y_limit,
@@ -471,7 +471,7 @@ impl MachineControlPane {
     /// * `step_mm` - Jog step in mm.
     /// * `feed_mm_min` - Jog feed in mm/min.
     /// * `travel_mm` - Machine travel of X, Y and Z in mm.
-    pub fn with_jog(mut self, step_mm: f32, feed_mm_min: f32, travel_mm: [f32; 3]) -> Self {
+    pub fn with_jog(mut self, step_mm: f64, feed_mm_min: f64, travel_mm: [f64; 3]) -> Self {
         let inverted = self.jog.inverted();
         self.jog = jog::JogPanel::new(step_mm, feed_mm_min, travel_mm);
         self.jog.set_inverted(inverted);
@@ -519,7 +519,7 @@ impl MachineControlPane {
 
     /// Jogs `axis` one step in the direction of `sign`, only while the machine is idle (or
     /// jogging).
-    fn jog_step(&mut self, ctx: &PaneContext, axis: Axis, sign: f32) {
+    fn jog_step(&mut self, ctx: &PaneContext, axis: Axis, sign: f64) {
         if !ctx.machine().is_some_and(|m| m.jog_allowed()) {
             self.notice = Some(
                 ctx.tr
@@ -530,12 +530,13 @@ impl MachineControlPane {
         }
         let (step, feed) = (self.jog.step_mm(), self.jog.feed_mm_min());
         let distance = self.jog.directed(axis, sign * step);
-        self.with_controller(|c| c.jog(axis, distance, feed));
+        // The controller's jog line is written from `f32`.
+        self.with_controller(|c| c.jog(axis, distance as f32, feed as f32));
     }
 
     /// Runs a jog command: one step, or, when a key ran it in continuous mode, a hold that
     /// lasts while the key is down (as a held jog button), under the same guards.
-    fn jog_command(&mut self, ctx: &PaneContext, command: Command, axis: Axis, sign: f32) {
+    fn jog_command(&mut self, ctx: &PaneContext, command: Command, axis: Axis, sign: f64) {
         let Some(key) = ctx.jog_key().filter(|_| self.jog.continuous()) else {
             self.jog_step(ctx, axis, sign);
             return;
@@ -572,7 +573,7 @@ impl MachineControlPane {
                 axis,
                 distance_mm,
                 feed_mm_min,
-            } => self.with_controller(|c| c.jog(axis, distance_mm, feed_mm_min)),
+            } => self.with_controller(|c| c.jog(axis, distance_mm as f32, feed_mm_min as f32)),
             jog::Action::Cancel => {
                 self.with_controller(|c| c.realtime(RealtimeCommand::JogCancel));
             }

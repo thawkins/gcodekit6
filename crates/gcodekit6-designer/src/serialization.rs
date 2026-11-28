@@ -250,25 +250,25 @@ pub struct ToolpathParameters {
     #[serde(default = "default_continuous_z_between_passes")]
     pub continuous_z_between_passes: bool,
     #[serde(default = "default_stock_width")]
-    pub stock_width: f32,
+    pub stock_width: f64,
     #[serde(default = "default_stock_height")]
-    pub stock_height: f32,
+    pub stock_height: f64,
     #[serde(default = "default_stock_thickness")]
-    pub stock_thickness: f32,
+    pub stock_thickness: f64,
     #[serde(default = "default_safe_z_height")]
-    pub safe_z_height: f32,
+    pub safe_z_height: f64,
     /// Depth below the stock top where cutting starts, in mm (0 for files before it was saved).
     #[serde(default)]
     pub start_depth: f64,
     /// Stock origin X in mm (0 for files before it was saved).
     #[serde(default)]
-    pub stock_origin_x: f32,
+    pub stock_origin_x: f64,
     /// Stock origin Y in mm (0 for files before it was saved).
     #[serde(default)]
-    pub stock_origin_y: f32,
+    pub stock_origin_y: f64,
     /// Stock origin Z in mm (0 for files before it was saved).
     #[serde(default)]
-    pub stock_origin_z: f32,
+    pub stock_origin_z: f64,
 }
 
 fn default_feed_rate() -> f64 {
@@ -289,16 +289,16 @@ fn default_step_down() -> f64 {
 fn default_continuous_z_between_passes() -> bool {
     false
 }
-fn default_stock_width() -> f32 {
+fn default_stock_width() -> f64 {
     200.0
 }
-fn default_stock_height() -> f32 {
+fn default_stock_height() -> f64 {
     200.0
 }
-fn default_stock_thickness() -> f32 {
+fn default_stock_thickness() -> f64 {
     10.0
 }
-fn default_safe_z_height() -> f32 {
+fn default_safe_z_height() -> f64 {
     default_stock_thickness() + 5.0
 }
 

@@ -111,7 +111,14 @@ fn stock_seed(state: &DesignerState, serial: u64) -> StockSeed {
         stock: state
             .stock_material
             .as_ref()
-            .map(|stock| [stock.width, stock.height, stock.thickness]),
+            // The visualizer's simulation is `f32` geometry.
+            .map(|stock| {
+                [
+                    stock.width as f32,
+                    stock.height as f32,
+                    stock.thickness as f32,
+                ]
+            }),
         tool_diameter: state.tool_settings.tool_diameter as f32,
     }
 }

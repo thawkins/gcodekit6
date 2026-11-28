@@ -5,7 +5,7 @@
 use gcodekit6_camtools::tabbed_box::{BoxParameters, MIN_PANEL_GAP_MM, TabbedBoxMaker, panel_gap};
 
 /// The bounding box (min x, min y, max x, max y) of every generated path.
-fn bounding_boxes(p: BoxParameters) -> Vec<(f32, f32, f32, f32)> {
+fn bounding_boxes(p: BoxParameters) -> Vec<(f64, f64, f64, f64)> {
     let mut maker = TabbedBoxMaker::new(p).expect("valid parameters");
     maker.generate().expect("generates");
     maker
@@ -14,10 +14,10 @@ fn bounding_boxes(p: BoxParameters) -> Vec<(f32, f32, f32, f32)> {
         .map(|path| {
             path.iter().fold(
                 (
-                    f32::INFINITY,
-                    f32::INFINITY,
-                    f32::NEG_INFINITY,
-                    f32::NEG_INFINITY,
+                    f64::INFINITY,
+                    f64::INFINITY,
+                    f64::NEG_INFINITY,
+                    f64::NEG_INFINITY,
                 ),
                 |(x0, y0, x1, y1), pt| (x0.min(pt.x), y0.min(pt.y), x1.max(pt.x), y1.max(pt.y)),
             )

@@ -370,7 +370,7 @@ impl DesignerPane {
                     img.center.x - img.width_mm / 2.0,
                     img.center.y - img.height_mm / 2.0,
                 );
-                let overscan = f64::from(OVERSCAN_MM);
+                let overscan = OVERSCAN_MM;
                 (ox.max(overscan) - ox, oy.max(overscan) - oy)
             }
             None => (0.0, 0.0),

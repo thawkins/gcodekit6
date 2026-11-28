@@ -29,6 +29,7 @@ pub fn parse_length(input: &str, system: MeasurementSystem) -> Result<f64, Strin
 
 Key rules:
 - Machine positions and designer geometry are `f64` mm (`CNCPoint` in `crates/gcodekit6-core/src/data/mod.rs`, `Point` in `crates/gcodekit6-designer/src/model/mod.rs`); the `gcodekit6_core::units` display, parse and feed-rate conversion helpers take and return `f64` too (`format_length(value_mm: f64, ...)`)
+- CAM tool parameters (Tabbed Box, bitmap engraving, Gerber, Excellon offsets, the CAM preset lengths), the designer stock (`StockMaterial`, the `.gckd` stock fields) and the Machine Control jog step, feed and travel are `f64` mm as well. `f32` remains only where the consumer is `f32`: egui and visualizer screen geometry, lyon paths (the Gerber rubout hatch), image and pixel maths, laser power values, and the controller's jog line and machine-reported positions (`MM_PER_INCH_F32`)
 - `format_length` and `format_feed_rate` show 3 decimal places in either unit (`25.400` mm, `1.000` in); the Machine Control DRO and status bar use their own `format_length` (`crates/gcodekit6-ui-egui/src/panes/machine_control/dro.rs`), which shows mm to 2 decimal places and inches to 3
 - DateTime values are stored in UTC, converted to locale in the UI layer
 - Text strings are internally UTF-8

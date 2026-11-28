@@ -7,30 +7,30 @@
 #[derive(Debug, Clone)]
 pub struct StockMaterial {
     /// Width in X dimension (mm)
-    pub width: f32,
+    pub width: f64,
     /// Height in Y dimension (mm)
-    pub height: f32,
+    pub height: f64,
     /// Thickness in Z dimension (mm)
-    pub thickness: f32,
+    pub thickness: f64,
     /// Origin point (bottom-left corner) in world coordinates
-    pub origin: (f32, f32, f32),
+    pub origin: (f64, f64, f64),
     /// Safe Z height for rapid moves (mm)
-    pub safe_z: f32,
+    pub safe_z: f64,
 }
 
 impl StockMaterial {
     /// Default clearance above stock top (mm) for safe Z moves.
-    pub const DEFAULT_SAFE_Z_ABOVE_STOCK_MM: f32 = 5.0;
+    pub const DEFAULT_SAFE_Z_ABOVE_STOCK_MM: f64 = 5.0;
     /// Minimum clearance above stock top (mm) for safe Z moves.
-    pub const MIN_SAFE_Z_ABOVE_STOCK_MM: f32 = 1.0;
+    pub const MIN_SAFE_Z_ABOVE_STOCK_MM: f64 = 1.0;
 
     /// Returns the default safe Z for a given stock thickness.
-    pub fn default_safe_z_for_thickness(thickness: f32) -> f32 {
+    pub fn default_safe_z_for_thickness(thickness: f64) -> f64 {
         thickness.max(0.0) + Self::DEFAULT_SAFE_Z_ABOVE_STOCK_MM
     }
 
     /// Create a new stock material definition
-    pub fn new(width: f32, height: f32, thickness: f32, origin: (f32, f32, f32)) -> Self {
+    pub fn new(width: f64, height: f64, thickness: f64, origin: (f64, f64, f64)) -> Self {
         let default_safe_z = Self::default_safe_z_for_thickness(thickness);
         let mut stock = Self {
             width,
@@ -44,7 +44,7 @@ impl StockMaterial {
     }
 
     /// Returns the minimum safe Z required for a given stock thickness.
-    pub fn min_safe_z_for_thickness(thickness: f32) -> f32 {
+    pub fn min_safe_z_for_thickness(thickness: f64) -> f64 {
         thickness.max(0.0) + Self::MIN_SAFE_Z_ABOVE_STOCK_MM
     }
 
@@ -58,7 +58,7 @@ impl StockMaterial {
     }
 
     /// Get the center point of the stock
-    pub fn center(&self) -> (f32, f32, f32) {
+    pub fn center(&self) -> (f64, f64, f64) {
         (
             self.origin.0 + self.width / 2.0,
             self.origin.1 + self.height / 2.0,
@@ -67,12 +67,12 @@ impl StockMaterial {
     }
 
     /// Get the top surface Z coordinate
-    pub fn top_z(&self) -> f32 {
+    pub fn top_z(&self) -> f64 {
         self.origin.2 + self.thickness
     }
 
     /// Check if a point is within stock bounds
-    pub fn contains(&self, x: f32, y: f32, z: f32) -> bool {
+    pub fn contains(&self, x: f64, y: f64, z: f64) -> bool {
         x >= self.origin.0
             && x <= self.origin.0 + self.width
             && y >= self.origin.1

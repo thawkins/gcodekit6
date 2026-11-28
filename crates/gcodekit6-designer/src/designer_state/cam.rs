@@ -50,7 +50,7 @@ impl CamSettings {
             stock_top_z: state
                 .stock_material
                 .as_ref()
-                .map(|s| f64::from(s.thickness))
+                .map(|s| s.thickness)
                 .unwrap_or(10.0),
             defaults: state.default_properties_shape.clone(),
         }

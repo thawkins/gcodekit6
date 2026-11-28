@@ -335,18 +335,18 @@ impl TabbedBoxParams {
             return Err(errors);
         }
         Ok(BoxParameters {
-            x: x as f32,
-            y: y as f32,
-            h: h as f32,
+            x,
+            y,
+            h,
             outside: self.outside,
-            thickness: thickness as f32,
-            burn: burn as f32,
+            thickness,
+            burn,
             finger_joint: FingerJointSettings {
-                finger: finger as f32,
-                space: space as f32,
-                surrounding_spaces: surrounding_spaces as f32,
-                play: play as f32,
-                extra_length: extra_length as f32,
+                finger,
+                space,
+                surrounding_spaces,
+                play,
+                extra_length,
                 style: self.finger_style,
                 ..FingerJointSettings::default()
             },
@@ -357,10 +357,10 @@ impl TabbedBoxParams {
             optimize_layout: self.optimize_layout,
             laser_passes: passes as i32,
             laser_power: power as i32,
-            feed_rate: feed_rate as f32,
-            z_step_down: z_step_down as f32,
-            offset_x: offset_x as f32,
-            offset_y: offset_y as f32,
+            feed_rate,
+            z_step_down,
+            offset_x,
+            offset_y,
             num_axes: self.num_axes,
             home_before_job: self.home_before,
         })
@@ -376,12 +376,12 @@ impl TabbedBoxParams {
         finger: f64,
         space: f64,
     ) {
-        if ((space + finger) as f32).abs() < MIN_JOINT_WIDTH {
+        if (space + finger).abs() < MIN_JOINT_WIDTH {
             errors.push(FieldError::field(SPACE_WIDTH, JOINT_TOO_SMALL));
         }
         if self.outside {
             for (label, side) in [WIDTH, DEPTH, HEIGHT].into_iter().zip(sides) {
-                if (side as f32) - 2.0 * (thickness as f32) <= 0.0 {
+                if side - 2.0 * thickness <= 0.0 {
                     errors.push(FieldError::field(label, NO_ROOM_FOR_WALLS));
                 }
             }
@@ -400,18 +400,14 @@ impl TabbedBoxParams {
         thickness: f64,
         dividers: [f64; 2],
     ) {
-        let t = thickness as f32;
+        let t = thickness;
         for ((label, side), count) in [DIVIDERS_X, DIVIDERS_Y]
             .into_iter()
             .zip(sides)
             .zip(dividers)
         {
-            let inside = if self.outside {
-                side as f32 - 2.0 * t
-            } else {
-                side as f32
-            };
-            if count > 0.0 && inside / (count as f32 + 1.0) <= t {
+            let inside = if self.outside { side - 2.0 * t } else { side };
+            if count > 0.0 && inside / (count + 1.0) <= t {
                 errors.push(FieldError::field(label, TOO_MANY_DIVIDERS));
             }
         }
@@ -441,10 +437,7 @@ impl TabbedBoxParams {
                 .paths()
                 .iter()
                 .map(|path| DesignerPath {
-                    points: path
-                        .iter()
-                        .map(|p| (f64::from(p.x), f64::from(p.y)))
-                        .collect(),
+                    points: path.iter().map(|p| (p.x, p.y)).collect(),
                     closed: true,
                 })
                 .collect(),

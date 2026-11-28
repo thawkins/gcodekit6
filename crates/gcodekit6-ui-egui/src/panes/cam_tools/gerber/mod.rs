@@ -282,7 +282,7 @@ impl GerberParams {
                 gated(strict && on, rule),
             )
         };
-        let below = |v: f64| ((v as f32) >= 0.0).then_some(BELOW_SURFACE);
+        let below = |v: f64| (v >= 0.0).then_some(BELOW_SURFACE);
         let board_width = len(BOARD_WIDTH, &self.board_width, true, &positive);
         let board_height = len(BOARD_HEIGHT, &self.board_height, true, &positive);
         let offset_x = len(OFFSET_X, &self.offset_x, true, &any);
@@ -340,21 +340,21 @@ impl GerberParams {
         }
         Ok(GerberParameters {
             layer_type: self.layer_type,
-            feed_rate: feed_rate as f32,
-            spindle_speed: spindle_speed as f32,
-            board_width: board_width as f32,
-            board_height: board_height as f32,
-            offset_x: offset_x as f32,
-            offset_y: offset_y as f32,
+            feed_rate,
+            spindle_speed,
+            board_width,
+            board_height,
+            offset_x,
+            offset_y,
             generate_alignment_holes: holes,
-            alignment_hole_diameter: hole_diameter as f32,
-            alignment_hole_margin: hole_margin as f32,
-            alignment_hole_depth: hole_depth as f32,
-            cut_depth: cut_depth as f32,
-            outline_step_down: outline_step_down as f32,
-            safe_z: safe_z as f32,
-            tool_diameter: tool_diameter as f32,
-            isolation_width: isolation_width as f32,
+            alignment_hole_diameter: hole_diameter,
+            alignment_hole_margin: hole_margin,
+            alignment_hole_depth: hole_depth,
+            cut_depth,
+            outline_step_down,
+            safe_z,
+            tool_diameter,
+            isolation_width,
             rubout: self.rubout,
             use_board_outline: self.use_board_outline,
             directory: self
