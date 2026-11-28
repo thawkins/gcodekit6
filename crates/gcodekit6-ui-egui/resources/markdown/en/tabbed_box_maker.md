@@ -24,7 +24,7 @@ The generator creates multiple 2D panels (sides, top/bottom, dividers) and arran
 - **Surrounding spaces**: Extra spacing near edges.
 - **Play**: Fit tolerance.
 - **Extra length**: Adds length to tabs for tighter fits.
-- **Finger Style**: Rectangular, Springs, Barbs or Snap Fit.
+- **Finger Style**: Rectangular, Springs, Barbs, Snap Fit or Dogbone. Dogbone cuts a small relief at each inside finger corner so a round tool leaves room for the square corner of the mating finger.
 
 ### Laser settings
 - **Passes / Power (S) / Feed rate**: Cutting parameters (laser-style), used when producing the final G-code.

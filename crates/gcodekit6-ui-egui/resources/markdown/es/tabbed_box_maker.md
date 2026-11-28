@@ -22,7 +22,7 @@ El generador crea múltiples paneles 2D (laterales, tapa/base, separadores) y lo
 - **Espacios circundantes**: Espacio adicional cerca de los bordes.
 - **Juego**: Tolerancia de ajuste.
 - **Longitud adicional**: Añade longitud a las pestañas para un ajuste más preciso.
-- **Estilo de Dedos**: Rectos, Muelles, Púas o Encaje a Presión.
+- **Estilo de Dedos**: Rectos, Muelles, Púas, Encaje a Presión o Dogbone (hueso de perro). Dogbone corta un pequeño alivio en cada esquina interior de los dedos para que una fresa redonda deje sitio a la esquina recta del dedo opuesto.
 
 ### Ajustes del láser
 - **Pasadas/Potencia (S)/Velocidad de avance**: Parámetros de corte (tipo láser), utilizados al generar el G-code final.

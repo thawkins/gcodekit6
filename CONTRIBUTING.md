@@ -33,7 +33,7 @@ Be respectful, inclusive, and constructive. We welcome contributors of all backg
    ```bash
    git config core.hooksPath .githooks
    ```
-   This enables automated checks (formatting, clippy, unit tests) before each commit. Skip with `git commit --no-verify` if needed.
+   This enables automated checks (formatting and clippy) before each commit; tests run in CI. Skip with `git commit --no-verify` if needed.
 5. **Create a branch** for your changes (never commit to `master`):
    ```bash
    git switch -c feature/my-new-feature

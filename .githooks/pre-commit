@@ -1,6 +1,6 @@
 #!/bin/bash
 # GCodeKit6 Pre-commit Hook
-# Runs formatting, linting, and the nextest suite before commit
+# Runs formatting and linting before commit; tests run in CI
 # Skip with: git commit --no-verify
 # Install with: git config core.hooksPath .githooks
 
@@ -10,7 +10,7 @@ echo "Running pre-commit checks..."
 echo ""
 
 # 1. Check formatting
-echo "[1/3] Checking code formatting..."
+echo "[1/2] Checking code formatting..."
 if ! cargo fmt --check >/dev/null 2>&1; then
     echo "✗ Formatting check failed. Run 'cargo fmt' to fix."
     exit 1
@@ -19,24 +19,16 @@ echo "✓ Formatting OK"
 echo ""
 
 # 2. Run clippy
-echo "[2/3] Running clippy lints..."
-if ! cargo clippy --all-targets -- -D warnings 2>/dev/null; then
+echo "[2/2] Running clippy lints (as CI does)..."
+if ! cargo clippy --workspace --all-targets -- -D warnings -W clippy::unwrap_used 2>/dev/null; then
     echo "✗ Clippy found warnings. Fix them before committing."
     exit 1
 fi
 echo "✓ Clippy OK"
 echo ""
 
-# 3. Run the test suite with nextest, as CI does. Every test lives in a
-# crate's tests/ directory (there are no --lib unit tests), so this runs the
-# whole workspace suite.
-echo "[3/3] Running tests (cargo nextest)..."
-if ! cargo nextest run --workspace 2>&1; then
-    echo "✗ Tests failed. Fix them before committing."
-    exit 1
-fi
-echo "✓ Tests OK"
-echo ""
+# Tests are left to CI (`cargo nextest run --workspace`); run them locally
+# before pushing when a change needs them.
 
 echo "✓ All pre-commit checks passed!"
 exit 0

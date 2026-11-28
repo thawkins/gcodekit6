@@ -24,7 +24,7 @@ Generate laser or CNC cut boxes with finger joints (tab-and-slot construction).
 - Box dimensions: X (Width), Y (Depth), H (Height), Outside Dims
 - Material: Thickness, Burn / Tool Dia
 - Finger joints (multiples of thickness): Finger Width, Space Width, Surrounding Spaces, Play (fit tolerance), Extra Length
-- **Finger Style:** Rectangular, Springs, Barbs or Snap Fit
+- **Finger Style:** Rectangular, Springs, Barbs, Snap Fit or Dogbone (relief cuts at the inside finger corners)
 - **Box Type:** Full Box, No Top, No Bottom, No Sides, No Front/Back, No Left/Right
 - Dividers X / Dividers Y, and **Divider Keying:** Walls and Floor, Walls Only, Floor Only, None
 - Laser settings: Passes, Power (S), Feed Rate, Z Step Down; work origin Offset X / Offset Y

@@ -878,6 +878,9 @@ msgstr ""
 msgid "Snap Fit"
 msgstr ""
 
+msgid "Dogbone"
+msgstr ""
+
 msgid "Walls and Floor"
 msgstr ""
 

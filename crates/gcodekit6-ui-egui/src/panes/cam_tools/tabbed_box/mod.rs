@@ -90,11 +90,12 @@ const BOX_TYPES: [(BoxType, &str); 6] = [
 ];
 
 /// The finger styles and the msgids of their names, in menu order.
-const FINGER_STYLES: [(FingerStyle, &str); 4] = [
+const FINGER_STYLES: [(FingerStyle, &str); 5] = [
     (FingerStyle::Rectangular, n_!("Rectangular")),
     (FingerStyle::Springs, n_!("Springs")),
     (FingerStyle::Barbs, n_!("Barbs")),
     (FingerStyle::Snap, n_!("Snap Fit")),
+    (FingerStyle::Dogbone, n_!("Dogbone")),
 ];
 
 /// The divider keying choices and the msgids of their names, in menu order.

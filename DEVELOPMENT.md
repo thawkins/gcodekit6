@@ -236,15 +236,14 @@ cargo clippy --fix
 
 ### Pre-Commit Checks
 
-`.githooks/pre-commit` runs these three commands and aborts the commit if one fails:
+`.githooks/pre-commit` runs these two commands and aborts the commit if one fails:
 
 ```bash
 cargo fmt --check
-cargo clippy --all-targets -- -D warnings
-cargo test --lib
+cargo clippy --workspace --all-targets -- -D warnings -W clippy::unwrap_used
 ```
 
-The hook is lighter than CI: it skips the integration tests under `crates/*/tests/`.
+Tests are left to CI. Run `cargo nextest run --workspace` locally before pushing when a change needs it.
 
 ### CI Gates
 

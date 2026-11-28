@@ -917,6 +917,9 @@ msgstr "Púas"
 msgid "Snap Fit"
 msgstr "Encaje a Presión"
 
+msgid "Dogbone"
+msgstr "Dogbone (hueso de perro)"
+
 msgid "Walls and Floor"
 msgstr "Paredes y Fondo"
 

@@ -322,7 +322,7 @@ fn test_cam_tabbed_box_finger_style_menu_lists_and_selects_the_styles() {
     h.get_by_role_and_label(Role::ComboBox, "Finger Style:")
         .click();
     frames(&mut h, 2);
-    for option in ["Springs", "Barbs", "Snap Fit"] {
+    for option in ["Springs", "Barbs", "Snap Fit", "Dogbone"] {
         assert!(h.query_by_label(option).is_some(), "{option} not listed");
     }
     h.get_by_label("Springs").click();
@@ -339,4 +339,35 @@ fn test_cam_tabbed_box_finger_style_menu_lists_and_selects_the_styles() {
     assert!(snap.generate().is_ok());
     snap.dividers_x = "1".into();
     assert!(matches!(snap.generate(), Err(CamError::Generator(_))));
+}
+
+/// Dogbone is in the Finger Style menu, and choosing it adds a relief cut at every inside
+/// finger corner: one tool radius past the corner and back on the diagonal.
+#[test]
+fn test_cam_tabbed_box_dogbone_menu_adds_corner_relief() {
+    let mut h = open_tool_tall(CamTool::TabbedBox);
+    h.get_by_role_and_label(egui::accesskit::Role::ComboBox, "Finger Style:")
+        .scroll_to_me();
+    frames(&mut h, 3);
+    h.get_by_role_and_label(egui::accesskit::Role::ComboBox, "Finger Style:")
+        .click();
+    frames(&mut h, 2);
+    h.get_by_label("Dogbone").click();
+    frames(&mut h, 2);
+    let page = pane(&h).tabbed_box_mut().clone();
+    assert_eq!(page.finger_style, FingerStyle::Dogbone);
+
+    let cuts = |style: FingerStyle| {
+        let mut p = page.clone();
+        p.finger_style = style;
+        p.burn = "3".into();
+        let program = p.generate().expect("generates");
+        assert!(program.contains(&format!("; Finger Style: {style:?}\n")));
+        program.lines().filter(|l| l.starts_with("G1")).count()
+    };
+    let (plain, dogbone) = (cuts(FingerStyle::Rectangular), cuts(FingerStyle::Dogbone));
+    assert!(
+        dogbone > plain,
+        "dogbone adds relief moves: {dogbone} cuts vs {plain} plain"
+    );
 }
