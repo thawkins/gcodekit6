@@ -63,22 +63,22 @@ impl DesignerState {
         }
     }
 
-    /// Sets one `f32` property on every selected shape that differs from
+    /// Sets one `f64` property on every selected shape that differs from
     /// `value`, as one undo step named `name`.
-    fn set_selected_f32(
+    fn set_selected_f64(
         &mut self,
         value: f64,
         name: &str,
-        get: fn(&DrawingObject) -> f32,
-        set: fn(&mut DrawingObject, f32),
+        get: fn(&DrawingObject) -> f64,
+        set: fn(&mut DrawingObject, f64),
     ) {
         let commands: Vec<DesignerCommand> = self
             .canvas
             .shapes()
-            .filter(|s| s.selected && (get(s) as f64 - value).abs() > f64::EPSILON)
+            .filter(|s| s.selected && (get(s) - value).abs() > f64::EPSILON)
             .map(|obj| {
                 let mut new_obj = obj.clone();
-                set(&mut new_obj, value as f32);
+                set(&mut new_obj, value);
                 DesignerCommand::ChangeProperty(ChangeProperty {
                     id: obj.id,
                     old_state: obj.clone(),
@@ -97,27 +97,27 @@ impl DesignerState {
 
     /// Sets the step down for selected shapes.
     pub fn set_selected_step_down(&mut self, step_down: f64) {
-        self.set_selected_f32(
+        self.set_selected_f64(
             step_down,
             "Change Step Down",
-            |o| o.step_down,
-            |o, v| o.step_down = v,
+            |o| f64::from(o.step_down),
+            |o, v| o.step_down = v as f32,
         );
     }
 
     /// Sets the step in for selected shapes.
     pub fn set_selected_step_in(&mut self, step_in: f64) {
-        self.set_selected_f32(
+        self.set_selected_f64(
             step_in,
             "Change Step In",
-            |o| o.step_in,
-            |o, v| o.step_in = v,
+            |o| f64::from(o.step_in),
+            |o, v| o.step_in = v as f32,
         );
     }
 
     /// Sets the ramp angle for selected shapes.
     pub fn set_selected_ramp_angle(&mut self, ramp_angle: f64) {
-        self.set_selected_f32(
+        self.set_selected_f64(
             ramp_angle,
             "Change Ramp Angle",
             |o| o.ramp_angle,

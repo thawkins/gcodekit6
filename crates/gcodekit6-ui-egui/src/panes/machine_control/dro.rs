@@ -14,7 +14,7 @@
 
 use gcodekit6_app::i18n::Translator;
 use gcodekit6_app::machine::Axis;
-use gcodekit6_core::units::{FeedRateUnits, MeasurementSystem, get_unit_label};
+use gcodekit6_core::units::{FeedRateUnits, MM_PER_INCH, MeasurementSystem, get_unit_label};
 
 use super::jog::feed_to_display;
 
@@ -56,10 +56,11 @@ pub(super) struct ZeroButtons<'a> {
 /// # Arguments
 /// * `value_mm` - Length in millimetres.
 /// * `units` - The measurement system to show.
-pub(crate) fn format_length(value_mm: f32, units: MeasurementSystem) -> String {
+pub(crate) fn format_length(value_mm: impl Into<f64>, units: MeasurementSystem) -> String {
+    let value_mm: f64 = value_mm.into();
     match units {
         MeasurementSystem::Metric => format!("{value_mm:.2}"),
-        MeasurementSystem::Imperial => format!("{:.3}", value_mm / 25.4),
+        MeasurementSystem::Imperial => format!("{:.3}", value_mm / MM_PER_INCH),
     }
 }
 

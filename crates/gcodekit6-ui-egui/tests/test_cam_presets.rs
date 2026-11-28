@@ -94,6 +94,13 @@ fn test_cam_preset_loads_the_gtk_files() {
     drill.apply_preset(&drill_json).expect("loads");
     assert_eq!(drill, custom_drill());
     assert_eq!(drill.preset_json(&tr).as_ref(), Ok(&drill_json));
+    // The file as the GTK page wrote it, its lengths widened from `f32`, loads the same.
+    let gtk_drill_json = drill_json
+        .replace("12.7,", "12.699999809265137,")
+        .replace("3.175,", "3.174999952316284,");
+    let mut gtk_drill = DrillPressParams::with_center(METRIC, (100.0, 100.0));
+    gtk_drill.apply_preset(&gtk_drill_json).expect("loads");
+    assert_eq!(gtk_drill, custom_drill());
 
     let surfacing_json = fixture("preset_spoilboard_surfacing.json");
     let mut surfacing = SpoilboardSurfacingParams::new(METRIC);
@@ -103,6 +110,11 @@ fn test_cam_preset_loads_the_gtk_files() {
     assert_eq!(surfacing.stepover_percent, "60");
     assert_eq!(surfacing.spindle_speed, "16000");
     assert_eq!(surfacing.preset_json(&tr).as_ref(), Ok(&surfacing_json));
+    let mut gtk_surfacing = SpoilboardSurfacingParams::new(METRIC);
+    gtk_surfacing
+        .apply_preset(&surfacing_json.replace("19.05,", "19.049999237060547,"))
+        .expect("loads");
+    assert_eq!(gtk_surfacing, surfacing);
 
     let grid_json = fixture("preset_spoilboard_grid.json");
     let mut grid = SpoilboardGridParams::new(METRIC);
@@ -111,6 +123,11 @@ fn test_cam_preset_loads_the_gtk_files() {
     assert_eq!(grid.laser_power, "800");
     assert_eq!(grid.laser_mode, LaserMode::M3);
     assert_eq!(grid.preset_json(&tr).as_ref(), Ok(&grid_json));
+    let mut gtk_grid = SpoilboardGridParams::new(METRIC);
+    gtk_grid
+        .apply_preset(&grid_json.replace("25.4,", "25.399999618530273,"))
+        .expect("loads");
+    assert_eq!(gtk_grid, grid);
 }
 
 /// Save asks where (GTK's file name), writes the preset; Load reads it back into the page.

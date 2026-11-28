@@ -12,42 +12,42 @@
 //! Dependencies: none.
 
 /// Springs: the leaf next to each finger side is this fraction of the finger length wide.
-const SPRING_LEAF: f32 = 0.3;
+const SPRING_LEAF: f64 = 0.3;
 /// Springs: radius of the rounded leaf corner, as a fraction of the finger length.
-const SPRING_RADIUS: f32 = 0.2;
+const SPRING_RADIUS: f64 = 0.2;
 /// Springs: the slit behind the leaf stops this fraction of the finger length short of
 /// the panel edge, so the leaf stays attached at its root.
-const SPRING_SLIT_STOP: f32 = 0.1;
+const SPRING_SLIT_STOP: f64 = 0.1;
 /// Springs: slit width in thicknesses (boxes.py cuts a zero-width line; a small width keeps
 /// the outline a simple polygon).
-const SPRING_SLIT: f32 = 0.1;
+const SPRING_SLIT: f64 = 0.1;
 /// Line segments used for the rounded leaf corner.
 const SPRING_ARC_STEPS: usize = 4;
 
 /// Barbs: distance between barbs along the finger side, in thicknesses.
-pub(super) const BARB_PITCH: f32 = 0.3;
+pub(super) const BARB_PITCH: f64 = 0.3;
 /// Barbs: how far each barb stands out of the finger side, in thicknesses.
-pub(super) const BARB_DEPTH: f32 = 0.1;
+pub(super) const BARB_DEPTH: f64 = 0.1;
 
 /// Snap: depth of the relief slits into the panel, in thicknesses.
-pub(super) const SNAP_RELIEF: f32 = 2.0;
+pub(super) const SNAP_RELIEF: f64 = 2.0;
 /// Snap: width of the slit outside the arm, in thicknesses.
-pub(super) const SNAP_OUTER_SLIT: f32 = 0.1;
+pub(super) const SNAP_OUTER_SLIT: f64 = 0.1;
 /// Snap: how far the hook stands out of the arm, in thicknesses.
-const SNAP_HOOK: f32 = 0.5;
+const SNAP_HOOK: f64 = 0.5;
 /// Snap: length of the hook's lead-in ramp beyond the finger tip, in thicknesses.
-const SNAP_RAMP: f32 = 1.0;
+const SNAP_RAMP: f64 = 1.0;
 /// Snap: arm width at the tip, in thicknesses (it widens to twice this at its root).
-const SNAP_ARM: f32 = 0.5;
+const SNAP_ARM: f64 = 0.5;
 /// Snap: distance from the hooked finger side to the far wall of the slit behind the arm,
 /// in thicknesses.
-pub(super) const SNAP_SLIT_WALL: f32 = 1.2;
+pub(super) const SNAP_SLIT_WALL: f64 = 1.2;
 /// Snap: the narrowest finger that takes a hook, in thicknesses (as boxes.py).
-pub(super) const SNAP_MIN_FINGER: f32 = 1.9;
+pub(super) const SNAP_MIN_FINGER: f64 = 1.9;
 
 /// Mirrors a left-to-right shape about the finger's centre line, keeping the traversal
 /// direction left to right.
-fn mirrored(shape: &[(f32, f32)], f: f32) -> Vec<(f32, f32)> {
+fn mirrored(shape: &[(f64, f64)], f: f64) -> Vec<(f64, f64)> {
     shape.iter().rev().map(|&(u, v)| (f - u, v)).collect()
 }
 
@@ -61,7 +61,7 @@ fn mirrored(shape: &[(f32, f32)], f: f32) -> Vec<(f32, f32)> {
 ///
 /// # Returns
 /// The outline from the left root `(0, 0)` to the right root `(f, 0)`.
-pub(super) fn springs(f: f32, h: f32, t: f32) -> Vec<(f32, f32)> {
+pub(super) fn springs(f: f64, h: f64, t: f64) -> Vec<(f64, f64)> {
     let r = SPRING_RADIUS * h;
     let leaf = SPRING_LEAF * h;
     let slit = SPRING_SLIT * t;
@@ -69,7 +69,7 @@ pub(super) fn springs(f: f32, h: f32, t: f32) -> Vec<(f32, f32)> {
     let mut left = vec![(0.0, 0.0), (0.0, corner_v)];
     // Quarter circle from the side (180 degrees) to the tip (90 degrees) about (r, corner_v).
     for step in 1..=SPRING_ARC_STEPS {
-        let angle = std::f32::consts::PI * (1.0 - 0.5 * step as f32 / SPRING_ARC_STEPS as f32);
+        let angle = std::f64::consts::PI * (1.0 - 0.5 * step as f64 / SPRING_ARC_STEPS as f64);
         left.push((r + r * angle.cos(), corner_v + r * angle.sin()));
     }
     left.extend([
@@ -88,7 +88,7 @@ pub(super) fn springs(f: f32, h: f32, t: f32) -> Vec<(f32, f32)> {
 /// # Arguments
 /// * `h` - Finger length.
 /// * `t` - Material thickness.
-pub(super) fn springs_min_finger(h: f32, t: f32) -> f32 {
+pub(super) fn springs_min_finger(h: f64, t: f64) -> f64 {
     2.0 * (SPRING_LEAF * h + SPRING_SLIT * t)
 }
 
@@ -102,14 +102,14 @@ pub(super) fn springs_min_finger(h: f32, t: f32) -> f32 {
 ///
 /// # Returns
 /// The outline from the left root `(0, 0)` to the right root `(f, 0)`.
-pub(super) fn barbs(f: f32, h: f32, t: f32) -> Vec<(f32, f32)> {
+pub(super) fn barbs(f: f64, h: f64, t: f64) -> Vec<(f64, f64)> {
     let pitch = BARB_PITCH * t;
     let depth = BARB_DEPTH * t;
     let n = barb_count(h, t);
-    let straight = h - n as f32 * pitch;
+    let straight = h - n as f64 * pitch;
     let mut left = vec![(0.0, 0.0), (0.0, straight)];
     for k in 0..n {
-        let v0 = straight + k as f32 * pitch;
+        let v0 = straight + k as f64 * pitch;
         left.push((-depth, v0 + depth));
         left.push((0.0, v0 + pitch));
     }
@@ -123,7 +123,7 @@ pub(super) fn barbs(f: f32, h: f32, t: f32) -> Vec<(f32, f32)> {
 /// # Arguments
 /// * `h` - Finger length.
 /// * `t` - Material thickness.
-pub(super) fn barb_count(h: f32, t: f32) -> usize {
+pub(super) fn barb_count(h: f64, t: f64) -> usize {
     ((h - BARB_DEPTH * t) / (BARB_PITCH * t)).floor().max(0.0) as usize
 }
 
@@ -140,7 +140,7 @@ pub(super) fn barb_count(h: f32, t: f32) -> usize {
 /// # Returns
 /// The outline from the left root to the right root; it starts (or ends) one outer slit
 /// width outside the finger, on the panel edge.
-pub(super) fn snap(f: f32, h: f32, t: f32, hook_right: bool) -> Vec<(f32, f32)> {
+pub(super) fn snap(f: f64, h: f64, t: f64, hook_right: bool) -> Vec<(f64, f64)> {
     let d = SNAP_RELIEF * t;
     let sw = SNAP_OUTER_SLIT * t;
     let top = h + SNAP_RAMP * t;

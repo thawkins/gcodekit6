@@ -137,7 +137,7 @@ impl DrillPressGenerator {
         crate::job_preamble::push_work_setup(&mut gcode, p.home_before_job);
         gcode.push_str(&crate::job_preamble::travel_z_line(
             p.home_before_job,
-            p.safe_z as f32,
+            p.safe_z,
             "Move to safe height",
         ));
         gcode.push_str(&format!("M3 S{:.0} ; Start spindle\n", p.spindle_speed));
@@ -155,7 +155,7 @@ impl DrillPressGenerator {
         // Retract and end
         gcode.push_str(&crate::job_preamble::travel_z_line(
             p.home_before_job,
-            p.safe_z as f32,
+            p.safe_z,
             "Retract to safe height",
         ));
         gcode.push_str("M5 ; Stop spindle\n");

@@ -1,5 +1,5 @@
 //! Reading and writing a CAM page's fields as the preset files hold them: lengths in
-//! millimetres as `f32`, numbers as typed, and the JSON object helpers of the
+//! millimetres as `f64`, numbers as typed, and the JSON object helpers of the
 //! spoilboard presets. Re-exported from [`super::common`].
 //!
 //! Dependencies: `gcodekit6-core` (units), `serde` / `serde_json`, `gcodekit6-app`
@@ -23,10 +23,8 @@ pub fn preset_len(
     field: &'static str,
     text: &str,
     units: MeasurementSystem,
-) -> Result<f32, FieldError> {
-    parse_len(text, units)
-        .map(|mm| mm as f32)
-        .map_err(|message| FieldError::field(field, message))
+) -> Result<f64, FieldError> {
+    parse_len(text, units).map_err(|message| FieldError::field(field, message))
 }
 
 /// A number field's text as the Drill Press preset holds it.

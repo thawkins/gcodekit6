@@ -236,9 +236,9 @@ fn stock_settings(
         &tr.tr("Stock Width"),
         Kind::Length,
         ctx,
-        f64::from(stock.width),
+        stock.width,
     ) {
-        stock.width = v as f32;
+        stock.width = v;
     }
     if let Some(v) = field(
         ui,
@@ -246,9 +246,9 @@ fn stock_settings(
         &tr.tr("Stock Height"),
         Kind::Length,
         ctx,
-        f64::from(stock.height),
+        stock.height,
     ) {
-        stock.height = v as f32;
+        stock.height = v;
     }
     // The safe Z follows the thickness: the clearance above the stock is kept.
     let clearance = (stock.safe_z - stock.thickness).max(StockMaterial::MIN_SAFE_Z_ABOVE_STOCK_MM);
@@ -258,9 +258,9 @@ fn stock_settings(
         &tr.tr("Stock Thickness"),
         Kind::Length,
         ctx,
-        f64::from(stock.thickness),
+        stock.thickness,
     ) {
-        stock.thickness = v as f32;
+        stock.thickness = v;
         stock.safe_z = stock.thickness + clearance;
     }
     if let Some(v) = field(
@@ -269,8 +269,8 @@ fn stock_settings(
         &tr.tr("Safe height above stock for rapid moves"),
         Kind::Length,
         ctx,
-        f64::from(clearance),
+        clearance,
     ) {
-        stock.safe_z = stock.thickness + (v as f32).max(StockMaterial::MIN_SAFE_Z_ABOVE_STOCK_MM);
+        stock.safe_z = stock.thickness + v.max(StockMaterial::MIN_SAFE_Z_ABOVE_STOCK_MM);
     }
 }

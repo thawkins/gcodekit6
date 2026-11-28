@@ -469,6 +469,27 @@ fn test_bitmap_preset_legacy_text_and_polarity_converted() {
     );
 }
 
+/// A version 2 preset saved while the lengths and feeds were `f32` (serde writes the
+/// shortest `f32` text) loads into the `f64` fields as those decimals.
+#[test]
+fn test_bitmap_preset_saved_from_f32_loads_as_f64() {
+    let json = r#"{"format_version":2,"units":"mm","width_mm":50.8,"feed_rate":1016.0,
+                   "travel_rate":2540.5,"pixels_per_mm":3.937,"line_spacing":1.5,
+                   "offset_x":0.1016,"offset_y":-2.54,"min_power":10.5,"max_power":90.0}"#;
+    let loaded = BitmapEngravingPreset::from_json(json, MeasurementSystem::Metric).expect("load");
+    assert!(loaded.warnings.is_empty());
+    let p = loaded.preset;
+    assert_eq!(
+        (p.width_mm, p.feed_rate, p.travel_rate, p.pixels_per_mm),
+        (50.8, 1016.0, 2540.5, 3.937)
+    );
+    assert_eq!(
+        (p.line_spacing, p.offset_x, p.offset_y),
+        (1.5, 0.1016, -2.54)
+    );
+    assert_eq!((p.min_power, p.max_power), (10.5, 90.0));
+}
+
 #[test]
 fn test_presets_report_invalid_files() {
     assert!(BitmapEngravingPreset::from_json("not json", MeasurementSystem::Metric).is_err());

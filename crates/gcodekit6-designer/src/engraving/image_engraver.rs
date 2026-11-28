@@ -26,19 +26,19 @@ pub use gcodekit6_camtools::laser_engraver::{HalftoneMethod, RotationAngle, Scan
 #[derive(Debug, Clone)]
 pub struct EngravingParams {
     /// Output width (mm).
-    pub width_mm: f32,
+    pub width_mm: f64,
     /// Output height (mm); from the image's aspect ratio when `None`.
-    pub height_mm: Option<f32>,
+    pub height_mm: Option<f64>,
     /// Engraving feed rate (mm/min).
-    pub feed_rate: f32,
+    pub feed_rate: f64,
     /// Travel feed rate (mm/min).
-    pub travel_rate: f32,
+    pub travel_rate: f64,
     /// Minimum laser power (%), used for grey levels only.
     pub min_power: f32,
     /// Maximum laser power (%).
     pub max_power: f32,
     /// Resolution (pixels per inch).
-    pub ppi: f32,
+    pub ppi: f64,
     /// Scan direction.
     pub scan_direction: ScanDirection,
     /// Alternate the scan direction line by line.
@@ -56,13 +56,13 @@ pub struct EngravingParams {
     /// Cut-off for [`HalftoneMethod::Threshold`] (0-255).
     pub halftone_threshold: u8,
     /// X of the image's lower-left corner (mm).
-    pub offset_x: f32,
+    pub offset_x: f64,
     /// Y of the image's lower-left corner (mm).
-    pub offset_y: f32,
+    pub offset_y: f64,
     /// S value of 100 % power.
     pub power_scale: f32,
     /// Line spacing as a multiple of the pixel pitch.
-    pub line_spacing: f32,
+    pub line_spacing: f64,
 }
 
 impl Default for EngravingParams {
@@ -95,11 +95,11 @@ impl Default for EngravingParams {
 ///
 /// The image origin is kept at least this far from 0 on both axes, so a run-up never goes
 /// below X/Y 0.
-pub const OVERSCAN_MM: f32 = 2.5;
+pub const OVERSCAN_MM: f64 = 2.5;
 
 impl EngravingParams {
     /// Convert PPI to pixels per mm
-    pub fn pixels_per_mm(&self) -> f32 {
+    pub fn pixels_per_mm(&self) -> f64 {
         self.ppi / 25.4
     }
 
@@ -176,7 +176,7 @@ impl ImageEngraver {
     }
 
     /// Get the output dimensions in millimeters
-    pub fn output_size_mm(&self) -> (f32, f32) {
+    pub fn output_size_mm(&self) -> (f64, f64) {
         self.engraver.output_size_mm()
     }
 

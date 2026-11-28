@@ -107,7 +107,7 @@ pub fn show(ui: &mut egui::Ui, cx: &mut Ctx<'_>) {
     let (step_down, step_in, ramp) = (
         f64::from(first.step_down),
         f64::from(first.step_in),
-        f64::from(first.ramp_angle),
+        first.ramp_angle,
     );
     let (strategy, fill, depth) = (
         first.pocket_strategy,

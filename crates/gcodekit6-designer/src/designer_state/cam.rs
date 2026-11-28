@@ -50,7 +50,7 @@ impl CamSettings {
             stock_top_z: state
                 .stock_material
                 .as_ref()
-                .map(|s| f64::from(s.thickness))
+                .map(|s| s.thickness)
                 .unwrap_or(10.0),
             defaults: state.default_properties_shape.clone(),
         }
@@ -163,7 +163,7 @@ impl CamSettings {
         generator.set_start_depth(start_depth);
         generator.set_cut_depth(cut_depth);
         generator.set_step_in(object.step_in as f64);
-        generator.set_ramp_angle(object.ramp_angle as f64);
+        generator.set_ramp_angle(object.ramp_angle);
         generator.set_raster_fill_ratio(object.raster_fill_ratio);
 
         let mut effective_shape = object.get_effective_shape();

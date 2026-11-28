@@ -62,9 +62,9 @@ const CONTINUOUS_NOT_ON_REPETIER: &str =
     n_!("Continuous jog needs GRBL's jog cancel; Repetier firmware has none.");
 
 /// Default step, feed and travel, as `MachineSettings` defaults them.
-const DEFAULT_STEP_MM: f32 = 1.0;
-const DEFAULT_FEED_MM_MIN: f32 = 1000.0;
-const DEFAULT_TRAVEL_MM: [f32; 3] = [200.0, 200.0, 100.0];
+const DEFAULT_STEP_MM: f64 = 1.0;
+const DEFAULT_FEED_MM_MIN: f64 = 1000.0;
+const DEFAULT_TRAVEL_MM: [f64; 3] = [200.0, 200.0, 100.0];
 /// How long a keyboard hold lasts without a frame confirming its key is still down.
 pub(super) const KEY_HOLD_DEAD_MAN: Duration = Duration::from_millis(250);
 /// How often a frame is asked for while a keyboard hold lasts, well inside
@@ -80,9 +80,9 @@ pub(super) enum Action {
         /// The axis to move.
         axis: Axis,
         /// Signed distance in mm, inversion applied.
-        distance_mm: f32,
+        distance_mm: f64,
         /// Feed in mm/min.
-        feed_mm_min: f32,
+        feed_mm_min: f64,
     },
     /// Jog cancel (0x85).
     Cancel,
@@ -101,7 +101,7 @@ struct JogButton {
     icon: Icon,
     axis: Axis,
     /// +1 or -1, before inversion.
-    sign: f32,
+    sign: f64,
     /// Index of `axis` in the travel tables.
     index: usize,
 }
@@ -111,7 +111,7 @@ const fn jog_button(
     text: &'static str,
     icon: Icon,
     axis: Axis,
-    sign: f32,
+    sign: f64,
 ) -> JogButton {
     let index = match axis {
         Axis::X => 0,
@@ -162,7 +162,7 @@ fn axis_slot(axis: Axis) -> usize {
 /// (`$3`) masks say (only a build with `HOMING_FORCE_SET_ORIGIN` moves it), so moving `+`
 /// leaves `-mpos` and moving `-` leaves `travel + mpos`. The
 /// app crate implements no other convention.
-pub(super) fn remaining_travel(mpos_mm: f32, travel_mm: f32, direction: f32) -> f32 {
+pub(super) fn remaining_travel(mpos_mm: f64, travel_mm: f64, direction: f64) -> f64 {
     if direction > 0.0 {
         -mpos_mm
     } else {
@@ -179,10 +179,10 @@ use gcodekit6_core::units::feed_rate_to_mm_per_min as feed_from_display;
 /// The jog settings and the hold in progress.
 #[derive(Debug)]
 pub(super) struct JogPanel {
-    step_mm: f32,
-    feed_mm_min: f32,
+    step_mm: f64,
+    feed_mm_min: f64,
     /// Configured X, Y, Z travel in mm, used until the controller reports `$130`-`$132`.
-    travel_mm: [f32; 3],
+    travel_mm: [f64; 3],
     units: MeasurementSystem,
     feed_units: FeedRateUnits,
     continuous: bool,
@@ -240,8 +240,8 @@ impl Default for JogPanel {
 impl JogPanel {
     /// A panel jogging by `step_mm` at `feed_mm_min` within `travel_mm`. Values that are not
     /// positive fall back to the defaults.
-    pub(super) fn new(step_mm: f32, feed_mm_min: f32, travel_mm: [f32; 3]) -> Self {
-        let positive = |v: f32, default: f32| if v.is_finite() && v > 0.0 { v } else { default };
+    pub(super) fn new(step_mm: f64, feed_mm_min: f64, travel_mm: [f64; 3]) -> Self {
+        let positive = |v: f64, default: f64| if v.is_finite() && v > 0.0 { v } else { default };
         Self {
             step_mm: positive(step_mm, DEFAULT_STEP_MM),
             feed_mm_min: positive(feed_mm_min, DEFAULT_FEED_MM_MIN),
@@ -273,7 +273,7 @@ impl JogPanel {
 
     /// The signed jog distance for `axis` moved `distance_mm` in the direction the user
     /// asked for: negated when the settings file inverts the axis.
-    pub(super) fn directed(&self, axis: Axis, distance_mm: f32) -> f32 {
+    pub(super) fn directed(&self, axis: Axis, distance_mm: f64) -> f64 {
         if self.inverted[axis_slot(axis)] {
             -distance_mm
         } else {
@@ -286,7 +286,7 @@ impl JogPanel {
         &mut self,
         units: MeasurementSystem,
         feed_units: FeedRateUnits,
-        travel_mm: [f32; 3],
+        travel_mm: [f64; 3],
     ) {
         self.units = units;
         self.feed_units = feed_units;
@@ -342,12 +342,12 @@ impl JogPanel {
     }
 
     /// The step in mm.
-    pub(super) fn step_mm(&self) -> f32 {
+    pub(super) fn step_mm(&self) -> f64 {
         self.step_mm
     }
 
     /// The feed in mm/min.
-    pub(super) fn feed_mm_min(&self) -> f32 {
+    pub(super) fn feed_mm_min(&self) -> f64 {
         self.feed_mm_min
     }
 
@@ -462,16 +462,19 @@ impl JogPanel {
         &self,
         button: JogButton,
         status: &MachineStatus,
-    ) -> Result<f32, &'static str> {
-        let travel = status.grbl_travel[button.index].unwrap_or(self.travel_mm[button.index]);
+    ) -> Result<f64, &'static str> {
+        let travel = status.grbl_travel[button.index]
+            .map(f64::from)
+            .unwrap_or(self.travel_mm[button.index]);
         let mpos = status
             .machine_position()
             .ok_or(n_!("Jog refused: the machine position is unknown."))?;
         let direction = self.directed(button.axis, button.sign);
-        let left = remaining_travel(mpos[button.index], travel, direction);
+        let left = remaining_travel(f64::from(mpos[button.index]), travel, direction);
         let distance = direction * travel.min(left);
         // Less travel left than a jog line can write (it would be sent as `X0.00`).
-        if left <= 0.0 || jog_writes_zero(distance, LINEAR_JOG_DECIMALS) {
+        // Judged on the `f32` the jog line is written from.
+        if left <= 0.0 || jog_writes_zero(distance as f32, LINEAR_JOG_DECIMALS) {
             return Err(n_!("Jog refused: no travel left in that direction."));
         }
         Ok(distance)
@@ -522,10 +525,10 @@ impl JogPanel {
         &mut self,
         ui: &egui::Ui,
         response: &egui::Response,
-        (axis, sign): (Axis, f32),
-        (enabled, step): (bool, f32),
+        (axis, sign): (Axis, f64),
+        (enabled, step): (bool, f64),
         actions: &mut Vec<Action>,
-        hold: impl FnOnce(&Self) -> Result<f32, &'static str>,
+        hold: impl FnOnce(&Self) -> Result<f64, &'static str>,
     ) {
         if !self.continuous() {
             if response.clicked() {
@@ -606,7 +609,7 @@ impl JogPanel {
         };
         let limit = self.rotary_limit_deg[index];
         let step = self.rotary_step_deg;
-        for (text, sign) in [("-", -1.0_f32), ("+", 1.0)] {
+        for (text, sign) in [("-", -1.0_f64), ("+", 1.0)] {
             let name = format!("{} {}{text}", tr.tr("Jog"), axis.letter());
             let widget = egui::Button::new(egui::RichText::new(text).strong())
                 .min_size(egui::vec2(32.0, 32.0))
@@ -617,11 +620,11 @@ impl JogPanel {
                 ui,
                 &response,
                 (axis, sign),
-                (enabled, step),
+                (enabled, f64::from(step)),
                 actions,
                 |panel| {
                     if limit > 0.0 {
-                        Ok(panel.directed(axis, sign * limit))
+                        Ok(panel.directed(axis, sign * f64::from(limit)))
                     } else {
                         Err(n_!("Jog refused: no travel left in that direction."))
                     }
@@ -637,7 +640,8 @@ impl JogPanel {
     /// Draws the step chooser in the user's units.
     fn show_step(&mut self, ui: &mut egui::Ui, tr: &Translator) {
         let label = ui.label(tr.tr("Step"));
-        let (choices, current) = jog_step_choices(self.units, self.step_mm);
+        // The presets are `f32`, as the jog line writes them; a step is one of them.
+        let (choices, current) = jog_step_choices(self.units, self.step_mm as f32);
         let selected = choices
             .get(current)
             .map(|c| c.label.clone())
@@ -647,7 +651,7 @@ impl JogPanel {
             .width(110.0)
             .show_ui(ui, |ui| {
                 for choice in &choices {
-                    ui.selectable_value(&mut self.step_mm, choice.mm, &choice.label);
+                    ui.selectable_value(&mut self.step_mm, f64::from(choice.mm), &choice.label);
                 }
             })
             .response
@@ -657,7 +661,7 @@ impl JogPanel {
     /// Draws the feed field in the user's feed units.
     fn show_feed(&mut self, ui: &mut egui::Ui, tr: &Translator) {
         let label = ui.label(tr.tr("Jog Feed:"));
-        let mut shown = feed_to_display(f64::from(self.feed_mm_min), self.feed_units);
+        let mut shown = feed_to_display(self.feed_mm_min, self.feed_units);
         let max = feed_to_display(100_000.0, self.feed_units);
         let response = ui
             .add(
@@ -668,7 +672,7 @@ impl JogPanel {
             )
             .labelled_by(label.id);
         if response.changed() {
-            self.feed_mm_min = feed_from_display(shown, self.feed_units) as f32;
+            self.feed_mm_min = feed_from_display(shown, self.feed_units);
         }
     }
 

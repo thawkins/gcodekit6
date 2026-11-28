@@ -13,9 +13,13 @@ All notable changes to this project are documented here. The format follows
 ### Changed
 - **Logo shows 6**: the app icon, the in-app logo and the help logo show "6" instead of "5"; the 256 px app icon (Linux packages, Flatpak, macOS `.icns`) is now rendered from `assets/pictures/gcodekit6-design.svg`, so it is the flat logo rather than the old isometric bitmap
 - **Pre-commit hook leaves tests to CI**: `.githooks/pre-commit` runs `cargo fmt --check` and the CI clippy command (`--workspace --all-targets -D warnings -W clippy::unwrap_used`); the test suite runs in CI instead of on every commit
+- **Remaining dimension fields are `f64`**: the Tabbed Box, bitmap engraving (camtools engraver, designer image engraver, bitmap preset), Gerber and Excellon lengths, feeds and offsets, the designer stock (`.gckd` stock size, safe Z and origin), the CAM preset lengths and the Machine Control jog step, feed and travel are `f64` mm (owner decision OD-2), and the casts at their uses are gone. G-code is unchanged; presets now save lengths as typed (`12.7` instead of `12.699999809265137`), and files written by older versions load as before
+- **Safe Z and ramp angle are `f64`**: the CAM safe-Z line (`travel_z_line`, used by the Drill Press and Spoilboard Surfacing) and the designer ramp angle take `f64` without casts; the designer step down and step in stay `f32` (an `f64` pass count would add a pass for some depths)
 
 ### Fixed
 - **Flatpak upgrade keeps settings**: the Flatpak build reads the `com.github.thawkins.gcodekit5` sandbox (`~/.var/app/com.github.thawkins.gcodekit5`, read-only) and copies its `gcodekit5` config and data folders to GCodeKit6's on first start; the old folders are left unchanged
+- **Tabbed box panel gap follows the tool size**: the gap between panels, in the plain layout and in Optimize Layout, is now `max(5 mm, 2 x burn + 1 mm)` instead of a fixed 5 mm, so a 3 mm router bit (burn 3) leaves a 1 mm web between neighbouring cuts instead of cutting into the next panel; burns up to 2 mm (the 0.1 mm default included) keep the 5 mm gap and produce the same G-code as before
+- **Tabbed box panels no longer overlap at their fingers**: the plain layout placed panels by their nominal size, so fingers sticking out past a panel edge were not counted; with the defaults the Top and Bottom panels' fingers overlapped by about 1.1 mm. Both layouts now space panels by their real cut extent (outline with fingers and slots, plus half the burn) with the panel gap between; panels move, their shapes are unchanged
 
 ## [2.0.0-alpha.6] - 2026-11-28
 

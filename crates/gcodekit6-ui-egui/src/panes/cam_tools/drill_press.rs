@@ -241,7 +241,7 @@ impl DrillPressParams {
     /// The first field that does not parse (saving is refused then).
     pub fn preset_json(&self, tr: &Translator) -> Result<String, String> {
         let u = self.units;
-        let len = |label, text: &str| common::preset_len(label, text, u).map(f64::from);
+        let len = |label, text: &str| common::preset_len(label, text, u);
         let num = common::preset_number;
         let preset = (|| {
             Ok(DrillPressParameters {

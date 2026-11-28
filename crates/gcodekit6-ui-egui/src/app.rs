@@ -1712,9 +1712,9 @@ fn machine_control_pane(state: &AppState) -> MachineControlPane {
     MachineControlPane::new(Arc::clone(state.machine.controller()))
         .with_connection(config.connection.clone())
         .with_jog(
-            m.jog_increment as f32,
-            m.jog_feed_rate as f32,
-            [m.x_limit as f32, m.y_limit as f32, m.z_limit as f32],
+            m.jog_increment,
+            m.jog_feed_rate,
+            [m.x_limit, m.y_limit, m.z_limit],
         )
 }
 

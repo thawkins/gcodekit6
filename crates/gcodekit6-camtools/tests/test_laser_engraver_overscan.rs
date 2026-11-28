@@ -157,7 +157,7 @@ fn test_laser_overscan_runs_up_before_every_burn() {
 
 #[test]
 fn test_laser_overscan_must_be_finite_and_not_negative() {
-    for overscan in [-1.0, f32::NAN, f32::INFINITY] {
+    for overscan in [-1.0, f64::NAN, f64::INFINITY] {
         let result = BitmapImageEngraver::from_image(
             stripes(),
             EngravingParameters {

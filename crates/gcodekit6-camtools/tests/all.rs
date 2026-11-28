@@ -51,3 +51,5 @@ mod test_speeds_feeds_calculator;
 mod test_speeds_feeds_service;
 #[path = "test_tabbed_box_finger_styles.rs"]
 mod test_tabbed_box_finger_styles;
+#[path = "test_tabbed_box_panel_gap.rs"]
+mod test_tabbed_box_panel_gap;

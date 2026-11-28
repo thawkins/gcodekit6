@@ -407,7 +407,7 @@ fn test_tabbed_box_divider_slot_pitch_matches_fingers() {
         .expect("regression test setup should succeed");
 
     // Vertical slot rectangles in the first wall: width t - kerf, height finger - kerf
-    let mut slots: Vec<(f32, f32)> = maker
+    let mut slots: Vec<(f64, f64)> = maker
         .paths()
         .iter()
         .filter(|p| p.len() == 5)
@@ -548,7 +548,7 @@ fn test_tabbed_box_rejects_zero_passes_and_nan() {
     };
     assert!(TabbedBoxMaker::new(zero_passes).is_err());
     let nan = BoxParameters {
-        x: f32::NAN,
+        x: f64::NAN,
         ..BoxParameters::default()
     };
     assert!(TabbedBoxMaker::new(nan).is_err());
@@ -605,22 +605,22 @@ fn test_tabbed_box_rejects_non_finite_burn_and_joint_settings() {
     let mut cases = Vec::new();
     let base = BoxParameters::default;
     cases.push(BoxParameters {
-        burn: f32::NAN,
+        burn: f64::NAN,
         ..base()
     });
     cases.push(BoxParameters {
-        feed_rate: f32::INFINITY,
+        feed_rate: f64::INFINITY,
         ..base()
     });
     cases.push(BoxParameters {
-        offset_x: f32::NAN,
+        offset_x: f64::NAN,
         ..base()
     });
     let mut p = base();
-    p.finger_joint.play = f32::NAN;
+    p.finger_joint.play = f64::NAN;
     cases.push(p);
     let mut p = base();
-    p.finger_joint.extra_length = f32::INFINITY;
+    p.finger_joint.extra_length = f64::INFINITY;
     cases.push(p);
     for params in cases {
         assert!(TabbedBoxMaker::new(params).is_err());
