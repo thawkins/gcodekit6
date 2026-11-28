@@ -24,9 +24,16 @@ fn main() -> anyhow::Result<()> {
 
     // Carry the GCodeKit5 folders over before anything (the Windows log file included)
     // creates the GCodeKit6 ones; the outcome is logged once logging is up.
-    let renamed = gcodekit6_settings::rename::migrate_renamed_folders(
+    let mut renamed = gcodekit6_settings::rename::migrate_renamed_folders(
         &gcodekit6_settings::rename::platform_bases(),
     );
+    // Inside Flatpak the GCodeKit5 sandbox's folders live under its own app ID.
+    renamed.extend(gcodekit6_settings::rename::migrate_folder_pairs(
+        &gcodekit6_settings::rename::flatpak_folders(
+            &|name| std::env::var_os(name),
+            std::path::Path::new(gcodekit6_settings::rename::FLATPAK_INFO),
+        ),
+    ));
 
     // Initialize logging
     init_logging()?;

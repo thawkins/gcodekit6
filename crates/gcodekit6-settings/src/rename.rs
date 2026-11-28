@@ -7,6 +7,11 @@
 //! copy goes to `<base>/gcodekit6.migrating` first and is renamed into place, so a failed
 //! copy is retried on the next start instead of leaving a half-filled folder.
 //!
+//! Inside Flatpak the platform folders are per app (`~/.var/app/<app-id>/{config,data}`), so
+//! the GCodeKit5 sandbox's folders are not under the new bases. [`flatpak_folders`] names
+//! them as extra sources; the manifest grants read-only access to
+//! `~/.var/app/com.github.thawkins.gcodekit5` so they can be read.
+//!
 //! Also resolves the `GCODEKIT6_CONFIG_DIR` override with `GCODEKIT5_CONFIG_DIR` as a
 //! fallback ([`config_dir_var`]).
 //!
@@ -20,6 +25,12 @@ use std::path::{Path, PathBuf};
 
 /// The folder name and override-variable stem used before the rename to GCodeKit6.
 pub const OLD_APP_ID: &str = "gcodekit5";
+
+/// The Flatpak app ID used before the rename to GCodeKit6.
+pub const OLD_FLATPAK_APP_ID: &str = "com.github.thawkins.gcodekit5";
+
+/// The file Flatpak places at the root of every sandbox.
+pub const FLATPAK_INFO: &str = "/.flatpak-info";
 
 /// Suffix of the folder a copy is staged in before it is renamed into place.
 const STAGING_SUFFIX: &str = ".migrating";
@@ -100,6 +111,64 @@ pub fn platform_bases() -> Vec<PathBuf> {
     bases
 }
 
+/// The pre-rename Flatpak sandbox's folders and where each is copied to: its config and data
+/// `gcodekit5` folders go to `gcodekit6` under the current config and data bases.
+///
+/// # Arguments
+/// * `env` - reads one environment variable (`FLATPAK_ID`, `HOME`, `XDG_CONFIG_HOME`,
+///   `XDG_DATA_HOME` and the settings-folder override)
+/// * `flatpak_info` - the sandbox marker file; its presence also means running in Flatpak
+///
+/// # Returns
+/// `(from, to)` pairs, or none outside Flatpak, without a home folder, or when a
+/// settings-folder override variable is set.
+pub fn flatpak_folders(
+    env: &dyn Fn(&str) -> Option<OsString>,
+    flatpak_info: &Path,
+) -> Vec<(PathBuf, PathBuf)> {
+    let in_flatpak = env("FLATPAK_ID").is_some() || flatpak_info.exists();
+    if !in_flatpak || config_dir_var(&paths::env_var_name(APP_ID), env).is_some() {
+        return Vec::new();
+    }
+    let Some(home) = env("HOME")
+        .filter(|home| !home.is_empty())
+        .map(PathBuf::from)
+    else {
+        return Vec::new();
+    };
+    let old_root = home.join(".var/app").join(OLD_FLATPAK_APP_ID);
+    let base = |var: &str, fallback: &str| {
+        env(var)
+            .filter(|dir| !dir.is_empty())
+            .map_or_else(|| home.join(fallback), PathBuf::from)
+    };
+    [
+        ("config", base("XDG_CONFIG_HOME", ".config")),
+        ("data", base("XDG_DATA_HOME", ".local/share")),
+    ]
+    .into_iter()
+    .map(|(kind, new_base)| (old_root.join(kind).join(OLD_APP_ID), new_base.join(APP_ID)))
+    .collect()
+}
+
+/// Copies each `from` folder to its `to` folder, once (see [`flatpak_folders`]).
+///
+/// # Arguments
+/// * `pairs` - `(from, to)` folders
+///
+/// # Returns
+/// One entry per pair; failures are reported, never raised.
+pub fn migrate_folder_pairs(pairs: &[(PathBuf, PathBuf)]) -> Vec<FolderMigration> {
+    pairs
+        .iter()
+        .map(|(from, to)| FolderMigration {
+            from: from.clone(),
+            to: to.clone(),
+            result: migrate_renamed_folder(from, to),
+        })
+        .collect()
+}
+
 /// Copies `<base>/gcodekit5` to `<base>/gcodekit6` for each base, once.
 ///
 /// # Arguments
@@ -135,6 +204,9 @@ fn migrate_renamed_folder(from: &Path, to: &Path) -> Result<bool, SettingsError>
     let mut staging = to.as_os_str().to_owned();
     staging.push(STAGING_SUFFIX);
     let staging = PathBuf::from(staging);
+    if let Some(parent) = to.parent() {
+        std::fs::create_dir_all(parent).map_err(io(parent))?;
+    }
     if staging.exists() {
         std::fs::remove_dir_all(&staging).map_err(io(&staging))?;
     }
