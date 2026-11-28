@@ -208,7 +208,9 @@ On first start the app imports the settings and data files of the older GTK buil
 On the first start after the rename from GCodeKit5, an existing `gcodekit5` settings folder is
 copied to `gcodekit6` (once, only when `gcodekit6` does not exist yet); the old folder is left
 unchanged. `GCODEKIT5_CONFIG_DIR` and `GCODEKIT5_TITLEBAR` are still read when the `GCODEKIT6_`
-variable is not set.
+variable is not set. The Flatpak build also copies the settings of the
+`com.github.thawkins.gcodekit5` Flatpak (from `~/.var/app/com.github.thawkins.gcodekit5`, which
+it may read but not change), so a Flatpak upgrade keeps your settings.
 
 ## Development
 

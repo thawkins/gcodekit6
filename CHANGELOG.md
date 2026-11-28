@@ -5,6 +5,11 @@ All notable changes to this project are documented here. The format follows
 [Semantic Versioning](https://semver.org/). Release notes are generated from the
 `## [x.y.z]` sections by `scripts/release_notes.py`.
 
+## [Unreleased]
+
+### Fixed
+- **Flatpak upgrade keeps settings**: the Flatpak build reads the `com.github.thawkins.gcodekit5` sandbox (`~/.var/app/com.github.thawkins.gcodekit5`, read-only) and copies its `gcodekit5` config and data folders to GCodeKit6's on first start; the old folders are left unchanged
+
 ## [2.0.0-alpha.6] - 2026-11-28
 
 ### Changed

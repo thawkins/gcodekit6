@@ -132,7 +132,10 @@ The picker lists 9 tools (`crates/gcodekit6-ui-egui/src/panes/cam_tools/tools.rs
   files (such as `devices.json`) are imported once on first start.
 - The settings folder is `gcodekit6` in the platform config folder. On first start a
   pre-rename `gcodekit5` folder (config, local data, or home fallback) is copied to `gcodekit6`
-  once when `gcodekit6` does not exist; the old folder is left unchanged.
+  once when `gcodekit6` does not exist; the old folder is left unchanged. Inside Flatpak the
+  `config/gcodekit5` and `data/gcodekit5` folders of the old sandbox
+  (`~/.var/app/com.github.thawkins.gcodekit5`, granted read-only in the manifest) are copied
+  the same way to the new config and data folders.
 - Translations: `po/*.po` (de, es, fr, it, pt). The build script embeds the catalogs, so
   there is no gettext at run time.
 

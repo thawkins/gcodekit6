@@ -4,7 +4,10 @@
 //! Every test works in a directory of its own under `target/temp`, never in the user's
 //! folders, and reads the environment through a closure instead of the process.
 
-use gcodekit6_settings::rename::{OLD_APP_ID, config_dir_var, migrate_renamed_folders};
+use gcodekit6_settings::rename::{
+    OLD_APP_ID, OLD_FLATPAK_APP_ID, config_dir_var, flatpak_folders, migrate_folder_pairs,
+    migrate_renamed_folders,
+};
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 
@@ -146,4 +149,120 @@ fn test_config_dir_var_falls_back_to_old_variable() {
 fn test_config_dir_var_unset_is_none() {
     let env = env_of(&[]);
     assert_eq!(config_dir_var("GCODEKIT6_CONFIG_DIR", &env), None);
+}
+
+/// An environment built from owned pairs, for paths that are only known at run time.
+fn env_owned(vars: Vec<(&'static str, OsString)>) -> impl Fn(&str) -> Option<OsString> {
+    move |name| {
+        vars.iter()
+            .find(|(key, _)| *key == name)
+            .map(|(_, value)| value.clone())
+    }
+}
+
+/// A fake home holding a GCodeKit5 Flatpak sandbox with config and data files, and the
+/// GCodeKit6 sandbox's environment for it.
+fn flatpak_home(test: &str) -> (PathBuf, impl Fn(&str) -> Option<OsString>) {
+    let home = scratch(test);
+    let old = home.join(".var/app").join(OLD_FLATPAK_APP_ID);
+    write(&old.join("config/gcodekit5/config.toml"), "[ui]\n");
+    write(&old.join("data/gcodekit5/tools.json"), "[]");
+    let new = home.join(".var/app/com.github.thawkins.gcodekit6");
+    let env = env_owned(vec![
+        (
+            "FLATPAK_ID",
+            OsString::from("com.github.thawkins.gcodekit6"),
+        ),
+        ("HOME", home.clone().into_os_string()),
+        ("XDG_CONFIG_HOME", new.join("config").into_os_string()),
+        ("XDG_DATA_HOME", new.join("data").into_os_string()),
+    ]);
+    (home, env)
+}
+
+#[test]
+fn test_rename_flatpak_copies_config_and_data() {
+    let (home, env) = flatpak_home("test_rename_flatpak_copies_config_and_data");
+    let missing_info = home.join("no-flatpak-info");
+
+    let report = migrate_folder_pairs(&flatpak_folders(&env, &missing_info));
+
+    assert_eq!(report.len(), 2);
+    assert!(report.iter().all(|m| matches!(m.result, Ok(true))));
+    let new = home.join(".var/app/com.github.thawkins.gcodekit6");
+    assert_eq!(
+        std::fs::read_to_string(new.join("config/gcodekit6/config.toml")).expect("read config"),
+        "[ui]\n"
+    );
+    assert_eq!(
+        std::fs::read_to_string(new.join("data/gcodekit6/tools.json")).expect("read data"),
+        "[]"
+    );
+    let old = home.join(".var/app").join(OLD_FLATPAK_APP_ID);
+    assert_eq!(
+        std::fs::read_to_string(old.join("config/gcodekit5/config.toml")).expect("read old"),
+        "[ui]\n",
+        "old folder is left unchanged"
+    );
+    assert!(old.join("data/gcodekit5/tools.json").is_file());
+    assert!(!new.join("config/gcodekit6.migrating").exists());
+}
+
+#[test]
+fn test_rename_flatpak_info_file_alone_enables_sources() {
+    let (home, env) = flatpak_home("test_rename_flatpak_info_file_alone_enables_sources");
+    let info = home.join(".flatpak-info");
+    write(&info, "[Application]\n");
+    let env = move |name: &str| {
+        if name == "FLATPAK_ID" {
+            None
+        } else {
+            env(name)
+        }
+    };
+
+    assert_eq!(flatpak_folders(&env, &info).len(), 2);
+}
+
+#[test]
+fn test_rename_flatpak_never_overwrites_new_folder() {
+    let (home, env) = flatpak_home("test_rename_flatpak_never_overwrites_new_folder");
+    let new_config = home.join(".var/app/com.github.thawkins.gcodekit6/config/gcodekit6");
+    write(&new_config.join("config.toml"), "new");
+
+    let report = migrate_folder_pairs(&flatpak_folders(&env, &home.join("none")));
+
+    assert!(matches!(report[0].result, Ok(false)));
+    assert_eq!(
+        std::fs::read_to_string(new_config.join("config.toml")).expect("read new"),
+        "new"
+    );
+}
+
+#[test]
+fn test_rename_flatpak_sources_unused_outside_flatpak() {
+    let (home, env) = flatpak_home("test_rename_flatpak_sources_unused_outside_flatpak");
+    let env = move |name: &str| {
+        if name == "FLATPAK_ID" {
+            None
+        } else {
+            env(name)
+        }
+    };
+
+    assert!(flatpak_folders(&env, &home.join("no-flatpak-info")).is_empty());
+}
+
+#[test]
+fn test_rename_flatpak_sources_unused_with_override() {
+    let (home, env) = flatpak_home("test_rename_flatpak_sources_unused_with_override");
+    let env = move |name: &str| {
+        if name == "GCODEKIT6_CONFIG_DIR" {
+            Some(OsString::from("/elsewhere"))
+        } else {
+            env(name)
+        }
+    };
+
+    assert!(flatpak_folders(&env, &home.join("none")).is_empty());
 }

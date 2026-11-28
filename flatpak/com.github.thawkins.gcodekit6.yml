@@ -10,6 +10,8 @@ finish-args:
   - --device=dri
   - --device=all
   - --share=network
+  # Read-only view of the pre-rename sandbox so its settings can be copied on first start.
+  - --filesystem=~/.var/app/com.github.thawkins.gcodekit5:ro
 modules:
   - name: gcodekit6
     buildsystem: simple
