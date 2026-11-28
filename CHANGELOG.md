@@ -9,6 +9,7 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 - **Logo shows 6**: the app icon, the in-app logo and the help logo show "6" instead of "5"; the 256 px app icon (Linux packages, Flatpak, macOS `.icns`) is now rendered from `assets/pictures/gcodekit6-design.svg`, so it is the flat logo rather than the old isometric bitmap
+- **Pre-commit hook leaves tests to CI**: `.githooks/pre-commit` runs `cargo fmt --check` and the CI clippy command (`--workspace --all-targets -D warnings -W clippy::unwrap_used`); the test suite runs in CI instead of on every commit
 
 ### Fixed
 - **Flatpak upgrade keeps settings**: the Flatpak build reads the `com.github.thawkins.gcodekit5` sandbox (`~/.var/app/com.github.thawkins.gcodekit5`, read-only) and copies its `gcodekit5` config and data folders to GCodeKit6's on first start; the old folders are left unchanged
