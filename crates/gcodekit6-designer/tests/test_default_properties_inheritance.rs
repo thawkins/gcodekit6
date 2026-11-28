@@ -31,7 +31,7 @@ fn new_shapes_inherit_default_properties_from_designer_state() {
     assert!((created.pocket_depth - 3.0).abs() < f64::EPSILON);
     assert!((created.step_down as f64 - 0.25).abs() < f64::EPSILON);
     assert!((created.step_in as f64 - 0.5).abs() < f64::EPSILON);
-    assert!((created.ramp_angle as f64 - 10.0).abs() < f64::EPSILON);
+    assert!((created.ramp_angle - 10.0).abs() < f64::EPSILON);
     assert!(created.use_custom_values);
     assert_eq!(created.operation_type, OperationType::Pocket);
 }

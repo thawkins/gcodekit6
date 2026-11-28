@@ -68,7 +68,7 @@ impl SpoilboardSurfacingGenerator {
         // Clear the work before any X/Y move.
         gcode.push_str(&crate::job_preamble::travel_z_line(
             p.home_before_job,
-            p.safe_z as f32,
+            p.safe_z,
             "Move to safe height",
         ));
 
@@ -106,7 +106,7 @@ impl SpoilboardSurfacingGenerator {
 
         gcode.push_str(&crate::job_preamble::travel_z_line(
             p.home_before_job,
-            p.safe_z as f32,
+            p.safe_z,
             "Retract",
         ));
 

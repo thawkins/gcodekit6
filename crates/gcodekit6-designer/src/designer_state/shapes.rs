@@ -14,6 +14,8 @@ impl DesignerState {
         // usual "still at 0.0" check never applies to them).
         const FACTORY_STEP_DOWN: f32 = 1.0;
         const FACTORY_STEP_IN: f32 = 0.5;
+        // The tolerance the ramp angle was compared with while it was `f32`.
+        const TOLERANCE: f64 = f32::EPSILON as f64;
         const FACTORY_RASTER_FILL_RATIO: f64 = 0.5;
 
         let default_props = &self.default_properties_shape;
@@ -39,7 +41,7 @@ impl DesignerState {
             obj.step_in = default_props.step_in;
         }
 
-        if obj.ramp_angle.abs() < f32::EPSILON && default_props.ramp_angle.abs() > f32::EPSILON {
+        if obj.ramp_angle.abs() < TOLERANCE && default_props.ramp_angle.abs() > TOLERANCE {
             obj.ramp_angle = default_props.ramp_angle;
         }
 

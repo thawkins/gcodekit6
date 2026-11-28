@@ -71,7 +71,7 @@ pub struct DrawingObject {
     pub start_depth: f64,
     pub step_down: f32,
     pub step_in: f32,
-    pub ramp_angle: f32,
+    pub ramp_angle: f64,
     pub pocket_strategy: PocketStrategy,
     pub raster_fill_ratio: f64,
     pub offset: f64,

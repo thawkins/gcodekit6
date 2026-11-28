@@ -8,11 +8,13 @@ mod types;
 
 pub use types::*;
 
-#[derive(Clone, Copy, Debug)]
-struct LayoutCursor {
-    x: f64,
-    y: f64,
-    spacing: f64,
+/// The plain layout's rows: which panels (group indices) go side by side, row by row.
+///
+/// Panels are drawn at a provisional origin and moved into place by
+/// [`TabbedBoxMaker::layout_rows`] once their real outlines are known.
+#[derive(Clone, Debug, Default)]
+struct LayoutRows {
+    rows: Vec<Vec<usize>>,
 }
 
 /// The smallest box width, depth or height accepted (mm).
@@ -32,11 +34,12 @@ const PANEL_WEB_MM: f64 = 1.0;
 
 /// The gap between neighbouring panels for a burn (tool or beam diameter) of `burn` mm.
 ///
-/// Every outline is drawn half a burn outside the panel edge, so the path is the tool
-/// centre line and the cut reaches a further half burn past it: one burn in all beyond
-/// the panel edge. Two panels placed `gap` apart therefore keep `gap - 2 * burn` of
-/// material between their cuts, so the gap is `2 * burn + PANEL_WEB_MM`, never less than
-/// [`MIN_PANEL_GAP_MM`]. The default 0.1 mm burn keeps the historical 5 mm gap.
+/// Both layouts measure it between the panels' cut extents: the bounding box of each
+/// outline (the tool centre line, fingers and slots included) grown by half a burn, the
+/// outer edge of the cut. The gap is therefore the material left standing between two
+/// neighbouring cuts: at least [`MIN_PANEL_GAP_MM`], and at least `2 * burn +
+/// PANEL_WEB_MM`, so a wide router bit leaves a web wider than the bit. The default
+/// 0.1 mm burn gives 5 mm.
 ///
 /// # Arguments
 /// * `burn` - the burn / tool diameter in mm.
@@ -47,24 +50,18 @@ pub fn panel_gap(burn: f64) -> f64 {
     MIN_PANEL_GAP_MM.max(2.0 * burn + PANEL_WEB_MM)
 }
 
-impl LayoutCursor {
-    fn new(spacing: f64) -> Self {
-        Self {
-            x: 0.0,
-            y: 0.0,
-            spacing,
+impl LayoutRows {
+    /// Adds panel group `group` to the current row.
+    fn place(&mut self, group: usize) {
+        match self.rows.last_mut() {
+            Some(row) => row.push(group),
+            None => self.rows.push(vec![group]),
         }
     }
 
-    fn place(&mut self, width: f64) -> (f64, f64) {
-        let position = (self.x, self.y);
-        self.x += width + self.spacing;
-        position
-    }
-
-    fn next_row(&mut self, height: f64) {
-        self.y += height + self.spacing;
-        self.x = 0.0;
+    /// Starts a new row.
+    fn next_row(&mut self) {
+        self.rows.push(Vec::new());
     }
 }
 
@@ -672,40 +669,10 @@ impl TabbedBoxMaker {
             }
         }
 
-        for (i, group) in self.path_groups.iter().enumerate() {
-            if group.is_empty() {
+        for i in 0..self.path_groups.len() {
+            let Some((min_x, min_y, max_x, max_y)) = self.group_extent(i) else {
                 continue;
-            }
-
-            let mut min_x = f64::INFINITY;
-            let mut max_x = f64::NEG_INFINITY;
-            let mut min_y = f64::INFINITY;
-            let mut max_y = f64::NEG_INFINITY;
-
-            for &path_idx in group {
-                if path_idx >= self.paths.len() {
-                    continue;
-                }
-                let path = &self.paths[path_idx];
-                if path.is_empty() {
-                    continue;
-                }
-
-                let p_min_x = path.iter().map(|p| p.x).fold(f64::INFINITY, f64::min);
-                let p_max_x = path.iter().map(|p| p.x).fold(f64::NEG_INFINITY, f64::max);
-                let p_min_y = path.iter().map(|p| p.y).fold(f64::INFINITY, f64::min);
-                let p_max_y = path.iter().map(|p| p.y).fold(f64::NEG_INFINITY, f64::max);
-
-                min_x = min_x.min(p_min_x);
-                max_x = max_x.max(p_max_x);
-                min_y = min_y.min(p_min_y);
-                max_y = max_y.max(p_max_y);
-            }
-
-            if min_x == f64::INFINITY {
-                continue;
-            }
-
+            };
             items.push(Item {
                 group_index: i,
                 width: max_x - min_x,
@@ -750,17 +717,79 @@ impl TabbedBoxMaker {
         // Apply new positions
         for item in items {
             let (new_x, new_y) = new_positions[item.group_index];
-            let dx = new_x - item.original_min_x;
-            let dy = new_y - item.original_min_y;
+            self.translate_group(
+                item.group_index,
+                new_x - item.original_min_x,
+                new_y - item.original_min_y,
+            );
+        }
+    }
 
-            let group = &self.path_groups[item.group_index];
-            for &path_idx in group {
-                if path_idx < self.paths.len() {
-                    for p in &mut self.paths[path_idx] {
-                        p.x += dx;
-                        p.y += dy;
-                    }
+    /// The cut extent of panel group `group`: the bounding box `(min_x, min_y, max_x, max_y)`
+    /// of its paths (tool centre lines, fingers and slots included) grown by half a burn,
+    /// the outer edge of the cut. `None` for a group without points.
+    fn group_extent(&self, group: usize) -> Option<(f64, f64, f64, f64)> {
+        let points = self
+            .path_groups
+            .get(group)?
+            .iter()
+            .filter_map(|&i| self.paths.get(i))
+            .flatten();
+        let (min_x, min_y, max_x, max_y) = points.fold(
+            (
+                f64::INFINITY,
+                f64::INFINITY,
+                f64::NEG_INFINITY,
+                f64::NEG_INFINITY,
+            ),
+            |(x0, y0, x1, y1), p| (x0.min(p.x), y0.min(p.y), x1.max(p.x), y1.max(p.y)),
+        );
+        if min_x == f64::INFINITY {
+            return None;
+        }
+        let half_burn = self.params.burn / 2.0;
+        Some((
+            min_x - half_burn,
+            min_y - half_burn,
+            max_x + half_burn,
+            max_y + half_burn,
+        ))
+    }
+
+    /// Moves every path of panel group `group` by `(dx, dy)`.
+    fn translate_group(&mut self, group: usize, dx: f64, dy: f64) {
+        let Some(indices) = self.path_groups.get(group) else {
+            return;
+        };
+        for &i in indices {
+            if let Some(path) = self.paths.get_mut(i) {
+                for p in path {
+                    p.x += dx;
+                    p.y += dy;
                 }
+            }
+        }
+    }
+
+    /// Places the plain layout: the panels of each row side by side, left to right, rows
+    /// bottom to top, with [`panel_gap`] between the cut extents ([`Self::group_extent`]) of
+    /// neighbouring panels and rows, so fingers that stick out past a panel edge are counted.
+    fn layout_rows(&mut self, layout: &LayoutRows) {
+        let gap = panel_gap(self.params.burn);
+        let mut y = 0.0;
+        for row in &layout.rows {
+            let mut x = 0.0;
+            let mut row_height: f64 = 0.0;
+            for &group in row {
+                let Some((min_x, min_y, max_x, max_y)) = self.group_extent(group) else {
+                    continue;
+                };
+                self.translate_group(group, x - min_x, y - min_y);
+                x += max_x - min_x + gap;
+                row_height = row_height.max(max_y - min_y);
+            }
+            if row_height > 0.0 {
+                y += row_height + gap;
             }
         }
     }
@@ -1131,8 +1160,8 @@ impl TabbedBoxMaker {
         let h = self.h;
         let _t = self.t;
 
-        let spacing = panel_gap(self.params.burn);
-        let mut layout = LayoutCursor::new(spacing);
+        // Every panel is drawn at the origin; `layout_rows` (or `pack_paths`) places it.
+        let mut layout = LayoutRows::default();
 
         let (has_top, has_bottom, has_front, has_back, has_left, has_right) =
             match self.params.box_type {
@@ -1170,7 +1199,8 @@ impl TabbedBoxMaker {
         if has_front {
             self.start_new_group("Wall 1 (front)");
             let e = edges(has_bottom, has_right, has_top, has_left);
-            let (start_x, start_y) = layout.place(x);
+            layout.place(self.path_groups.len() - 1);
+            let (start_x, start_y) = (0.0, 0.0);
             self.add_path(self.draw_rectangular_wall(x, h, &e, start_x, start_y));
 
             if key_walls {
@@ -1182,21 +1212,23 @@ impl TabbedBoxMaker {
         if has_right {
             self.start_new_group("Wall 2 (right)");
             let e = edges_side(has_bottom, has_back, has_top, has_front);
-            let (start_x, start_y) = layout.place(y);
+            layout.place(self.path_groups.len() - 1);
+            let (start_x, start_y) = (0.0, 0.0);
             self.add_path(self.draw_rectangular_wall(y, h, &e, start_x, start_y));
 
             if key_walls {
                 self.add_divider_slots(self.params.dividers_y, y, start_x, start_y, h, true);
             }
 
-            layout.next_row(h);
+            layout.next_row();
         }
 
         // Wall 4: Left (y by h)
         if has_left {
             self.start_new_group("Wall 4 (left)");
             let e = edges_side(has_bottom, has_front, has_top, has_back);
-            let (start_x, start_y) = layout.place(y);
+            layout.place(self.path_groups.len() - 1);
+            let (start_x, start_y) = (0.0, 0.0);
             self.add_path(self.draw_rectangular_wall(y, h, &e, start_x, start_y));
 
             if key_walls {
@@ -1208,7 +1240,8 @@ impl TabbedBoxMaker {
         if has_back {
             self.start_new_group("Wall 3 (back)");
             let e = edges(has_bottom, has_left, has_top, has_right);
-            let (start_x, start_y) = layout.place(x);
+            layout.place(self.path_groups.len() - 1);
+            let (start_x, start_y) = (0.0, 0.0);
             self.add_path(self.draw_rectangular_wall(x, h, &e, start_x, start_y));
 
             if key_walls {
@@ -1220,7 +1253,8 @@ impl TabbedBoxMaker {
         if has_top {
             self.start_new_group("Top");
             let e = edges_tb(has_front, has_right, has_back, has_left);
-            let (start_x, start_y) = layout.place(x);
+            layout.place(self.path_groups.len() - 1);
+            let (start_x, start_y) = (0.0, 0.0);
             self.add_path(self.draw_rectangular_wall(x, y, &e, start_x, start_y));
         }
 
@@ -1228,7 +1262,8 @@ impl TabbedBoxMaker {
         if has_bottom {
             self.start_new_group("Bottom");
             let e = edges_tb(has_front, has_right, has_back, has_left);
-            let (start_x, start_y) = layout.place(x);
+            layout.place(self.path_groups.len() - 1);
+            let (start_x, start_y) = (0.0, 0.0);
             self.add_path(self.draw_rectangular_wall(x, y, &e, start_x, start_y));
 
             if key_floor {
@@ -1267,7 +1302,8 @@ impl TabbedBoxMaker {
                 // X-divider (Width=Y). Slots at Y-positions (slots_y).
                 // Slots from Top (Plain edge).
                 self.start_new_group(&format!("X divider {}", n));
-                let (start_x, start_y) = layout.place(y);
+                layout.place(self.path_groups.len() - 1);
+                let (start_x, start_y) = (0.0, 0.0);
                 self.add_path(self.draw_divider(
                     y,
                     h,
@@ -1285,7 +1321,8 @@ impl TabbedBoxMaker {
                 // Y-divider (Width=X). Slots at X-positions (slots_x).
                 // Slots from Bottom (Connecting edge).
                 self.start_new_group(&format!("Y divider {}", n));
-                let (start_x, start_y) = layout.place(x);
+                layout.place(self.path_groups.len() - 1);
+                let (start_x, start_y) = (0.0, 0.0);
                 self.add_path(self.draw_divider(
                     x,
                     h,
@@ -1300,6 +1337,8 @@ impl TabbedBoxMaker {
 
         if self.params.optimize_layout {
             self.pack_paths();
+        } else {
+            self.layout_rows(&layout);
         }
 
         // Normalize so (offset_x, offset_y) is always the minimum XY.

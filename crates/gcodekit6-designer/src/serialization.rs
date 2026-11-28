@@ -120,7 +120,7 @@ pub struct ShapeData {
     #[serde(default)]
     pub rotation: f64,
     #[serde(default)]
-    pub ramp_angle: f32,
+    pub ramp_angle: f64,
     #[serde(default)]
     pub pocket_strategy: PocketStrategy,
     #[serde(default = "default_raster_fill_ratio")]

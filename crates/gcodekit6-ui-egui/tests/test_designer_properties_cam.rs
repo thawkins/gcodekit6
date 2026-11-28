@@ -73,7 +73,7 @@ fn test_cam_fields_follow_use_global_and_pocket() {
     let o = &objects(&h)[0];
     assert!(close(f64::from(o.step_down), 0.5));
     assert!(close(f64::from(o.step_in), 1.25));
-    assert!(close(f64::from(o.ramp_angle), 3.0));
+    assert!(close(o.ramp_angle, 3.0));
     assert!(close(o.raster_fill_ratio, 1.0), "clamped to 100 %");
     assert_eq!(o.pocket_strategy, PocketStrategy::Adaptive);
     assert_eq!(field_text(&h, "Raster Fill (%):"), "100");
@@ -213,7 +213,7 @@ fn test_cam_rejects_unsafe_step_and_ramp_values() {
     let o = &objects(&h)[0];
     assert_eq!((o.step_down, o.step_in, o.ramp_angle), before);
     set_field(&mut h, "Ramp Angle:", "90");
-    assert!(close(f64::from(objects(&h)[0].ramp_angle), 90.0));
+    assert!(close(objects(&h)[0].ramp_angle, 90.0));
 }
 
 #[test]

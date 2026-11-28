@@ -38,7 +38,7 @@
 /// default 1 mm), so after `$H` the head rests at about `-$27`. `-1.0` keeps a 1 mm margin
 /// below the switch trip point while staying within the soft-limit range (`0` to
 /// `-$132`).
-pub const HOMED_TRAVEL_Z_MACHINE: f32 = -1.0;
+pub const HOMED_TRAVEL_Z_MACHINE: f64 = -1.0;
 
 /// Append the modal header every job starts with: millimetre units, absolute positioning and,
 /// when `with_plane` is set, the XY plane.
@@ -90,7 +90,7 @@ pub fn push_work_setup(gcode: &mut String, home_before_job: bool) {
 ///
 /// # Returns
 /// The G-code line, terminated with `\n`.
-pub fn travel_z_line(home_before_job: bool, safe_z: f32, comment: &str) -> String {
+pub fn travel_z_line(home_before_job: bool, safe_z: f64, comment: &str) -> String {
     if home_before_job {
         format!(
             "G53 G0 Z{:.2} ; {} (machine coordinates)\n",
