@@ -7,6 +7,9 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+- **Dogbone finger style**: the Tabbed Box Finger Style menu offers Dogbone, which cuts a relief at every inside finger corner (one tool radius past the corner, back on the diagonal) so router-cut fingers seat fully; the generator already supported it
+
 ### Changed
 - **Logo shows 6**: the app icon, the in-app logo and the help logo show "6" instead of "5"; the 256 px app icon (Linux packages, Flatpak, macOS `.icns`) is now rendered from `assets/pictures/gcodekit6-design.svg`, so it is the flat logo rather than the old isometric bitmap
 - **Pre-commit hook leaves tests to CI**: `.githooks/pre-commit` runs `cargo fmt --check` and the CI clippy command (`--workspace --all-targets -D warnings -W clippy::unwrap_used`); the test suite runs in CI instead of on every commit

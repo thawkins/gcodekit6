@@ -919,6 +919,9 @@ msgstr "Ardillons"
 msgid "Snap Fit"
 msgstr "Encliquetage"
 
+msgid "Dogbone"
+msgstr "Dogbone (os de chien)"
+
 msgid "Walls and Floor"
 msgstr "Parois et fond"
 

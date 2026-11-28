@@ -910,6 +910,9 @@ msgstr "Widerhaken"
 msgid "Snap Fit"
 msgstr "Schnappverbindung"
 
+msgid "Dogbone"
+msgstr "Dogbone (Hundeknochen)"
+
 msgid "Walls and Floor"
 msgstr "Wände und Boden"
 

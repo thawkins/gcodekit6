@@ -911,6 +911,9 @@ msgstr "Farpas"
 msgid "Snap Fit"
 msgstr "Encaixe por pressão"
 
+msgid "Dogbone"
+msgstr "Dogbone (osso de cão)"
+
 msgid "Walls and Floor"
 msgstr "Paredes e fundo"
 

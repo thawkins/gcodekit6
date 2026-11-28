@@ -913,6 +913,9 @@ msgstr "Ardiglioni"
 msgid "Snap Fit"
 msgstr "Incastro a scatto"
 
+msgid "Dogbone"
+msgstr "Dogbone (osso di cane)"
+
 msgid "Walls and Floor"
 msgstr "Pareti e fondo"
 
