@@ -16,6 +16,7 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 - **Flatpak upgrade keeps settings**: the Flatpak build reads the `com.github.thawkins.gcodekit5` sandbox (`~/.var/app/com.github.thawkins.gcodekit5`, read-only) and copies its `gcodekit5` config and data folders to GCodeKit6's on first start; the old folders are left unchanged
+- **Tabbed box panel gap follows the tool size**: the gap between panels, in the plain layout and in Optimize Layout, is now `max(5 mm, 2 x burn + 1 mm)` instead of a fixed 5 mm, so a 3 mm router bit (burn 3) leaves a 1 mm web between neighbouring cuts instead of cutting into the next panel; burns up to 2 mm (the 0.1 mm default included) keep the 5 mm gap and produce the same G-code as before
 
 ## [2.0.0-alpha.6] - 2026-11-28
 

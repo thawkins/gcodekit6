@@ -25,6 +25,27 @@ pub const MAX_THICKNESS_MM: f64 = 20.0;
 pub const MIN_JOINT_WIDTH: f32 = 0.1;
 /// The fewest laser passes accepted.
 pub const MIN_LASER_PASSES: f64 = 1.0;
+/// The smallest gap left between neighbouring panels (mm).
+pub const MIN_PANEL_GAP_MM: f32 = 5.0;
+/// The material left standing between two neighbouring cuts (mm).
+const PANEL_WEB_MM: f32 = 1.0;
+
+/// The gap between neighbouring panels for a burn (tool or beam diameter) of `burn` mm.
+///
+/// Every outline is drawn half a burn outside the panel edge, so the path is the tool
+/// centre line and the cut reaches a further half burn past it: one burn in all beyond
+/// the panel edge. Two panels placed `gap` apart therefore keep `gap - 2 * burn` of
+/// material between their cuts, so the gap is `2 * burn + PANEL_WEB_MM`, never less than
+/// [`MIN_PANEL_GAP_MM`]. The default 0.1 mm burn keeps the historical 5 mm gap.
+///
+/// # Arguments
+/// * `burn` - the burn / tool diameter in mm.
+///
+/// # Returns
+/// The gap in mm.
+pub fn panel_gap(burn: f32) -> f32 {
+    MIN_PANEL_GAP_MM.max(2.0 * burn + PANEL_WEB_MM)
+}
 
 impl LayoutCursor {
     fn new(spacing: f32) -> Self {
@@ -646,7 +667,7 @@ impl TabbedBoxMaker {
         }
 
         let mut items = Vec::new();
-        let spacing = 5.0; // Gap between parts
+        let spacing = panel_gap(self.params.burn);
 
         // If path_groups is empty (legacy or bug), treat each path as a group
         if self.path_groups.is_empty() {
@@ -1116,7 +1137,7 @@ impl TabbedBoxMaker {
         let h = self.h;
         let _t = self.t;
 
-        let spacing = 5.0;
+        let spacing = panel_gap(self.params.burn);
         let mut layout = LayoutCursor::new(spacing);
 
         let (has_top, has_bottom, has_front, has_back, has_left, has_right) =
