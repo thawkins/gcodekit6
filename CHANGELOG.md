@@ -5,7 +5,7 @@ All notable changes to this project are documented here. The format follows
 [Semantic Versioning](https://semver.org/). Release notes are generated from the
 `## [x.y.z]` sections by `scripts/release_notes.py`.
 
-## [Unreleased]
+## [2.0.0-alpha.7] - 2026-11-28
 
 ### Added
 - **Dogbone finger style**: the Tabbed Box Finger Style menu offers Dogbone, which cuts a relief at every inside finger corner (one tool radius past the corner, back on the diagonal) so router-cut fingers seat fully; the generator already supported it

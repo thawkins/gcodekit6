@@ -2203,7 +2203,7 @@ dependencies = [
 
 [[package]]
 name = "gcodekit6-app"
-version = "2.0.0-alpha.6"
+version = "2.0.0-alpha.7"
 dependencies = [
  "anyhow",
  "dirs",
@@ -2222,7 +2222,7 @@ dependencies = [
 
 [[package]]
 name = "gcodekit6-camtools"
-version = "2.0.0-alpha.6"
+version = "2.0.0-alpha.7"
 dependencies = [
  "anyhow",
  "cavalier_contours",
@@ -2244,7 +2244,7 @@ dependencies = [
 
 [[package]]
 name = "gcodekit6-communication"
-version = "2.0.0-alpha.6"
+version = "2.0.0-alpha.7"
 dependencies = [
  "anyhow",
  "gcodekit6-core",
@@ -2258,7 +2258,7 @@ dependencies = [
 
 [[package]]
 name = "gcodekit6-core"
-version = "2.0.0-alpha.6"
+version = "2.0.0-alpha.7"
 dependencies = [
  "chrono",
  "criterion",
@@ -2272,7 +2272,7 @@ dependencies = [
 
 [[package]]
 name = "gcodekit6-design"
-version = "2.0.0-alpha.6"
+version = "2.0.0-alpha.7"
 dependencies = [
  "anyhow",
  "dirs",
@@ -2284,7 +2284,7 @@ dependencies = [
 
 [[package]]
 name = "gcodekit6-designer"
-version = "2.0.0-alpha.6"
+version = "2.0.0-alpha.7"
 dependencies = [
  "anyhow",
  "cavalier_contours",
@@ -2309,7 +2309,7 @@ dependencies = [
 
 [[package]]
 name = "gcodekit6-devicedb"
-version = "2.0.0-alpha.6"
+version = "2.0.0-alpha.7"
 dependencies = [
  "anyhow",
  "chrono",
@@ -2323,7 +2323,7 @@ dependencies = [
 
 [[package]]
 name = "gcodekit6-settings"
-version = "2.0.0-alpha.6"
+version = "2.0.0-alpha.7"
 dependencies = [
  "craft-settings",
  "dirs",
@@ -2338,7 +2338,7 @@ dependencies = [
 
 [[package]]
 name = "gcodekit6-ui-egui"
-version = "2.0.0-alpha.6"
+version = "2.0.0-alpha.7"
 dependencies = [
  "anyhow",
  "bytemuck",
@@ -2375,7 +2375,7 @@ dependencies = [
 
 [[package]]
 name = "gcodekit6-visualizer"
-version = "2.0.0-alpha.6"
+version = "2.0.0-alpha.7"
 dependencies = [
  "gcodekit6-camtools",
  "gcodekit6-core",
